@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>문장 조립 전투 — 코어 루프 레퍼런스</title>
+<style>
+:root{
+  --surface-0:#f1efe8; --surface-1:#f7f6f1; --surface-2:#ffffff;
+  --text-primary:#2c2c2a; --text-secondary:#5f5e5a; --text-muted:#888780;
+  --text-disabled:#b4b2a9; --border:#d3d1c7; --border-accent:#378add;
+  --bg-accent:#e6f1fb; --on-accent:#0c447c;
+  --green:#1d9e75; --coral:#d85a30;
+  --radius:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --surface-0:#1a1a19; --surface-1:#232322; --surface-2:#2c2c2a;
+    --text-primary:#f1efe8; --text-secondary:#b4b2a9; --text-muted:#888780;
+    --text-disabled:#5f5e5a; --border:#444441;
+    --bg-accent:#0c447c; --on-accent:#b5d4f4;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:2rem 1rem; background:var(--surface-0);
+  color:var(--text-primary); line-height:1.7;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+}
+.wrap{max-width:680px;margin:0 auto}
+button{
+  font:inherit; cursor:pointer; border-radius:var(--radius);
+  border:0.5px solid var(--border); background:var(--surface-2);
+  color:var(--text-primary); padding:10px 14px;
+  transition:background .12s;
+}
+button:hover{background:var(--surface-1)}
+button:active{transform:scale(.98)}
+h1{font-size:20px;font-weight:500;margin:0 0 .25rem}
+.sub{font-size:13px;color:var(--text-muted);margin:0 0 1.5rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>문장 조립 전투 — 코어 루프 레퍼런스</h1>
+<p class="sub">잼 프로토타입. 프로덕션 코드가 아니라 감(feel) 확인용 단일 파일이다. 구조는 SENTENCE_COMBAT_SPEC.md를 따른다.</p>
+
+<div style="background:var(--surface-1);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+    <div style="flex:1">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">촛농 기사</div>
+      <div style="height:10px;background:var(--surface-0);border-radius:5px;overflow:hidden">
+        <div id="php" style="height:100%;width:100%;background:var(--green)"></div>
+      </div>
+      <div id="phptxt" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
+    </div>
+    <div id="vs" style="font-size:12px;color:var(--text-muted);padding-bottom:18px"></div>
+    <div style="flex:1;text-align:right">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">어둠의 사서</div>
+      <div style="height:10px;background:var(--surface-0);border-radius:5px;overflow:hidden">
+        <div id="ehp" style="height:100%;width:100%;background:var(--coral);margin-left:auto"></div>
+      </div>
+      <div id="ehptxt" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="chain" style="min-height:52px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:12px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;margin-bottom:.75rem"></div>
+<div id="combo" style="min-height:22px;text-align:center;font-size:13px;color:var(--border-accent);margin-bottom:.75rem"></div>
+<div id="slots"></div>
+
+<div style="display:flex;gap:8px;margin-top:1rem">
+  <button id="go" style="flex:1">문장 실행</button>
+  <button id="undo" style="width:110px">되돌리기</button>
+  <button id="reset" style="width:110px">다시 시작</button>
+</div>
+
+<div id="log" style="margin-top:1rem;font-size:13px;color:var(--text-secondary);max-height:180px;overflow-y:auto"></div>
+
+</div>
+
+<script>
+// ============================================================
+// #region 조사 처리  → SPEC 5장 / core/josa.ts
+// ============================================================
+
+const hasJong = w => (w.charCodeAt(w.length - 1) - 0xAC00) % 28 !== 0;
+const josa = (w, withJong, without) => w + (hasJong(w) ? withJong : without);
+
+// #endregion
+
+// ============================================================
+// #region 데이터  → SPEC 3~4장 / data/*.json
+// 실제 구현에서는 JSON으로 분리한다. 여기서만 인라인.
+// ============================================================
+
+const SLOT_ORDER = ['subj', 'adv', 'obj', 'verb', 'end'];
+const SLOT_LABEL = { subj:'주어', adv:'수식', obj:'목적어', verb:'동사', end:'어미' };
+
+const WORDS = {
+  subj: [
+    { id:'na',  text:'나는',   tags:['self'],  bonus:0,    targetMode:'enemy', note:'균형' },
+    { id:'neo', text:'너는',   tags:['enemy'], bonus:0.25, targetMode:'enemy', note:'공격 특화 · 방어 무효' },
+    { id:'uri', text:'우리는', tags:['both'],  bonus:0.5,  targetMode:'both',  note:'피해 40% 되돌아옴' }
+  ],
+  adv: [
+    { id:'holo', text:'홀로',     tags:['solo'],  bonus:0.3,  effects:{guard:-2}, note:'방어 −2' },
+    { id:'joy',  text:'조용히',   tags:['quiet'], bonus:-0.1, effects:{evade:3},  note:'회피 +3' },
+    { id:'mad',  text:'미친듯이', tags:['mad'],   bonus:0.7,  effects:{recoil:3}, note:'자해 3' },
+    { id:'slow', text:'천천히',   tags:['slow'],  bonus:0.1,  effects:{guard:2},  note:'방어 +2' }
+  ],
+  obj: [
+    { id:'war', text:'전투', tags:['war'],   power:6, note:'위력 6' },
+    { id:'fir', text:'불꽃', tags:['fire'],  power:8, note:'위력 8' },
+    { id:'sil', text:'침묵', tags:['quiet'], power:3, effects:{guard:4}, note:'위력 3 · 방어 +4' },
+    { id:'mem', text:'기억', tags:['mind'],  power:4, effects:{heal:3},  note:'위력 4 · 회복 3' }
+  ],
+  verb: [
+    { id:'jin',  text:'진행', tags:['atk'],  power:4, kind:'attack', note:'공격' },
+    { id:'hoi',  text:'회피', tags:['grd'],  power:1, kind:'guard',  effects:{guard:5}, note:'방어 +5' },
+    { id:'jum',  text:'점화', tags:['fire'], power:6, kind:'attack', note:'공격' },
+    { id:'mang', text:'망각', tags:['mind'], power:2, kind:'heal',   effects:{heal:4},  note:'회복 +4' }
+  ],
+  end: [
+    { id:'e1', text:'했다',        tags:[], bonus:0,   timing:'immediate', note:'즉발' },
+    { id:'e2', text:'하려고 했다', tags:[], bonus:0.9, timing:'delayed',   note:'다음 턴 발동' },
+    { id:'e3', text:'했었나?',     tags:[], bonus:0,   timing:'immediate', variance:{p:0.5,hi:2.5,lo:0.3}, note:'50%: ×2.5 / ×0.3' },
+    { id:'e4', text:'하고 말았다!',tags:[], bonus:0.4, timing:'immediate', effects:{recoil:4}, note:'자해 4' }
+  ]
+};
+
+const COMBOS = [
+  { id:'c1', name:'고독한 전사', need:['solo','war','atk'],  mult:1.4 },
+  { id:'c2', name:'화염광란',    need:['mad','fire','fire'], mult:1.8 },
+  { id:'c3', name:'완전한 정적', need:['quiet','quiet'],     mult:1.2 },
+  { id:'c4', name:'망각의 의식', need:['mind','mind'],       mult:1.3 },
+  { id:'c5', name:'공멸',        need:['both','fire'],       mult:2.0 }
+];
+
+const CONFLICTS = [
+  { a:'both',  b:'solo',  reason:'혼자일 수 없다' },
+  { a:'mad',   b:'quiet', reason:'광기와 정적은 공존 못 한다' },
+  { a:'quiet', b:'fire',  reason:'조용히 불태울 수 없다' },
+  { a:'slow',  b:'mad',   reason:'속도가 모순된다' }
+];
+
+// SPEC 5장. tools/sweep.ts 전수 검사로 확정한 값 — 임의로 올리지 말 것.
+// 4.0이면 「우리는 미친듯이 불꽃을 점화 했었나?」가 140뎀으로 원턴킬이 난다.
+const MULT_CAP = 2.5;
+const ENEMY_MAX = 90;
+const PLAYER_MAX = 40;
+
+// #endregion
+
+// ============================================================
+// #region 검증  → SPEC 3.4 / core/validator.ts
+// ============================================================
+
+function tagsBefore(sel, slotIndex) {
+  const out = [];
+  SLOT_ORDER.forEach((k, i) => {
+    if (i < slotIndex && sel[k]) out.push(...sel[k].tags);
+  });
+  return out;
+}
+
+// 이 단어를 이 슬롯에 놓으면 모순인가? 이유 문자열 또는 null.
+function conflictReason(word, slotIndex, sel) {
+  const prior = tagsBefore(sel, slotIndex);
+  for (const c of CONFLICTS) {
+    if (word.tags.includes(c.b) && prior.includes(c.a)) return c.reason;
+    if (word.tags.includes(c.a) && prior.includes(c.b)) return c.reason;
+  }
+  return null;
+}
+
+// #endregion
+
+// ============================================================
+// #region 컴파일러  → SPEC 5장 / core/compiler.ts  ★핵심
+// 순수함수다. RNG 없음, 전역 상태 참조 없음.
+// variance는 적용하지 않고 그대로 넘긴다 — 시뮬이 굴린다.
+// ============================================================
+
+function matchCombos(sel) {
+  const pool = SLOT_ORDER.flatMap(k => sel[k] ? sel[k].tags : []);
+  return COMBOS.filter(c => {
+    const rest = [...pool];
+    return c.need.every(n => {
+      const i = rest.indexOf(n);
+      if (i < 0) return false;
+      rest.splice(i, 1);
+      return true;
+    });
+  });
+}
+
+function buildSentence(sel) {
+  return [
+    sel.subj ? sel.subj.text : '____',
+    sel.adv  ? sel.adv.text  : '____',
+    sel.obj  ? josa(sel.obj.text, '을', '를') : '____',
+    sel.verb ? sel.verb.text : '____',
+    sel.end  ? sel.end.text  : '____'
+  ];
+}
+
+function compile(sel) {
+  const combos = matchCombos(sel);
+
+  const base = (sel.obj.power || 0) + (sel.verb.power || 0);
+
+  // ★ 가산 풀. 곱셈은 관용구에만 허용한다.
+  const bonusPool = (sel.subj.bonus || 0) + (sel.adv.bonus || 0) + (sel.end.bonus || 0);
+  const comboMult = combos.reduce((m, c) => m * c.mult, 1);
+  const multiplier = Math.min((1 + bonusPool) * comboMult, MULT_CAP);
+
+  const sum = key => SLOT_ORDER.reduce(
+    (n, k) => n + ((sel[k] && sel[k].effects && sel[k].effects[key]) || 0), 0
+  );
+
+  return {
+    sentence: buildSentence(sel).join(' '),
+    targetMode: sel.subj.targetMode,
+    kind: sel.verb.kind,
+    base,
+    multiplier,
+    variance: sel.end.variance || null,
+    timing: sel.end.timing,
+    guard: sum('guard'),
+    heal: sum('heal'),
+    recoil: sum('recoil'),
+    tags: SLOT_ORDER.flatMap(k => sel[k].tags),
+    combos: combos.map(c => c.name)
+  };
+}
+
+// #endregion
+
+// ============================================================
+// #region 레퍼런스 시뮬  → SPEC 6장 경로 C / sim/reference.ts
+// 기존 헤드리스 시뮬을 붙일 때 이 파일만 교체한다.
+// View와 Compiler는 건드리지 않는다.
+// ============================================================
+
+function applyIntent(state, intent, rng) {
+  let mult = intent.multiplier;
+  let note = '';
+
+  if (intent.variance) {
+    const hit = rng() < intent.variance.p;
+    mult *= hit ? intent.variance.hi : intent.variance.lo;
+    mult = Math.min(mult, MULT_CAP);   // 캡은 variance 적용 "후"에 건다
+    note = hit ? ' (도박 성공)' : ' (도박 실패)';
+  }
+
+  const dmg = Math.round(intent.base * mult);
+
+  if (intent.timing === 'delayed') {
+    state.pending = { dmg, sentence: intent.sentence };
+    return { text: `${intent.sentence} → 다음 턴에 ${dmg} 예약`, combos: intent.combos };
+  }
+
+  let self = intent.recoil;
+  if (intent.targetMode === 'both') self += Math.round(dmg * 0.4);
+
+  if (intent.kind !== 'heal') state.enemyHp -= dmg;
+  state.playerHp = Math.min(PLAYER_MAX, state.playerHp - self + intent.heal);
+
+  // 주어가 '너는'이면 이번 턴 방어를 포기한다
+  state.guard = intent.targetMode === 'enemy' && intent.tags.includes('enemy')
+    ? 0 : Math.max(0, intent.guard);
+
+  return {
+    text: `${intent.sentence} → ${dmg} 피해${note}` + (self ? ` · 자신 ${self}` : ''),
+    combos: intent.combos
+  };
+}
+
+function enemyTurn(state, rng) {
+  const raw = 7 + Math.floor(rng() * 6);
+  const dealt = Math.max(0, raw - state.guard);
+  state.playerHp -= dealt;
+  return `사서의 반격 → ${dealt} 피해` + (state.guard ? ` (방어 ${state.guard} 흡수)` : '');
+}
+
+// #endregion
+
+// ============================================================
+// #region 뷰  → SPEC 9장 / view/*
+// ============================================================
+
+let sel, state, over;
+
+function reset() {
+  sel = {};
+  over = false;
+  state = { playerHp: PLAYER_MAX, enemyHp: ENEMY_MAX, guard: 0, turn: 1, pending: null };
+  document.getElementById('log').innerHTML = '';
+  draw();
+}
+
+function log(html) {
+  const el = document.getElementById('log');
+  el.innerHTML = `<div style="padding:2px 0">${html}</div>` + el.innerHTML;
+}
+
+function drawChain() {
+  const parts = buildSentence(sel);
+  document.getElementById('chain').innerHTML = parts.map((p, i) => {
+    const on = !!sel[SLOT_ORDER[i]];
+    return `<span style="padding:6px 12px;border-radius:var(--radius);font-size:16px;
+      background:${on ? 'var(--bg-accent)' : 'var(--surface-0)'};
+      color:${on ? 'var(--on-accent)' : 'var(--text-muted)'}">${p}</span>`;
+  }).join('');
+
+  const cs = matchCombos(sel);
+  document.getElementById('combo').textContent =
+    cs.length ? cs.map(c => `「${c.name}」 ×${c.mult}`).join('   ') : '';
+}
+
+function drawSlots() {
+  document.getElementById('slots').innerHTML = SLOT_ORDER.map((k, idx) => {
+    const opts = WORDS[k].map(w => {
+      const why = conflictReason(w, idx, sel);
+      const on = sel[k] && sel[k].id === w.id;
+      return `<button data-slot="${k}" data-word="${w.id}" ${why ? 'data-blocked="1"' : ''}
+        style="text-align:left;padding:8px 10px;line-height:1.35;
+        background:${on ? 'var(--bg-accent)' : (why ? 'var(--surface-0)' : 'var(--surface-2)')};
+        border:0.5px solid ${on ? 'var(--border-accent)' : 'var(--border)'};
+        color:${why ? 'var(--text-disabled)' : (on ? 'var(--on-accent)' : 'var(--text-primary)')}">
+        ${w.text}<br><span style="font-size:11px;color:var(--text-muted)">${why || w.note}</span>
+      </button>`;
+    }).join('');
+    return `<div style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:5px">${SLOT_LABEL[k]}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px">${opts}</div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('#slots button').forEach(b => {
+    b.onclick = () => {
+      if (over) return;
+      if (b.dataset.blocked) { log('모순된 조합이다.'); return; }
+      const k = b.dataset.slot;
+      sel[k] = WORDS[k].find(w => w.id === b.dataset.word);
+      // 뒤쪽 선택이 이제 모순이 되면 해제한다
+      const at = SLOT_ORDER.indexOf(k);
+      SLOT_ORDER.forEach((k2, j) => {
+        if (j > at && sel[k2] && conflictReason(sel[k2], j, sel)) delete sel[k2];
+      });
+      draw();
+    };
+  });
+}
+
+function drawBars() {
+  const pct = (v, max) => Math.max(0, v / max * 100) + '%';
+  document.getElementById('php').style.width = pct(state.playerHp, PLAYER_MAX);
+  document.getElementById('ehp').style.width = pct(state.enemyHp, ENEMY_MAX);
+  document.getElementById('phptxt').textContent = `${Math.max(0, state.playerHp)} / ${PLAYER_MAX}`;
+  document.getElementById('ehptxt').textContent = `${Math.max(0, state.enemyHp)} / ${ENEMY_MAX}`;
+  document.getElementById('vs').textContent = `턴 ${state.turn}`;
+}
+
+function draw() { drawChain(); drawSlots(); drawBars(); }
+
+function resolve() {
+  if (over) return;
+  if (SLOT_ORDER.some(k => !sel[k])) { log('문장이 완성되지 않았다.'); return; }
+
+  const intent = compile(sel);
+  const res = applyIntent(state, intent, Math.random);
+  log(`<b>${res.text}</b>` + (res.combos.length ? ` · ${res.combos.join(', ')}` : ''));
+
+  sel = {};
+  state.turn++;
+
+  if (state.enemyHp <= 0) { over = true; log('<b>사서가 무너졌다.</b>'); draw(); return; }
+
+  log(enemyTurn(state, Math.random));
+
+  if (state.pending) {
+    state.enemyHp -= state.pending.dmg;
+    log(`예약된 문장 발동 → ${state.pending.dmg} 피해`);
+    state.pending = null;
+    if (state.enemyHp <= 0) { over = true; log('<b>사서가 무너졌다.</b>'); }
+  }
+  if (state.playerHp <= 0) { over = true; log('<b>초가 다 녹았다.</b>'); }
+  draw();
+}
+
+document.getElementById('go').onclick = resolve;
+document.getElementById('undo').onclick = () => { if (!over) { sel = {}; draw(); } };
+document.getElementById('reset').onclick = reset;
+
+reset();
+
+// #endregion
+</script>
+</body>
+</html>
