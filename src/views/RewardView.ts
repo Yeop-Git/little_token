@@ -34,7 +34,7 @@ export class RewardView {
               .map(
                 (p, i) => `
               <div class="reward-pick rarity-${p.rarity}" data-i="${i}">
-                <div class="kind">${p.kind === 'word' ? '문장 · 스킬업' : '아이템 · 스펙업'} · ${RARITY_LABEL[p.rarity]}</div>
+                <div class="kind">${p.kind === 'word' ? (p.reinforce ? '문장 · 강화' : '문장 · 스킬업') : '아이템 · 스펙업'} · ${RARITY_LABEL[p.rarity]}</div>
                 <div class="art">${itemArt(p.art)}</div>
                 <div class="rname">${p.name}</div>
                 <div class="rdesc">${p.desc}</div>

@@ -308,16 +308,20 @@ export class CardHand {
     const isDrawing = this.drawingId === card.instanceId
     const aria = blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`
     const artUrl = card.word.art ? SKILL_ART[card.word.art] : undefined
+    const level = card.word.level ?? 1
+    const levelBadge = level > 1 ? `<span class="card-level">Lv.${level}</span>` : ''
     // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
     const front = artUrl
       ? `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
+          ${levelBadge}
           <strong class="card-title">${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
+          ${levelBadge}
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
           <strong>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>

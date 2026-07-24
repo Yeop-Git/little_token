@@ -102,7 +102,7 @@ function goBattle() {
 function goReward() {
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player.stats.luck)
+  const options = genRewards(run.player)
   current = new RewardView(stage, {
     day: run.day,
     nextField: stageFor(run.day + 1).field,
