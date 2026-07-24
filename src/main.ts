@@ -8,12 +8,14 @@ import './style.css'
 import { BattleView } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
+import { TitleView } from '@views/TitleView'
 import { FontManager } from '@/ui/FontManager'
 import { ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
+import { loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 
 const STAGE_W = 1920
@@ -27,20 +29,21 @@ function fit() {
 window.addEventListener('resize', fit)
 fit()
 
-const run = newRun()
+let run = newRun()
 let current: { destroy?: () => void } | null = null
-type SceneName = 'battle' | 'reward' | 'item'
+type SceneName = 'title' | 'battle' | 'reward' | 'item'
 
 // 개발/검수용 씬 점퍼.
 function mountDev(active: SceneName) {
   const b = (id: SceneName, label: string) => `<button data-scene="${id}" class="${id === active ? 'on' : ''}">${label}</button>`
   const bar = document.createElement('div')
   bar.className = 'dev-jump'
-  bar.innerHTML = b('battle', '전투') + b('reward', '보상') + b('item', '아이템')
+  bar.innerHTML = b('title', '타이틀') + b('battle', '전투') + b('reward', '보상') + b('item', '아이템')
   bar.querySelectorAll('button').forEach((btn) =>
     btn.addEventListener('click', () => {
       const s = (btn as HTMLElement).dataset.scene as SceneName
-      if (s === 'battle') goBattle()
+      if (s === 'title') goTitle()
+      else if (s === 'battle') goBattle()
       else if (s === 'reward') goReward()
       else goItem(ITEMS.candle)
     }),
@@ -64,6 +67,30 @@ function mountMeta(active: SceneName) {
 function reset() {
   current?.destroy?.()
   stage.innerHTML = ''
+}
+
+function goTitle() {
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  const saved = loadRun()
+  current = new TitleView(stage, {
+    canContinue: saved !== null,
+    onContinue: () => {
+      const loaded = loadRun()
+      if (!loaded) {
+        goTitle()
+        return
+      }
+      run = loaded
+      goBattle()
+    },
+    onNewGame: () => {
+      run = newRun()
+      saveRun(run)
+      goBattle()
+    },
+  })
+  mountVersion()
 }
 
 function goBattle() {
@@ -94,6 +121,7 @@ function goReward() {
       if (opt.kind === 'word' && opt.word) {
         registerWord(run.player, opt.word) // 문장 = 스킬업
         run.day++
+        saveRun(run)
         goBattle()
       } else if (opt.item) {
         goItem(opt.item) // 아이템 = 감탄사 커스텀(스펙업)
@@ -111,6 +139,7 @@ function goItem(itemDef: ItemDef) {
     onDone: (result) => {
       applyItemReward(run.player, result)
       run.day++
+      saveRun(run)
       goBattle()
     },
   })
@@ -118,9 +147,10 @@ function goItem(itemDef: ItemDef) {
 }
 
 // ?scene= 로 직접 진입(스샷/검수용). 폰트 로드 후 시작.
-const start = (new URLSearchParams(location.search).get('scene') as SceneName) || 'battle'
+const start = (new URLSearchParams(location.search).get('scene') as SceneName) || 'title'
 FontManager.load().finally(() => {
   if (start === 'reward') goReward()
   else if (start === 'item') goItem(ITEMS.candle)
-  else goBattle()
+  else if (start === 'battle') goBattle()
+  else goTitle()
 })
