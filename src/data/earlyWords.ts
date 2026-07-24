@@ -12,7 +12,7 @@ export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']
 
 export const EARLY_WORDS: Record<string, Word[]> = {
   subj: [
-    { id: 'na', text: '나는', slot: 'subj', tags: ['self'], bonus: 0, targetMode: 'enemy', rarity: 'common', note: '문장의 시작', lore: '오늘도 일기를 편다.' },
+    { id: 'na', text: '나는', slot: 'subj', tags: ['self'], person: 'first', bonus: 0, targetMode: 'enemy', rarity: 'common', note: '문장의 시작', lore: '오늘도 일기를 편다.' },
   ],
   adv: [
     { id: 'himkkeot', text: '힘껏', slot: 'adv', tags: ['force'], bonus: 0.6, rarity: 'common', note: '세게 · 위력 +60%', lore: '팔에 힘을 준다.' },
