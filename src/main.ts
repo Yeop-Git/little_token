@@ -72,21 +72,11 @@ function reset() {
 function goTitle() {
   reset()
   stage.setAttribute('data-theme', 'day')
-  const saved = loadRun()
   current = new TitleView(stage, {
-    canContinue: saved !== null,
-    onContinue: () => {
-      const loaded = loadRun()
-      if (!loaded) {
-        goTitle()
-        return
-      }
-      run = loaded
-      goBattle()
-    },
-    onNewGame: () => {
-      run = newRun()
-      saveRun(run)
+    onStart: () => {
+      const saved = loadRun()
+      run = saved ?? newRun()
+      if (!saved) saveRun(run)
       goBattle()
     },
   })
