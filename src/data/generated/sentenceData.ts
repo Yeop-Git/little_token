@@ -235,11 +235,11 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "grd"
       ],
       "stat": "guard",
-      "statMult": 1.4,
+      "statMult": 1,
       "kind": "guard",
       "rarity": "common",
       "art": "3002",
-      "note": "방어 ×1.4",
+      "note": "방어 ×1",
       "lore": "한 발 버틴다."
     },
     {
@@ -250,11 +250,11 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "mend"
       ],
       "stat": "heal",
-      "statMult": 1.4,
+      "statMult": 1,
       "kind": "heal",
       "rarity": "common",
       "art": "3003",
-      "note": "회복 ×1.4",
+      "note": "회복 ×1",
       "lore": "상처를 매만진다."
     },
     {
@@ -281,10 +281,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "hold"
       ],
       "stat": "guard",
-      "statMult": 1.4,
+      "statMult": 1,
       "kind": "guard",
       "rarity": "common",
-      "note": "방어 ×1.4",
+      "note": "방어 ×1",
       "lore": "한 뼘도 안 내준다."
     },
     {
@@ -296,10 +296,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "warm"
       ],
       "stat": "heal",
-      "statMult": 1.4,
+      "statMult": 1,
       "kind": "heal",
       "rarity": "common",
-      "note": "회복 ×1.4",
+      "note": "회복 ×1",
       "lore": "가슴에 안는다."
     }
   ]
