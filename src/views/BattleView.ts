@@ -31,6 +31,7 @@ import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@cor
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
+import { GameAudio } from '@/audio/GameAudio'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -591,6 +592,7 @@ export class BattleView {
   private pick(id: string) {
     const key = this.order()[this.slotIndex]
     const w = this.t.words[key].find((x) => x.id === id)!
+    GameAudio.play('wordSelect')
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
     const order = this.order()
@@ -601,7 +603,10 @@ export class BattleView {
     this.renderChain()
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
-    if (this.complete() && !this.busy && !this.over) void this.autoComplete()
+    if (this.complete() && !this.busy && !this.over) {
+      GameAudio.play('sentenceComplete')
+      void this.autoComplete()
+    }
   }
 
   private complete(): boolean {
@@ -784,7 +789,10 @@ export class BattleView {
   }) {
     const you = this.q<HTMLElement>('.actor.you')
     const attacking = res.hits.length > 0
-    if (attacking) you.classList.add('lunge')
+    if (attacking) {
+      GameAudio.play('paperAttack')
+      you.classList.add('lunge')
+    }
     await sleep(attacking ? 170 : 40)
 
     for (const h of res.hits) {

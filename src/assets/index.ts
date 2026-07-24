@@ -17,6 +17,10 @@ import skill3001 from './sprites/skills/skill_3001.png'
 import skill3002 from './sprites/skills/skill_3002.png'
 import skill3003 from './sprites/skills/skill_3003.png'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
+import paperMapParade from './audio/paper-map-parade.mp3'
+import wordSelect from './audio/word-select.mp3'
+import sentenceComplete from './audio/sentence-complete.mp3'
+import paperAttack from './audio/paper-attack.mp3'
 
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
@@ -48,3 +52,10 @@ export const SKILL_ART: Record<string, string> = {
 }
 
 export const FONT_URL = griunFont
+
+export const AUDIO = {
+  bgm: paperMapParade,
+  wordSelect,
+  sentenceComplete,
+  paperAttack,
+}
