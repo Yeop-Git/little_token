@@ -7,6 +7,9 @@ import bg001 from './backgrounds/bg_001.png'
 import titleBg from './backgrounds/tt_001.png'
 import titleLogo from './backgrounds/tt_002.png'
 import player001 from './sprites/player_001.png'
+import token001 from './sprites/token/token_001.png'
+import token002 from './sprites/token/token_002.png'
+import token003 from './sprites/token/token_003.png'
 import enemyMoth from './sprites/enemy_moth.png'
 import enemyRoach from './sprites/enemy_roach.png'
 import skill1001 from './sprites/skills/skill_1001.png'
@@ -27,6 +30,13 @@ export const BACKGROUNDS: Record<string, string> = {
 export const TITLE = {
   bg: titleBg,
   logo: titleLogo,
+}
+
+// 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상
+export const TOKEN_FACES = {
+  neutral: token001,
+  smile: token002,
+  sad: token003,
 }
 
 // 스프라이트 키 → URL (엔티티 데이터의 sprite 필드가 이 키를 참조)
