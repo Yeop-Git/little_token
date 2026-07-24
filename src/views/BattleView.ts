@@ -123,7 +123,6 @@ export class BattleView {
               <div class="bag-row" id="bagrow"></div>
             </div>
           </div>
-          <button class="undo-btn" id="undo">되돌리기</button>
         </div>
 
         <div class="stat-dock glass">
@@ -142,7 +141,6 @@ export class BattleView {
     this.q('#f-desc').textContent = this.field.desc.replace(/<[^>]+>/g, '')
     this.q('#f-weather').innerHTML = weatherIcon(this.field.weather)
 
-    this.q('#undo').addEventListener('click', () => this.undo())
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
 
@@ -600,24 +598,6 @@ export class BattleView {
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
     if (this.complete() && !this.busy && !this.over) void this.autoComplete()
-  }
-
-  // 한 단계 되돌리기 — 마지막으로 채운 단어만 제거.
-  private undo() {
-    if (this.busy || this.over) return
-    const order = this.order()
-    for (let i = order.length - 1; i >= 0; i--) {
-      if (this.sel[order[i]]) {
-        const next = { ...this.sel }
-        delete next[order[i]]
-        this.sel = next
-        this.slotIndex = i
-        this.setPhase(`${this.t.template.slots[i].label} 선택`)
-        break
-      }
-    }
-    this.renderChain()
-    this.renderWords()
   }
 
   private complete(): boolean {
