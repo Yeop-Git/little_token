@@ -30,6 +30,7 @@ import { SquareBurst } from '@/ui/SquareBurst'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
+import { CardHand } from '@/ui/CardHand'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -59,7 +60,7 @@ export class BattleView {
   private over = false
   private bagMode = false
   private timers: number[] = []
-  private hand: Record<string, Word[]> = {} // 슬롯별로 이번 턴에 보이는 단어(최대 3)
+  private cardHand!: CardHand
   private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string }[] = []
   private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
 
@@ -79,6 +80,7 @@ export class BattleView {
 
   destroy() {
     this.timers.forEach((t) => clearTimeout(t))
+    this.cardHand.destroy()
   }
 
   private mount() {
@@ -107,7 +109,14 @@ export class BattleView {
           <div class="pane-stack">
             <div class="pane words">
               <div class="slot-step" id="steps"></div>
-              <div class="word-row" id="grid"></div>
+              <div class="card-drop-zone disabled" id="card-drop-zone" role="button" tabindex="0"
+                aria-label="카드를 이곳으로 드래그해 단어 확정" aria-disabled="true">
+                <b>문장에 넣기</b><span>카드를 여기로 끌어 놓기</span>
+              </div>
+              <div class="card-table" aria-label="단어 카드 선택 영역">
+                <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
+                <button class="draw-deck" id="draw-deck" type="button"></button>
+              </div>
             </div>
             <div class="pane bag">
               <div class="bag-row" id="bagrow"></div>
@@ -136,30 +145,22 @@ export class BattleView {
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
 
-    this.drawHand()
+    this.cardHand = new CardHand({
+      handRoot: this.q('#card-hand'),
+      deckButton: this.q<HTMLButtonElement>('#draw-deck'),
+      dropZone: this.q('#card-drop-zone'),
+      onConfirm: (word) => {
+        if (!this.busy && !this.over) this.pick(word.id)
+      },
+      onPreview: (word) => this.renderDetail(word),
+      onPreviewEnd: () => this.renderDetail(null),
+    })
     this.renderActors()
     this.renderChain()
     this.renderWords()
     this.renderStats()
     this.renderBag()
     this.renderCastLog()
-  }
-
-  // 한 턴에 슬롯당 최대 3개만 보여준다(많아도 3가지). 매 턴 새로 뽑는다.
-  private drawHand() {
-    for (const s of this.t.template.slots) {
-      const pool = this.t.words[s.key] ?? []
-      if (pool.length <= 3) {
-        this.hand[s.key] = [...pool]
-        continue
-      }
-      const bag = [...pool]
-      for (let i = bag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[bag[i], bag[j]] = [bag[j], bag[i]]
-      }
-      this.hand[s.key] = bag.slice(0, 3)
-    }
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -371,32 +372,8 @@ export class BattleView {
       )
 
     const key = this.order()[this.slotIndex]
-    // 손패(최대 3). 이미 고른 단어가 손패에 없으면 포함시켜 표시가 어긋나지 않게.
-    const words = [...(this.hand[key] ?? this.t.words[key] ?? [])]
-    const chosen = this.sel[key]
-    if (chosen && !words.some((w) => w.id === chosen.id)) words.unshift(chosen)
-    const grid = this.q('#grid')
-    grid.innerHTML = words
-      .map((w) => {
-        const why = conflictReason(w, this.slotIndex, this.sel, this.t)
-        const picked = this.sel[key]?.id === w.id
-        const cls = ['word-cell', `mood-${this.moodOf(w)}`, picked ? 'picked' : '', why ? 'blocked' : ''].join(' ')
-        return `<button class="${cls}" data-id="${w.id}">
-          <span class="w">${w.text}</span>
-          <span class="n">${why ?? w.note}</span>
-        </button>`
-      })
-      .join('')
-
-    grid.querySelectorAll<HTMLElement>('.word-cell').forEach((btn) => {
-      const w = words.find((x) => x.id === btn.dataset.id)!
-      btn.addEventListener('mouseenter', () => this.renderDetail(w))
-      btn.addEventListener('mouseleave', () => this.renderDetail(null))
-      btn.addEventListener('click', () => {
-        if (btn.classList.contains('blocked') || this.busy || this.over) return
-        this.pick(btn.dataset.id!)
-      })
-    })
+    const words = this.player.deck[key] ?? this.t.words[key] ?? []
+    this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
     if (!this.bagMode) this.renderDetail(null)
   }
 
@@ -786,7 +763,7 @@ export class BattleView {
     this.q('#turn').textContent = String(this.state.turn)
     this.setPhase('주어 선택')
     this.busy = false
-    this.drawHand()
+    this.cardHand.resetTurn()
     this.renderChain()
     this.renderWords()
   }

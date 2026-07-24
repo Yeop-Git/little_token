@@ -232,7 +232,7 @@ button {
   left: 0;
   right: 0;
   top: 0;
-  bottom: 300px;
+  bottom: 350px;
   z-index: 3;
 }
 
@@ -761,7 +761,7 @@ button {
   position: absolute;
   left: 356px;
   right: 420px;
-  bottom: 70px;
+  bottom: 12px;
   z-index: 7;
   display: flex;
   flex-direction: column;
@@ -783,7 +783,7 @@ button {
   border-radius: 40px;
 }
 /* 단어 ↔ 가방 슬라이드 토글(같은 자리) */
-.pane-stack { position: relative; width: 100%; height: 168px; }
+.pane-stack { position: relative; width: 100%; height: 318px; }
 .pane {
   position: absolute;
   inset: 0;
@@ -791,7 +791,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 7px;
   transition: transform 0.38s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.3s ease;
 }
 .pane.bag { transform: translateY(70px); opacity: 0; pointer-events: none; }
@@ -815,6 +815,288 @@ button {
 .slot-step .step.active { color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .slot-step .step.done { color: var(--hp-you); }
 .slot-step .sep { color: var(--ink-faint); opacity: 0.5; }
+
+/* ───────── 단어 카드 손패 ─────────
+   바깥 카드가 부채꼴 위치를 맡고, card-lift가 호버/선택 상승을 맡는다.
+   두 transform을 분리해 이후 드래그 상호작용을 붙이기 쉽게 유지한다. */
+.card-table {
+  position: relative;
+  width: 100%;
+  height: 263px;
+}
+.card-hand {
+  position: absolute;
+  left: 0;
+  right: 154px;
+  top: 0;
+  height: 255px;
+  perspective: 1100px;
+}
+.word-card {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 158px;
+  height: 218px;
+  z-index: var(--card-z);
+  transform-origin: 50% 115%;
+  transform: translate(calc(-50% + var(--card-x)), var(--card-y)) rotate(var(--card-r)) scale(var(--card-s));
+  transition: transform 0.38s cubic-bezier(.2,.82,.22,1), opacity .22s ease, filter .2s ease;
+  outline: none;
+  touch-action: manipulation;
+  will-change: transform;
+}
+.card-lift {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: center bottom;
+  transition: transform .22s cubic-bezier(.2,1.15,.3,1), filter .22s ease;
+}
+.word-card:hover:not(.blocked):not(.drawing),
+.word-card:focus-visible:not(.blocked):not(.drawing),
+.word-card.selected {
+  z-index: 900 !important;
+}
+.word-card:hover:not(.blocked):not(.drawing) .card-lift,
+.word-card:focus-visible:not(.blocked):not(.drawing) .card-lift {
+  transform: translateY(-54px) rotate(calc(var(--card-r) * -.76)) scale(1.06);
+  filter: drop-shadow(0 22px 18px rgba(0,0,0,.52));
+}
+.word-card.selected .card-lift {
+  transform: translateY(calc(var(--selected-lift) * -1)) rotate(calc(var(--card-r) * -1)) scale(var(--selected-scale));
+  filter: drop-shadow(0 0 16px var(--wglow)) drop-shadow(0 24px 20px rgba(0,0,0,.58));
+}
+.card-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  border-radius: 17px;
+}
+.card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 17px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow:
+    0 14px 28px rgba(0,0,0,.58),
+    inset 0 0 0 3px rgba(244,218,165,.7),
+    inset 0 0 0 7px rgba(44,29,34,.92),
+    inset 0 0 0 9px color-mix(in srgb, var(--wglow) 58%, #5c4434);
+}
+.card-front {
+  padding: 12px 12px 11px;
+  color: #34251e;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.56), transparent 35%),
+    repeating-linear-gradient(0deg, transparent 0 16px, rgba(88,64,48,.055) 17px),
+    #ead9b9;
+}
+.card-front::before,
+.card-front::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.card-front::before {
+  inset: 10px;
+  border: 1px solid rgba(71,48,38,.32);
+  border-radius: 10px;
+}
+.card-front::after {
+  left: 19px;
+  right: 19px;
+  top: 137px;
+  height: 1px;
+  background: rgba(72,48,36,.22);
+}
+.card-rarity {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 2;
+  color: var(--wglow);
+  font-size: 9px;
+  letter-spacing: -2px;
+  text-shadow: 0 0 7px var(--wglow);
+}
+.card-art {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 125px;
+  height: 92px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 48% 44% 42% 46%;
+  color: #fff3d3;
+  background:
+    radial-gradient(circle at 62% 36%, color-mix(in srgb, var(--wglow) 82%, white), transparent 8%),
+    radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--wglow) 58%, transparent), transparent 49%),
+    linear-gradient(145deg, #2e2536, #17121f);
+  box-shadow: inset 0 0 0 3px rgba(81,52,37,.76), inset 0 0 25px rgba(0,0,0,.48);
+}
+.card-art i {
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  border: 2px solid color-mix(in srgb, var(--wglow) 58%, transparent);
+  transform: rotate(32deg);
+  border-radius: 36% 52%;
+}
+.card-art b {
+  position: relative;
+  font-size: 43px;
+  font-weight: 400;
+  text-shadow: 0 0 18px var(--wglow);
+}
+.card-front strong {
+  position: relative;
+  z-index: 1;
+  width: 126px;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #3c291e;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.16;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-note {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 35px;
+  padding: 2px 7px 0;
+  color: #654a38;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: center;
+}
+.card-front small {
+  margin-top: auto;
+  color: color-mix(in srgb, var(--wglow) 62%, #59402e);
+  font-family: Georgia, serif;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1.8px;
+}
+.card-back {
+  justify-content: center;
+  gap: 10px;
+  transform: rotateY(180deg);
+  color: #f8dda0;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255,217,135,.06) 10px 12px),
+    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
+}
+.card-back i {
+  width: 74px;
+  height: 74px;
+  border: 3px double #d9ad63;
+  transform: rotate(45deg);
+  box-shadow: 0 0 18px rgba(255,207,118,.34), inset 0 0 18px rgba(255,207,118,.2);
+}
+.card-back b { font-family: Georgia, serif; font-size: 12px; letter-spacing: 3px; }
+.word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
+.word-card.blocked .card-note { color: #9a342b; }
+.word-card.drawing { pointer-events: none; }
+.word-card.dragging {
+  z-index: 1200 !important;
+  opacity: .38;
+  transform: translate(calc(-50% + var(--card-x)), var(--card-y)) rotate(0deg) scale(1.04);
+  transition: none;
+  cursor: grabbing;
+}
+.word-card.dragging .card-lift {
+  transform: none;
+  filter: drop-shadow(0 26px 22px rgba(0,0,0,.62));
+}
+
+.card-drop-zone {
+  position: absolute;
+  left: 50%;
+  top: -76px;
+  z-index: 1300;
+  width: 340px;
+  height: 64px;
+  transform: translateX(-50%) scale(.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px dashed rgba(255,225,160,.42);
+  border-radius: 22px;
+  color: var(--gold-hi);
+  background: rgba(22,15,27,.66);
+  box-shadow: inset 0 0 20px rgba(255,207,118,.06);
+  opacity: .68;
+  outline: none;
+  transition: transform .18s ease, opacity .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.card-drop-zone b { font-size: 15px; }
+.card-drop-zone span { color: var(--ink-faint); font-size: 11px; font-weight: 800; }
+.card-drop-zone.visible,
+.card-drop-zone:focus-visible { opacity: 1; transform: translateX(-50%) scale(1); }
+.card-drop-zone.drag-ready {
+  border-color: var(--gold-hi);
+  background: rgba(72,47,29,.84);
+  box-shadow: 0 0 28px rgba(255,207,118,.55), inset 0 0 22px rgba(255,225,160,.16);
+  transform: translateX(-50%) scale(1.06);
+}
+.card-drop-zone.disabled:focus-visible { opacity: .68; }
+
+.draw-deck {
+  position: absolute;
+  right: 0;
+  top: 24px;
+  width: 142px;
+  height: 205px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 18px;
+  outline: none;
+  transition: transform .18s ease, filter .18s ease, opacity .18s ease;
+}
+.draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) {
+  transform: translateY(-7px) rotate(1deg);
+  filter: drop-shadow(0 0 15px var(--gold));
+}
+.draw-deck:disabled { opacity: .48; cursor: default; }
+.deck-stack {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 103px;
+  height: 142px;
+  border-radius: 13px;
+  color: #f8dda0;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 9px, rgba(255,217,135,.06) 9px 11px),
+    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
+  box-shadow: 5px 5px 0 #4a3841, 9px 9px 0 #211923, inset 0 0 0 3px #d5ad6b, inset 0 0 0 7px #382a3a;
+}
+.deck-stack i:first-child { width: 52px; height: 52px; border: 2px double #d9ad63; transform: rotate(45deg); }
+.deck-stack i:nth-child(2) { position: absolute; inset: 12px; border: 1px solid rgba(229,190,118,.4); border-radius: 8px; }
+.deck-stack b { position: absolute; bottom: 16px; font-family: Georgia, serif; font-size: 9px; letter-spacing: 2px; }
+.deck-copy { display: flex; flex-direction: column; line-height: 1.15; text-shadow: 0 2px 7px #000; }
+.deck-copy b { color: var(--gold-hi); font-size: 14px; }
+.deck-copy small { color: var(--ink-faint); font-size: 10px; }
 
 /* 무드(효과별) 색 — 단어 발광/정보 패널 강조 */
 .mood-attack { --wglow: #ff8a5c; }
@@ -1032,6 +1314,22 @@ button {
   transition: opacity 0.14s, color 0.14s, transform 0.14s;
 }
 .undo-btn:hover { opacity: 1; color: var(--ink-dim); transform: scale(1.04); }
+
+@media (max-width: 860px) {
+  .card-hand { right: 128px; }
+  .draw-deck { right: 8px; transform: scale(.88); }
+  .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) { transform: translateY(-6px) scale(.88); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-card,
+  .card-lift,
+  .draw-deck,
+  .card-drop-zone,
+  .pane { transition-duration: .01ms !important; }
+  .word-card:hover:not(.blocked):not(.drawing) .card-lift,
+  .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift { transform: translateY(-24px) rotate(calc(var(--card-r) * -.76)); }
+}
 
 /* 가방 아이템 가로 목록(단어 자리 토글) */
 .bag-row { display: flex; justify-content: center; align-items: flex-start; gap: 34px; flex-wrap: wrap; }
