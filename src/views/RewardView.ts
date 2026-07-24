@@ -50,15 +50,12 @@ function mainEffect(opt: RewardOption): string {
   return w.note
 }
 
-function illusHtml(opt: RewardOption): string {
-  if (opt.kind === 'item' && opt.item) {
-    return `<div class="rp-illus item">${itemArt(opt.item.art)}</div>`
-  }
-  const art = opt.word?.art ? SKILL_ART[opt.word.art] : undefined
-  if (art) {
-    return `<div class="rp-illus"><img src="${art}" alt="" /><span class="rp-illus-tint"></span></div>`
-  }
-  return `<div class="rp-illus glyph">${itemArt('word')}</div>`
+// 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(아이템/보상단어) 색 그라디언트 + 아이콘.
+function bgHtml(opt: RewardOption): string {
+  const art = opt.kind === 'word' && opt.word?.art ? SKILL_ART[opt.word.art] : undefined
+  if (art) return `<div class="rp-bg"><img src="${art}" alt="" /></div>`
+  const icon = opt.kind === 'item' && opt.item ? itemArt(opt.item.art) : itemArt('word')
+  return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`
 }
 
 // 단어 고유 수치(누적 아님).
@@ -170,15 +167,21 @@ export class RewardView {
     const cls = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
     return `
       <div class="reward-pick ${mood} ${cls}" data-i="${i}">
+        ${bgHtml(p)}
+        <span class="rp-tint" aria-hidden="true"></span>
+        <span class="rp-veil" aria-hidden="true"></span>
         <div class="rp-top">
           <span class="rp-type">${typeLabel(p)}</span>
           <span class="rp-badge">${badge}</span>
         </div>
-        ${illusHtml(p)}
-        <div class="rp-name">${p.name}</div>
-        <div class="rp-effect">${mainEffect(p)}</div>
-        <button class="rp-detail" type="button">자세히보기</button>
-        <div class="rp-take">고르기 →</div>
+        <div class="rp-foot">
+          <div class="rp-name">${p.name}</div>
+          <div class="rp-effect">${mainEffect(p)}</div>
+          <div class="rp-actions">
+            <button class="rp-detail" type="button">자세히보기</button>
+            <span class="rp-take">고르기 →</span>
+          </div>
+        </div>
       </div>`
   }
 
