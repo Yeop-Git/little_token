@@ -48,7 +48,7 @@ export class TitleView {
                 calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
                 values="0.005 0.009;0.010 0.006;0.005 0.009" />
             </feTurbulence>
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </svg>
         <div class="title-reveal">
