@@ -60,6 +60,12 @@ export class CardHand {
   private drawingId: string | null = null
   private draggingId: string | null = null
   private suppressClickId: string | null = null
+  private dragGhost: HTMLElement | null = null
+  private dragOrigin = { x: 0, y: 0 }
+  private dragPointerOffset = { x: 0, y: 0 }
+  private dragDestination: { x: number; y: number } | null = null
+  private lastDragX = 0
+  private dragAccepted = false
   private drawQueue = 0
   private processing = false
   private serial = 0
@@ -67,6 +73,8 @@ export class CardHand {
   private conflictOf: ConflictResolver = () => null
   private destroyed = false
   private readonly battlefield: HTMLElement
+  private readonly stage: HTMLElement
+  private readonly wordZone: HTMLElement | null
 
   private readonly onResize = () => this.render()
   private readonly onOutsidePointer = (event: PointerEvent) => {
@@ -78,12 +86,15 @@ export class CardHand {
   constructor(private readonly opts: CardHandOptions) {
     this.battlefield = this.opts.handRoot.closest('.scene')?.querySelector<HTMLElement>('.stage-area')
       ?? this.opts.handRoot.parentElement!
+    this.stage = this.opts.handRoot.closest<HTMLElement>('.stage') ?? this.opts.handRoot.parentElement!
+    this.wordZone = this.opts.handRoot.closest<HTMLElement>('.word-zone')
     this.opts.dropZone.setAttribute('aria-hidden', 'true')
     this.opts.dropZone.setAttribute('tabindex', '-1')
     this.opts.deckButton.addEventListener('click', () => this.enqueueDraw())
     this.battlefield.addEventListener('dragover', (event) => {
       if (!this.draggingId) return
       event.preventDefault()
+      this.moveDragGhost(event.clientX, event.clientY)
       if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
     })
     this.battlefield.addEventListener('drop', (event) => this.dropCard(event))
@@ -98,6 +109,8 @@ export class CardHand {
     this.selectedId = null
     this.drawingId = null
     this.draggingId = null
+    this.removeDragGhost()
+    this.clearDragFeedback()
     this.drawQueue = 0
     this.processing = false
   }
@@ -138,6 +151,8 @@ export class CardHand {
   destroy() {
     this.destroyed = true
     this.epoch++
+    this.removeDragGhost()
+    this.clearDragFeedback()
     window.removeEventListener('resize', this.onResize)
     document.removeEventListener('pointerdown', this.onOutsidePointer)
   }
@@ -232,6 +247,12 @@ export class CardHand {
       this.opts.handRoot.innerHTML = ''
       return
     }
+    const previousPositions = new Map(
+      [...this.opts.handRoot.querySelectorAll<HTMLElement>('.word-card')].map((card) => [
+        card.dataset.instanceId ?? '',
+        card.getBoundingClientRect(),
+      ]),
+    )
     const availableWidth = Math.max(520, this.opts.handRoot.clientWidth - 40)
     this.opts.handRoot.innerHTML = state.hand
       .map((card, index) => this.cardHtml(card, index, state.hand.length, availableWidth))
@@ -256,7 +277,24 @@ export class CardHand {
       })
       button.addEventListener('dragstart', (event) => this.beginDrag(event, button, card))
       button.addEventListener('dragend', () => this.endDrag(button))
+      button.addEventListener('pointerdown', () => button.classList.add('pressing'))
+      ;['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+        button.addEventListener(type, () => button.classList.remove('pressing'))
+      })
       button.addEventListener('keydown', (event) => this.handleCardKey(event, button, state.hand))
+
+      const previous = previousPositions.get(card.instanceId)
+      if (previous && this.drawingId !== card.instanceId) {
+        const current = button.getBoundingClientRect()
+        const dx = previous.left - current.left
+        const dy = previous.top - current.top
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+          button.animate(
+            [{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }],
+            { duration: 340, easing: 'cubic-bezier(.2,.82,.22,1)' },
+          )
+        }
+      }
     })
     this.updateDeckButton(state)
     this.updateDropZone(state)
@@ -326,24 +364,38 @@ export class CardHand {
       return
     }
     this.draggingId = card.instanceId
+    this.dragAccepted = false
+    button.classList.remove('pressing')
     this.selectedId = card.instanceId
     this.opts.handRoot.querySelectorAll('.word-card.selected').forEach((item) => {
       item.classList.remove('selected')
       item.setAttribute('aria-pressed', 'false')
     })
     button.classList.add('selected')
+    this.createDragGhost(button, event.clientX, event.clientY)
+    this.battlefield.classList.add('card-drag-target')
+    this.wordZone?.classList.add('card-drag-origin')
+    this.wordZone?.querySelector('.slot-step .step.active')?.classList.add('receiving')
     requestAnimationFrame(() => button.classList.add('dragging'))
     button.setAttribute('aria-pressed', 'true')
     this.opts.onPreview(card.word)
     this.updateDropZone(this.currentState())
     event.dataTransfer?.setData('text/plain', card.instanceId)
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+      const transparentDragImage = document.createElement('canvas')
+      transparentDragImage.width = 1
+      transparentDragImage.height = 1
+      event.dataTransfer.setDragImage(transparentDragImage, 0, 0)
+    }
   }
 
   private endDrag(button: HTMLButtonElement) {
-    if (this.draggingId) this.suppressClickId = this.draggingId
+    this.suppressClickId = button.dataset.instanceId ?? this.draggingId
     this.draggingId = null
     button.classList.remove('dragging')
+    this.clearDragFeedback()
+    void this.settleDragGhost(this.dragAccepted)
     this.render()
   }
 
@@ -353,8 +405,126 @@ export class CardHand {
     const state = this.currentState()
     const card = state?.hand.find((item) => item.instanceId === instanceId)
     if (!card || this.conflictOf(card.word)) return
+    this.dragAccepted = true
     this.draggingId = null
+    const steps = this.wordZone?.querySelector<HTMLElement>('.slot-step')
+    steps?.classList.remove('commit-pulse')
+    void steps?.offsetWidth
+    steps?.classList.add('commit-pulse')
+    window.setTimeout(() => steps?.classList.remove('commit-pulse'), 420)
     this.opts.onConfirm(card.word)
+  }
+
+  private stagePoint(clientX: number, clientY: number) {
+    const rect = this.stage.getBoundingClientRect()
+    const scaleX = rect.width / this.stage.offsetWidth || 1
+    const scaleY = rect.height / this.stage.offsetHeight || 1
+    return {
+      x: (clientX - rect.left) / scaleX,
+      y: (clientY - rect.top) / scaleY,
+    }
+  }
+
+  private createDragGhost(button: HTMLButtonElement, clientX: number, clientY: number) {
+    this.removeDragGhost()
+    const stageRect = this.stage.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const scaleX = stageRect.width / this.stage.offsetWidth || 1
+    const scaleY = stageRect.height / this.stage.offsetHeight || 1
+    const pointer = this.stagePoint(clientX, clientY)
+    this.dragOrigin = {
+      x: (buttonRect.left - stageRect.left) / scaleX,
+      y: (buttonRect.top - stageRect.top) / scaleY,
+    }
+    this.dragPointerOffset = {
+      x: pointer.x - this.dragOrigin.x,
+      y: pointer.y - this.dragOrigin.y,
+    }
+    this.lastDragX = pointer.x
+    const activeStep = this.opts.handRoot.closest('.word-zone')?.querySelector<HTMLElement>('.slot-step .step.active')
+    if (activeStep) {
+      const rect = activeStep.getBoundingClientRect()
+      const target = this.stagePoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      this.dragDestination = {
+        x: target.x - CARD_HAND_CONFIG.cardWidth / 2,
+        y: target.y - CARD_HAND_CONFIG.cardHeight / 2,
+      }
+    } else {
+      this.dragDestination = null
+    }
+
+    const ghost = button.cloneNode(true) as HTMLElement
+    ghost.classList.remove('selected', 'dragging')
+    ghost.classList.add('drag-ghost')
+    ghost.removeAttribute('data-instance-id')
+    ghost.removeAttribute('draggable')
+    ghost.setAttribute('aria-hidden', 'true')
+    ghost.style.setProperty('--drag-x', `${this.dragOrigin.x}px`)
+    ghost.style.setProperty('--drag-y', `${this.dragOrigin.y}px`)
+    ghost.style.setProperty('--drag-tilt', '0deg')
+    this.stage.append(ghost)
+    this.dragGhost = ghost
+  }
+
+  private moveDragGhost(clientX: number, clientY: number) {
+    if (!this.dragGhost) return
+    const point = this.stagePoint(clientX, clientY)
+    const tilt = Math.max(-5, Math.min(5, (point.x - this.lastDragX) * 0.22))
+    this.lastDragX = point.x
+    this.dragGhost.style.setProperty('--drag-x', `${point.x - this.dragPointerOffset.x}px`)
+    this.dragGhost.style.setProperty('--drag-y', `${point.y - this.dragPointerOffset.y}px`)
+    this.dragGhost.style.setProperty('--drag-tilt', `${tilt.toFixed(2)}deg`)
+    this.battlefield.style.setProperty('--drag-cue-x', `${point.x}px`)
+    this.battlefield.style.setProperty('--drag-cue-y', `${point.y}px`)
+  }
+
+  private async settleDragGhost(accepted: boolean) {
+    const ghost = this.dragGhost
+    if (!ghost) return
+    this.dragGhost = null
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) {
+      ghost.remove()
+      return
+    }
+
+    const current = getComputedStyle(ghost).transform
+    let destination = `translate3d(${this.dragOrigin.x}px, ${this.dragOrigin.y}px, 0) scale(1)`
+    if (accepted && this.dragDestination) {
+      destination = `translate3d(${this.dragDestination.x}px, ${this.dragDestination.y}px, 0) scale(.28) rotate(-2deg)`
+    }
+
+    const animation = ghost.animate(
+      accepted
+        ? [
+            { transform: current, opacity: 0.98, filter: 'brightness(1)' },
+            { transform: destination, opacity: 0, filter: 'brightness(1.45)' },
+          ]
+        : [
+            { transform: current, opacity: 0.98 },
+            { transform: destination, opacity: 0.72 },
+          ],
+      {
+        duration: accepted ? 260 : 220,
+        easing: accepted ? 'cubic-bezier(.2,.82,.22,1)' : 'cubic-bezier(.34,1.2,.5,1)',
+      },
+    )
+    await animation.finished.catch(() => undefined)
+    ghost.remove()
+    this.dragAccepted = false
+  }
+
+  private removeDragGhost() {
+    this.dragGhost?.remove()
+    this.dragGhost = null
+  }
+
+  private clearDragFeedback() {
+    this.battlefield.classList.remove('card-drag-target')
+    this.battlefield.style.removeProperty('--drag-cue-x')
+    this.battlefield.style.removeProperty('--drag-cue-y')
+    this.wordZone?.classList.remove('card-drag-origin')
+    this.wordZone?.querySelector('.slot-step .step.receiving')?.classList.remove('receiving')
   }
 
   private updateDeckButton(state: SlotHandState) {

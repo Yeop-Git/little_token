@@ -25,6 +25,7 @@ export class TitleView {
       <main class="scene title-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="title-shade" aria-hidden="true"></div>
         <div class="title-art-space" aria-hidden="true"></div>
+        <h1 class="game-title">그림일기</h1>
         <button class="title-start" type="button" aria-label="게임 시작">
           <span>터치해서 시작</span>
         </button>

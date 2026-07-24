@@ -121,6 +121,23 @@ button {
   transform: translateX(-50%);
   pointer-events: none;
 }
+.game-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff2d6;
+  font-size: 104px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 18px;
+  text-indent: 18px;
+  white-space: nowrap;
+  text-shadow:
+    0 0 28px rgba(255, 207, 118, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
 .title-start {
   position: absolute;
   inset: 0;
@@ -293,6 +310,17 @@ button {
   bottom: 350px;
   z-index: 3;
 }
+.stage-area::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle 190px at var(--drag-cue-x, 50%) var(--drag-cue-y, 70%), rgba(255, 210, 122, .16), transparent 72%);
+  transition: opacity .18s ease;
+}
+.stage-area.card-drag-target::after { opacity: 1; }
 
 /* 배우 */
 .actor {
@@ -871,8 +899,18 @@ button {
 }
 .slot-step .step b { color: inherit; margin-right: 3px; }
 .slot-step .step.active { color: var(--gold); text-shadow: 0 0 14px var(--glow); }
+.slot-step .step.active.receiving {
+  animation: step-receiving .72s ease-in-out infinite alternate;
+}
+.slot-step.commit-pulse { animation: step-commit .38s cubic-bezier(.2,1.35,.3,1); }
 .slot-step .step.done { color: var(--hp-you); }
 .slot-step .sep { color: var(--ink-faint); opacity: 0.5; }
+@keyframes step-receiving {
+  to { color: #fff4cf; text-shadow: 0 0 10px #fff, 0 0 24px var(--glow); transform: scale(1.06); }
+}
+@keyframes step-commit {
+  45% { transform: translateY(-5px) scale(1.08); filter: brightness(1.45); }
+}
 
 /* ───────── 단어 카드 손패 ─────────
    모든 카드를 같은 높이·각도의 일렬로 놓고 card-lift만 호버/선택 상승을 맡는다. */
@@ -884,7 +922,7 @@ button {
 .card-hand {
   position: absolute;
   left: 0;
-  right: 154px;
+  right: 0;
   top: 0;
   height: 255px;
   perspective: 1100px;
@@ -909,6 +947,10 @@ button {
   transform-origin: center bottom;
   transition: transform .22s cubic-bezier(.2,1.15,.3,1), filter .22s ease;
 }
+.word-zone.card-drag-origin .word-card:not(.dragging) {
+  opacity: .72;
+  filter: saturate(.78);
+}
 .word-card:hover:not(.blocked):not(.drawing),
 .word-card:focus-visible:not(.blocked):not(.drawing),
 .word-card.selected {
@@ -922,6 +964,10 @@ button {
 .word-card.selected .card-lift {
   transform: translateY(calc(var(--selected-lift) * -1)) scale(var(--selected-scale));
   filter: drop-shadow(0 0 16px var(--wglow)) drop-shadow(0 24px 20px rgba(0,0,0,.58));
+}
+.word-card.pressing:not(.blocked):not(.drawing) .card-lift {
+  transform: translateY(-40px) scale(.985);
+  transition-duration: .09s;
 }
 .card-inner {
   position: relative;
@@ -1071,14 +1117,28 @@ button {
 .word-card.drawing { pointer-events: none; }
 .word-card.dragging {
   z-index: 1200 !important;
-  opacity: .38;
-  transform: translateX(calc(-50% + var(--card-x))) scale(1.04);
-  transition: none;
+  opacity: .16;
+  transform: translateX(calc(-50% + var(--card-x))) scale(.97);
   cursor: grabbing;
 }
 .word-card.dragging .card-lift {
   transform: none;
-  filter: drop-shadow(0 26px 22px rgba(0,0,0,.62));
+  filter: none;
+}
+.word-card.drag-ghost {
+  left: 0;
+  top: 0;
+  z-index: 1400;
+  opacity: .98;
+  pointer-events: none;
+  transform: translate3d(var(--drag-x), var(--drag-y), 0) scale(1.06) rotate(var(--drag-tilt, 0deg));
+  transition: transform 72ms linear;
+  filter: drop-shadow(0 28px 24px rgba(0,0,0,.66));
+  will-change: transform;
+}
+.word-card.drag-ghost .card-lift {
+  transform: translateY(-12px);
+  filter: none;
 }
 
 .card-drop-zone {
@@ -1343,17 +1403,20 @@ button {
 .undo-btn:hover { opacity: 1; color: var(--ink-dim); transform: scale(1.04); }
 
 @media (max-width: 860px) {
-  .card-hand { right: 128px; }
   .draw-deck { right: 8px; transform: scale(.88); }
   .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) { transform: translateY(-6px) scale(.88); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .word-card,
+  .word-card.drag-ghost,
   .card-lift,
   .draw-deck,
   .card-drop-zone,
-  .pane { transition-duration: .01ms !important; }
+  .pane,
+  .stage-area::after { transition-duration: .01ms !important; }
+  .slot-step .step.active.receiving,
+  .slot-step.commit-pulse { animation: none !important; }
   .word-card:hover:not(.blocked):not(.drawing) .card-lift,
   .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift { transform: translateY(-24px); }
 }
