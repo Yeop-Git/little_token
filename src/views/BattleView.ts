@@ -228,7 +228,7 @@ export class BattleView {
         </div>
 
         <div class="stat-dock glass">
-          <div class="dock-title">우비 아이</div>
+          <div class="dock-title">프롬</div>
           <div class="stat-list" id="stats"></div>
           <button class="wordbook-btn" id="deck-btn">${icon('book')}<span>단어장</span></button>
         </div>
@@ -329,13 +329,13 @@ export class BattleView {
 
   private playerHtml(): string {
     return `
-      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="우비 아이 상세 보기">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬 상세 보기">
         <div class="nameplate glass">
-          <div class="row"><span class="nm">우비 아이</span><span class="hpn"></span></div>
+          <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div></div>
         </div>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="우비 아이"></div>
+        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
         <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>`
   }

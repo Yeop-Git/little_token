@@ -14,7 +14,7 @@ export interface CharacterVisualDef {
 export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisualDef> = {
   player: {
     id: 'player',
-    name: '우비 아이',
+    name: '프롬',
     model3d: null,
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',

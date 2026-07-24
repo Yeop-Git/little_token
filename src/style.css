@@ -2548,7 +2548,7 @@ button {
     0 0 18px rgba(255, 212, 100, 0.28);
 }
 
-/* 플레이어(우비 아이) 대사 — 토큰의 샛노랑과 구분되는 차분한 크림 톤 */
+/* 플레이어(프롬) 대사 — 토큰의 샛노랑과 구분되는 차분한 크림 톤 */
 .intro-dlg-box.is-player-line .intro-dlg-name {
   color: #f8f1de;
   text-shadow:
