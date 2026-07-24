@@ -1,7 +1,7 @@
 /**
  * 전수 밸런스 검사 — SPEC 8장. `npm run sweep`.
- * 모순 제외 전 조합을 순회해 즉발 데미지 분포와 불변식(INV-1~4)을 검사한다.
- * 컴파일러/캡을 실게임과 동일 함수로 호출해 결과가 어긋나지 않게 한다.
+ * 모순 제외 전 조합을 순회해 즉발 데미지 분포와 불변식을 검사한다.
+ * 컴파일러를 실게임과 동일 함수로 호출해 결과가 어긋나지 않게 한다(천장 없음).
  */
 
 import { compile, finalMultiplier, isDamageIntent } from '@core/compiler'
@@ -39,9 +39,9 @@ function walk(i: number, sel: Selection) {
         aoe: it.aoe,
       })
     if (it.variance) {
-      push(finalMultiplier(it, TABLES.multCap, 0))
-      push(finalMultiplier(it, TABLES.multCap, 1))
-    } else push(finalMultiplier(it, TABLES.multCap))
+      push(finalMultiplier(it, 0))
+      push(finalMultiplier(it, 1))
+    } else push(finalMultiplier(it))
     return
   }
   const key = order[i]
@@ -75,11 +75,12 @@ console.log(`유효 문장 ${rows.length} · 차단된 선택 ${blocked} · 막�
 console.log(`즉발(단일) min ${imm[0]} / p25 ${q(0.25)} / med ${med} / p75 ${q(0.75)} / max ${max}`)
 console.log(`예상 전투 길이 ${(ENEMY_MAX / med).toFixed(1)}턴\n`)
 
+// 천장 없음 — 최대 스파이크는 설계상 허용(폭발). 캡 기반 상한/비율 검사 대신
+// "전형(median)이 즉사가 아님 + 관용구 없이도 성장 + 막다른 길 없음"만 지킨다.
 const inv: [string, boolean, string][] = [
-  ['INV-1  max ≤ 적HP 40%', max <= ENEMY_MAX * 0.4, `${max} vs ${(ENEMY_MAX * 0.4).toFixed(0)}`],
-  ['INV-2  max/med ≤ 3.5', max / med <= 3.5, (max / med).toFixed(2)],
-  ['INV-3  관용구 없이 p75 도달', noCombo[0] >= q(0.75), `${noCombo[0]} vs ${q(0.75)}`],
-  ['INV-4  막다른 길 없음', deadEnds === 0, String(deadEnds)],
+  ['INV-1  전형(median)이 즉사 아님 (med ≤ 적HP)', med <= ENEMY_MAX, `${med} vs ${ENEMY_MAX}`],
+  ['INV-2  관용구 없이 p75 도달', noCombo[0] >= q(0.75), `${noCombo[0]} vs ${q(0.75)}`],
+  ['INV-3  막다른 길 없음', deadEnds === 0, String(deadEnds)],
 ]
 for (const [name, ok, detail] of inv) console.log(`${ok ? '통과' : '위반'}  ${name}  (${detail})`)
 

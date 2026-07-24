@@ -53,6 +53,8 @@ export interface Word {
   tags: string[]
   power?: number // object/verb: 가산 위력
   bonus?: number // subject/modifier/ending: 배수 풀 기여(가산)
+  crit?: number // 대성공 확률(0..1) — 수식 룰렛
+  fail?: number // 실패 확률(0..1) — 수식 룰렛
   variance?: Variance
   effects?: WordEffects
   kind?: IntentKind // verb 전용
@@ -119,6 +121,8 @@ export interface Intent {
   combos: string[] // 발동 관용구 이름
   coherence: number // 부조화 패널티 곱(1이면 어긋남 없음)
   penalties: string[] // 발동한 부조화 이유
+  critP: number // 대성공 확률 합(수식 룰렛) — 스탯 보정 전 기본값
+  failP: number // 실패 확률 합(수식 룰렛) — 스탯 보정 전 기본값
 }
 
 export interface Tables {

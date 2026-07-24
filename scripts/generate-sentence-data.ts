@@ -121,6 +121,8 @@ wordRows.forEach((row, index) => {
     tags: row.tags ? row.tags.split('|').filter(Boolean) : [],
     power: optionalNumber(row.power, 'words.csv', line, 'power'),
     bonus: optionalNumber(row.bonus, 'words.csv', line, 'bonus'),
+    crit: optionalNumber(row.crit, 'words.csv', line, 'crit'),
+    fail: optionalNumber(row.fail, 'words.csv', line, 'fail'),
     kind: row.kind || undefined,
     timing: row.timing || undefined,
     targetMode: row.target_mode || undefined,

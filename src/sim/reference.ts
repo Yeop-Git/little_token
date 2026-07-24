@@ -3,7 +3,7 @@
  * 교체한다(View/Compiler 불변). 다중 적 + 범위(aoe)를 지원한다.
  */
 
-import { finalMultiplier, isDamageIntent } from '@core/compiler'
+import { isDamageIntent } from '@core/compiler'
 import type { EnemyDef, Intent } from '@core/types'
 
 export interface EnemyInst {
@@ -62,8 +62,8 @@ export const aliveIdx = (s: BattleState): number[] =>
 
 // 준비 효과는 적 선공보다 먼저 적용한다. 이전 문장의 미사용 방어는 다음 문장의
 // 준비 단계까지만 유지되며, 새 방어와 중첩하지 않고 이번 문장의 값으로 교체한다.
-export function applyPreparation(state: BattleState, intent: Intent): PreparationResult {
-  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
+export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
+  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
   state.guard = guardGain
   return { guardGain }
 }
@@ -71,17 +71,14 @@ export function applyPreparation(state: BattleState, intent: Intent): Preparatio
 export function applyIntent(
   state: BattleState,
   intent: Intent,
-  multCap: number,
+  mult: number, // BattleView에서 확정한 최종 배율(운·룰렛·variance 포함)
   target: number,
-  rng: () => number,
   atkBonus = 0, // 플레이어 공격력 스탯(공격 문장 위력에 가산)
 ): ApplyResult {
-  const roll = intent.variance ? rng() : null
-  const mult = finalMultiplier(intent, multCap, roll)
   const dealsDamage = isDamageIntent(intent)
   const effBase = dealsDamage ? intent.base + atkBonus : 0
   const dmg = Math.round(effBase * mult)
-  const note = intent.variance ? (roll! < intent.variance.p ? ' (도박 성공)' : ' (도박 실패)') : ''
+  const healAmt = Math.round(intent.heal * mult) // 회복도 배율을 받는다
 
   // 지연 발동은 예약만 한다.
   if (intent.timing === 'delayed') {
@@ -119,15 +116,15 @@ export function applyIntent(
   // 자해 + 공멸(both) 되받음.
   let selfDmg = intent.recoil
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
-  state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + intent.heal)
+  state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + healAmt)
 
-  const label = dealsDamage ? `${dmg} 피해${note}` : intent.heal > 0 ? `${intent.heal} 회복` : '준비 완료'
+  const label = dealsDamage ? `${dmg} 피해` : healAmt > 0 ? `${healAmt} 회복` : '준비 완료'
   return {
     text: `${intent.sentence} → ${label}` + (selfDmg ? ` · 자신 ${selfDmg}` : ''),
     combos: intent.combos,
     hits,
     selfDmg,
-    heal: intent.heal,
+    heal: healAmt,
     killed,
     overflow: Math.max(0, overflow),
   }
