@@ -16,7 +16,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "common",
-      "note": "문장의 시작",
+      "note": "배율 0%",
       "lore": "오늘도 일기를 편다."
     }
   ],
@@ -30,7 +30,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "bonus": 0.6,
       "rarity": "common",
-      "note": "세게 · 위력 +60%",
+      "note": "배율 +60% · 실패 20% · 대성공 10%",
       "lore": "팔에 힘을 준다."
     },
     {
@@ -42,11 +42,8 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "bonus": -0.2,
       "rarity": "common",
-      "note": "살살 · 위력 −20% · 회피",
-      "lore": "조심스럽게.",
-      "effects": {
-        "evade": 2
-      }
+      "note": "배율 −20% · 대성공 30%",
+      "lore": "조심스럽게."
     },
     {
       "id": "dandanhi",
@@ -57,7 +54,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "bonus": 0,
       "rarity": "common",
-      "note": "야무지게 · 방어 +2",
+      "note": "방어 +2",
       "lore": "이를 악문다.",
       "effects": {
         "guard": 2
@@ -75,7 +72,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "power": 6,
       "kind": "attack",
       "rarity": "common",
-      "note": "공격",
+      "note": "공격 · 위력 6",
       "lore": "정직한 한 방."
     },
     {
@@ -85,7 +82,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "grd"
       ],
-      "power": 1,
+      "power": 0,
       "kind": "guard",
       "rarity": "common",
       "note": "방어 +6",
@@ -123,11 +120,8 @@ export const REWARD_WORDS: Word[] = [
     ],
     "bonus": 0.2,
     "rarity": "rare",
-    "note": "빠르게 · 위력 +20% · 회피 +3",
-    "lore": "숨 돌릴 틈 없이.",
-    "effects": {
-      "evade": 3
-    }
+    "note": "배율 +20%",
+    "lore": "숨 돌릴 틈 없이."
   },
   {
     "id": "naedeonjyeot",
@@ -175,7 +169,7 @@ export const WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "common",
-      "note": "균형",
+      "note": "배율 0%",
       "lore": "일기의 화자. 언제나 여기서 시작한다."
     },
     {
@@ -230,11 +224,8 @@ export const WORDS: Record<string, Word[]> = {
       ],
       "bonus": -0.1,
       "rarity": "common",
-      "note": "회피 +3",
-      "lore": "숨을 죽이면 벌레도 방심한다.",
-      "effects": {
-        "evade": 3
-      }
+      "note": "배율 −10%",
+      "lore": "숨을 죽이면 벌레도 방심한다."
     },
     {
       "id": "mad",
