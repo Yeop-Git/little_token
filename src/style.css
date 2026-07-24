@@ -2169,3 +2169,397 @@ button {
   pointer-events: none;
   backdrop-filter: blur(4px);
 }
+
+/* ==========================================================================
+   오프닝 다이얼로그 — 토큰의 컷신.
+   무대 전체를 덮는 딤 + 하단 청색 라인 대화창 + 표정 초상(잔상 2겹) +
+   글자별 바운스 타자. 플레이어(p) 대사는 중앙에 뜬 단어 칩을 단방향으로
+   골라 문장을 조립하는 맥락조합 맛보기.
+   ========================================================================== */
+
+.intro-dialogue {
+  position: absolute;
+  inset: 0;
+  z-index: 260;
+  cursor: pointer;
+}
+
+.intro-dlg-dim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(4, 3, 10, 0.72);
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.intro-dialogue.is-dim-visible .intro-dlg-dim {
+  opacity: 1;
+}
+
+.intro-dialogue.is-dim-clearing .intro-dlg-dim {
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+/* ── 대화창: 하단, 거의 풀폭, 샛노란 발광 라인 패널 ── */
+.intro-dlg-box {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translate(-50%, 20px);
+  width: min(1440px, 92%);
+  min-height: 180px;
+  padding: 26px 46px;
+  border-radius: 24px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(32, 24, 8, 0.7), rgba(20, 14, 4, 0.88));
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 228, 110, 0.72),
+    inset 0 0 30px rgba(255, 204, 80, 0.14),
+    0 0 30px rgba(255, 208, 80, 0.4),
+    0 0 78px rgba(255, 190, 60, 0.24),
+    0 24px 54px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.intro-dialogue.is-box-visible .intro-dlg-box {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.intro-dialogue.is-gone .intro-dlg-box {
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+.intro-dlg-box-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* 토큰의 이름 — 샛노란 발광 */
+.intro-dlg-name {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fff1a0;
+  text-shadow:
+    0 0 14px rgba(255, 222, 90, 0.9),
+    0 0 34px rgba(255, 200, 60, 0.55);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.intro-dlg-divider {
+  width: 230px;
+  height: 1px;
+  margin: 11px auto 15px;
+  background: linear-gradient(to right, transparent, rgba(255, 224, 120, 0.95), transparent);
+  box-shadow: 0 0 10px rgba(255, 214, 90, 0.8);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.intro-dlg-text {
+  text-align: center;
+  font-size: 24px;
+  line-height: 1.65;
+  color: #fdf6e0;
+  min-height: 2.6em;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(255, 212, 100, 0.28);
+}
+
+/* 플레이어(우비 아이) 대사 — 토큰의 샛노랑과 구분되는 차분한 크림 톤 */
+.intro-dlg-box.is-player-line .intro-dlg-name {
+  color: #f8f1de;
+  text-shadow:
+    0 0 12px rgba(255, 242, 205, 0.5),
+    0 0 26px rgba(255, 228, 160, 0.25);
+}
+
+.intro-dlg-box.is-player-line .intro-dlg-divider {
+  background: linear-gradient(to right, transparent, rgba(255, 245, 218, 0.85), transparent);
+  box-shadow: 0 0 8px rgba(255, 238, 190, 0.5);
+}
+
+.intro-dlg-char {
+  display: inline-block;
+  animation: intro-dlg-char-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes intro-dlg-char-pop {
+  0% {
+    transform: translateY(10px) scale(0.4);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(-4px) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 다 출력된 대사는 정지하지 않고 은은하게 부유한다 */
+.intro-dlg-text.is-line-settled {
+  animation: intro-dlg-text-float 2.6s ease-in-out infinite;
+}
+
+@keyframes intro-dlg-text-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ── SKIP — 우하단의 은은한 발광 타이포 ── */
+.intro-dlg-skip {
+  position: absolute;
+  right: 42px;
+  bottom: 40px;
+  padding: 8px 14px;
+  pointer-events: auto;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: rgba(255, 226, 140, 0.62);
+  text-shadow: 0 0 12px rgba(255, 208, 90, 0.4);
+  opacity: 0;
+  transition:
+    opacity 0.5s ease,
+    color 0.18s ease,
+    text-shadow 0.18s ease;
+}
+
+.intro-dialogue.is-box-visible .intro-dlg-skip {
+  opacity: 1;
+}
+
+.intro-dlg-skip:hover {
+  color: rgba(255, 245, 200, 0.95);
+  text-shadow:
+    0 0 14px rgba(255, 222, 110, 0.85),
+    0 0 30px rgba(255, 222, 110, 0.4);
+}
+
+.intro-dialogue.is-dim-clearing .intro-dlg-skip {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── 초상 스테이지: 대화창 상단 테두리에 발이 닿게, 잔상 한 겹과 함께 ── */
+.intro-dlg-stage {
+  position: absolute;
+  left: 50%;
+  /* 대화창(bottom 30px + min-height 180px) 위에 정확히 얹힌다 */
+  bottom: 208px;
+  transform: translateX(-50%);
+  width: 560px;
+  height: 640px;
+  pointer-events: none;
+  transition: left 0.6s ease;
+}
+
+/* 단어 선택 중엔 초상이 좌측으로 비켜서고 중앙에 단어 칩이 뜬다 */
+.intro-dialogue.is-choice .intro-dlg-stage {
+  left: 27%;
+}
+
+.intro-dialogue.is-gone .intro-dlg-stage {
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+.intro-dlg-portrait-main,
+.intro-dlg-portrait-shadow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+}
+
+.intro-dlg-portrait-shadow {
+  z-index: 0;
+  transform: translateX(-36px);
+  opacity: 0;
+  filter: blur(1px) brightness(0.55) saturate(0.7);
+  transition: opacity 0.4s ease;
+}
+
+.intro-dlg-portrait-main {
+  z-index: 1;
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+  /* 토큰 자체가 노란 발광을 두른다 */
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+    drop-shadow(0 0 80px rgba(255, 200, 70, 0.3));
+}
+
+.intro-dlg-stage.is-portrait-visible .intro-dlg-portrait-main {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.intro-dlg-stage.is-portrait-visible .intro-dlg-portrait-shadow {
+  opacity: 0.32;
+}
+
+/* 잔상식 스왑 — 이전 그림이 작게 스러지고 새 그림이 살짝 크게 팝인 후 안착 */
+.intro-dlg-portrait-main.is-swap-out {
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  opacity: 0;
+  transform: scale(0.88);
+}
+
+.intro-dlg-portrait-main.is-swap-in {
+  animation: intro-portrait-swap-in 0.26s ease-out;
+}
+
+@keyframes intro-portrait-swap-in {
+  0% {
+    opacity: 0.2;
+    transform: scale(1.1);
+    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+      drop-shadow(0 0 80px rgba(255, 200, 70, 0.3)) brightness(1.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+      drop-shadow(0 0 80px rgba(255, 200, 70, 0.3)) brightness(1);
+  }
+}
+
+/* ── 플레이어 단어 칩: 화면 중앙에 흩어진 인게임풍 단어 카드 ── */
+.intro-dlg-choice {
+  position: absolute;
+  left: 58%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 18px;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+.intro-dlg-choice.is-leaving {
+  opacity: 0;
+}
+
+.intro-word-chip {
+  pointer-events: auto;
+  padding: 16px 26px;
+  border-radius: 18px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--gold-hi);
+  background: linear-gradient(180deg, rgba(30, 22, 16, 0.78), rgba(18, 13, 10, 0.88));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 214, 138, 0.34),
+    0 12px 28px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 0 12px rgba(255, 208, 120, 0.45);
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s cubic-bezier(0.34, 1.3, 0.5, 1),
+    box-shadow 0.3s ease,
+    color 0.3s ease;
+}
+
+.intro-word-chip.is-entering {
+  opacity: 0;
+  transform: translateY(26px) scale(0.8);
+}
+
+/* 아직 차례가 아닌 단어 — 흐릿하게 대기 */
+.intro-word-chip:disabled:not(.is-done) {
+  cursor: default;
+  opacity: 0.42;
+}
+
+/* 지금 고를 단어 — 손짓하듯 맥동하는 금빛 발광 */
+.intro-word-chip.is-next {
+  animation: intro-chip-beckon 1.6s ease-in-out infinite;
+}
+
+.intro-word-chip.is-next:hover {
+  transform: translateY(-6px) scale(1.06);
+  animation-play-state: paused;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 226, 160, 0.9),
+    0 0 30px rgba(255, 206, 118, 0.5),
+    0 14px 30px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes intro-chip-beckon {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 214, 138, 0.55),
+      0 0 16px rgba(255, 206, 118, 0.28),
+      0 12px 28px rgba(0, 0, 0, 0.55);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 226, 160, 0.85),
+      0 0 30px rgba(255, 206, 118, 0.5),
+      0 12px 28px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* 이미 문장에 들어간 단어 — 불이 꺼지며 살짝 가라앉는다 */
+.intro-word-chip.is-done {
+  cursor: default;
+  opacity: 0.55;
+  color: var(--ink-dim);
+  text-shadow: none;
+  transform: translateY(6px) scale(0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 214, 138, 0.16),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* ── 오프닝 홀드/등장 — 다이얼로그 동안 적은 어둠 밖, 끝나면 천천히 밀려온다 ── */
+.scene.battle.is-intro-hold .actor.foe {
+  opacity: 0 !important;
+  transform: translateX(620px);
+  transition: none;
+  pointer-events: none;
+}
+
+.scene.battle.is-enemies-arriving .actor.foe {
+  transition:
+    transform 3.6s cubic-bezier(0.22, 0.6, 0.3, 1),
+    opacity 2.6s ease;
+  pointer-events: none;
+}
+
+/* 하단 단어 영역(밝은 카드/덱)은 반투명 대화창을 뚫고 비치므로 홀드 동안 숨기고,
+   적이 밀려들어올 때 한 박자 늦게 서서히 켠다 */
+.scene.battle.is-intro-hold .word-zone {
+  opacity: 0;
+  transition: none;
+  pointer-events: none;
+}
+
+.scene.battle.is-enemies-arriving .word-zone {
+  transition: opacity 1.4s ease 0.8s;
+}
