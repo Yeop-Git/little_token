@@ -8,9 +8,9 @@
  *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
  */
 
-import { compile, isDamageIntent, matchCombos, sentenceTokens } from '@core/compiler'
+import { compile, isDamageIntent, matchCombos, resolveMultiplier, sentenceTokens } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
-import type { Selection, Tables, Word, FieldDef } from '@core/types'
+import type { Intent, Selection, Tables, Word, FieldDef } from '@core/types'
 import { RARITY_LABEL } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ENEMIES } from '@data/enemies'
@@ -408,19 +408,25 @@ export class BattleView {
       ${warn}`
   }
 
-  // 이 문장(현재 선택 + 이 단어)이 실제 발동될 때의 최종 수치 — execute()와 동일 계산.
+  // 맥락에 맞는 스탯 — 룰렛 확률을 미는 값(공격→atk · 회복→heal · 방어→guard).
+  private statBiasFor(intent: Intent): number {
+    if (intent.kind === 'heal') return this.player.stats.heal
+    if (intent.kind === 'guard') return this.player.stats.guard
+    return this.player.stats.atk
+  }
+
+  // 이 문장(현재 선택 + 이 단어)이 발동될 때의 미리보기 수치 — 운은 반영, 룰렛은 보통(normal) 가정.
+  // 공/방/회 모두 하나의 배율을 공유한다(execute와 동일 규칙, 룰렛만 미확정).
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
     const intent = compile(sel, this.t)
-    let guard = intent.guard
-    let heal = intent.heal
-    if (guard > 0) guard += this.player.stats.guard
-    if (heal > 0) heal += this.player.stats.heal
+    const m = resolveMultiplier(intent, { luck: this.player.stats.luck, statBias: this.statBiasFor(intent) }, 0.5).mult
     const atk = this.player.stats.atk
+    const guard = intent.guard > 0 ? Math.round((intent.guard + this.player.stats.guard) * m) : 0
+    const heal = intent.heal > 0 ? Math.round((intent.heal + this.player.stats.heal) * m) : 0
     const dealsDamage = isDamageIntent(intent)
-    const effBase = dealsDamage ? intent.base + atk : 0
-    const dmg = dealsDamage ? Math.round(effBase * intent.multiplier) : 0
-    if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: intent.multiplier }
-    return { dmg, heal, guard, self: intent.recoil, multiplier: intent.multiplier }
+    const dmg = dealsDamage ? Math.round((intent.base + atk) * m) : 0
+    if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
+    return { dmg, heal, guard, self: intent.recoil, multiplier: m }
   }
 
   // "적용(이 단어가 더하는 값) · 최종(현재 문장 총합)" 프로젝션 블록.
@@ -633,9 +639,17 @@ export class BattleView {
     if (intent.heal > 0) intent.heal += this.player.stats.heal
     const atk = this.player.stats.atk
     const dealsDamage = isDamageIntent(intent)
+    // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
+    const resolved = resolveMultiplier(
+      intent,
+      { luck: this.player.stats.luck, statBias: this.statBiasFor(intent) },
+      Math.random(),
+      intent.variance ? Math.random() : null,
+    )
+    const mult = resolved.mult
     const effBase = dealsDamage ? intent.base + atk : 0
-    const dmg = Math.round(effBase * intent.multiplier)
-    const heal = intent.heal
+    const dmg = Math.round(effBase * mult)
+    const heal = Math.round(intent.heal * mult)
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
@@ -664,7 +678,7 @@ export class BattleView {
 
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
-    const prep = applyPreparation(this.state, intent)
+    const prep = applyPreparation(this.state, intent, mult)
     if (prep.guardGain > 0) {
       await this.rollTotal(prep.guardGain, 'guard')
       await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
@@ -690,11 +704,13 @@ export class BattleView {
     if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
     // 실제 본행동 발동 + 꽂힘 연출
-    const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
+    const res = applyIntent(this.state, intent, mult, this.target, atk)
     await this.strike(res)
+    const rouletteNote = resolved.outcome === 'crit' ? ' · 대성공!' : resolved.outcome === 'fail' ? ' · 실패…' : ''
     this.log(
       res.text +
         (res.combos.length ? ` · ${res.combos.join(', ')}` : '') +
+        rouletteNote +
         (intent.penalties.length ? ` · 어긋남 ×${intent.coherence.toFixed(2)}` : ''),
     )
     this.renderActors()

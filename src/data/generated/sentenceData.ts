@@ -29,6 +29,8 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "force"
       ],
       "bonus": 0.6,
+      "crit": 0.1,
+      "fail": 0.2,
       "rarity": "common",
       "note": "배율 +60% · 실패 20% · 대성공 10%",
       "lore": "팔에 힘을 준다."
@@ -41,6 +43,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "soft"
       ],
       "bonus": -0.2,
+      "crit": 0.3,
       "rarity": "common",
       "note": "배율 −20% · 대성공 30%",
       "lore": "조심스럽게."
