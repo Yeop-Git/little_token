@@ -1292,6 +1292,77 @@ button {
   box-shadow: 0 0 18px rgba(255,207,118,.34), inset 0 0 18px rgba(255,207,118,.2);
 }
 .card-back b { font-family: Georgia, serif; font-size: 12px; letter-spacing: 3px; }
+
+/* 풀 일러스트 맥락카드 — 일러스트 전체 + kind 색감 틴트 + 발광·깊은그림자 글자 */
+.card-front.art {
+  padding: 0;
+  background: #12101a;
+  overflow: hidden;
+}
+.card-front.art::before,
+.card-front.art::after { content: none; }
+.card-illus {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+/* 색감 쉐이더 — kind 색(--wglow)을 은은하게 입힌다 */
+.card-tint {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--wglow) 72%, transparent),
+    transparent 52%,
+    color-mix(in srgb, var(--wglow) 48%, transparent)
+  );
+}
+/* 하단 어둠 + 안쪽 발광 테두리 — 글자 가독성 & 카드 발광 */
+.card-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 4, 12, 0) 42%, rgba(6, 4, 12, 0.84) 100%);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--wglow) 42%, rgba(255, 255, 255, 0.12)),
+    inset 0 0 26px color-mix(in srgb, var(--wglow) 42%, transparent);
+}
+.card-front.art .card-title {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 30px;
+  z-index: 3;
+  width: auto;
+  margin: 0;
+  overflow: visible;
+  color: #fff;
+  font-size: 27px;
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow:
+    0 0 10px var(--wglow),
+    0 0 22px color-mix(in srgb, var(--wglow) 78%, transparent),
+    0 2px 2px rgba(0, 0, 0, 0.95),
+    0 3px 10px rgba(0, 0, 0, 0.92);
+}
+.card-front.art .card-note {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 9px;
+  z-index: 3;
+  min-height: 0;
+  color: rgba(255, 246, 230, 0.92);
+  font-size: 10.5px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
 .word-card.blocked .card-note { color: #9a342b; }
 .word-card.drawing { pointer-events: none; }
@@ -1366,9 +1437,12 @@ button {
 .deck-copy small { color: var(--ink-faint); font-size: 10px; }
 
 /* 무드(효과별) 색 — 단어 발광/정보 패널 강조 */
-.mood-attack { --wglow: #ff8a5c; }
-.mood-guard { --wglow: #6fc6dd; }
-.mood-heal { --wglow: #8fd66a; }
+/* 카드 색상 코드 — 공격=붉음 · 방어=파랑 · 회복=초록 · 도박=보라(혼돈 예정) */
+.word-card { --wglow: #e8c98a; } /* 기본(버프·희생 등) */
+.mood-sacrifice { --wglow: #e0637a; }
+.mood-attack { --wglow: #ff5a4d; }
+.mood-guard { --wglow: #5aa9ff; }
+.mood-heal { --wglow: #6fd85f; }
 .mood-gamble { --wglow: #c79bf0; }
 .mood-sacrifice { --wglow: #ff5c6e; }
 .mood-buff { --wglow: #ffcf76; }

@@ -1,3 +1,4 @@
+import { SKILL_ART } from '@/assets'
 import type { Word } from '@core/types'
 
 export const CARD_HAND_CONFIG = {
@@ -304,26 +305,37 @@ export class CardHand {
     const line = calculateLineTransform(index, count, availableWidth)
     const blocked = this.conflictOf(card.word)
     const selected = this.selectedId === card.instanceId
-    const rarity = card.word.rarity ?? 'common'
     const isDrawing = this.drawingId === card.instanceId
     const aria = blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`
-    return `<button class="word-card mood-${this.moodOf(card.word)} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
+    const artUrl = card.word.art ? SKILL_ART[card.word.art] : undefined
+    // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
+    const front = artUrl
+      ? `<span class="card-face card-front art">
+          <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
+          <span class="card-tint" aria-hidden="true"></span>
+          <span class="card-veil" aria-hidden="true"></span>
+          <strong class="card-title">${card.word.text}</strong>
+          <span class="card-note">${blocked ?? card.word.note}</span>
+        </span>`
+      : `<span class="card-face card-front">
+          <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
+          <strong>${card.word.text}</strong>
+          <span class="card-note">${blocked ?? card.word.note}</span>
+          <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
+        </span>`
+    return `<button class="word-card mood-${this.moodOf(card.word)}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
       draggable="${!blocked && !isDrawing}"
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
-        <span class="card-face card-front">
-          <span class="card-rarity">${this.rarityMark(rarity)}</span>
-          <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
-          <strong>${card.word.text}</strong>
-          <span class="card-note">${blocked ?? card.word.note}</span>
-          <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
-        </span>
+        ${front}
       </span></span>
     </button>`
   }
 
+  // 카드 색감(--wglow): 공격=붉음 · 방어=파랑 · 회복=초록 · 도박=보라.
+  // TODO(기획): 보라색 '혼돈(chaos)' 종류 — 무슨 효과가 터질지 모르는 카드. 추후 추가.
   private moodOf(word: Word): string {
     if (word.variance) return 'gamble'
     if (word.kind === 'heal' || word.effects?.heal) return 'heal'
@@ -340,10 +352,6 @@ export class CardHand {
     if (word.kind === 'attack' || word.power) return '↗'
     if (word.effects?.recoil) return '※'
     return '✦'
-  }
-
-  private rarityMark(rarity: Word['rarity']): string {
-    return rarity === 'legendary' ? '◆◆◆' : rarity === 'epic' ? '◆◆' : rarity === 'rare' ? '◆' : '◇'
   }
 
   private select(instanceId: string | null) {

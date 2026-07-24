@@ -16,6 +16,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "common",
+      "art": "1001",
       "note": "배율 0%",
       "lore": "오늘도 일기를 편다."
     }
@@ -32,6 +33,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "crit": 0.1,
       "fail": 0.2,
       "rarity": "common",
+      "art": "2001",
       "note": "배율 +60% · 실패 20% · 대성공 10%",
       "lore": "팔에 힘을 준다."
     },
@@ -45,6 +47,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": -0.2,
       "crit": 0.3,
       "rarity": "common",
+      "art": "2002",
       "note": "배율 −20% · 대성공 30%",
       "lore": "조심스럽게."
     },
@@ -57,6 +60,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "bonus": 0,
       "rarity": "common",
+      "art": "2003",
       "note": "방어 +2",
       "lore": "이를 악문다.",
       "effects": {
@@ -75,6 +79,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "power": 6,
       "kind": "attack",
       "rarity": "common",
+      "art": "3001",
       "note": "공격 · 위력 6",
       "lore": "정직한 한 방."
     },
@@ -88,6 +93,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "power": 0,
       "kind": "guard",
       "rarity": "common",
+      "art": "3002",
       "note": "방어 +6",
       "lore": "한 발 버틴다.",
       "effects": {
@@ -104,6 +110,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "power": 0,
       "kind": "heal",
       "rarity": "common",
+      "art": "3003",
       "note": "회복 +5",
       "lore": "상처를 매만진다.",
       "effects": {
