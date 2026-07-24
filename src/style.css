@@ -27,16 +27,21 @@ body {
   --font: 'Griun', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
 }
 
+/* 뷰포트가 무대를 flex로 정중앙에 놓는다. 무대는 자기 크기 그대로 두고
+   scale()로만 축소 — translate+scale 순서 문제 없이 항상 레터박스 중앙. */
 #viewport {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: radial-gradient(ellipse at center, #14101a 0%, #060509 100%);
 }
 
 .stage {
   position: relative;
+  flex: none;
   width: 1920px;
   height: 1080px;
   transform-origin: center center;
@@ -278,6 +283,63 @@ button {
   transform: translateY(20px) scale(0.7);
   filter: grayscale(1) brightness(0.6);
 }
+/* 사망 — 카드가 발밑을 축으로 젖혀졌다 옆으로 쓰러지고, 회색으로 소멸 */
+.actor.foe.dying {
+  transform-origin: 50% 92%;
+  animation: foe-die 0.6s cubic-bezier(0.35, 0.6, 0.4, 1) forwards;
+  pointer-events: none;
+  z-index: 6;
+}
+.actor.foe.dying .nameplate { opacity: 0; transition: opacity 0.18s ease; }
+.actor.foe.dying::after { display: none; }
+@keyframes foe-die {
+  0%   { transform: translateY(0) rotate(0deg) scale(1); filter: none; opacity: 1; }
+  18%  { transform: translateY(-8px) rotate(5deg) scale(1.05); filter: brightness(1.25); }
+  55%  { transform: translateY(26px) rotate(-27deg) scale(0.97); filter: grayscale(1) brightness(0.66) saturate(0.35); opacity: 0.95; }
+  100% { transform: translateY(86px) rotate(-44deg) scale(0.9); filter: grayscale(1) brightness(0.32) blur(4px); opacity: 0; }
+}
+/* 불꽃 파편 */
+.spark {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff2c4 0%, #ffb24a 42%, #ff5a1c 72%, transparent 100%);
+  box-shadow: 0 0 10px #ff8a3c, 0 0 20px #ff5a1c;
+  pointer-events: none;
+  z-index: 44;
+}
+/* 관통 콤보 배지 — "관통 ×N" */
+.combo-badge {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  z-index: 45;
+  pointer-events: none;
+  animation: combo-badge 0.9s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
+}
+.combo-badge .cb-x {
+  font-size: calc(20px + var(--cb, 2) * 4px);
+  font-weight: 900;
+  color: #ffd27a;
+  text-shadow: 0 0 14px #ff8a3c, 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+.combo-badge .cb-n {
+  font-size: calc(38px + var(--cb, 2) * 11px);
+  font-weight: 900;
+  color: #ff9a3c;
+  text-shadow: 0 0 24px #ff5a1c, 0 0 44px #ff3a0c, 0 4px 0 rgba(0, 0, 0, 0.45);
+}
+@keyframes combo-badge {
+  0%   { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; }
+  30%  { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); opacity: 1; }
+  75%  { transform: translate(-50%, -54%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -70%) scale(1) rotate(0deg); opacity: 0; }
+}
 /* 타깃 표시 — 회전 링 대신 은은한 빛 웅덩이 + 하강 화살표 */
 .actor.target::after {
   content: '';
@@ -439,7 +501,18 @@ button {
   0% { text-shadow: 0 0 16px #ff5a1c, 0 0 30px #ff3a0c; transform: translate(-50%, -50%) scale(1) rotate(-1deg); }
   100% { text-shadow: 0 0 28px #ffb24a, 0 0 46px #ff5a1c; transform: translate(-50%, -53%) scale(1.07) rotate(1deg); }
 }
-.ember-num.stab { transition: transform 0.2s ease, opacity 0.2s; opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+/* 콤보가 높을수록 더 뜨겁게 타오르는 초과 피해 숫자 */
+.ember-num.hot {
+  font-size: 90px;
+  color: #ffca5a;
+  text-shadow: 0 0 26px #ff5a1c, 0 0 54px #ff3a0c, 0 0 82px #ff1a00, 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+/* 꼬챙이처럼 앞으로 깊게 찔러 넣으며 사라진다(적 쪽으로 돌진) */
+.ember-num.stab {
+  transition: transform 0.17s cubic-bezier(0.5, 0, 0.3, 1), opacity 0.22s ease 0.04s;
+  opacity: 0;
+  transform: translate(calc(-50% + 360px), calc(-50% + 24px)) scale(1.45) rotate(7deg);
+}
 
 /* 돌진(박치기) — 공격자가 상대 쪽으로 훅 */
 .actor.you.lunge { animation: lunge-you 0.44s cubic-bezier(0.5, 0, 0.25, 1); z-index: 10; }
@@ -767,8 +840,49 @@ button {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.08);
 }
-.wd-values { margin-top: auto; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; }
-.wd-values .v { font-size: 21px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.25); }
+/* 프로젝션 — 이 단어를 넣었을 때의 "적용(더하는 값) · 최종(문장 총합)" */
+.wd-proj {
+  margin-top: 14px;
+  padding: 10px 14px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 122, 0.16);
+}
+.pj-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.pj-head .pj-mult { color: var(--gold); text-shadow: 0 0 10px var(--glow); }
+.pj-rows { display: flex; flex-direction: column; gap: 4px; }
+.pj-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: baseline;
+}
+.pj-l { font-size: 17px; font-weight: 800; color: var(--ink); }
+.pj-d { font-size: 18px; font-weight: 900; text-align: right; opacity: 0.9; }
+.pj-d.up { color: #b6f38a; }
+.pj-d.down { color: #ff8a6a; }
+.pj-d.flat { color: var(--ink-faint); }
+.pj-f { font-size: 30px; font-weight: 900; text-align: right; min-width: 56px; line-height: 1; text-shadow: 0 0 12px currentColor; }
+.pj-row.dmg .pj-f { color: #ff9a72; }
+.pj-row.heal .pj-f { color: #b6f38a; }
+.pj-row.guard .pj-f { color: #86d6ea; }
+.pj-row.self .pj-f { color: #ffc15a; }
+
+.wd-values { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.wd-values .v {
+  font-size: 14px; font-weight: 800; color: #ffe4a8;
+  padding: 3px 9px; border-radius: 9px; background: rgba(255, 255, 255, 0.05);
+}
 .wd-values .v.dmg { color: #ff9a72; }
 .wd-values .v.self { color: #ffc15a; }
 .wd-values .v.heal { color: #b6f38a; }

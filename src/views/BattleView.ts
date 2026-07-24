@@ -299,14 +299,16 @@ export class BattleView {
     if (!this.bagMode) this.renderDetail(null)
   }
 
-  // ── 우측 정보 패널: "해당 단어"만의 효과(누적 아님) ──
+  // ── 우측 정보 패널 ──
+  // 이 단어의 고유 효과(작게) + 이 단어를 문장에 넣었을 때의 "최종 적용 수치"를
+  // 단계별로 보여준다: 이 단어가 더하는 값(적용) + 현재 문장 총합(최종).
   private renderDetail(word: Word | null) {
     const detail = this.q('#detail')
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
       detail.className = 'info-dock glass empty'
-      detail.innerHTML = '단어에 마우스를 올리면<br>등급 · 범위 · 수치가 여기 표시된다.'
+      detail.innerHTML = '단어에 마우스를 올리면<br>등급 · 범위 · 최종 적용 수치가 여기 표시된다.'
       return
     }
     const rarity = w.rarity ?? 'common'
@@ -323,11 +325,57 @@ export class BattleView {
     detail.className = `info-dock glass mood-${mood}`
     detail.innerHTML = `
       <div class="wd-name">${w.text}</div>
-      <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel}</div>
-      <div class="wd-range">범위 · ${this.wordRange(w)}</div>
+      <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel} · 범위 ${this.wordRange(w)}</div>
+      ${this.projectionHtml(w)}
       <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
-      ${warn}
-      <div class="wd-lore">“${w.lore ?? ''}”</div>`
+      ${warn}`
+  }
+
+  // 이 문장(현재 선택 + 이 단어)이 실제 발동될 때의 최종 수치 — execute()와 동일 계산.
+  private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
+    const intent = compile(sel, this.t)
+    let guard = intent.guard
+    let heal = intent.heal
+    if (guard > 0) guard += this.player.stats.guard
+    if (heal > 0) heal += this.player.stats.heal
+    const atk = this.player.stats.atk
+    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
+    const dmg = intent.kind === 'heal' ? 0 : Math.round(effBase * intent.multiplier)
+    if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: intent.multiplier }
+    return { dmg, heal, guard, self: intent.recoil, multiplier: intent.multiplier }
+  }
+
+  // "적용(이 단어가 더하는 값) · 최종(현재 문장 총합)" 프로젝션 블록.
+  private projectionHtml(w: Word): string {
+    const base: Selection = { ...this.sel }
+    delete base[w.slot]
+    const now = this.projectFinal({ ...this.sel, [w.slot]: w })
+    const prev = this.projectFinal(base)
+    const metrics: { key: 'dmg' | 'heal' | 'guard' | 'self'; label: string }[] = [
+      { key: 'dmg', label: '피해' },
+      { key: 'heal', label: '회복' },
+      { key: 'guard', label: '방어' },
+      { key: 'self', label: '자해' },
+    ]
+    const rows = metrics
+      .filter((m) => now[m.key] > 0 || (m.key === 'dmg' && prev.dmg > 0))
+      .map((m) => {
+        const delta = now[m.key] - prev[m.key]
+        const sign = delta > 0 ? '+' : delta < 0 ? '' : '±'
+        const dcls = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+        return `<div class="pj-row ${m.key}">
+          <span class="pj-l">${m.label}</span>
+          <span class="pj-d ${dcls}">${sign}${delta}</span>
+          <span class="pj-f">${now[m.key]}</span>
+        </div>`
+      })
+      .join('')
+    if (!rows) return '' // 순수 보정 단어(회피/지연 등)는 프로젝션 없이 고유 효과만
+    const multLine = now.multiplier !== 1 ? `<span class="pj-mult">위력 ×${now.multiplier.toFixed(2)}</span>` : ''
+    return `<div class="wd-proj">
+      <div class="pj-head"><span>이 단어 적용</span><span>문장 최종</span>${multLine}</div>
+      <div class="pj-rows">${rows}</div>
+    </div>`
   }
 
   // 단어 하나의 범위(대상) — 다른 슬롯과 무관.
@@ -588,6 +636,7 @@ export class BattleView {
     if (this.state.pending) {
       const p = this.state.pending
       const targets = p.aoe ? aliveIdx(this.state) : [p.target]
+      const killed: number[] = []
       for (const ti of targets) {
         const e = this.state.enemies[ti]
         if (!e || e.dead) continue
@@ -595,11 +644,15 @@ export class BattleView {
         const el = this.q(`#actors .actor.foe[data-i="${ti}"]`)
         if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
         this.popAt(ti, `${p.dmg}`, 'dmg big')
-        if (e.hp <= 0) e.dead = true
+        if (e.hp <= 0) {
+          e.dead = true
+          killed.push(ti)
+        }
       }
       this.log(`예약된 문장 발동 → ${p.dmg} 피해`)
       this.state.pending = null
       await sleep(300)
+      for (const k of killed) await this.playDeath(k, 1)
       this.renderActors()
     }
 
@@ -627,6 +680,7 @@ export class BattleView {
     selfDmg: number
     heal: number
     guardGain: number
+    killed: number[]
   }) {
     const you = this.q<HTMLElement>('.actor.you')
     const attacking = res.hits.length > 0
@@ -649,46 +703,119 @@ export class BattleView {
     if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
     if (res.heal) await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
     if (res.guardGain > 0) await this.flyToPlayer(`방어+${res.guardGain}`, 'guard', 'guard')
+    // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
+    for (const k of res.killed) await this.playDeath(k, 1)
   }
 
-  // 초과 피해가 활활 타오르다 다음 적이 당겨오면 꽂힌다(오버플로우 → 도파민).
-  private async resolveOverflow(overflow: number) {
-    while (overflow > 0 && !allDead(this.state)) {
-      this.renderActors() // 다음 적이 최전방으로 당겨온다
-      const ember = this.showEmber(overflow)
-      await sleep(560) // 레일이 당겨오는 동안 숫자가 타오른다
-      const front = frontIdx(this.state)
-      if (front < 0) {
-        ember.remove()
-        break
-      }
-      const e = this.state.enemies[front]
-      const before = e.hp
-      e.hp -= overflow
-      ember.classList.add('stab')
-      const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${front}"]`)
-      if (el) {
-        SquareBurst.playOn(el, 'damage', { spread: 130 })
-        this.hitOne(el)
-      }
-      this.popAt(front, `${overflow}`, 'dmg big')
-      this.timers.push(window.setTimeout(() => ember.remove(), 200))
-      // 또 넘겼으면 남은 초과 피해가 다시 다음 적으로 이어진다(연쇄).
-      if (e.hp <= 0) {
-        e.dead = true
-        overflow = overflow - before
-      } else {
-        overflow = 0
-      }
-      await sleep(360)
-      this.renderActors()
+  // 적 사망 연출 — 카드가 살짝 젖혀졌다 옆으로 쓰러지고, 회색으로 변하며 소멸.
+  // combo가 높을수록 튀는 불꽃이 많아 관통 콤보의 화려함이 커진다.
+  private async playDeath(idx: number, combo = 1): Promise<void> {
+    const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${idx}"]`)
+    if (!el) return
+    el.classList.remove('lunge')
+    el.classList.add('dying')
+    this.spawnSparks(el, 8 + combo * 5)
+    await sleep(560)
+  }
+
+  // 불꽃 파편 — 지정 배우 근처에서 사방으로 튀며 사그라든다.
+  private spawnSparks(el: HTMLElement, count: number) {
+    const pbox = this.q('#pbox')
+    const r = this.toStage(el.getBoundingClientRect())
+    const cx = r.x
+    const cy = r.y + 150 // 스프라이트 몸통 근처
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div')
+      s.className = 'spark'
+      s.style.left = `${cx}px`
+      s.style.top = `${cy}px`
+      pbox.appendChild(s)
+      const ang = Math.random() * Math.PI * 2
+      const dist = 60 + Math.random() * 150
+      const dx = Math.cos(ang) * dist
+      const dy = Math.sin(ang) * dist - 50 // 살짝 위로 솟구쳤다 흩어짐
+      const dur = 420 + Math.random() * 380
+      s.animate(
+        [
+          { transform: 'translate(0,0) scale(1)', opacity: 1 },
+          { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(0.15)`, opacity: 0 },
+        ],
+        { duration: dur, easing: 'cubic-bezier(0.2,0.7,0.3,1)' },
+      )
+      this.timers.push(window.setTimeout(() => s.remove(), dur + 60))
     }
   }
 
-  // 중앙에서 타오르는 초과 피해 숫자.
-  private showEmber(n: number): HTMLElement {
+  // 관통 콤보 배지 — "관통 ×N". 콤보가 오를수록 크고 뜨겁게.
+  private showComboBadge(combo: number) {
+    if (combo < 2) return
+    const b = document.createElement('div')
+    b.className = 'combo-badge'
+    b.style.setProperty('--cb', String(Math.min(combo, 6)))
+    b.innerHTML = `<span class="cb-x">관통</span><span class="cb-n">×${combo}</span>`
+    this.q('#pbox').appendChild(b)
+    this.timers.push(window.setTimeout(() => b.remove(), 900))
+  }
+
+  // 화면 흔들림 — 관통이 깊을수록 강하게(0~1).
+  private shakeStage(intensity: number) {
+    if (intensity <= 0) return
+    const px = 5 + intensity * 13
+    this.q('#pbox').animate(
+      [
+        { transform: 'translate(0,0)' },
+        { transform: `translate(${px.toFixed(0)}px, ${(-px * 0.5).toFixed(0)}px)` },
+        { transform: `translate(${(-px * 0.8).toFixed(0)}px, ${(px * 0.4).toFixed(0)}px)` },
+        { transform: 'translate(0,0)' },
+      ],
+      { duration: 230, easing: 'ease-out' },
+    )
+  }
+
+  // 오버플로우 — 초과 피해가 꼬챙이처럼 다음 적을 깊게 관통한다(빠바바박).
+  // 한 마리씩 쓰러질수록 콤보가 오르고 불꽃·흔들림·배지가 점점 화려해진다.
+  private async resolveOverflow(overflow: number) {
+    let combo = 1 // strike의 첫 처치가 콤보 1. 관통마다 +1.
+    while (overflow > 0 && !allDead(this.state)) {
+      this.renderActors() // 다음 적이 최전방으로 당겨온다
+      const front = frontIdx(this.state)
+      if (front < 0) break
+      combo++
+      const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${front}"]`)
+      const ember = this.showEmber(overflow, combo)
+      // 콤보가 오를수록 대기가 짧아져 관통이 빨라진다(빠·바·바·박).
+      await sleep(Math.max(200, 480 - combo * 66))
+      const e = this.state.enemies[front]
+      const before = e.hp
+      e.hp -= overflow
+      // 깊고 화려한 관통 — 콤보에 따라 블라스트/불꽃/흔들림이 커진다.
+      ember.classList.add('stab')
+      this.showComboBadge(combo)
+      if (el) {
+        SquareBurst.playOn(el, 'damage', { spread: 120 + combo * 46 })
+        this.hitOne(el)
+        this.spawnSparks(el, 6 + combo * 4)
+      }
+      this.shakeStage(Math.min(1, combo / 5))
+      this.popAt(front, `${overflow}`, 'dmg big')
+      this.timers.push(window.setTimeout(() => ember.remove(), 220))
+      // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
+      if (e.hp <= 0) {
+        e.dead = true
+        await this.playDeath(front, combo)
+        overflow = overflow - before
+      } else {
+        overflow = 0
+        await sleep(320)
+      }
+    }
+    this.renderActors()
+  }
+
+  // 중앙에서 타오르는 초과 피해 숫자. 콤보가 높으면 더 뜨겁게 빛난다.
+  private showEmber(n: number, combo = 1): HTMLElement {
     const el = document.createElement('div')
-    el.className = 'ember-num'
+    el.className = 'ember-num' + (combo >= 3 ? ' hot' : '')
     el.textContent = String(n)
     this.q('#pbox').appendChild(el)
     return el
