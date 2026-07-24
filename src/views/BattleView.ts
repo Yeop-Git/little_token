@@ -8,7 +8,7 @@
  *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
  */
 
-import { compile, matchCombos, sentenceTokens } from '@core/compiler'
+import { compile, isDamageIntent, matchCombos, sentenceTokens } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import type { Selection, Tables, Word, FieldDef } from '@core/types'
 import { RARITY_LABEL } from '@core/types'
@@ -18,17 +18,20 @@ import {
   allDead,
   aliveIdx,
   applyIntent,
+  applyPreparation,
   enemyTurn,
   frontIdx,
   makeEnemy,
   type BattleState,
 } from '@/sim/reference'
-import { BACKGROUNDS, SPRITES } from '@/assets'
+import { BACKGROUNDS } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { STAT_LABEL, type StatKey } from '@data/items'
+import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
+import { CardHand } from '@/ui/CardHand'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -58,7 +61,9 @@ export class BattleView {
   private over = false
   private bagMode = false
   private timers: number[] = []
-  private hand: Record<string, Word[]> = {} // 슬롯별로 이번 턴에 보이는 단어(최대 3)
+  private cardHand!: CardHand
+  private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string }[] = []
+  private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -76,6 +81,7 @@ export class BattleView {
 
   destroy() {
     this.timers.forEach((t) => clearTimeout(t))
+    this.cardHand.destroy()
   }
 
   private mount() {
@@ -89,7 +95,7 @@ export class BattleView {
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-weather"><span id="f-weather"></span></div>
         </div>
-        <div class="turn-badge glass">턴 <b id="turn">1</b></div>
+        <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
 
         <div class="stage-area" id="pbox">
           <div class="chain-rail" id="chain"></div>
@@ -104,7 +110,14 @@ export class BattleView {
           <div class="pane-stack">
             <div class="pane words">
               <div class="slot-step" id="steps"></div>
-              <div class="word-row" id="grid"></div>
+              <div class="card-drop-zone disabled" id="card-drop-zone" role="button" tabindex="0"
+                aria-label="카드를 이곳으로 드래그해 단어 확정" aria-disabled="true">
+                <b>문장에 넣기</b><span>카드를 여기로 끌어 놓기</span>
+              </div>
+              <div class="card-table" aria-label="단어 카드 선택 영역">
+                <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
+                <button class="draw-deck" id="draw-deck" type="button"></button>
+              </div>
             </div>
             <div class="pane bag">
               <div class="bag-row" id="bagrow"></div>
@@ -119,7 +132,7 @@ export class BattleView {
           <button class="wordbook-btn" id="deck-btn">${icon('book')}<span>단어장</span></button>
         </div>
 
-        <div class="info-dock glass empty" id="detail"></div>
+        <aside class="info-dock glass cast-dock" id="detail" aria-live="polite"></aside>
 
         <div id="overlay"></div>
       </div>`
@@ -133,29 +146,22 @@ export class BattleView {
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
 
-    this.drawHand()
+    this.cardHand = new CardHand({
+      handRoot: this.q('#card-hand'),
+      deckButton: this.q<HTMLButtonElement>('#draw-deck'),
+      dropZone: this.q('#card-drop-zone'),
+      onConfirm: (word) => {
+        if (!this.busy && !this.over) this.pick(word.id)
+      },
+      onPreview: (word) => this.renderDetail(word),
+      onPreviewEnd: () => this.renderDetail(null),
+    })
     this.renderActors()
     this.renderChain()
     this.renderWords()
     this.renderStats()
     this.renderBag()
-  }
-
-  // 한 턴에 슬롯당 최대 3개만 보여준다(많아도 3가지). 매 턴 새로 뽑는다.
-  private drawHand() {
-    for (const s of this.t.template.slots) {
-      const pool = this.t.words[s.key] ?? []
-      if (pool.length <= 3) {
-        this.hand[s.key] = [...pool]
-        continue
-      }
-      const bag = [...pool]
-      for (let i = bag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[bag[i], bag[j]] = [bag[j], bag[i]]
-      }
-      this.hand[s.key] = bag.slice(0, 3)
-    }
+    this.renderCastLog()
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -199,34 +205,131 @@ export class BattleView {
         const op = Math.max(0.42, 1 - rank * 0.26)
         const front = rank === 0
         const pct = Math.max(0, (e.hp / e.maxHp) * 100)
-        const imgStyle = front
-          ? `transform:scale(${scale.toFixed(2)});`
-          : `transform:scale(${scale.toFixed(2)}); filter: blur(${blur.toFixed(1)}px) drop-shadow(0 12px 12px rgba(0,0,0,0.4));`
+        const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
         return `
-        <div class="actor foe ${front ? 'front target' : 'back'}" data-i="${i}" style="right:${right}px; opacity:${op.toFixed(2)};">
+        <div class="actor foe ${front ? 'front target' : 'back'}" data-i="${i}" data-character="${visual.id}"
+          role="button" tabindex="0" aria-label="${e.def.name} 상세 보기"
+          style="right:${right}px; opacity:${op.toFixed(2)}; --model-scale:${scale.toFixed(2)}; --model-blur:${blur.toFixed(1)}px;">
           ${front
             ? `<div class="nameplate glass">
                  <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
-                 <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
+                 <div class="hp-row">
+                   <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
+                   ${this.initiativeHtml(e.initiativePhase)}
+                 </div>
                </div>`
             : ''}
           <div class="shadow"></div>
-          <img class="sprite" src="${SPRITES[e.def.sprite]}" alt="${e.def.name}" style="${imgStyle}">
+          <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+          ${front ? '<span class="inspect-hint">마우스를 올려 상세 보기</span>' : ''}
         </div>`
       })
       .join('')
 
     const php = Math.max(0, (s.playerHp / s.playerMax) * 100)
     host.innerHTML = `
-      <div class="actor you">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="우비 아이 상세 보기">
         <div class="nameplate glass">
           <div class="row"><span class="nm">우비 아이</span><span class="hpn">${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}</span></div>
           <div class="hpbar you"><div class="fill" style="width:${php}%"></div></div>
         </div>
         <div class="shadow"></div>
-        <img class="sprite" src="${SPRITES.player_001}" alt="우비 아이">
+        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="우비 아이"></div>
+        <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>
       ${enemyHtml}`
+
+    host.querySelectorAll<HTMLElement>('.actor[role="button"]').forEach((actor) => {
+      const show = () => {
+        const id = actor.dataset.character as CharacterVisualDef['id']
+        this.renderCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
+      }
+      actor.addEventListener('mouseenter', show)
+      actor.addEventListener('mouseleave', () => this.renderCastLog())
+      actor.addEventListener('focus', show)
+      actor.addEventListener('blur', () => this.renderCastLog())
+      actor.addEventListener('click', show)
+      actor.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          show()
+        }
+      })
+    })
+  }
+
+  private initiativeHtml(phase: 'first' | 'second') {
+    const first = phase === 'first'
+    const label = first ? '선공' : '후공'
+    const desc = first ? '문장 완성 직후, 플레이어보다 먼저 행동' : '플레이어 행동이 끝난 뒤 행동'
+    const glyph = first
+      ? '<path d="M5 12h12M13 7l5 5-5 5"/><path d="M3 7l5 5-5 5"/>'
+      : '<path d="M19 12H7M11 7l-5 5 5 5"/><circle cx="18" cy="12" r="2"/>'
+    return `<span class="initiative-chip ${phase}" title="${label} · ${desc}" aria-label="${label}: ${desc}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${glyph}</svg><b>${label}</b>
+    </span>`
+  }
+
+  private setPhase(label: string) {
+    const el = this.root.querySelector<HTMLElement>('#phase')
+    if (el) el.textContent = label
+  }
+
+  // 캐릭터 호버 상세는 우측 캐스트 로그 패널 위에 그대로 겹쳐 표시한다.
+  private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
+    const visual = CHARACTER_VISUALS[id]
+    const host = this.q('#detail')
+    this.dockMode = 'character'
+    let stats: string
+    if (id === 'player') {
+      const p = this.player.stats
+      stats = [
+        ['체력', `${Math.max(0, this.state.playerHp)} / ${this.state.playerMax}`],
+        ['공격', String(p.atk)],
+        ['방어', String(p.guard)],
+        ['회복', String(p.heal)],
+        ['운', String(p.luck)],
+      ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
+    } else {
+      const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
+      stats = enemy
+        ? [
+            ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
+            ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
+            ['행동 주기', `${enemy.def.every}턴`],
+            ['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공'],
+          ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
+        : ''
+    }
+    host.className = 'info-dock glass character-dock'
+    host.innerHTML = `
+      <article aria-label="${visual.name} 상세 정보">
+        <div class="character-portrait"><img src="${visual.portrait2d}" alt="${visual.name} 2D 스프라이트"></div>
+        <div class="character-copy">
+          <div class="character-kicker">CHARACTER DETAIL</div>
+          <h2>${visual.name}</h2>
+          <h3>${visual.title}</h3>
+          <p>${visual.description}</p>
+          <div class="character-stats">${stats}</div>
+          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${this.state.enemies[enemyIndex ?? 0]?.def.note ?? ''}</div>`}
+        </div>
+      </article>`
+  }
+
+  private renderCastLog() {
+    const host = this.q('#detail')
+    this.dockMode = 'log'
+    host.className = 'info-dock glass cast-dock'
+    const rows = [...this.castLog]
+      .reverse()
+      .map((entry) => `<div class="cast-entry ${entry.kind}">
+        <div class="cast-meta"><span>TURN ${entry.turn}</span><b>${entry.kind === 'cast' ? '문장' : entry.kind === 'enemy' ? '적 행동' : '기록'}</b></div>
+        <div class="cast-text">${entry.text}</div>
+      </div>`)
+      .join('')
+    host.innerHTML = `
+      <div class="cast-head"><span class="cast-kicker">DIARY CAST</span><h2>문장 캐스트 로그</h2></div>
+      <div class="cast-list">${rows || '<div class="cast-empty">아직 발동한 문장이 없다.<br>첫 문장을 완성해 이야기를 시작하자.</div>'}</div>`
   }
 
   // ── 상단 발광 체인(문장) + 맥락/어긋남 미리보기 ──
@@ -270,32 +373,8 @@ export class BattleView {
       )
 
     const key = this.order()[this.slotIndex]
-    // 손패(최대 3). 이미 고른 단어가 손패에 없으면 포함시켜 표시가 어긋나지 않게.
-    const words = [...(this.hand[key] ?? this.t.words[key] ?? [])]
-    const chosen = this.sel[key]
-    if (chosen && !words.some((w) => w.id === chosen.id)) words.unshift(chosen)
-    const grid = this.q('#grid')
-    grid.innerHTML = words
-      .map((w) => {
-        const why = conflictReason(w, this.slotIndex, this.sel, this.t)
-        const picked = this.sel[key]?.id === w.id
-        const cls = ['word-cell', `mood-${this.moodOf(w)}`, picked ? 'picked' : '', why ? 'blocked' : ''].join(' ')
-        return `<button class="${cls}" data-id="${w.id}">
-          <span class="w">${w.text}</span>
-          <span class="n">${why ?? w.note}</span>
-        </button>`
-      })
-      .join('')
-
-    grid.querySelectorAll<HTMLElement>('.word-cell').forEach((btn) => {
-      const w = words.find((x) => x.id === btn.dataset.id)!
-      btn.addEventListener('mouseenter', () => this.renderDetail(w))
-      btn.addEventListener('mouseleave', () => this.renderDetail(null))
-      btn.addEventListener('click', () => {
-        if (btn.classList.contains('blocked') || this.busy || this.over) return
-        this.pick(btn.dataset.id!)
-      })
-    })
+    const words = this.player.deck[key] ?? this.t.words[key] ?? []
+    this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
     if (!this.bagMode) this.renderDetail(null)
   }
 
@@ -307,10 +386,10 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
-      detail.className = 'info-dock glass empty'
-      detail.innerHTML = '단어에 마우스를 올리면<br>등급 · 범위 · 최종 적용 수치가 여기 표시된다.'
+      this.renderCastLog()
       return
     }
+    this.dockMode = 'word'
     const rarity = w.rarity ?? 'common'
     const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
     const mood = this.moodOf(w)
@@ -339,8 +418,9 @@ export class BattleView {
     if (guard > 0) guard += this.player.stats.guard
     if (heal > 0) heal += this.player.stats.heal
     const atk = this.player.stats.atk
-    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
-    const dmg = intent.kind === 'heal' ? 0 : Math.round(effBase * intent.multiplier)
+    const dealsDamage = isDamageIntent(intent)
+    const effBase = dealsDamage ? intent.base + atk : 0
+    const dmg = dealsDamage ? Math.round(effBase * intent.multiplier) : 0
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: intent.multiplier }
     return { dmg, heal, guard, self: intent.recoil, multiplier: intent.multiplier }
   }
@@ -380,7 +460,7 @@ export class BattleView {
 
   // 단어 하나의 범위(대상) — 다른 슬롯과 무관.
   private wordRange(w: Word): string {
-    if (w.kind === 'heal') return '자신'
+    if (w.kind === 'heal' || w.kind === 'guard') return '자신'
     if (w.aoe === 'all') return w.targetMode === 'both' ? '적 전체 + 자신' : '적 전체'
     if (w.targetMode === 'both') return '적 하나 + 자신'
     if (w.targetMode === 'enemy' || w.kind === 'attack' || (w.power ?? 0) > 0) return '적 하나'
@@ -450,12 +530,10 @@ export class BattleView {
   private renderItemDetail(item: OwnedItem | null) {
     const detail = this.q('#detail')
     if (!item) {
-      detail.className = 'info-dock glass empty'
-      detail.innerHTML = this.bagMode
-        ? '아이템에 마우스를 올리면<br>스탯과 일러스트가 여기 표시된다.'
-        : '단어에 마우스를 올리면<br>등급 · 범위 · 수치가 여기 표시된다.'
+      this.renderCastLog()
       return
     }
+    this.dockMode = 'item'
     const rows = STAT_ORDER.filter((k) => item.stats[k])
       .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
       .join('')
@@ -517,6 +595,7 @@ export class BattleView {
     let next = this.slotIndex + 1
     while (next < order.length && this.sel[order[next]]) next++
     this.slotIndex = Math.min(next, order.length - 1)
+    this.setPhase(this.complete() ? '단어 완성' : `${this.t.template.slots[this.slotIndex].label} 선택`)
     this.renderChain()
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
@@ -533,6 +612,7 @@ export class BattleView {
         delete next[order[i]]
         this.sel = next
         this.slotIndex = i
+        this.setPhase(`${this.t.template.slots[i].label} 선택`)
         break
       }
     }
@@ -572,11 +652,12 @@ export class BattleView {
     if (intent.guard > 0) intent.guard += this.player.stats.guard
     if (intent.heal > 0) intent.heal += this.player.stats.heal
     const atk = this.player.stats.atk
-    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
+    const dealsDamage = isDamageIntent(intent)
+    const effBase = dealsDamage ? intent.base + atk : 0
     const dmg = Math.round(effBase * intent.multiplier)
     const heal = intent.heal
 
-    // 1) 팅팅팅 — 각 단어의 기여 수치가 문장 위로 톡톡 튄다
+    // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
     for (let i = 0; i < order.length; i++) {
       const w = this.sel[order[i]]
@@ -589,7 +670,7 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(150)
 
-    // 2) 맥락(관용구) 발동 배너
+    // 맥락(관용구) 발동 배너
     if (intent.combos.length) {
       const combos = matchCombos(this.sel, this.t.combos, order)
       const mult = combos.reduce((m, c) => m * c.mult, 1)
@@ -601,12 +682,34 @@ export class BattleView {
       await sleep(760)
     }
 
-    // 3) 총합이 띠리리릭 차오른다
+    // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
+    this.setPhase('준비 효과')
+    const prep = applyPreparation(this.state, intent)
+    if (prep.guardGain > 0) {
+      await this.rollTotal(prep.guardGain, 'guard')
+      await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
+      this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
+    }
+    this.renderActors()
+
+    // 6) 선공 상대 행동 — 이번 문장의 준비 효과를 받은 뒤 공격한다.
+    this.setPhase('선공 상대 행동')
+    await this.enemyPhase('first')
+    if (this.state.playerHp <= 0) {
+      this.over = true
+      this.setPhase('패배')
+      this.log('일기장이 너무 상했다… (패배)')
+      return
+    }
+
+    // 7) 본인 캐릭터 행동 — 공격·회복·자해 등 나머지 효과를 적용한다.
+    this.setPhase('본인 캐릭터 행동')
+
+    // 본행동 총합이 띠리리릭 차오른다.
     const totalVal = dmg > 0 ? dmg : heal
     if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
-    // 4) 실제 발동 + 꽂힘 연출
-    const startFront = frontIdx(this.state)
+    // 실제 본행동 발동 + 꽂힘 연출
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
     await this.strike(res)
     this.log(
@@ -621,17 +724,16 @@ export class BattleView {
 
     if (allDead(this.state)) {
       this.over = true
+      this.setPhase('전투 승리')
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
       await sleep(800)
       this.onWin()
       return
     }
 
-    // 5) 적 턴 — 방금 최전방으로 도착한 적은 이번 턴 공격 유예(부조리 방지)
-    this.state.turn++
-    this.q('#turn').textContent = String(this.state.turn)
-    const grace = frontIdx(this.state) !== startFront
-    await this.enemyPhase(grace)
+    // 8) 후공 상대 행동 — 플레이어 본행동이 끝난 뒤 행동한다.
+    this.setPhase('후공 상대 행동')
+    await this.enemyPhase('second')
 
     if (this.state.pending) {
       const p = this.state.pending
@@ -658,9 +760,11 @@ export class BattleView {
 
     if (this.state.playerHp <= 0) {
       this.over = true
+      this.setPhase('패배')
       this.log('일기장이 너무 상했다… (패배)')
     } else if (allDead(this.state)) {
       this.over = true
+      this.setPhase('전투 승리')
       await sleep(500)
       this.onWin()
       return
@@ -668,8 +772,11 @@ export class BattleView {
 
     this.sel = {}
     this.slotIndex = 0
+    this.state.turn++
+    this.q('#turn').textContent = String(this.state.turn)
+    this.setPhase('주어 선택')
     this.busy = false
-    this.drawHand()
+    this.cardHand.resetTurn()
     this.renderChain()
     this.renderWords()
   }
@@ -679,7 +786,6 @@ export class BattleView {
     hits: { target: number; dmg: number }[]
     selfDmg: number
     heal: number
-    guardGain: number
     killed: number[]
   }) {
     const you = this.q<HTMLElement>('.actor.you')
@@ -699,10 +805,9 @@ export class BattleView {
       await sleep(250)
       you.classList.remove('lunge')
     }
-    // 방어/회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다.
+    // 회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다. 방어는 준비 단계에서 처리한다.
     if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
     if (res.heal) await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
-    if (res.guardGain > 0) await this.flyToPlayer(`방어+${res.guardGain}`, 'guard', 'guard')
     // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
     for (const k of res.killed) await this.playDeath(k, 1)
   }
@@ -850,8 +955,8 @@ export class BattleView {
   }
 
   // 적 턴 연출 — 최전방 적이 돌진해 플레이어에게 사각 블라스트.
-  private async enemyPhase(skipFront = false) {
-    for (const st of enemyTurn(this.state, Math.random, skipFront)) {
+  private async enemyPhase(phase: 'first' | 'second') {
+    for (const st of enemyTurn(this.state, Math.random, phase)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
       if (st.dealt <= 0) {
         this.log(st.text)
@@ -935,5 +1040,10 @@ export class BattleView {
     host.appendChild(line)
     this.timers.push(window.setTimeout(() => line.remove(), 3100))
     while (host.children.length > 3) host.removeChild(host.firstChild!)
+
+    const kind = html.includes('습격') ? 'enemy' : html.includes('→') ? 'cast' : 'system'
+    this.castLog.push({ turn: this.state.turn, kind, text: html })
+    if (this.castLog.length > 8) this.castLog.shift()
+    if (this.dockMode === 'log') this.renderCastLog()
   }
 }

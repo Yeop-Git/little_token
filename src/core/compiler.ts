@@ -9,6 +9,9 @@
 import { eul } from './josa'
 import type { Combo, Intent, Rarity, Selection, Tables, Word } from './types'
 
+export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
+  intent.kind !== 'heal' && intent.kind !== 'guard'
+
 // 등급이 높은 문장일수록 더 강하게 — 기존 배수 풀에 등급 보너스를 얹는다.
 // (새 효과를 늘리지 않고 공격/배율만 강화하는 방향.)
 const RARITY_WEIGHT: Record<Rarity, number> = { common: 0, rare: 0.15, epic: 0.3, legendary: 0.5 }
