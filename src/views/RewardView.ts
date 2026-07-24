@@ -7,17 +7,21 @@ import type { FieldDef, Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
+import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
 import { STAT_LABEL, type StatKey } from '@data/items'
 
 interface Opts {
   day: number
+  /** 전투에서 확정된 보상등급 — 카드 희귀도가 이 등급의 가중치로 굴려졌다. */
+  grade: number
   nextField: FieldDef
   options: RewardOption[]
   onPick: (opt: RewardOption) => void
 }
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb: '동사', obj: '목적어', end: '어미' }
+const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
 const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
 const pct = (b: number) => `${b >= 0 ? '+' : ''}${Math.round(b * 100)}%`
 
@@ -137,6 +141,7 @@ export class RewardView {
             <div class="reward-head">
               <div class="k">${opts.day}일차 클리어</div>
               <div class="t hand">전리품을 고르자</div>
+              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade}</b></div>
             </div>
             <div class="reward-field">
               내일은 <b>${f.date}</b> · <b>${f.title}</b><br>${f.desc}
@@ -172,7 +177,10 @@ export class RewardView {
         <span class="rp-veil" aria-hidden="true"></span>
         <div class="rp-top">
           <span class="rp-type">${typeLabel(p)}</span>
-          <span class="rp-badge">${badge}</span>
+          <span class="rp-tags">
+            <span class="rp-rarity rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</span>
+            <span class="rp-badge">${badge}</span>
+          </span>
         </div>
         <div class="rp-foot">
           <div class="rp-name">${p.name}</div>

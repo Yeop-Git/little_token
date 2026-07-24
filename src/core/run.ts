@@ -4,7 +4,7 @@
  */
 
 import type { OwnedItem, PlayerState, PlayerStats } from './player'
-import type { Rarity, Word } from './types'
+import type { Word } from './types'
 import { EARLY_WORDS } from '@data/earlyWords'
 
 export interface RunState {
@@ -29,16 +29,6 @@ export function startingPlayer(): PlayerState {
 
 export function newRun(): RunState {
   return { player: startingPlayer(), day: 1 }
-}
-
-const RARITY_ORDER: Record<Rarity, number> = { common: 0, rare: 1, epic: 2, legendary: 3 }
-
-// 운이 낮으면 커먼~레어만, 오를수록 영웅·전설 해금.
-export function luckRarityCap(luck: number): Rarity {
-  return luck < 5 ? 'rare' : luck < 10 ? 'epic' : 'legendary'
-}
-export function rarityAllowed(r: Rarity, cap: Rarity): boolean {
-  return RARITY_ORDER[r] <= RARITY_ORDER[cap]
 }
 
 // 아이템 보상 = 스탯 수치 상승(스펙업).

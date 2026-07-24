@@ -39,6 +39,7 @@ import { BACKGROUNDS } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
+import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -51,7 +52,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 interface Opts {
   field: FieldDef
   encounter: string[]
-  onWin: () => void
+  /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
+  onWin: (grade: number) => void
   player?: PlayerState
   tables?: Tables
   hpMult?: number
@@ -92,7 +94,9 @@ interface Tally {
 export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
-  private onWin: () => void
+  private onWin: (grade: number) => void
+  // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
+  private grade = 0
   private player: PlayerState
   private state: BattleState
   private sel: Selection = {}
@@ -122,6 +126,7 @@ export class BattleView {
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
+    this.grade = startGrade(this.player.stats.luck)
     this.target = aliveIdx(this.state)[0] ?? 0
     this.mount()
     if (opts.intro) this.mountIntro()
@@ -198,6 +203,7 @@ export class BattleView {
           <div class="hud-weather"><span id="f-weather"></span></div>
         </div>
         <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+        <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
 
         <div class="stage-area" id="pbox">
           <div class="chain-rail" id="chain"></div>
@@ -242,6 +248,7 @@ export class BattleView {
     this.q('#f-title').textContent = this.field.title
     this.q('#f-desc').textContent = this.field.desc.replace(/<[^>]+>/g, '')
     this.q('#f-weather').innerHTML = weatherIcon(this.field.weather)
+    this.renderGrade()
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
@@ -1034,14 +1041,19 @@ export class BattleView {
     this.renderActors()
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
-    if (res.overflow > 0 && !allDead(this.state)) await this.resolveOverflow(res.overflow, sweep)
+    let kills = res.killed.length
+    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
+
+    // 한 턴에 두 마리 이상 쓸어담으면 보상등급이 띵·띵·띵 오른다. 전멸 마무리면 +1.
+    const gradeGain = overkillGain(kills, allDead(this.state))
+    if (gradeGain > 0) await this.dingGrade(gradeGain)
 
     if (allDead(this.state)) {
       this.over = true
       this.setPhase('전투 승리')
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
       await sleep(800)
-      this.onWin()
+      this.onWin(this.grade)
       return
     }
 
@@ -1070,6 +1082,9 @@ export class BattleView {
       await sleep(300)
       for (const k of killed) await this.playDeath(k, 1)
       this.renderActors()
+      // 예약 문장의 몰살도 오버킬로 인정한다.
+      const pendingGain = overkillGain(killed.length, allDead(this.state))
+      if (pendingGain > 0) await this.dingGrade(pendingGain)
     }
 
     if (this.state.playerHp <= 0) {
@@ -1080,7 +1095,7 @@ export class BattleView {
       this.over = true
       this.setPhase('전투 승리')
       await sleep(500)
-      this.onWin()
+      this.onWin(this.grade)
       return
     }
 
@@ -1088,6 +1103,10 @@ export class BattleView {
     this.slotIndex = 0
     this.state.turn++
     this.q('#turn').textContent = String(this.state.turn)
+    // 턴이 넘어가면 등급이 식는다 — 운이 보장하는 바닥까지만.
+    const prevGrade = this.grade
+    this.grade = decayGrade(this.grade, this.player.stats.luck)
+    if (this.grade < prevGrade) this.tickGradeDown()
     this.setPhase('주어 선택')
     this.busy = false
     this.cardHand.resetTurn()
@@ -1243,10 +1262,12 @@ export class BattleView {
 
   // 오버플로우 — 초과 피해가 꼬챙이처럼 다음 적을 깊게 관통한다(빠바바박).
   // 한 마리씩 쓰러질수록 콤보가 오르고 불꽃·흔들림·배지가 점점 화려해진다.
-  private async resolveOverflow(overflow: number, sweep = false) {
+  // 반환값: 관통으로 추가 처치한 수(보상등급 오버킬 집계용).
+  private async resolveOverflow(overflow: number, sweep = false): Promise<number> {
     const actors = this.q('#actors')
     if (sweep) actors.classList.add('rail-rush')
     let combo = 1 // strike의 첫 처치가 콤보 1. 관통마다 +1.
+    let killedCount = 0
     while (overflow > 0 && !allDead(this.state)) {
       this.renderActors() // 다음 적이 최전방으로 당겨온다
       const front = frontIdx(this.state)
@@ -1274,6 +1295,7 @@ export class BattleView {
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
       if (e.hp <= 0) {
         e.dead = true
+        killedCount++
         await this.playDeath(front, combo, sweep)
         overflow = overflow - before
       } else {
@@ -1283,6 +1305,44 @@ export class BattleView {
     }
     this.renderActors()
     if (sweep) this.timers.push(window.setTimeout(() => actors.classList.remove('rail-rush'), 460))
+    return killedCount
+  }
+
+  // 보상등급 배지 — 현재 등급 숫자와, 그 등급이면 노려볼 만한 희귀도의 색.
+  private renderGrade() {
+    const badge = this.q('#grade-badge')
+    badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
+    badge.classList.add(`rarity-${gradeTier(this.grade)}`)
+    this.q('#grade').textContent = `✦ ${this.grade}`
+  }
+
+  // 띵·띵·띵 — 처치 수만큼 등급이 연타로 튀어오른다. 만렙이면 조용히 멈춘다.
+  private async dingGrade(n: number) {
+    const badge = this.q('#grade-badge')
+    for (let i = 0; i < n; i++) {
+      if (this.grade >= GRADE_MAX) break
+      this.grade = bumpGrade(this.grade, 1)
+      this.renderGrade()
+      badge.classList.remove('ding')
+      void (badge as HTMLElement).offsetWidth
+      badge.classList.add('ding')
+      GameAudio.play('wordSelect')
+      const pop = document.createElement('span')
+      pop.className = 'grade-pop'
+      pop.textContent = '+1'
+      badge.appendChild(pop)
+      this.timers.push(window.setTimeout(() => pop.remove(), 700))
+      await sleep(150)
+    }
+  }
+
+  // 턴 경과 감쇠 — 배지가 살짝 가라앉으며 식는다.
+  private tickGradeDown() {
+    this.renderGrade()
+    const badge = this.q('#grade-badge')
+    badge.classList.remove('down')
+    void (badge as HTMLElement).offsetWidth
+    badge.classList.add('down')
   }
 
   // 중앙에서 타오르는 초과 피해 숫자. 콤보가 높으면 더 뜨겁게 빛난다.

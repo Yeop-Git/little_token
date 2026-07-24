@@ -15,6 +15,7 @@ import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
+import { startGrade } from '@core/grade'
 import { clearRun, loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 
@@ -98,18 +99,20 @@ function goBattle(intro = false) {
     atkMult: st.atkMult,
     player: run.player,
     tables: makeEarlyTables(run.player.deck),
-    onWin: () => goReward(),
+    onWin: (grade) => goReward(grade),
     intro,
   })
   mountMeta(intro ? 'intro' : 'battle')
 }
 
-function goReward() {
+// 전투에서 들고 나온 보상등급이 희귀도 확률을 정한다. 씬 점퍼 직행이면 운 기준 시작 등급.
+function goReward(grade = startGrade(run.player.stats.luck)) {
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player)
+  const options = genRewards(run.player, grade)
   current = new RewardView(stage, {
     day: run.day,
+    grade,
     nextField: stageFor(run.day + 1).field,
     options,
     onPick: (opt) => {

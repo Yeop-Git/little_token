@@ -3,26 +3,30 @@ early,na,"나는",subj,self,first,,,,0.2,,,enemy,,common,"배율 ×1.20","오늘
 early,eoje,"어제의 나는",subj,self|mind,first,,,,0.2,,,enemy,,common,"배율 ×1.20","지난 장을 손끝으로 짚는다.",,,,,,,,,,
 early,nado,"나도",subj,self|echo,first,,,,0.2,,,enemy,,common,"배율 ×1.20","누가 먼저였는지는 중요하지 않다.",,,,,,,,,,
 early,oneul,"오늘의 나는",subj,self|now,first,,,,0.2,,,enemy,,common,"배율 ×1.20","오늘 몫은 오늘 적는다.",,,,,,,,,,
-early,gyeop,"겁먹은 나는",subj,self|fear,first,,,,0,,,enemy,,common,"도박 50% — ×1.40 / ×1.00","연필 쥔 손이 떨린다. 그래서 가끔 더 세게.",,,,,0.5,1.4,1,,,
+early,gyeop,"겁먹은 나는",subj,self|fear,first,,,,0,,,enemy,,rare,"도박 40% — ×2.50 / ×1.00","연필 쥔 손이 떨린다. 그래서 터질 땐 크게.",,,,,0.4,2.5,1,,,
 early,naman,"나만은",subj,self|solo,first,,,,0.6,,,enemy,,rare,"배율 ×1.60","아무도 없어도 나는 남는다.",,,,,,,,,,
 early,dachin,"다친 나는",subj,self|hurt,first,,,,0,,,enemy,,rare,"도박 50% — ×2.20 / ×1.00","아픈 자리가 오히려 뜨겁다.",,,,,0.5,2.2,1,,,
 reward,uri,"우리는",subj,self|both,first,,,,0,,,enemy,,epic,"도박 50% — ×3.20 / ×1.00","함께라면 크게 타오른다.",,,,,0.5,3.2,1,,,
 early,himkkeot,"힘껏",adv,force,,atk,,,0.15,,,,,common,"배율 ×1.15 · 대성공 10%","팔에 힘을 준다.",,,,,,,,0.1,,2001
 early,dandanhi,"단단히",adv,solid,,guard,,,0.1,,,,,common,"배율 ×1.10 · 대성공 20%","이를 악문다.",,,,,,,,0.2,,2002
 early,saljjak,"살짝",adv,soft,,heal,,,0,,,,,common,"배율 ×1.00 · 대성공 40%","조심스럽게.",,,,,,,,0.4,,2003
-early,naepda,"냅다",adv,rush,,atk,,,0.15,,,,,common,"배율 ×1.15 · 대성공 10%","앞뒤 안 가리고.",,,,,,,,0.1,,
+early,naepda,"냅다",adv,rush,,atk,,,0.4,,,,,rare,"배율 ×1.40 · 대성공 25%","앞뒤 안 가리고.",,,,,,,,0.25,,
 early,kkuk,"꾹 참고",adv,grit,,guard,,,0.1,,,,,common,"배율 ×1.10 · 대성공 20%","울음을 삼킨다.",,,,,,,,0.2,,
 early,nunmullo,"눈물로",adv,tear,,heal,,,0,,,,,common,"배율 ×1.00 · 대성공 40%","젖은 눈으로 쓴다.",,,,,,,,0.4,,
 early,ttaeryeot,"때렸다",verb,atk,,atk,1,,,attack,,,,common,"공격 ×1","정직한 한 방.",,,,,,,,,,3001
 early,makat,"막았다",verb,grd,,guard,1,,,guard,,,,common,"방어 ×1","한 발 버틴다.",,,,,,,,,,3002
 early,gamssat,"감쌌다",verb,mend,,heal,1,,,heal,,,,common,"회복 ×1","상처를 매만진다.",,,,,,,,,,3003
-early,huryeo,"후려쳤다",verb,atk|swing,,atk,1,,,attack,,,,common,"공격 ×1","크게 휘두른다.",,,,,,,,,,
+early,huryeo,"후려쳤다",verb,atk|swing,,atk,1.5,,,attack,,,,rare,"공격 ×1.5","크게 휘두른다.",,,,,,,,,,
 early,jikyeot,"지켰다",verb,grd|hold,,guard,1,,,guard,,,,common,"방어 ×1","한 뼘도 안 내준다.",,,,,,,,,,
 early,pumeot,"품었다",verb,mend|warm,,heal,1,,,heal,,,,common,"회복 ×1","가슴에 안는다.",,,,,,,,,,
 reward,jaeppalli,"재빨리",adv,swift,,luck,,,0.5,,,,,rare,"배율 ×1.50 · 대성공 15%","숨 돌릴 틈 없이.",,,,,,,,0.15,,
 reward,motdohage,"못 이기는 척",adv,mad,,luck,,,0.3,,,,,rare,"배율 ×1.30 · 대성공 45%","안 하려 했는데, 손이 먼저 나갔다.",,,,,,,,0.45,,
 reward,naedeonjyeot,"내던졌다",verb,atk|hurl,,atk,1.5,,,attack,,,,rare,"공격 ×1.5","있는 힘껏 내던진다.",,,,,,,,,,
 reward,ureojyeot,"웅크렸다",verb,grd|mend,,guard,1.5,,,guard,,,,rare,"방어 ×1.5","몸을 말아 지킨다.",,,,,,,,,,
+reward,michin,"미친듯이",adv,mad,,atk,,,0.7,,,,,epic,"배율 ×1.70 · 대성공 45%","종이가 타는 냄새. 멈출 수 없다.",,,,,,,,0.45,,
+reward,ipan,"이판사판",adv,reckless,,atk,,,0,,,,,epic,"도박 50% — ×3.20 / ×1.00","이래 죽으나 저래 죽으나.",,,,,0.5,3.2,1,,,
+reward,baksal,"박살냈다",verb,atk|smash,,atk,2,,,attack,,,,epic,"공격 ×2","산산조각 낸다.",,,,,,,,,,
+reward,hwissda,"휩쓸어버렸다",verb,atk|wide,,atk,1.4,,,attack,,,all,epic,"공격 ×1.4 · 전체 적중","페이지 끝에서 끝까지 쓸어버린다.",,,,,,,,,,
 expansion,na,"나는",subj,self,first,,,,0.2,,,enemy,,common,"배율 ×1.20","일기의 화자. 언제나 여기서 시작한다.",,,,,,,,,,
 expansion,neo,"너는",subj,enemy,second,,,,0.2,,,enemy,,rare,"주어로 쓸 수 없다 — 일기의 주어는 나·우리","손끝을 겨눈다. 하지만 이건 내 일기다.",,,,,,,,,,
 expansion,geu,"그 애는",subj,other,third,,,,0.2,,,enemy,,rare,"주어로 쓸 수 없다 — 일기의 주어는 나·우리","남의 이야기는 남의 공책에.",,,,,,,,,,
