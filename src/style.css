@@ -2484,8 +2484,12 @@ button {
   transform: translate(-50%, 20px);
   width: min(1440px, 92%);
   min-height: 180px;
-  padding: 26px 46px;
+  padding: 24px 46px;
   border-radius: 24px;
+  /* 이름·문장·단어 칩 묶음을 상자 안에서 세로 중앙에 둔다 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
   background: linear-gradient(180deg, rgba(32, 24, 8, 0.7), rgba(20, 14, 4, 0.88));
   box-shadow:
@@ -2511,8 +2515,8 @@ button {
 }
 
 .intro-dlg-box-inner {
-  max-width: 720px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 760px;
 }
 
 /* 토큰의 이름 — 샛노란 발광 */
@@ -2644,10 +2648,7 @@ button {
   transition: left 0.6s ease;
 }
 
-/* 단어 선택 중엔 초상이 좌측으로 비켜서고 중앙에 단어 칩이 뜬다 */
-.intro-dialogue.is-choice .intro-dlg-stage {
-  left: 27%;
-}
+/* 단어 칩이 대화창 안으로 들어오면서, 초상은 굳이 비켜설 필요가 없어졌다(제자리 유지). */
 
 .intro-dialogue.is-gone .intro-dlg-stage {
   opacity: 0;
@@ -2719,16 +2720,22 @@ button {
   }
 }
 
-/* ── 플레이어 단어 칩: 화면 중앙에 흩어진 인게임풍 단어 카드 ── */
+/* ── 플레이어 단어 칩: 대화창 안, 문장 아래에 순서대로 뜨는 인게임풍 단어 카드 ── */
 .intro-dlg-choice {
-  position: absolute;
-  left: 58%;
-  top: 42%;
-  transform: translate(-50%, -50%);
   display: flex;
-  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
   pointer-events: none;
   transition: opacity 0.45s ease;
+}
+/* 토큰 대사(단어 칩 없음)일 땐 자리를 차지하지 않는다 */
+.intro-dlg-choice:not(:empty) {
+  margin-top: 20px;
+}
+/* 플레이어 대사는 문장이 아직 짧으니 위 여백을 줄여 칩을 중앙으로 끌어올린다 */
+.intro-dlg-box.is-player-line .intro-dlg-text {
+  min-height: 1.3em;
 }
 
 .intro-dlg-choice.is-leaving {
@@ -2737,9 +2744,9 @@ button {
 
 .intro-word-chip {
   pointer-events: auto;
-  padding: 16px 26px;
-  border-radius: 18px;
-  font-size: 26px;
+  padding: 15px 30px;
+  border-radius: 17px;
+  font-size: 27px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--gold-hi);
