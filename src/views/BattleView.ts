@@ -60,6 +60,8 @@ export class BattleView {
   private bagMode = false
   private timers: number[] = []
   private hand: Record<string, Word[]> = {} // 슬롯별로 이번 턴에 보이는 단어(최대 3)
+  private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string }[] = []
+  private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -120,7 +122,7 @@ export class BattleView {
           <button class="wordbook-btn" id="deck-btn">${icon('book')}<span>단어장</span></button>
         </div>
 
-        <div class="info-dock glass empty" id="detail"></div>
+        <aside class="info-dock glass cast-dock" id="detail" aria-live="polite"></aside>
 
         <div id="overlay"></div>
       </div>`
@@ -140,6 +142,7 @@ export class BattleView {
     this.renderWords()
     this.renderStats()
     this.renderBag()
+    this.renderCastLog()
   }
 
   // 한 턴에 슬롯당 최대 3개만 보여준다(많아도 3가지). 매 턴 새로 뽑는다.
@@ -213,7 +216,7 @@ export class BattleView {
             : ''}
           <div class="shadow"></div>
           <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
-          ${front ? '<span class="inspect-hint">클릭해서 상세 보기</span>' : ''}
+          ${front ? '<span class="inspect-hint">마우스를 올려 상세 보기</span>' : ''}
         </div>`
       })
       .join('')
@@ -227,29 +230,34 @@ export class BattleView {
         </div>
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="우비 아이"></div>
-        <span class="inspect-hint">클릭해서 상세 보기</span>
+        <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>
       ${enemyHtml}`
 
     host.querySelectorAll<HTMLElement>('.actor[role="button"]').forEach((actor) => {
-      const open = () => {
+      const show = () => {
         const id = actor.dataset.character as CharacterVisualDef['id']
-        this.openCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
+        this.renderCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
       }
-      actor.addEventListener('click', open)
+      actor.addEventListener('mouseenter', show)
+      actor.addEventListener('mouseleave', () => this.renderCastLog())
+      actor.addEventListener('focus', show)
+      actor.addEventListener('blur', () => this.renderCastLog())
+      actor.addEventListener('click', show)
       actor.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          open()
+          show()
         }
       })
     })
   }
 
-  // 모델이 준비되기 전 전장은 2D 대체 스프라이트를 쓰며, 상세도 같은 매핑을 따른다.
-  private openCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
+  // 캐릭터 호버 상세는 우측 캐스트 로그 패널 위에 그대로 겹쳐 표시한다.
+  private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
     const visual = CHARACTER_VISUALS[id]
-    const host = this.q('#overlay')
+    const host = this.q('#detail')
+    this.dockMode = 'character'
     let stats: string
     if (id === 'player') {
       const p = this.player.stats
@@ -270,13 +278,12 @@ export class BattleView {
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
         : ''
     }
+    host.className = 'info-dock glass character-dock'
     host.innerHTML = `
-      <div class="ov-backdrop"></div>
-      <article class="character-card glass" aria-modal="true" role="dialog" aria-label="${visual.name} 상세 정보">
-        <button class="ov-close character-close" id="character-x" aria-label="닫기">${icon('close')}</button>
+      <article aria-label="${visual.name} 상세 정보">
         <div class="character-portrait"><img src="${visual.portrait2d}" alt="${visual.name} 2D 스프라이트"></div>
         <div class="character-copy">
-          <div class="character-kicker">3D MODEL ↔ 2D SPRITE</div>
+          <div class="character-kicker">CHARACTER DETAIL</div>
           <h2>${visual.name}</h2>
           <h3>${visual.title}</h3>
           <p>${visual.description}</p>
@@ -284,10 +291,22 @@ export class BattleView {
           ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${this.state.enemies[enemyIndex ?? 0]?.def.note ?? ''}</div>`}
         </div>
       </article>`
-    host.classList.add('open')
-    const close = () => this.closeOverlay()
-    host.querySelector('#character-x')?.addEventListener('click', close)
-    host.querySelector('.ov-backdrop')?.addEventListener('click', close)
+  }
+
+  private renderCastLog() {
+    const host = this.q('#detail')
+    this.dockMode = 'log'
+    host.className = 'info-dock glass cast-dock'
+    const rows = [...this.castLog]
+      .reverse()
+      .map((entry) => `<div class="cast-entry ${entry.kind}">
+        <div class="cast-meta"><span>TURN ${entry.turn}</span><b>${entry.kind === 'cast' ? '문장' : entry.kind === 'enemy' ? '적 행동' : '기록'}</b></div>
+        <div class="cast-text">${entry.text}</div>
+      </div>`)
+      .join('')
+    host.innerHTML = `
+      <div class="cast-head"><span class="cast-kicker">DIARY CAST</span><h2>문장 캐스트 로그</h2></div>
+      <div class="cast-list">${rows || '<div class="cast-empty">아직 발동한 문장이 없다.<br>첫 문장을 완성해 이야기를 시작하자.</div>'}</div>`
   }
 
   // ── 상단 발광 체인(문장) + 맥락/어긋남 미리보기 ──
@@ -368,10 +387,10 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
-      detail.className = 'info-dock glass empty'
-      detail.innerHTML = '단어에 마우스를 올리면<br>등급 · 범위 · 최종 적용 수치가 여기 표시된다.'
+      this.renderCastLog()
       return
     }
+    this.dockMode = 'word'
     const rarity = w.rarity ?? 'common'
     const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
     const mood = this.moodOf(w)
@@ -511,12 +530,10 @@ export class BattleView {
   private renderItemDetail(item: OwnedItem | null) {
     const detail = this.q('#detail')
     if (!item) {
-      detail.className = 'info-dock glass empty'
-      detail.innerHTML = this.bagMode
-        ? '아이템에 마우스를 올리면<br>스탯과 일러스트가 여기 표시된다.'
-        : '단어에 마우스를 올리면<br>등급 · 범위 · 수치가 여기 표시된다.'
+      this.renderCastLog()
       return
     }
+    this.dockMode = 'item'
     const rows = STAT_ORDER.filter((k) => item.stats[k])
       .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
       .join('')
@@ -996,5 +1013,10 @@ export class BattleView {
     host.appendChild(line)
     this.timers.push(window.setTimeout(() => line.remove(), 3100))
     while (host.children.length > 3) host.removeChild(host.firstChild!)
+
+    const kind = html.includes('습격') ? 'enemy' : html.includes('→') ? 'cast' : 'system'
+    this.castLog.push({ turn: this.state.turn, kind, text: html })
+    if (this.castLog.length > 8) this.castLog.shift()
+    if (this.dockMode === 'log') this.renderCastLog()
   }
 }
