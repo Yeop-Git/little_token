@@ -1935,10 +1935,17 @@ button {
   backdrop-filter: blur(3px);
 }
 
+.reward-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
 .reward-card {
   position: relative;
-  width: 1160px;
-  padding: 44px 56px 52px;
+  width: 1000px;
+  flex: none;
+  padding: 40px 48px 46px;
   border-radius: 28px;
   background: var(--glass);
   backdrop-filter: blur(16px) saturate(1.2);
@@ -1966,14 +1973,14 @@ button {
 .reward-field b { color: #fff2da; }
 .reward-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
 .reward-pick {
-  padding: 26px 22px;
+  padding: 0;
   border-radius: 20px;
   background: var(--glass-strong);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45), inset 0 1px 0 var(--glass-hi);
   cursor: pointer;
   transition: transform 0.16s, box-shadow 0.16s;
   text-align: center;
-  min-height: 250px;
+  min-height: 372px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1994,11 +2001,69 @@ button {
   box-shadow: 0 26px 50px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 210, 122, 0.2), inset 0 1px 0 var(--glass-hi);
 }
 .reward-pick:hover::before { opacity: 1; }
-.reward-pick .kind { font-size: 14px; letter-spacing: 2px; color: var(--ink-faint); }
-.reward-pick .art { margin: 14px auto 12px; width: 92px; height: 92px; color: var(--gold); filter: drop-shadow(0 0 12px rgba(255, 210, 122, 0.4)); }
-.reward-pick .rname { font-size: 28px; font-weight: 900; color: #fff6e2; }
-.reward-pick .rdesc { margin-top: 8px; font-size: 15px; color: var(--ink-dim); line-height: 1.45; }
-.reward-pick .rtag { margin-top: auto; padding-top: 12px; font-size: 14px; color: var(--gold); font-weight: 800; }
+/* 상단: 종류 + 랭크업/신규/아이템 배지 */
+.rp-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; z-index: 2; }
+.rp-type {
+  font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #fff6e2;
+  text-shadow: 0 0 12px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+.rp-badge {
+  font-size: 11px; font-weight: 900; letter-spacing: 1px; padding: 3px 8px; border-radius: 999px;
+  color: var(--wglow, var(--gold));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 55%, transparent);
+  text-shadow: 0 0 8px var(--wglow, var(--gold));
+}
+.is-reinforce { --wglow: #ffb24d; }
+/* 일러스트 */
+.rp-illus {
+  position: relative; margin: 10px 14px 0; height: 176px; border-radius: 14px; overflow: hidden;
+  display: grid; place-items: center;
+  background: linear-gradient(160deg, #2a2333, #14101c);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 30%, transparent);
+}
+.rp-illus img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.rp-illus-tint {
+  position: absolute; inset: 0; mix-blend-mode: soft-light; opacity: 0.85;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--wglow) 70%, transparent), transparent 55%);
+}
+.rp-illus.item, .rp-illus.glyph { color: var(--wglow, var(--gold)); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--wglow, var(--gold)) 50%, transparent)); }
+.rp-name {
+  margin-top: 12px; font-size: 30px; font-weight: 900; color: #fff6e2;
+  text-shadow: 0 0 16px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+.rp-effect { margin-top: 4px; padding: 0 12px; font-size: 15px; font-weight: 800; color: color-mix(in srgb, var(--wglow, var(--ink-dim)) 78%, #fff); }
+.rp-detail {
+  margin: 10px auto 0; padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: var(--ink-dim);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); transition: color 0.15s, box-shadow 0.15s;
+}
+.rp-detail:hover { color: #fff; box-shadow: inset 0 0 0 1px var(--wglow, var(--gold)); }
+.rp-take { margin: 8px 0 14px; font-size: 14px; font-weight: 900; letter-spacing: 1px; color: var(--wglow, var(--gold)); }
+.reward-pick.detailing { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--wglow, var(--gold)), inset 0 1px 0 var(--glass-hi); }
+
+/* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
+.reward-dock {
+  position: static;
+  inset: auto;
+  width: 322px;
+  flex: none;
+  align-self: stretch;
+  min-height: 468px;
+  max-height: 80vh;
+  padding: 26px 24px;
+  overflow: auto;
+}
+.reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
+.rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
+.rd-hint b { color: var(--gold); }
+.rf-deltas {
+  margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 30%, transparent);
+}
+.rf-h { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); margin-bottom: 6px; }
+.rf-row { font-size: 15px; color: var(--ink-dim); line-height: 1.7; }
+.rf-row b { color: #fff6e2; }
+.wd-inf { margin-top: 12px; font-size: 13px; color: var(--ink-faint); line-height: 1.55; }
 
 /* ── 아이템 감탄사(재련) 뷰 — 전투와 같은 패턴 ── */
 .item-scene .iforge {
