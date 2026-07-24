@@ -31,6 +31,7 @@ import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@cor
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
+import { IntroDialogue } from '@views/IntroDialogue'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -42,6 +43,8 @@ interface Opts {
   tables?: Tables
   hpMult?: number
   atkMult?: number
+  /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
+  intro?: boolean
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
@@ -61,6 +64,7 @@ export class BattleView {
   private bagMode = false
   private timers: number[] = []
   private cardHand!: CardHand
+  private introDialogue: IntroDialogue | null = null
   private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string }[] = []
   private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
 
@@ -76,11 +80,28 @@ export class BattleView {
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
     this.target = aliveIdx(this.state)[0] ?? 0
     this.mount()
+    if (opts.intro) this.mountIntro()
   }
 
   destroy() {
     this.timers.forEach((t) => clearTimeout(t))
     this.cardHand.destroy()
+    this.introDialogue?.destroy()
+  }
+
+  // 오프닝 컷신 — 적들은 홀드로 어둠 밖에 묶어 두고, 다이얼로그가 끝나면
+  // 홀드를 풀어 천천히 밀려들어오게 한다. 전투 상태는 손대지 않는다.
+  private mountIntro() {
+    const scene = this.q('.scene.battle')
+    scene.classList.add('is-intro-hold')
+    this.introDialogue = new IntroDialogue(scene, {
+      onComplete: () => {
+        this.introDialogue = null
+        scene.classList.add('is-enemies-arriving')
+        requestAnimationFrame(() => scene.classList.remove('is-intro-hold'))
+        this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
+      },
+    })
   }
 
   private mount() {

@@ -31,18 +31,19 @@ fit()
 
 let run = newRun()
 let current: { destroy?: () => void } | null = null
-type SceneName = 'title' | 'battle' | 'reward' | 'item'
+type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item'
 
 // 개발/검수용 씬 점퍼.
 function mountDev(active: SceneName) {
   const b = (id: SceneName, label: string) => `<button data-scene="${id}" class="${id === active ? 'on' : ''}">${label}</button>`
   const bar = document.createElement('div')
   bar.className = 'dev-jump'
-  bar.innerHTML = b('title', '타이틀') + b('battle', '전투') + b('reward', '보상') + b('item', '아이템')
+  bar.innerHTML = b('title', '타이틀') + b('intro', '인트로') + b('battle', '전투') + b('reward', '보상') + b('item', '아이템')
   bar.querySelectorAll('button').forEach((btn) =>
     btn.addEventListener('click', () => {
       const s = (btn as HTMLElement).dataset.scene as SceneName
       if (s === 'title') goTitle()
+      else if (s === 'intro') goBattle(true)
       else if (s === 'battle') goBattle()
       else if (s === 'reward') goReward()
       else goItem(ITEMS.candle)
@@ -77,13 +78,14 @@ function goTitle() {
       const saved = loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
-      goBattle()
+      // 새 런 첫 진입에만 토큰의 오프닝 다이얼로그가 흐른다.
+      goBattle(!saved)
     },
   })
   mountVersion()
 }
 
-function goBattle() {
+function goBattle(intro = false) {
   reset()
   const st = stageFor(run.day)
   stage.setAttribute('data-theme', st.field.theme)
@@ -95,8 +97,9 @@ function goBattle() {
     player: run.player,
     tables: makeEarlyTables(run.player.deck),
     onWin: () => goReward(),
+    intro,
   })
-  mountMeta('battle')
+  mountMeta(intro ? 'intro' : 'battle')
 }
 
 function goReward() {
@@ -141,6 +144,7 @@ const start = (new URLSearchParams(location.search).get('scene') as SceneName) |
 FontManager.load().finally(() => {
   if (start === 'reward') goReward()
   else if (start === 'item') goItem(ITEMS.candle)
+  else if (start === 'intro') goBattle(true)
   else if (start === 'battle') goBattle()
   else goTitle()
 })
