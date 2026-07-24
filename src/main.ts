@@ -14,6 +14,7 @@ import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
+import packageInfo from '../package.json'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -47,6 +48,19 @@ function mountDev(active: SceneName) {
   stage.appendChild(bar)
 }
 
+function mountVersion() {
+  const badge = document.createElement('div')
+  badge.className = 'version-badge'
+  badge.textContent = `v_${packageInfo.version}`
+  badge.setAttribute('aria-label', `게임 버전 ${packageInfo.version}`)
+  stage.appendChild(badge)
+}
+
+function mountMeta(active: SceneName) {
+  mountDev(active)
+  mountVersion()
+}
+
 function reset() {
   current?.destroy?.()
   stage.innerHTML = ''
@@ -65,7 +79,7 @@ function goBattle() {
     tables: makeEarlyTables(run.player.deck),
     onWin: () => goReward(),
   })
-  mountDev('battle')
+  mountMeta('battle')
 }
 
 function goReward() {
@@ -86,7 +100,7 @@ function goReward() {
       }
     },
   })
-  mountDev('reward')
+  mountMeta('reward')
 }
 
 function goItem(itemDef: ItemDef) {
@@ -100,7 +114,7 @@ function goItem(itemDef: ItemDef) {
       goBattle()
     },
   })
-  mountDev('item')
+  mountMeta('item')
 }
 
 // ?scene= 로 직접 진입(스샷/검수용). 폰트 로드 후 시작.
