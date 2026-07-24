@@ -1,8 +1,8 @@
 pool,id,text,slot,tags,power,bonus,kind,timing,target_mode,aoe,rarity,note,lore,guard,heal,recoil,evade,variance_p,variance_hi,variance_lo,crit,fail,art
 early,na,"나는",subj,self,,0,,,enemy,,common,"배율 0%","오늘도 일기를 편다.",,,,,,,,,,1001
 early,himkkeot,"힘껏",adv,force,,0.6,,,,,common,"배율 +60% · 실패 20% · 대성공 10%","팔에 힘을 준다.",,,,,,,,0.1,0.2,2001
-early,saljjak,"살짝",adv,soft,,-0.2,,,,,common,"배율 −20% · 대성공 30%","조심스럽게.",,,,,,,,0.3,,2002
-early,dandanhi,"단단히",adv,solid,,0,,,,,common,"방어 +2","이를 악문다.",2,,,,,,,,,2003
+early,saljjak,"살짝",adv,soft,,-0.2,,,,,common,"배율 −20% · 대성공 30%","조심스럽게.",,,,,,,,0.3,,2003
+early,dandanhi,"단단히",adv,solid,,0,,,,,common,"방어 +2","이를 악문다.",2,,,,,,,,,2002
 early,ttaeryeot,"때렸다",verb,atk,6,,attack,,,,common,"공격 · 위력 6","정직한 한 방.",,,,,,,,,,3001
 early,makat,"막았다",verb,grd,0,,guard,,,,common,"방어 +6","한 발 버틴다.",6,,,,,,,,,3002
 early,gamssat,"감쌌다",verb,mend,0,,heal,,,,common,"회복 +5","상처를 매만진다.",,5,,,,,,,,3003

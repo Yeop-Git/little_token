@@ -47,7 +47,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": -0.2,
       "crit": 0.3,
       "rarity": "common",
-      "art": "2002",
+      "art": "2003",
       "note": "배율 −20% · 대성공 30%",
       "lore": "조심스럽게."
     },
@@ -60,7 +60,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "bonus": 0,
       "rarity": "common",
-      "art": "2003",
+      "art": "2002",
       "note": "방어 +2",
       "lore": "이를 악문다.",
       "effects": {
