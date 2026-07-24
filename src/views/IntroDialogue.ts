@@ -21,7 +21,7 @@ type ScriptLine =
   | { kind: 'player'; words: string[] }
 
 const TOKEN_NAME = '토큰'
-const PLAYER_NAME = '우비 아이'
+const PLAYER_NAME = '프롬'
 
 // 타자 속도와, 다 출력된 뒤 클릭 진행 게이트: ADVANCE_LOCK_MS 동안 무시 →
 // 이후 클릭 또는 ADVANCE_TIMEOUT_MS 경과 시 다음 대사.
@@ -151,7 +151,7 @@ export class IntroDialogue {
     if (!this.destroyed) await this.finish()
   }
 
-  /** 화자 전환 — 이름/톤을 토큰(청색)·우비 아이(금빛)로 스르륵 갈아끼운다. */
+  /** 화자 전환 — 이름/톤을 토큰(청색)·프롬(금빛)로 스르륵 갈아끼운다. */
   private setSpeaker(speaker: 'token' | 'player'): void {
     this.nameEl.textContent = speaker === 'token' ? TOKEN_NAME : PLAYER_NAME
     this.boxEl.classList.toggle('is-player-line', speaker === 'player')
