@@ -38,6 +38,8 @@ export interface ApplyResult {
   selfDmg: number
   heal: number
   killed: number[]
+  overflow: number // 단일 공격이 최전방 적을 넘겨 죽였을 때 남는 초과 피해
+  guardGain: number // 이번 문장으로 얻은 방어(임시 체력)
 }
 
 // 살아있는 적 인덱스 목록.
@@ -68,6 +70,8 @@ export function applyIntent(
       selfDmg: 0,
       heal: 0,
       killed: [],
+      overflow: 0,
+      guardGain: 0,
     }
   }
 
@@ -75,14 +79,18 @@ export function applyIntent(
   const killed: number[] = []
   const targets = intent.kind === 'heal' ? [] : intent.aoe === 'all' ? aliveIdx(state) : [target]
 
+  let overflow = 0
   for (const ti of targets) {
     const e = state.enemies[ti]
     if (!e || e.dead) continue
+    const before = e.hp
     e.hp -= dmg
     hits.push({ target: ti, dmg })
     if (e.hp <= 0) {
       e.dead = true
       killed.push(ti)
+      // 단일 공격만 초과 피해를 다음 적으로 넘긴다(범위는 각자 처리).
+      if (intent.aoe !== 'all') overflow = dmg - before
     }
   }
 
@@ -92,7 +100,8 @@ export function applyIntent(
   state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + intent.heal)
 
   // 주어가 '너는'(enemy 태그)이면 이번 턴 방어 포기.
-  state.guard = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
+  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
+  state.guard = guardGain
 
   const label = intent.kind === 'heal' ? `${intent.heal} 회복` : `${dmg} 피해${note}`
   return {
@@ -102,6 +111,8 @@ export function applyIntent(
     selfDmg,
     heal: intent.heal,
     killed,
+    overflow: Math.max(0, overflow),
+    guardGain,
   }
 }
 
@@ -113,10 +124,10 @@ export interface EnemyStrike {
 
 // 적 턴 — 레일 최전방(플레이어와 가장 가까운) 적만 전투에 참여한다.
 // 뒷줄은 대기열이라 공격하지 않는다.
-export function enemyTurn(state: BattleState, rng: () => number): EnemyStrike[] {
+export function enemyTurn(state: BattleState, rng: () => number, skipFront = false): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
   const front = frontIdx(state)
-  if (front < 0) return strikes
+  if (front < 0 || skipFront) return strikes // 방금 도착한 최전방은 이번 턴 공격 유예
   const e = state.enemies[front]
   if (state.turn % e.def.every === 0) {
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)

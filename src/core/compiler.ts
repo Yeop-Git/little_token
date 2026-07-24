@@ -7,7 +7,11 @@
  */
 
 import { eul } from './josa'
-import type { Combo, Intent, Selection, Tables, Word } from './types'
+import type { Combo, Intent, Rarity, Selection, Tables, Word } from './types'
+
+// 등급이 높은 문장일수록 더 강하게 — 기존 배수 풀에 등급 보너스를 얹는다.
+// (새 효과를 늘리지 않고 공격/배율만 강화하는 방향.)
+const RARITY_WEIGHT: Record<Rarity, number> = { common: 0, rare: 0.15, epic: 0.3, legendary: 0.5 }
 
 // 선택된 단어들의 tag를 전부 모아 멀티셋으로 관용구를 매칭.
 export function matchCombos(sel: Selection, combos: Combo[], order: string[]): Combo[] {
@@ -65,8 +69,10 @@ export function compile(sel: Selection, t: Tables): Intent {
     }
   }
 
+  // 등급 보너스: 선택 단어들의 희귀도 합. 배수 풀과 상한 둘 다 올린다.
+  const gradeBonus = order.reduce((n, k) => n + RARITY_WEIGHT[sel[k]?.rarity ?? 'common'], 0)
   const comboMult = combos.reduce((m, c) => m * c.mult, 1)
-  const multiplier = Math.min((1 + bonusPool) * comboMult, t.multCap)
+  const multiplier = Math.min((1 + bonusPool + gradeBonus) * comboMult, t.multCap + gradeBonus)
 
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
     order.reduce((n, key) => n + (sel[key]?.effects?.[k] || 0), 0)

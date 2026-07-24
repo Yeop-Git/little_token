@@ -56,6 +56,7 @@ export class BattleView {
   private over = false
   private bagMode = false
   private timers: number[] = []
+  private hand: Record<string, Word[]> = {} // 슬롯별로 이번 턴에 보이는 단어(최대 3)
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -126,11 +127,29 @@ export class BattleView {
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
 
+    this.drawHand()
     this.renderActors()
     this.renderChain()
     this.renderWords()
     this.renderStats()
     this.renderBag()
+  }
+
+  // 한 턴에 슬롯당 최대 3개만 보여준다(많아도 3가지). 매 턴 새로 뽑는다.
+  private drawHand() {
+    for (const s of this.t.template.slots) {
+      const pool = this.t.words[s.key] ?? []
+      if (pool.length <= 3) {
+        this.hand[s.key] = [...pool]
+        continue
+      }
+      const bag = [...pool]
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[bag[i], bag[j]] = [bag[j], bag[i]]
+      }
+      this.hand[s.key] = bag.slice(0, 3)
+    }
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -235,7 +254,10 @@ export class BattleView {
       )
 
     const key = this.order()[this.slotIndex]
-    const words = this.t.words[key] ?? []
+    // 손패(최대 3). 이미 고른 단어가 손패에 없으면 포함시켜 표시가 어긋나지 않게.
+    const words = [...(this.hand[key] ?? this.t.words[key] ?? [])]
+    const chosen = this.sel[key]
+    if (chosen && !words.some((w) => w.id === chosen.id)) words.unshift(chosen)
     const grid = this.q('#grid')
     grid.innerHTML = words
       .map((w) => {
@@ -509,10 +531,14 @@ export class BattleView {
     if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
     // 4) 실제 발동 + 꽂힘 연출
+    const startFront = frontIdx(this.state)
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
-    await this.strike(res, intent)
+    await this.strike(res)
     this.log(res.text + (res.combos.length ? ` · ${res.combos.join(', ')}` : ''))
     this.renderActors()
+
+    // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
+    if (res.overflow > 0 && !allDead(this.state)) await this.resolveOverflow(res.overflow)
 
     if (allDead(this.state)) {
       this.over = true
@@ -522,10 +548,11 @@ export class BattleView {
       return
     }
 
-    // 5) 적 턴 — 각 적이 돌진하며 플레이어에게 꽂는다
+    // 5) 적 턴 — 방금 최전방으로 도착한 적은 이번 턴 공격 유예(부조리 방지)
     this.state.turn++
     this.q('#turn').textContent = String(this.state.turn)
-    await this.enemyPhase()
+    const grace = frontIdx(this.state) !== startFront
+    await this.enemyPhase(grace)
 
     if (this.state.pending) {
       const p = this.state.pending
@@ -558,12 +585,18 @@ export class BattleView {
     this.sel = {}
     this.slotIndex = 0
     this.busy = false
+    this.drawHand()
     this.renderChain()
     this.renderWords()
   }
 
-  // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진.
-  private async strike(res: { hits: { target: number; dmg: number }[]; selfDmg: number; heal: number }, intent: ReturnType<typeof compile>) {
+  // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
+  private async strike(res: {
+    hits: { target: number; dmg: number }[]
+    selfDmg: number
+    heal: number
+    guardGain: number
+  }) {
     const you = this.q<HTMLElement>('.actor.you')
     const attacking = res.hits.length > 0
     if (attacking) you.classList.add('lunge')
@@ -577,26 +610,90 @@ export class BattleView {
       }
       this.popAt(h.target, `${h.dmg}`, 'dmg big')
     }
-    if (res.selfDmg) {
-      SquareBurst.playOn(you, 'self', { spread: 90 })
-      this.hitOne(you)
-      this.popPlayer(`${res.selfDmg}`, 'self')
+    if (attacking) {
+      await sleep(250)
+      you.classList.remove('lunge')
     }
-    if (res.heal) {
-      SquareBurst.playOn(you, 'heal', { spread: 90 })
-      this.popPlayer(`${res.heal}`, 'heal')
-    }
-    if (intent.guard > 0 && !attacking) {
-      SquareBurst.playOn(you, 'guard', { spread: 90 })
-      this.popPlayer(`방어+${intent.guard}`, 'guard')
-    }
-    await sleep(attacking ? 250 : 120)
-    you.classList.remove('lunge')
+    // 방어/회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다.
+    if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
+    if (res.heal) await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+    if (res.guardGain > 0) await this.flyToPlayer(`방어+${res.guardGain}`, 'guard', 'guard')
   }
 
-  // 적 턴 연출 — 각 적이 돌진해 플레이어에게 사각 블라스트.
-  private async enemyPhase() {
-    for (const st of enemyTurn(this.state, Math.random)) {
+  // 초과 피해가 활활 타오르다 다음 적이 당겨오면 꽂힌다(오버플로우 → 도파민).
+  private async resolveOverflow(overflow: number) {
+    while (overflow > 0 && !allDead(this.state)) {
+      this.renderActors() // 다음 적이 최전방으로 당겨온다
+      const ember = this.showEmber(overflow)
+      await sleep(560) // 레일이 당겨오는 동안 숫자가 타오른다
+      const front = frontIdx(this.state)
+      if (front < 0) {
+        ember.remove()
+        break
+      }
+      const e = this.state.enemies[front]
+      const before = e.hp
+      e.hp -= overflow
+      ember.classList.add('stab')
+      const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${front}"]`)
+      if (el) {
+        SquareBurst.playOn(el, 'damage', { spread: 130 })
+        this.hitOne(el)
+      }
+      this.popAt(front, `${overflow}`, 'dmg big')
+      this.timers.push(window.setTimeout(() => ember.remove(), 200))
+      // 또 넘겼으면 남은 초과 피해가 다시 다음 적으로 이어진다(연쇄).
+      if (e.hp <= 0) {
+        e.dead = true
+        overflow = overflow - before
+      } else {
+        overflow = 0
+      }
+      await sleep(360)
+      this.renderActors()
+    }
+  }
+
+  // 중앙에서 타오르는 초과 피해 숫자.
+  private showEmber(n: number): HTMLElement {
+    const el = document.createElement('div')
+    el.className = 'ember-num'
+    el.textContent = String(n)
+    this.q('#pbox').appendChild(el)
+    return el
+  }
+
+  // 수치가 중앙에서 플레이어에게 날아가 꽂힌다.
+  private async flyToPlayer(text: string, cls: string, theme: 'self' | 'heal' | 'guard') {
+    const pboxEl = this.q('#pbox')
+    const you = this.q<HTMLElement>('.actor.you')
+    const to = this.toStage(you.getBoundingClientRect())
+    const fx = pboxEl.offsetWidth / 2
+    const fy = pboxEl.offsetHeight * 0.5
+    const p = document.createElement('div')
+    p.className = `pop ${cls} big`
+    p.textContent = text
+    p.style.left = `${fx - 24}px`
+    p.style.top = `${fy}px`
+    p.style.animation = 'none'
+    pboxEl.appendChild(p)
+    await p.animate(
+      [
+        { transform: 'translate(0,0) scale(0.6)', opacity: 0 },
+        { transform: 'translate(0,0) scale(1.15)', opacity: 1, offset: 0.22 },
+        { transform: `translate(${to.x - fx}px, ${to.y + 40 - fy}px) scale(1)`, opacity: 1, offset: 0.85 },
+        { transform: `translate(${to.x - fx}px, ${to.y + 40 - fy}px) scale(0.7)`, opacity: 0 },
+      ],
+      { duration: 520, easing: 'cubic-bezier(0.4,0,0.3,1)' },
+    ).finished
+    SquareBurst.playOn(you, theme, { spread: 95 })
+    this.hitOne(you)
+    p.remove()
+  }
+
+  // 적 턴 연출 — 최전방 적이 돌진해 플레이어에게 사각 블라스트.
+  private async enemyPhase(skipFront = false) {
+    for (const st of enemyTurn(this.state, Math.random, skipFront)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
       if (st.dealt <= 0) {
         this.log(st.text)

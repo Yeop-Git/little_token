@@ -402,6 +402,26 @@ button {
   to { transform: translate(-50%, -58%) scale(1.25); opacity: 0; }
 }
 
+/* 오버플로우 — 활활 타오르는 초과 피해 숫자 */
+.ember-num {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  z-index: 42;
+  font-size: 76px;
+  font-weight: 900;
+  color: #ff8a3c;
+  pointer-events: none;
+  text-shadow: 0 0 18px #ff5a1c, 0 0 36px #ff3a0c, 0 3px 0 rgba(0, 0, 0, 0.3);
+  animation: ember-flicker 0.42s ease-in-out infinite alternate;
+}
+@keyframes ember-flicker {
+  0% { text-shadow: 0 0 16px #ff5a1c, 0 0 30px #ff3a0c; transform: translate(-50%, -50%) scale(1) rotate(-1deg); }
+  100% { text-shadow: 0 0 28px #ffb24a, 0 0 46px #ff5a1c; transform: translate(-50%, -53%) scale(1.07) rotate(1deg); }
+}
+.ember-num.stab { transition: transform 0.2s ease, opacity 0.2s; opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+
 /* 돌진(박치기) — 공격자가 상대 쪽으로 훅 */
 .actor.you.lunge { animation: lunge-you 0.44s cubic-bezier(0.5, 0, 0.25, 1); z-index: 10; }
 @keyframes lunge-you {
