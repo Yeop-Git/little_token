@@ -1,14 +1,15 @@
 {
   "name": "diary-word-battle",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "data:generate": "tsx scripts/generate-sentence-data.ts",
+    "dev": "npm run data:generate && vite",
+    "build": "npm run data:generate && tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
-    "sweep": "tsx src/tools/sweep.ts"
+    "type-check": "npm run data:generate && tsc --noEmit",
+    "sweep": "npm run data:generate && tsx src/tools/sweep.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

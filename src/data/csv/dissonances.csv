@@ -1,0 +1,7 @@
+pool,a,b,penalty,reason
+early,soft,atk,0.55,"살살 때려선 아프지 않다"
+early,force,mend,0.6,"거칠게 감쌀 순 없다"
+early,swift,grd,0.7,"급히 막으면 엉성하다"
+expansion,slow,fire,0.7,"천천히 불태우면 김이 샌다"
+expansion,quiet,war,0.75,"조용한 전투는 미적지근하다"
+expansion,mind,war,0.8,"기억으로 전투를 논하니 어긋난다"
