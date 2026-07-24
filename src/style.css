@@ -495,6 +495,17 @@ button {
   color: var(--gold);
   text-shadow: 0 0 16px var(--glow), 0 4px 10px rgba(0, 0, 0, 0.85);
 }
+/* 부조화(어긋난 맥락) 경고 — 붉게, 위력 감소 안내 */
+.chain-penalty {
+  padding: 3px 12px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ff8a6a;
+  background: rgba(60, 12, 12, 0.5);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(3px);
+}
 @keyframes chain-pop {
   0% { transform: translateY(-10px) scale(0.7); opacity: 0; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
@@ -762,6 +773,16 @@ button {
 .wd-values .v.self { color: #ffc15a; }
 .wd-values .v.heal { color: #b6f38a; }
 .wd-values .v.guard { color: #86d6ea; }
+.wd-warn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #ff8a6a;
+  background: rgba(80, 16, 16, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 90, 0.3);
+}
 .wd-lore { margin-top: 10px; font-size: 15px; font-style: italic; color: var(--ink-faint); opacity: 0.75; line-height: 1.4; }
 
 /* 가방 아이템 정보(스탯표 위 · 일러스트 아래) */

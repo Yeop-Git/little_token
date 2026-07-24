@@ -3,7 +3,7 @@
  * 새 관용구를 늘리는 것이 조합 공간을 키우는 정석(단어보다 관용구).
  */
 
-import type { Combo, Conflict } from '@core/types'
+import type { Combo, Conflict, Dissonance } from '@core/types'
 
 export const COMBOS: Combo[] = [
   { id: 'c1', name: '고독한 전사', need: ['solo', 'war', 'atk'], mult: 1.4, flavor: '혼자서 맞서는 자' },
@@ -19,6 +19,13 @@ export const CONFLICTS: Conflict[] = [
   { a: 'mad', b: 'quiet', reason: '광기와 정적은 공존 못 한다' },
   { a: 'quiet', b: 'fire', reason: '조용히 불태울 수 없다' },
   { a: 'slow', b: 'mad', reason: '속도가 모순된다' },
+]
+
+// 부조화(어긋난 맥락) — 결이 안 맞는 태그 쌍이면 위력이 깎인다("틀린 문장").
+export const DISSONANCES: Dissonance[] = [
+  { a: 'slow', b: 'fire', penalty: 0.7, reason: '천천히 불태우면 김이 샌다' },
+  { a: 'quiet', b: 'war', penalty: 0.75, reason: '조용한 전투는 미적지근하다' },
+  { a: 'mind', b: 'war', penalty: 0.8, reason: '기억으로 전투를 논하니 어긋난다' },
 ]
 
 // SPEC 5장. sweep으로 확정한 값. 임의로 올리지 말 것.

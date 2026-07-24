@@ -229,16 +229,26 @@ export class BattleView {
       ${enemyHtml}`
   }
 
-  // ── 상단 발광 체인(문장) ──
+  // ── 상단 발광 체인(문장) + 맥락/어긋남 미리보기 ──
   private renderChain() {
     const host = this.q('#chain')
     const toks = sentenceTokens(this.sel, this.t)
-    const combos = matchCombos(this.sel, this.t.combos, this.order())
-    const words = this.order()
+    const order = this.order()
+    const anyPicked = order.some((k) => this.sel[k])
+    const words = order
       .map((k, i) => (this.sel[k] ? `<span class="chain-word" data-i="${i}">${toks[i]}</span>` : ''))
       .join('')
-    const preview = combos.length ? `<span class="chain-combo">${combos.map((c) => `「${c.name}」×${c.mult}`).join(' ')}</span>` : ''
-    host.innerHTML = words + (words ? preview : '')
+    let extra = ''
+    if (anyPicked) {
+      const combos = matchCombos(this.sel, this.t.combos, order)
+      if (combos.length) extra += `<span class="chain-combo">${combos.map((c) => `「${c.name}」×${c.mult}`).join(' ')}</span>`
+      // 부조화(어긋난 맥락) 경고 — 위력이 깎인다는 걸 실행 전에 보여준다.
+      const intent = compile(this.sel, this.t)
+      if (intent.penalties.length) {
+        extra += `<span class="chain-penalty">⚠ 어긋남 ×${intent.coherence.toFixed(2)} · ${intent.penalties[0]}</span>`
+      }
+    }
+    host.innerHTML = words + extra
   }
 
   // ── 중앙 하단: 슬롯 스텝 + 가로 단어 ──
@@ -303,12 +313,20 @@ export class BattleView {
     const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
     const mood = this.moodOf(w)
     const values = this.wordOwnValues(w)
+    // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
+    const trial: Selection = { ...this.sel, [w.slot]: w }
+    const intent = compile(trial, this.t)
+    const warn = intent.penalties.length
+      ? `<div class="wd-warn">⚠ ${intent.penalties[0]} · 위력 ×${intent.coherence.toFixed(2)}</div>`
+      : ''
+
     detail.className = `info-dock glass mood-${mood}`
     detail.innerHTML = `
       <div class="wd-name">${w.text}</div>
       <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel}</div>
       <div class="wd-range">범위 · ${this.wordRange(w)}</div>
       <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+      ${warn}
       <div class="wd-lore">“${w.lore ?? ''}”</div>`
   }
 
@@ -543,7 +561,11 @@ export class BattleView {
     const startFront = frontIdx(this.state)
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
     await this.strike(res)
-    this.log(res.text + (res.combos.length ? ` · ${res.combos.join(', ')}` : ''))
+    this.log(
+      res.text +
+        (res.combos.length ? ` · ${res.combos.join(', ')}` : '') +
+        (intent.penalties.length ? ` · 어긋남 ×${intent.coherence.toFixed(2)}` : ''),
+    )
     this.renderActors()
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.

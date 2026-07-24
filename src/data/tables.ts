@@ -5,12 +5,13 @@
 import type { Tables } from '@core/types'
 import { DEFAULT_TEMPLATE } from './slots'
 import { WORDS } from './words'
-import { COMBOS, CONFLICTS, MULT_CAP } from './combos'
+import { COMBOS, CONFLICTS, DISSONANCES, MULT_CAP } from './combos'
 
 export const TABLES: Tables = {
   template: DEFAULT_TEMPLATE,
   words: WORDS,
   combos: COMBOS,
   conflicts: CONFLICTS,
+  dissonances: DISSONANCES,
   multCap: MULT_CAP,
 }

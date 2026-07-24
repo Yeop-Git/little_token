@@ -87,6 +87,15 @@ export interface Conflict {
   reason: string
 }
 
+// 부조화 — 맥락이 안 맞는 태그 쌍. 하드 차단(Conflict)이 아니라 위력을 깎는
+// "틀린 문장" 소프트 패널티(penalty < 1). 다양한 단어에 태그로 자연히 섞인다.
+export interface Dissonance {
+  a: string
+  b: string
+  penalty: number // 위력 배수(<1)
+  reason: string // UI에 뜨는 이유 — "살살 때려선 아프지 않다"
+}
+
 export type Selection = Record<SlotKey, Word | undefined>
 
 // 컴파일 결과 — 시뮬이 소비하는 순수 행동 객체.
@@ -105,6 +114,8 @@ export interface Intent {
   evade: number
   tags: string[]
   combos: string[] // 발동 관용구 이름
+  coherence: number // 부조화 패널티 곱(1이면 어긋남 없음)
+  penalties: string[] // 발동한 부조화 이유
 }
 
 export interface Tables {
@@ -112,6 +123,7 @@ export interface Tables {
   words: Record<SlotKey, Word[]>
   combos: Combo[]
   conflicts: Conflict[]
+  dissonances?: Dissonance[]
   multCap: number
 }
 

@@ -72,7 +72,19 @@ export function compile(sel: Selection, t: Tables): Intent {
   // 등급 보너스: 선택 단어들의 희귀도 합. 배수 풀과 상한 둘 다 올린다.
   const gradeBonus = order.reduce((n, k) => n + RARITY_WEIGHT[sel[k]?.rarity ?? 'common'], 0)
   const comboMult = combos.reduce((m, c) => m * c.mult, 1)
-  const multiplier = Math.min((1 + bonusPool + gradeBonus) * comboMult, t.multCap + gradeBonus)
+
+  // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
+  const allTags = order.flatMap((k) => (sel[k] ? sel[k]!.tags : []))
+  let coherence = 1
+  const penalties: string[] = []
+  for (const d of t.dissonances ?? []) {
+    if (allTags.includes(d.a) && allTags.includes(d.b)) {
+      coherence *= d.penalty
+      penalties.push(d.reason)
+    }
+  }
+
+  const multiplier = Math.min((1 + bonusPool + gradeBonus) * comboMult, t.multCap + gradeBonus) * coherence
 
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
     order.reduce((n, key) => n + (sel[key]?.effects?.[k] || 0), 0)
@@ -90,8 +102,10 @@ export function compile(sel: Selection, t: Tables): Intent {
     heal: sumEffect('heal'),
     recoil: sumEffect('recoil'),
     evade: sumEffect('evade'),
-    tags: order.flatMap((k) => (sel[k] ? sel[k]!.tags : [])),
+    tags: allTags,
     combos: combos.map((c) => c.name),
+    coherence,
+    penalties,
   }
 }
 

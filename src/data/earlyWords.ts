@@ -5,7 +5,7 @@
  * 방식(adv)=배수 풀, 행동(verb)=기본 위력·행동 종류. 슬롯 시스템은 가변이라 이후 확장.
  */
 
-import type { Combo, Tables, Word } from '@core/types'
+import type { Combo, Dissonance, Tables, Word } from '@core/types'
 import { buildTemplate } from './slots'
 
 export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']
@@ -32,6 +32,13 @@ export const EARLY_COMBOS: Combo[] = [
   { id: 'ec2', name: '철벽', need: ['solid', 'grd'], mult: 1.3, flavor: '한 치도 안 밀린다' },
 ]
 
+// 부조화(어긋난 맥락) — 방식과 행동의 결이 안 맞으면 위력이 깎인다.
+export const EARLY_DISSONANCE: Dissonance[] = [
+  { a: 'soft', b: 'atk', penalty: 0.55, reason: '살살 때려선 아프지 않다' },
+  { a: 'force', b: 'mend', penalty: 0.6, reason: '거칠게 감쌀 순 없다' },
+  { a: 'swift', b: 'grd', penalty: 0.7, reason: '급히 막으면 엉성하다' },
+]
+
 // 보상으로 단어장에 등록되는 후보(슬롯별).
 export const REWARD_WORDS: Word[] = [
   { id: 'jaeppalli', text: '재빨리', slot: 'adv', tags: ['swift'], bonus: 0.2, effects: { evade: 3 }, rarity: 'rare', note: '빠르게 · 위력 +20% · 회피 +3', lore: '숨 돌릴 틈 없이.' },
@@ -47,6 +54,7 @@ export function makeEarlyTables(deck: Record<string, Word[]> = EARLY_WORDS): Tab
     words: deck,
     combos: EARLY_COMBOS,
     conflicts: [],
+    dissonances: EARLY_DISSONANCE,
     multCap: MULT_CAP,
   }
 }
