@@ -116,22 +116,32 @@ button {
   overflow: hidden;
 }
 
-/* 로딩 완료 시 중앙을 기점으로 아이리스 페이드인 */
+/* 로딩 완료 시 흐릿하게 전체 페이드인(중앙이 조금 더 먼저) */
 .title-reveal {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center;
-  clip-path: circle(0% at 50% 50%);
   opacity: 0;
+  filter: blur(18px);
+  transform: scale(1.035);
   transition:
-    clip-path 1.05s cubic-bezier(0.22, 0.61, 0.36, 1),
-    opacity 0.7s ease;
-  will-change: clip-path, opacity;
+    opacity 1.2s ease,
+    filter 1.3s ease,
+    transform 1.5s ease;
+  will-change: opacity, filter, transform;
 }
 .title-reveal.ready {
-  clip-path: circle(90% at 50% 50%);
   opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+
+/* 배경·발광·비네트를 묶어 난류 필터로 화면 전체가 일렁이게 한다(글자는 제외) */
+.title-atmos {
+  position: absolute;
+  inset: -3%;
+  background-size: cover;
+  background-position: center;
+  filter: url(#title-warp);
 }
 
 /* 좌측 어둠 스크림 — 메뉴 글자가 확실히 읽히게 */
@@ -189,7 +199,6 @@ button {
     radial-gradient(circle at 100% 0%, rgba(2, 1, 5, 0.82), transparent 36%),
     radial-gradient(circle at 0% 100%, rgba(2, 1, 5, 0.82), transparent 36%),
     radial-gradient(circle at 100% 100%, rgba(2, 1, 5, 0.82), transparent 36%);
-  filter: url(#title-warp);
   animation: vignette-breathe 7s ease-in-out infinite;
 }
 @keyframes vignette-breathe {
@@ -218,16 +227,14 @@ button {
 }
 /* 등장·숨쉬기는 로딩 완료(reveal) 이후에 시작 */
 .title-reveal.ready .title-logo-wrap {
-  animation: logo-enter 1.5s cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+  animation: logo-enter 1.7s ease-out both;
 }
 .title-reveal.ready .title-logo {
-  animation: logo-breathe 4.6s ease-in-out 1.6s infinite;
+  animation: logo-breathe 4.6s ease-in-out 1.8s infinite;
 }
+/* 톡 튀지 않게 — 부드러운 페이드 + 아주 살짝만 정착 */
 @keyframes logo-enter {
-  0%   { opacity: 0; transform: translateY(-14px) rotate(-3.2deg) scale(0.9); }
-  55%  { opacity: 1; transform: translateY(0) rotate(2.4deg) scale(1.035); }
-  72%  { transform: translateY(0) rotate(-1.5deg) scale(0.995); }
-  86%  { transform: translateY(0) rotate(0.8deg) scale(1.01); }
+  0%   { opacity: 0; transform: translateY(-8px) rotate(-1.1deg) scale(0.975); }
   100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
 }
 @keyframes logo-breathe {
@@ -267,8 +274,9 @@ button {
   font-weight: 900;
   letter-spacing: 4px;
   padding: 4px 6px 4px 28px;
+  transform-origin: left center;
   text-shadow: 0 0 14px rgba(255, 205, 120, 0.4), 0 3px 12px rgba(0, 0, 0, 0.88);
-  transition: color 0.18s ease, transform 0.18s ease, text-shadow 0.18s ease;
+  transition: color 0.18s ease, transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1.1), text-shadow 0.18s ease;
 }
 .tmenu-btn::before {
   content: '✦';
@@ -283,8 +291,8 @@ button {
 .tmenu-btn:hover,
 .tmenu-btn:focus-visible {
   color: #fff;
-  transform: translateX(7px);
-  text-shadow: 0 0 20px rgba(255, 224, 150, 0.7), 0 3px 12px rgba(0, 0, 0, 0.88);
+  transform: translateX(7px) scale(1.1);
+  text-shadow: 0 0 22px rgba(255, 224, 150, 0.75), 0 3px 12px rgba(0, 0, 0, 0.88);
   outline: none;
 }
 .tmenu-btn:hover::before,
@@ -308,9 +316,32 @@ button {
 }
 .title-toast.show { opacity: 1; }
 
+/* 로딩 마스크 — 가장자리가 조금 더 늦게 밝아져 '중앙이 조금 더 먼저' 느낌 */
+.title-loadmask {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 47%, rgba(5, 4, 10, 0) 6%, rgba(5, 4, 10, 0.55) 78%);
+  opacity: 1;
+  transition: opacity 1.5s ease;
+}
+.title-reveal.ready .title-loadmask { opacity: 0; }
+
+/* 시작 시 은은한 암전 */
+.title-darken {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: #05040a;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+.title-scene.starting .title-darken { opacity: 0.94; }
+
 @media (prefers-reduced-motion: reduce) {
-  .title-reveal { transition: opacity 0.4s ease; clip-path: none; }
-  .title-reveal.ready { clip-path: none; }
+  .title-reveal { filter: none; transform: none; transition: opacity 0.4s ease; }
   .title-reveal.ready .title-logo-wrap { animation: none; opacity: 1; }
   .title-reveal.ready .title-menu { animation: none; opacity: 1; }
   .title-reveal.ready .title-logo,
