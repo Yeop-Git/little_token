@@ -360,11 +360,56 @@ button {
 .pop.dmg { color: #ff9a72; }
 .pop.heal { color: #b6f38a; }
 .pop.self { color: #ffc15a; font-size: 34px; }
+.pop.guard { color: #86d6ea; font-size: 34px; }
+.pop.buff { color: #ffcf76; }
+/* 단어 기여 수치(팅) — 작게 톡 */
+.pop.tick { font-size: 27px; animation: pop-tick 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
+.pop.big { font-size: 58px; }
 @keyframes pop-up {
   0% { transform: translateY(8px) scale(0.6); opacity: 0; }
   25% { transform: translateY(-8px) scale(1.16); opacity: 1; }
   70% { opacity: 1; }
   100% { transform: translateY(-60px) scale(1); opacity: 0; }
+}
+@keyframes pop-tick {
+  0% { transform: translateY(4px) scale(0.4); opacity: 0; }
+  35% { transform: translateY(-14px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-30px) scale(0.9); opacity: 0; }
+}
+
+/* 중앙 총합 롤업(띠리리릭) */
+.big-total {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translate(-50%, -50%);
+  z-index: 41;
+  font-size: 104px;
+  font-weight: 900;
+  pointer-events: none;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 30px currentColor;
+  animation: total-in 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.big-total.dmg { color: #ff9a72; }
+.big-total.heal { color: #b6f38a; }
+.big-total.out { animation: total-out 0.4s ease forwards; }
+@keyframes total-in { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }
+@keyframes total-out {
+  to { transform: translate(-50%, -58%) scale(1.25); opacity: 0; }
+}
+
+/* 돌진(박치기) — 공격자가 상대 쪽으로 훅 */
+.actor.you.lunge { animation: lunge-you 0.44s cubic-bezier(0.5, 0, 0.25, 1); z-index: 10; }
+@keyframes lunge-you {
+  0% { transform: translateX(0); }
+  42% { transform: translateX(300px) scale(1.06); }
+  100% { transform: translateX(0); }
+}
+.actor.foe.lunge { animation: lunge-foe 0.44s cubic-bezier(0.5, 0, 0.25, 1); z-index: 10; }
+@keyframes lunge-foe {
+  0% { transform: translateX(0); }
+  42% { transform: translateX(-260px) scale(1.06); }
+  100% { transform: translateX(0); }
 }
 
 /* 상단 발광 체인(선택 단어) — 테두리/배경 없음, 글자 발광만 */

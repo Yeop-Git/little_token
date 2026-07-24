@@ -25,6 +25,7 @@ import {
 import { BACKGROUNDS, SPRITES } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
+import { SquareBurst } from '@/ui/SquareBurst'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { STAT_LABEL, type StatKey } from '@data/items'
 
@@ -35,6 +36,7 @@ interface Opts {
   encounter: string[]
   onWin: () => void
   player?: PlayerState
+  tables?: Tables
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
@@ -57,6 +59,7 @@ export class BattleView {
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
     this.onWin = opts.onWin
+    this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], this.field.enemyAtkMult ?? 1))
     this.state = { playerHp: 40, playerMax: 40, guard: 0, turn: 1, enemies, pending: null }
@@ -452,56 +455,75 @@ export class BattleView {
     await this.execute()
   }
 
-  // ── 발동 → 적 턴 ──
+  // 단어 하나가 문장 위로 톡 튀길 기여 수치.
+  private contribOf(w: Word): { text: string; cls: string } | null {
+    if (w.power) return { text: `+${w.power}`, cls: w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg' }
+    if (w.bonus) return { text: `×${(1 + w.bonus).toFixed(1)}`, cls: 'buff' }
+    if (w.effects?.guard) return { text: `방어+${w.effects.guard}`, cls: 'guard' }
+    if (w.effects?.heal) return { text: `+${w.effects.heal}`, cls: 'heal' }
+    return null
+  }
+
+  // ── 발동: 팅팅팅(기여 수치) → 맥락 → 총합 롤업 → 돌진·사각 블라스트로 꽂힘 ──
   private async execute() {
     if (!this.complete() || this.busy || this.over) return
     this.busy = true
 
+    const order = this.order()
     const intent = compile(this.sel, this.t)
+    const atk = this.player.stats.atk
+    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
+    const dmg = Math.round(effBase * intent.multiplier)
+    const heal = intent.heal + (intent.kind === 'heal' ? this.player.stats.heal : 0)
 
-    const words = this.q('#chain').querySelectorAll<HTMLElement>('.chain-word')
-    for (let i = 0; i < words.length; i++) {
-      words[i].classList.add('wave')
-      await sleep(70)
+    // 1) 팅팅팅 — 각 단어의 기여 수치가 문장 위로 톡톡 튄다
+    const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
+    for (let i = 0; i < order.length; i++) {
+      const w = this.sel[order[i]]
+      const c = w ? this.contribOf(w) : null
+      const el = chainEls[i]
+      if (el) el.classList.add('wave')
+      if (c && el) this.popEl(el, c.text, `tick ${c.cls}`)
+      await sleep(95)
     }
     this.q('#flash').classList.add('go')
-    await sleep(180)
+    await sleep(150)
 
+    // 2) 맥락(관용구) 발동 배너
     if (intent.combos.length) {
-      const combos = matchCombos(this.sel, this.t.combos, this.order())
+      const combos = matchCombos(this.sel, this.t.combos, order)
       const mult = combos.reduce((m, c) => m * c.mult, 1)
       const el = this.q('#combo')
       el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">위력 ×${mult.toFixed(1)}</div>`
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await sleep(720)
+      await sleep(760)
     }
 
-    const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, this.player.stats.atk)
-    for (const h of res.hits) this.popAt(h.target, `${h.dmg}`, 'dmg')
-    if (res.selfDmg) this.popPlayer(`${res.selfDmg}`, 'self')
-    if (res.heal) this.popPlayer(`${res.heal}`, 'heal')
-    this.hitFlash(res.hits.map((h) => h.target), !!res.selfDmg)
-    this.log(res.text + (res.combos.length ? ` · ${res.combos.join(', ')}` : ''))
+    // 3) 총합이 띠리리릭 차오른다
+    const totalVal = dmg > 0 ? dmg : heal
+    if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
-    await sleep(420)
+    // 4) 실제 발동 + 꽂힘 연출
+    const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
+    await this.strike(res, intent)
+    this.log(res.text + (res.combos.length ? ` · ${res.combos.join(', ')}` : ''))
     this.renderActors()
 
     if (allDead(this.state)) {
       this.over = true
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
-      await sleep(900)
+      await sleep(800)
       this.onWin()
       return
     }
 
+    // 5) 적 턴 — 각 적이 돌진하며 플레이어에게 꽂는다
     this.state.turn++
     this.q('#turn').textContent = String(this.state.turn)
-    for (const st of enemyTurn(this.state, Math.random)) {
-      if (st.dealt) this.popPlayer(`${st.dealt}`, 'dmg')
-      this.log(st.text)
-    }
+    await this.enemyPhase()
+
     if (this.state.pending) {
       const p = this.state.pending
       const targets = p.aoe ? aliveIdx(this.state) : [p.target]
@@ -509,23 +531,23 @@ export class BattleView {
         const e = this.state.enemies[ti]
         if (!e || e.dead) continue
         e.hp -= p.dmg
-        this.popAt(ti, `${p.dmg}`, 'dmg')
+        const el = this.q(`#actors .actor.foe[data-i="${ti}"]`)
+        if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
+        this.popAt(ti, `${p.dmg}`, 'dmg big')
         if (e.hp <= 0) e.dead = true
       }
       this.log(`예약된 문장 발동 → ${p.dmg} 피해`)
       this.state.pending = null
-      this.hitFlash(targets, false)
+      await sleep(300)
+      this.renderActors()
     }
-
-    await sleep(360)
-    this.renderActors()
 
     if (this.state.playerHp <= 0) {
       this.over = true
       this.log('일기장이 너무 상했다… (패배)')
     } else if (allDead(this.state)) {
       this.over = true
-      await sleep(600)
+      await sleep(500)
       this.onWin()
       return
     }
@@ -537,17 +559,98 @@ export class BattleView {
     this.renderWords()
   }
 
+  // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진.
+  private async strike(res: { hits: { target: number; dmg: number }[]; selfDmg: number; heal: number }, intent: ReturnType<typeof compile>) {
+    const you = this.q<HTMLElement>('.actor.you')
+    const attacking = res.hits.length > 0
+    if (attacking) you.classList.add('lunge')
+    await sleep(attacking ? 170 : 40)
+
+    for (const h of res.hits) {
+      const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
+      if (el) {
+        SquareBurst.playOn(el, 'damage', { spread: 120 })
+        this.hitOne(el)
+      }
+      this.popAt(h.target, `${h.dmg}`, 'dmg big')
+    }
+    if (res.selfDmg) {
+      SquareBurst.playOn(you, 'self', { spread: 90 })
+      this.hitOne(you)
+      this.popPlayer(`${res.selfDmg}`, 'self')
+    }
+    if (res.heal) {
+      SquareBurst.playOn(you, 'heal', { spread: 90 })
+      this.popPlayer(`${res.heal}`, 'heal')
+    }
+    if (intent.guard > 0 && !attacking) {
+      SquareBurst.playOn(you, 'guard', { spread: 90 })
+      this.popPlayer(`방어+${intent.guard}`, 'guard')
+    }
+    await sleep(attacking ? 250 : 120)
+    you.classList.remove('lunge')
+  }
+
+  // 적 턴 연출 — 각 적이 돌진해 플레이어에게 사각 블라스트.
+  private async enemyPhase() {
+    for (const st of enemyTurn(this.state, Math.random)) {
+      const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
+      if (st.dealt <= 0) {
+        this.log(st.text)
+        continue
+      }
+      foe?.classList.add('lunge')
+      await sleep(170)
+      const you = this.q<HTMLElement>('.actor.you')
+      SquareBurst.playOn(you, 'damage', { spread: 100 })
+      this.hitOne(you)
+      this.popPlayer(`${st.dealt}`, 'dmg big')
+      this.log(st.text)
+      await sleep(240)
+      foe?.classList.remove('lunge')
+    }
+    this.renderActors()
+  }
+
+  // 중앙 총합 카운트업(띠리리릭).
+  private async rollTotal(val: number, cls: string) {
+    const host = this.q('#pbox')
+    const el = document.createElement('div')
+    el.className = `big-total ${cls}`
+    host.appendChild(el)
+    const dur = 440
+    const t0 = performance.now()
+    await new Promise<void>((resolve) => {
+      const tick = (t: number) => {
+        const p = Math.min(1, (t - t0) / dur)
+        el.textContent = String(Math.round(val * (0.15 + 0.85 * p)))
+        if (p < 1) requestAnimationFrame(tick)
+        else resolve()
+      }
+      requestAnimationFrame(tick)
+    })
+    el.textContent = String(val)
+    await sleep(160)
+    el.classList.add('out')
+    this.timers.push(window.setTimeout(() => el.remove(), 400))
+  }
+
   // ── 피드백 ──
-  private popAt(enemyIdx: number, txt: string, cls: string) {
-    const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
+  private toStage(rect: DOMRect): { x: number; y: number } {
     const pboxEl = this.q('#pbox')
-    if (!el) return
-    const r = el.getBoundingClientRect()
     const box = pboxEl.getBoundingClientRect()
     const scale = box.width / pboxEl.offsetWidth
-    const x = (r.left + r.width / 2 - box.left) / scale
-    const y = (r.top - box.top) / scale + 30
-    this.spawnPop(x, y, txt, cls)
+    return { x: (rect.left + rect.width / 2 - box.left) / scale, y: (rect.top - box.top) / scale }
+  }
+  private popEl(el: HTMLElement, txt: string, cls: string) {
+    const { x, y } = this.toStage(el.getBoundingClientRect())
+    this.spawnPop(x, y - 4, txt, cls)
+  }
+  private popAt(enemyIdx: number, txt: string, cls: string) {
+    const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
+    if (!el) return
+    const { x, y } = this.toStage(el.getBoundingClientRect())
+    this.spawnPop(x, y + 30, txt, cls)
   }
   private popPlayer(txt: string, cls: string) {
     this.spawnPop(320, 120, txt, cls)
@@ -555,26 +658,16 @@ export class BattleView {
   private spawnPop(x: number, y: number, txt: string, cls: string) {
     const p = document.createElement('div')
     p.className = `pop ${cls}`
-    p.textContent = (cls === 'heal' ? '+' : '') + txt
+    p.textContent = (cls.includes('heal') ? '+' : '') + txt
     p.style.left = `${x - 24}px`
-    p.style.top = `${Math.max(20, y)}px`
+    p.style.top = `${Math.max(10, y)}px`
     this.q('#pbox').appendChild(p)
     this.timers.push(window.setTimeout(() => p.remove(), 1000))
   }
-  private hitFlash(enemyIdxs: number[], player: boolean) {
-    for (const i of enemyIdxs) {
-      const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${i}"]`)
-      if (!el) continue
-      el.classList.remove('hit')
-      void el.offsetWidth
-      el.classList.add('hit')
-    }
-    if (player) {
-      const el = this.q('#actors').querySelector<HTMLElement>('.actor.you')
-      el?.classList.remove('hit')
-      void el?.offsetWidth
-      el?.classList.add('hit')
-    }
+  private hitOne(el: HTMLElement) {
+    el.classList.remove('hit')
+    void el.offsetWidth
+    el.classList.add('hit')
   }
   private log(html: string) {
     const host = this.q('#log')

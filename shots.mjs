@@ -12,45 +12,59 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, de
 const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-// 1) 전투 — 선택 중 + 단어 hover(무드색/정보 패널)
+// 1) 전투 — 선택 중(3단어) + hover 상세 (나는 힘껏 [때렸다])
 await page.goto(`${BASE}/?scene=battle`, { waitUntil: 'networkidle' })
 await sleep(600)
 await page.click('.word-cell[data-id="na"]')
 await sleep(120)
-await page.click('.word-cell[data-id="mad"]')
-await sleep(120)
-await page.click('.word-cell[data-id="fir"]')
-await sleep(250)
-await page.hover('.word-cell[data-id="jum"]')
+await page.click('.word-cell[data-id="himkkeot"]')
+await sleep(200)
+await page.hover('.word-cell[data-id="ttaeryeot"]')
 await sleep(350)
 await shot('1-battle-select')
 
-// 1b) 가방 토글(단어 자리에 아이템, 우측 아이템 정보)
+// 1b) 가방 토글
 await page.click('#bag')
 await sleep(500)
 await page.hover('.bag-item[data-i="0"]')
-await sleep(350)
+await sleep(300)
 await shot('1b-bag')
 await page.click('#bag')
-await sleep(400)
+await sleep(300)
 
-// 2) 맥락 발동 — 5단어 채우면 자동 완성
-await page.goto(`${BASE}/?scene=battle`, { waitUntil: 'networkidle' })
-await sleep(500)
-for (const id of ['na', 'mad', 'fir', 'jum', 'e1']) {
-  await page.click(`.word-cell[data-id="${id}"]`)
-  await sleep(120)
+// 2) 맥락 발동(정면돌파) — 나는 힘껏 때렸다 자동완성
+async function runCombo() {
+  await page.goto(`${BASE}/?scene=battle`, { waitUntil: 'networkidle' })
+  await sleep(500)
+  await page.click('.word-cell[data-id="na"]')
+  await sleep(110)
+  await page.click('.word-cell[data-id="himkkeot"]')
+  await sleep(110)
+  await page.click('.word-cell[data-id="ttaeryeot"]')
 }
+await runCombo()
 await page.waitForSelector('.combo-flash .name', { state: 'visible', timeout: 5000 })
-await sleep(320)
-await shot('2-battle-combo')
+await sleep(280)
+await shot('2-combo')
 
-// 2c) 단어장 오버레이
+// 2b) 총합 롤업(띠리리릭)
+await runCombo()
+await page.waitForSelector('.big-total', { timeout: 6000 })
+await sleep(200)
+await shot('2b-roll')
+
+// 2c) 돌진 + 사각 블라스트(꽂힘)
+await runCombo()
+await page.waitForSelector('.actor.you.lunge', { timeout: 6000 })
+await sleep(120)
+await shot('2c-strike')
+
+// 2d) 단어장
 await page.goto(`${BASE}/?scene=battle`, { waitUntil: 'networkidle' })
 await sleep(500)
 await page.click('#deck-btn')
 await sleep(500)
-await shot('2c-deck')
+await shot('2d-deck')
 
 // 3) 보상
 await page.goto(`${BASE}/?scene=reward`, { waitUntil: 'networkidle' })

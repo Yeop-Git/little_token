@@ -10,8 +10,9 @@ import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { FontManager } from '@/ui/FontManager'
 import { FIELDS } from '@data/fields'
-import { DEMO_ENCOUNTER } from '@data/enemies'
 import { ITEMS } from '@data/items'
+import { makeEarlyTables, EARLY_WORDS } from '@data/earlyWords'
+import { defaultPlayer } from '@core/player'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -40,7 +41,16 @@ function go(scene: SceneName) {
   stage.innerHTML = ''
   if (scene === 'battle') {
     stage.setAttribute('data-theme', FIELDS[0].theme)
-    current = new BattleView(stage, { field: FIELDS[0], encounter: DEMO_ENCOUNTER, onWin: () => go('reward') })
+    // 초기 레벨: 3단어(나는+방식+행동) 자연 문장, 간단한 때리기/막기 수치.
+    const player = defaultPlayer()
+    player.deck = EARLY_WORDS
+    current = new BattleView(stage, {
+      field: FIELDS[0],
+      encounter: ['moth', 'roach', 'moth'],
+      onWin: () => go('reward'),
+      player,
+      tables: makeEarlyTables(),
+    })
   } else if (scene === 'reward') {
     stage.setAttribute('data-theme', 'day')
     current = new RewardView(stage, { nextField: FIELDS[1], onPickItem: () => go('item'), onPickWord: () => go('battle') })

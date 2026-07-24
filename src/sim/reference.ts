@@ -108,15 +108,16 @@ export function applyIntent(
 export interface EnemyStrike {
   text: string
   dealt: number
+  idx: number // 공격한 적 인덱스(연출용)
 }
 
 // 적 턴 — every 주기에 맞는 적만 공격. guard로 흡수.
 export function enemyTurn(state: BattleState, rng: () => number): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
   let guard = state.guard
-  for (const e of state.enemies) {
-    if (e.dead) continue
-    if (state.turn % e.def.every !== 0) continue
+  state.enemies.forEach((e, idx) => {
+    if (e.dead) return
+    if (state.turn % e.def.every !== 0) return
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)
     const dealt = Math.max(0, raw - guard)
     const absorbed = Math.min(guard, raw)
@@ -125,8 +126,9 @@ export function enemyTurn(state: BattleState, rng: () => number): EnemyStrike[] 
     strikes.push({
       text: `${e.def.name}의 습격 → ${dealt} 피해` + (absorbed ? ` (방어 ${absorbed} 흡수)` : ''),
       dealt,
+      idx,
     })
-  }
+  })
   state.guard = 0
   return strikes
 }
