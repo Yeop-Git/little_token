@@ -2123,7 +2123,7 @@ button {
   transition: opacity 1s ease;
 }
 
-/* ── 대화창: 하단, 거의 풀폭, 깔끔한 청색 라인 패널 ── */
+/* ── 대화창: 하단, 거의 풀폭, 샛노란 발광 라인 패널 ── */
 .intro-dlg-box {
   position: absolute;
   left: 50%;
@@ -2134,10 +2134,12 @@ button {
   padding: 26px 46px;
   border-radius: 24px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(10, 18, 34, 0.68), rgba(6, 10, 22, 0.86));
+  background: linear-gradient(180deg, rgba(32, 24, 8, 0.7), rgba(20, 14, 4, 0.88));
   box-shadow:
-    inset 0 0 0 1.5px rgba(120, 195, 255, 0.5),
-    0 0 34px rgba(80, 150, 255, 0.18),
+    inset 0 0 0 1.5px rgba(255, 228, 110, 0.72),
+    inset 0 0 30px rgba(255, 204, 80, 0.14),
+    0 0 30px rgba(255, 208, 80, 0.4),
+    0 0 78px rgba(255, 190, 60, 0.24),
     0 24px 54px rgba(0, 0, 0, 0.6);
   opacity: 0;
   transition:
@@ -2160,15 +2162,16 @@ button {
   margin: 0 auto;
 }
 
+/* 토큰의 이름 — 샛노란 발광 */
 .intro-dlg-name {
   text-align: center;
   font-size: 30px;
   font-weight: 900;
   letter-spacing: 0.06em;
-  color: #cdeaff;
+  color: #fff1a0;
   text-shadow:
-    0 0 14px rgba(120, 200, 255, 0.75),
-    0 0 30px rgba(150, 180, 255, 0.4);
+    0 0 14px rgba(255, 222, 90, 0.9),
+    0 0 34px rgba(255, 200, 60, 0.55);
   transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
@@ -2176,8 +2179,8 @@ button {
   width: 230px;
   height: 1px;
   margin: 11px auto 15px;
-  background: linear-gradient(to right, transparent, rgba(140, 210, 255, 0.9), transparent);
-  box-shadow: 0 0 8px rgba(120, 200, 255, 0.7);
+  background: linear-gradient(to right, transparent, rgba(255, 224, 120, 0.95), transparent);
+  box-shadow: 0 0 10px rgba(255, 214, 90, 0.8);
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -2185,22 +2188,24 @@ button {
   text-align: center;
   font-size: 24px;
   line-height: 1.65;
-  color: #eaf3ff;
+  color: #fdf6e0;
   min-height: 2.6em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(255, 212, 100, 0.28);
 }
 
-/* 플레이어(우비 아이) 대사 — 이름/구분선만 리틀토큰의 따뜻한 금빛으로 전환 */
+/* 플레이어(우비 아이) 대사 — 토큰의 샛노랑과 구분되는 차분한 크림 톤 */
 .intro-dlg-box.is-player-line .intro-dlg-name {
-  color: var(--gold-hi);
+  color: #f8f1de;
   text-shadow:
-    0 0 14px rgba(255, 210, 122, 0.75),
-    0 0 30px rgba(255, 190, 110, 0.4);
+    0 0 12px rgba(255, 242, 205, 0.5),
+    0 0 26px rgba(255, 228, 160, 0.25);
 }
 
 .intro-dlg-box.is-player-line .intro-dlg-divider {
-  background: linear-gradient(to right, transparent, rgba(255, 214, 138, 0.9), transparent);
-  box-shadow: 0 0 8px rgba(255, 208, 120, 0.7);
+  background: linear-gradient(to right, transparent, rgba(255, 245, 218, 0.85), transparent);
+  box-shadow: 0 0 8px rgba(255, 238, 190, 0.5);
 }
 
 .intro-dlg-char {
@@ -2248,8 +2253,8 @@ button {
   font-size: 19px;
   font-weight: 800;
   letter-spacing: 0.16em;
-  color: rgba(160, 210, 255, 0.62);
-  text-shadow: 0 0 12px rgba(110, 190, 255, 0.4);
+  color: rgba(255, 226, 140, 0.62);
+  text-shadow: 0 0 12px rgba(255, 208, 90, 0.4);
   opacity: 0;
   transition:
     opacity 0.5s ease,
@@ -2262,10 +2267,10 @@ button {
 }
 
 .intro-dlg-skip:hover {
-  color: rgba(215, 240, 255, 0.95);
+  color: rgba(255, 245, 200, 0.95);
   text-shadow:
-    0 0 14px rgba(140, 215, 255, 0.85),
-    0 0 30px rgba(140, 215, 255, 0.4);
+    0 0 14px rgba(255, 222, 110, 0.85),
+    0 0 30px rgba(255, 222, 110, 0.4);
 }
 
 .intro-dialogue.is-dim-clearing .intro-dlg-skip {
@@ -2321,7 +2326,9 @@ button {
   transition:
     opacity 0.35s ease,
     transform 0.35s ease;
-  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55));
+  /* 토큰 자체가 노란 발광을 두른다 */
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+    drop-shadow(0 0 80px rgba(255, 200, 70, 0.3));
 }
 
 .intro-dlg-stage.is-portrait-visible .intro-dlg-portrait-main {
@@ -2348,12 +2355,14 @@ button {
   0% {
     opacity: 0.2;
     transform: scale(1.1);
-    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) brightness(1.6);
+    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+      drop-shadow(0 0 80px rgba(255, 200, 70, 0.3)) brightness(1.6);
   }
   100% {
     opacity: 1;
     transform: scale(1);
-    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) brightness(1);
+    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 220, 110, 0.55))
+      drop-shadow(0 0 80px rgba(255, 200, 70, 0.3)) brightness(1);
   }
 }
 
