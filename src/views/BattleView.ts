@@ -38,6 +38,8 @@ interface Opts {
   onWin: () => void
   player?: PlayerState
   tables?: Tables
+  hpMult?: number
+  atkMult?: number
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
@@ -63,7 +65,8 @@ export class BattleView {
     this.onWin = opts.onWin
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
-    const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], this.field.enemyAtkMult ?? 1))
+    const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
+    const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1))
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
@@ -77,8 +80,9 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" style="background-image:url(${BACKGROUNDS.bg001})">
+      <div class="scene battle" data-weather="${this.field.weather}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="vignette"></div>
+        <div class="weather-wash"></div>
 
         <div class="hud-top">
           <div class="hud-date" id="f-date"></div>

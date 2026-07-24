@@ -26,7 +26,7 @@ await shot('1-battle-select')
 // 1b) 가방 토글
 await page.click('#bag')
 await sleep(500)
-await page.hover('.bag-item[data-i="0"]')
+await page.hover('.bag-item[data-i="0"]').catch(() => {}) // 시작 시엔 비어 있을 수 있음
 await sleep(300)
 await shot('1b-bag')
 await page.click('#bag')

@@ -23,8 +23,9 @@ export interface BattleState {
   pending: { dmg: number; sentence: string; aoe: boolean; target: number } | null
 }
 
-export function makeEnemy(def: EnemyDef, atkMult = 1): EnemyInst {
-  return { def, hp: def.hp, maxHp: def.hp, atkMult, dead: false }
+export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1): EnemyInst {
+  const maxHp = Math.max(1, Math.round(def.hp * hpMult))
+  return { def, hp: maxHp, maxHp, atkMult, dead: false }
 }
 
 export interface HitFx {

@@ -127,6 +127,25 @@ button {
     radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(8, 6, 12, 0.35) 100%);
 }
 
+/* 날씨/밤낮 워시 — 배경 위에 톤 오버레이(적/UI보다 아래) */
+.weather-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.battle[data-weather='night'] .weather-wash {
+  background: linear-gradient(180deg, rgba(30, 36, 92, 0.62), rgba(12, 12, 44, 0.55));
+  opacity: 1;
+}
+.battle[data-weather='rain'] .weather-wash {
+  background: linear-gradient(180deg, rgba(70, 92, 120, 0.42), rgba(44, 60, 84, 0.38));
+  opacity: 1;
+}
+
 /* 상단 HUD — 날짜/제목/날씨. 테두리 없이 발광 텍스트 + 얇은 유리. */
 .hud-top {
   position: absolute;
@@ -995,11 +1014,12 @@ button {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; height: 4px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
-  box-shadow: 0 0 16px var(--glow);
-  opacity: 0.6;
+  background: linear-gradient(90deg, transparent, var(--wglow, var(--gold)), transparent);
+  box-shadow: 0 0 16px var(--wglow, var(--glow));
+  opacity: 0.7;
   transition: opacity 0.16s;
 }
+.reward-pick .kind { color: var(--wglow, var(--ink-faint)); }
 .reward-pick:hover {
   transform: translateY(-10px);
   box-shadow: 0 26px 50px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 210, 122, 0.2), inset 0 1px 0 var(--glass-hi);

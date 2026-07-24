@@ -7,12 +7,13 @@
 
 import type { ItemDef, StatKey } from '@data/items'
 import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
+import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 
 interface Opts {
   item: ItemDef
-  onDone: () => void
+  onDone: (result: OwnedItem) => void
 }
 
 const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
@@ -73,7 +74,18 @@ export class ItemExclaimView {
       </div>`
 
     this.root.querySelector('#confirm')!.addEventListener('click', () => {
-      if (this.complete()) this.opts.onDone()
+      if (!this.complete()) return
+      const totals = this.totals()
+      const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
+      // 최종 스탯(기본+감탄사) 전체가 플레이어 스탯에 더해진다(스펙업).
+      this.opts.onDone({
+        id: item.id,
+        name: item.name,
+        grade: item.grade,
+        art: item.art,
+        line,
+        stats: { atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
+      })
     })
     this.root.querySelector('#undo')!.addEventListener('click', () => {
       this.picks = {}
