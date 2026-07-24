@@ -27,6 +27,9 @@ export const icon = (key: string): string => {
     case 'heart':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
         <path d="M24 40S8 30 8 18a8 8 0 0116-4 8 8 0 0116 4c0 12-16 22-16 22z" fill="currentColor" fill-opacity="0.18"/></svg>`
+    case 'cross': // 회복
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
+        <path d="M24 13v22M13 24h22"/></svg>`
     case 'clover': // 행운
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
         <path d="M24 24c-4-4-4-10 0-13 4 3 4 9 0 13zM24 24c4-4 10-4 13 0-3 4-9 4-13 0zM24 24c4 4 4 10 0 13-4-3-4-9 0-13zM24 24c-4 4-10 4-13 0 3-4 9-4 13 0z" fill="currentColor" fill-opacity="0.18"/>

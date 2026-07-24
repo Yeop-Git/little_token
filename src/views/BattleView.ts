@@ -64,7 +64,9 @@ export class BattleView {
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], this.field.enemyAtkMult ?? 1))
-    this.state = { playerHp: 40, playerMax: 40, guard: 0, turn: 1, enemies, pending: null }
+    // 체력 스탯 = 최대 체력.
+    const maxHp = this.player.stats.hp
+    this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
     this.target = aliveIdx(this.state)[0] ?? 0
     this.mount()
   }
@@ -496,10 +498,13 @@ export class BattleView {
 
     const order = this.order()
     const intent = compile(this.sel, this.t)
+    // 스탯 = 효과 "수치" 상승(개수 아님). 방어/회복 값에 가산, 공격은 atkBonus로.
+    if (intent.guard > 0) intent.guard += this.player.stats.guard
+    if (intent.heal > 0) intent.heal += this.player.stats.heal
     const atk = this.player.stats.atk
     const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
     const dmg = Math.round(effBase * intent.multiplier)
-    const heal = intent.heal + (intent.kind === 'heal' ? this.player.stats.heal : 0)
+    const heal = intent.heal
 
     // 1) 팅팅팅 — 각 단어의 기여 수치가 문장 위로 톡톡 튄다
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
