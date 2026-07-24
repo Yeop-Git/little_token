@@ -4,7 +4,7 @@
  * 컴파일러/캡을 실게임과 동일 함수로 호출해 결과가 어긋나지 않게 한다.
  */
 
-import { compile, finalMultiplier } from '@core/compiler'
+import { compile, finalMultiplier, isDamageIntent } from '@core/compiler'
 import { conflictReason } from '@core/validator'
 import type { Selection, Word } from '@core/types'
 import { TABLES } from '@data/tables'
@@ -16,6 +16,7 @@ const order = TABLES.template.slots.map((s) => s.key)
 
 interface Row {
   dmg: number
+  dealsDamage: boolean
   sentence: string
   combos: string[]
   timing: string
@@ -29,7 +30,14 @@ function walk(i: number, sel: Selection) {
   if (i === order.length) {
     const it = compile(sel, TABLES)
     const push = (m: number) =>
-      rows.push({ dmg: Math.round(it.base * m), sentence: it.sentence, combos: it.combos, timing: it.timing, aoe: it.aoe })
+      rows.push({
+        dmg: isDamageIntent(it) ? Math.round(it.base * m) : 0,
+        dealsDamage: isDamageIntent(it),
+        sentence: it.sentence,
+        combos: it.combos,
+        timing: it.timing,
+        aoe: it.aoe,
+      })
     if (it.variance) {
       push(finalMultiplier(it, TABLES.multCap, 0))
       push(finalMultiplier(it, TABLES.multCap, 1))
@@ -52,14 +60,14 @@ walk(0, {})
 
 // 단일 대상 즉발만으로 밸런스 기준을 잡는다(범위는 대상당 낮음).
 const imm = rows
-  .filter((r) => r.timing === 'immediate' && r.aoe === 'single')
+  .filter((r) => r.dealsDamage && r.timing === 'immediate' && r.aoe === 'single')
   .map((r) => r.dmg)
   .sort((a, b) => a - b)
 const q = (p: number) => imm[Math.floor(imm.length * p)]
 const max = imm[imm.length - 1]
 const med = q(0.5)
 const noCombo = rows
-  .filter((r) => !r.combos.length && r.timing === 'immediate' && r.aoe === 'single')
+  .filter((r) => r.dealsDamage && !r.combos.length && r.timing === 'immediate' && r.aoe === 'single')
   .map((r) => r.dmg)
   .sort((a, b) => b - a)
 

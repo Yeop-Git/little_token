@@ -3,7 +3,7 @@
  * 교체한다(View/Compiler 불변). 다중 적 + 범위(aoe)를 지원한다.
  */
 
-import { finalMultiplier } from '@core/compiler'
+import { finalMultiplier, isDamageIntent } from '@core/compiler'
 import type { EnemyDef, Intent } from '@core/types'
 
 export interface EnemyInst {
@@ -12,6 +12,8 @@ export interface EnemyInst {
   maxHp: number
   atkMult: number
   dead: boolean
+  initiativePhase: 'first' | 'second'
+  nextAttackTurn: number
 }
 
 export interface BattleState {
@@ -25,7 +27,15 @@ export interface BattleState {
 
 export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1): EnemyInst {
   const maxHp = Math.max(1, Math.round(def.hp * hpMult))
-  return { def, hp: maxHp, maxHp, atkMult, dead: false }
+  return {
+    def,
+    hp: maxHp,
+    maxHp,
+    atkMult,
+    dead: false,
+    initiativePhase: def.initiative,
+    nextAttackTurn: 1,
+  }
 }
 
 export interface HitFx {
@@ -40,12 +50,23 @@ export interface ApplyResult {
   heal: number
   killed: number[]
   overflow: number // 단일 공격이 최전방 적을 넘겨 죽였을 때 남는 초과 피해
-  guardGain: number // 이번 문장으로 얻은 방어(임시 체력)
+}
+
+export interface PreparationResult {
+  guardGain: number // 이번 문장으로 선공 전에 얻은 방어(임시 체력)
 }
 
 // 살아있는 적 인덱스 목록.
 export const aliveIdx = (s: BattleState): number[] =>
   s.enemies.map((e, i) => (e.dead ? -1 : i)).filter((i) => i >= 0)
+
+// 준비 효과는 적 선공보다 먼저 적용한다. 이전 문장의 미사용 방어는 다음 문장의
+// 준비 단계까지만 유지되며, 새 방어와 중첩하지 않고 이번 문장의 값으로 교체한다.
+export function applyPreparation(state: BattleState, intent: Intent): PreparationResult {
+  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
+  state.guard = guardGain
+  return { guardGain }
+}
 
 export function applyIntent(
   state: BattleState,
@@ -57,7 +78,8 @@ export function applyIntent(
 ): ApplyResult {
   const roll = intent.variance ? rng() : null
   const mult = finalMultiplier(intent, multCap, roll)
-  const effBase = intent.kind === 'heal' ? intent.base : intent.base + atkBonus
+  const dealsDamage = isDamageIntent(intent)
+  const effBase = dealsDamage ? intent.base + atkBonus : 0
   const dmg = Math.round(effBase * mult)
   const note = intent.variance ? (roll! < intent.variance.p ? ' (도박 성공)' : ' (도박 실패)') : ''
 
@@ -72,13 +94,12 @@ export function applyIntent(
       heal: 0,
       killed: [],
       overflow: 0,
-      guardGain: 0,
     }
   }
 
   const hits: HitFx[] = []
   const killed: number[] = []
-  const targets = intent.kind === 'heal' ? [] : intent.aoe === 'all' ? aliveIdx(state) : [target]
+  const targets = !dealsDamage ? [] : intent.aoe === 'all' ? aliveIdx(state) : [target]
 
   let overflow = 0
   for (const ti of targets) {
@@ -100,11 +121,7 @@ export function applyIntent(
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
   state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + intent.heal)
 
-  // 주어가 '너는'(enemy 태그)이면 이번 턴 방어 포기.
-  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
-  state.guard = guardGain
-
-  const label = intent.kind === 'heal' ? `${intent.heal} 회복` : `${dmg} 피해${note}`
+  const label = dealsDamage ? `${dmg} 피해${note}` : intent.heal > 0 ? `${intent.heal} 회복` : '준비 완료'
   return {
     text: `${intent.sentence} → ${label}` + (selfDmg ? ` · 자신 ${selfDmg}` : ''),
     combos: intent.combos,
@@ -113,7 +130,6 @@ export function applyIntent(
     heal: intent.heal,
     killed,
     overflow: Math.max(0, overflow),
-    guardGain,
   }
 }
 
@@ -123,14 +139,14 @@ export interface EnemyStrike {
   idx: number // 공격한 적 인덱스(연출용)
 }
 
-// 적 턴 — 레일 최전방(플레이어와 가장 가까운) 적만 전투에 참여한다.
-// 뒷줄은 대기열이라 공격하지 않는다.
-export function enemyTurn(state: BattleState, rng: () => number, skipFront = false): EnemyStrike[] {
+// 적 행동 페이즈 — 최전방 적이 현재 선/후공 페이즈이며 쿨다운이 끝났을 때만 행동한다.
+// 기본 선공 적은 행동할 때마다 후공→선공으로 교대하고, 기본 후공 적은 계속 후공이다.
+export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' | 'second'): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
   const front = frontIdx(state)
-  if (front < 0 || skipFront) return strikes // 방금 도착한 최전방은 이번 턴 공격 유예
+  if (front < 0) return strikes
   const e = state.enemies[front]
-  if (state.turn % e.def.every === 0) {
+  if (e.initiativePhase === phase && state.turn >= e.nextAttackTurn) {
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)
     const dealt = Math.max(0, raw - state.guard)
     const absorbed = Math.min(state.guard, raw)
@@ -140,8 +156,12 @@ export function enemyTurn(state: BattleState, rng: () => number, skipFront = fal
       dealt,
       idx: front,
     })
+    state.guard = 0
+    e.nextAttackTurn = state.turn + e.def.every
+    if (e.def.initiative === 'first') {
+      e.initiativePhase = phase === 'first' ? 'second' : 'first'
+    }
   }
-  state.guard = 0
   return strikes
 }
 
