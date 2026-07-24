@@ -208,11 +208,22 @@ button {
   font-size: 16px;
   font-weight: 800;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .turn-badge b {
   color: var(--gold);
   font-size: 20px;
   text-shadow: 0 0 12px var(--glow);
+}
+.turn-badge em {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--gold-hi);
+  font-size: 13px;
+  font-style: normal;
+  letter-spacing: 0.04em;
 }
 
 /* 전투 스테이지(배우 영역) — 하단에 가로 단어/스탯 공간 확보 */
@@ -433,6 +444,36 @@ button {
   font-weight: 800;
   text-shadow: 0 0 10px var(--glow);
 }
+.hp-row { display: flex; align-items: center; gap: 7px; }
+.hp-row .hpbar { flex: 1; min-width: 0; }
+.initiative-chip {
+  flex: none;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 5px 0 3px;
+  border-radius: 8px;
+  color: #ffb080;
+  background: rgba(92, 29, 20, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 142, 98, 0.34), 0 0 10px rgba(255, 100, 60, 0.2);
+  cursor: help;
+}
+.initiative-chip.second {
+  color: #8bd4e1;
+  background: rgba(20, 55, 72, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(111, 198, 221, 0.34), 0 0 10px rgba(80, 180, 220, 0.18);
+}
+.initiative-chip svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.initiative-chip b { font-size: 10px; line-height: 1; white-space: nowrap; }
 /* 통통하고 귀여운 캡슐 HP 바 */
 .hpbar {
   position: relative;

@@ -134,6 +134,7 @@ export interface EnemyDef {
   hp: number
   atk: number // 기본 반격 피해
   every: number // n턴마다 공격
+  initiative: 'first' | 'second' // 문장 완성 후 플레이어보다 먼저/나중에 행동
   sprite: string // Sprites.ts 키
   note: string
 }

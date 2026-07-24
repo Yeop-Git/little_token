@@ -92,7 +92,7 @@ export class BattleView {
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-weather"><span id="f-weather"></span></div>
         </div>
-        <div class="turn-badge glass">턴 <b id="turn">1</b></div>
+        <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
 
         <div class="stage-area" id="pbox">
           <div class="chain-rail" id="chain"></div>
@@ -211,7 +211,10 @@ export class BattleView {
           ${front
             ? `<div class="nameplate glass">
                  <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
-                 <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
+                 <div class="hp-row">
+                   <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
+                   ${this.initiativeHtml(e.initiativePhase)}
+                 </div>
                </div>`
             : ''}
           <div class="shadow"></div>
@@ -253,6 +256,23 @@ export class BattleView {
     })
   }
 
+  private initiativeHtml(phase: 'first' | 'second') {
+    const first = phase === 'first'
+    const label = first ? '선공' : '후공'
+    const desc = first ? '문장 완성 직후, 플레이어보다 먼저 행동' : '플레이어 행동이 끝난 뒤 행동'
+    const glyph = first
+      ? '<path d="M5 12h12M13 7l5 5-5 5"/><path d="M3 7l5 5-5 5"/>'
+      : '<path d="M19 12H7M11 7l-5 5 5 5"/><circle cx="18" cy="12" r="2"/>'
+    return `<span class="initiative-chip ${phase}" title="${label} · ${desc}" aria-label="${label}: ${desc}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${glyph}</svg><b>${label}</b>
+    </span>`
+  }
+
+  private setPhase(label: string) {
+    const el = this.root.querySelector<HTMLElement>('#phase')
+    if (el) el.textContent = label
+  }
+
   // 캐릭터 호버 상세는 우측 캐스트 로그 패널 위에 그대로 겹쳐 표시한다.
   private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
     const visual = CHARACTER_VISUALS[id]
@@ -275,6 +295,7 @@ export class BattleView {
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
             ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
             ['행동 주기', `${enemy.def.every}턴`],
+            ['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공'],
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
         : ''
     }
@@ -595,6 +616,7 @@ export class BattleView {
     let next = this.slotIndex + 1
     while (next < order.length && this.sel[order[next]]) next++
     this.slotIndex = Math.min(next, order.length - 1)
+    this.setPhase(this.complete() ? '단어 완성' : `${this.t.template.slots[this.slotIndex].label} 선택`)
     this.renderChain()
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
@@ -611,6 +633,7 @@ export class BattleView {
         delete next[order[i]]
         this.sel = next
         this.slotIndex = i
+        this.setPhase(`${this.t.template.slots[i].label} 선택`)
         break
       }
     }
@@ -654,6 +677,19 @@ export class BattleView {
     const dmg = Math.round(effBase * intent.multiplier)
     const heal = intent.heal
 
+    // 5) 선공 상대 행동 — 현재 선공 표시이며 행동 쿨다운이 끝난 최전방 적.
+    this.setPhase('선공 상대 행동')
+    await this.enemyPhase('first')
+    if (this.state.playerHp <= 0) {
+      this.over = true
+      this.setPhase('패배')
+      this.log('일기장이 너무 상했다… (패배)')
+      return
+    }
+
+    // 6) 본인 캐릭터 행동 — 완성한 문장을 실제 전투 행동으로 적용한다.
+    this.setPhase('본인 캐릭터 행동')
+
     // 1) 팅팅팅 — 각 단어의 기여 수치가 문장 위로 톡톡 튄다
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
     for (let i = 0; i < order.length; i++) {
@@ -684,7 +720,6 @@ export class BattleView {
     if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
     // 4) 실제 발동 + 꽂힘 연출
-    const startFront = frontIdx(this.state)
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
     await this.strike(res)
     this.log(
@@ -699,17 +734,16 @@ export class BattleView {
 
     if (allDead(this.state)) {
       this.over = true
+      this.setPhase('전투 승리')
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
       await sleep(800)
       this.onWin()
       return
     }
 
-    // 5) 적 턴 — 방금 최전방으로 도착한 적은 이번 턴 공격 유예(부조리 방지)
-    this.state.turn++
-    this.q('#turn').textContent = String(this.state.turn)
-    const grace = frontIdx(this.state) !== startFront
-    await this.enemyPhase(grace)
+    // 7) 후공 상대 행동 — 플레이어 문장이 끝난 뒤 행동한다.
+    this.setPhase('후공 상대 행동')
+    await this.enemyPhase('second')
 
     if (this.state.pending) {
       const p = this.state.pending
@@ -736,9 +770,11 @@ export class BattleView {
 
     if (this.state.playerHp <= 0) {
       this.over = true
+      this.setPhase('패배')
       this.log('일기장이 너무 상했다… (패배)')
     } else if (allDead(this.state)) {
       this.over = true
+      this.setPhase('전투 승리')
       await sleep(500)
       this.onWin()
       return
@@ -746,6 +782,9 @@ export class BattleView {
 
     this.sel = {}
     this.slotIndex = 0
+    this.state.turn++
+    this.q('#turn').textContent = String(this.state.turn)
+    this.setPhase('주어 선택')
     this.busy = false
     this.drawHand()
     this.renderChain()
@@ -928,8 +967,8 @@ export class BattleView {
   }
 
   // 적 턴 연출 — 최전방 적이 돌진해 플레이어에게 사각 블라스트.
-  private async enemyPhase(skipFront = false) {
-    for (const st of enemyTurn(this.state, Math.random, skipFront)) {
+  private async enemyPhase(phase: 'first' | 'second') {
+    for (const st of enemyTurn(this.state, Math.random, phase)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
       if (st.dealt <= 0) {
         this.log(st.text)

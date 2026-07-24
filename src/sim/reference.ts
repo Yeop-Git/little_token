@@ -12,6 +12,8 @@ export interface EnemyInst {
   maxHp: number
   atkMult: number
   dead: boolean
+  initiativePhase: 'first' | 'second'
+  nextAttackTurn: number
 }
 
 export interface BattleState {
@@ -25,7 +27,15 @@ export interface BattleState {
 
 export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1): EnemyInst {
   const maxHp = Math.max(1, Math.round(def.hp * hpMult))
-  return { def, hp: maxHp, maxHp, atkMult, dead: false }
+  return {
+    def,
+    hp: maxHp,
+    maxHp,
+    atkMult,
+    dead: false,
+    initiativePhase: def.initiative,
+    nextAttackTurn: 1,
+  }
 }
 
 export interface HitFx {
@@ -123,14 +133,14 @@ export interface EnemyStrike {
   idx: number // 공격한 적 인덱스(연출용)
 }
 
-// 적 턴 — 레일 최전방(플레이어와 가장 가까운) 적만 전투에 참여한다.
-// 뒷줄은 대기열이라 공격하지 않는다.
-export function enemyTurn(state: BattleState, rng: () => number, skipFront = false): EnemyStrike[] {
+// 적 행동 페이즈 — 최전방 적이 현재 선/후공 페이즈이며 쿨다운이 끝났을 때만 행동한다.
+// 기본 선공 적은 행동할 때마다 후공→선공으로 교대하고, 기본 후공 적은 계속 후공이다.
+export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' | 'second'): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
   const front = frontIdx(state)
-  if (front < 0 || skipFront) return strikes // 방금 도착한 최전방은 이번 턴 공격 유예
+  if (front < 0) return strikes
   const e = state.enemies[front]
-  if (state.turn % e.def.every === 0) {
+  if (e.initiativePhase === phase && state.turn >= e.nextAttackTurn) {
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)
     const dealt = Math.max(0, raw - state.guard)
     const absorbed = Math.min(state.guard, raw)
@@ -140,8 +150,12 @@ export function enemyTurn(state: BattleState, rng: () => number, skipFront = fal
       dealt,
       idx: front,
     })
+    state.guard = 0
+    e.nextAttackTurn = state.turn + e.def.every
+    if (e.def.initiative === 'first') {
+      e.initiativePhase = phase === 'first' ? 'second' : 'first'
+    }
   }
-  state.guard = 0
   return strikes
 }
 
