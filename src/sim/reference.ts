@@ -3,7 +3,7 @@
  * 교체한다(View/Compiler 불변). 다중 적 + 범위(aoe)를 지원한다.
  */
 
-import { isDamageIntent } from '@core/compiler'
+import { effectiveBase, isDamageIntent } from '@core/compiler'
 import type { EnemyDef, Intent } from '@core/types'
 
 export interface EnemyInst {
@@ -73,11 +73,9 @@ export function applyIntent(
   intent: Intent,
   mult: number, // BattleView에서 확정한 최종 배율(운·룰렛·variance 포함)
   target: number,
-  atkBonus = 0, // 플레이어 공격력 스탯(공격 문장 위력에 가산)
 ): ApplyResult {
   const dealsDamage = isDamageIntent(intent)
-  const effBase = dealsDamage ? intent.base + atkBonus : 0
-  const dmg = Math.round(effBase * mult)
+  const dmg = Math.round(effectiveBase(intent) * mult)
   const healAmt = Math.round(intent.heal * mult) // 회복도 배율을 받는다
 
   // 지연 발동은 예약만 한다.

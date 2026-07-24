@@ -15,7 +15,7 @@ import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
-import { loadRun, saveRun } from '@core/save'
+import { clearRun, loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 
 const STAGE_W = 1920
@@ -74,8 +74,10 @@ function goTitle() {
   reset()
   stage.setAttribute('data-theme', 'day')
   current = new TitleView(stage, {
-    onStart: () => {
-      const saved = loadRun()
+    hasSave: !!loadRun(),
+    onStart: (fresh) => {
+      if (fresh) clearRun()
+      const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
       // 새 런 첫 진입에만 토큰의 오프닝 다이얼로그가 흐른다.
@@ -139,8 +141,11 @@ function goItem(itemDef: ItemDef) {
   mountMeta('item')
 }
 
-// ?scene= 로 직접 진입(스샷/검수용). 폰트 로드 후 시작.
-const start = (new URLSearchParams(location.search).get('scene') as SceneName) || 'title'
+// ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
+const params = new URLSearchParams(location.search)
+const start = (params.get('scene') as SceneName) || 'title'
+const dayParam = Number(params.get('day'))
+if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
 FontManager.load().finally(() => {
   if (start === 'reward') goReward()
   else if (start === 'item') goItem(ITEMS.candle)

@@ -37,3 +37,12 @@ export function saveRun(run: RunState): void {
     // 저장 공간을 사용할 수 없는 브라우저에서도 게임 진행은 유지한다.
   }
 }
+
+// 새로하기 — 이전 런을 지운다. 지워야 오프닝 다이얼로그가 다시 흐른다.
+export function clearRun(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY)
+  } catch {
+    // 저장소를 못 쓰는 환경이면 애초에 남은 런도 없다.
+  }
+}

@@ -46,12 +46,25 @@ export interface WordEffects {
   evade?: number
 }
 
+// 문장이 기대는 플레이어 스탯 — 동사의 깡수치와 수식 룰렛 보정이 여기서 나온다.
+export type StatName = 'atk' | 'guard' | 'heal' | 'luck'
+export interface StatBlock {
+  atk: number
+  guard: number
+  heal: number
+  luck: number
+}
+
 export interface Word {
   id: string
   text: string
   slot: SlotKey
   tags: string[]
-  power?: number // object/verb: 가산 위력
+  power?: number // object/verb: 가산 위력(스탯 비례가 아닌 고정 위력)
+  // 스탯 비례 — 동사의 깡수치는 "공격×1 · 방어×1 · 회복×1"처럼 스탯에서 나온다.
+  // 수식에서는 룰렛(대성공/실패) 확률을 밀어 주는 기준 스탯을 가리킨다.
+  stat?: StatName
+  statMult?: number // 동사 전용 계수. 깡수치 = stat × statMult
   bonus?: number // subject/modifier/ending: 배수 풀 기여(가산)
   crit?: number // 대성공 확률(0..1) — 수식 룰렛
   fail?: number // 실패 확률(0..1) — 수식 룰렛
@@ -125,6 +138,16 @@ export interface Intent {
   penalties: string[] // 발동한 부조화 이유
   critP: number // 대성공 확률 합(수식 룰렛) — 스탯 보정 전 기본값
   failP: number // 실패 확률 합(수식 룰렛) — 스탯 보정 전 기본값
+  statKey: StatName | null // 룰렛을 밀어 줄 스탯(수식이 지정). 없으면 맥락(kind)으로 결정
+  /** 화면에 그대로 늘어놓을 계산 내역 — 깡수치와 배율의 출처. */
+  breakdown: { flats: IntentPart[]; mults: IntentPart[] }
+}
+
+export interface IntentPart {
+  label: string // 화면 표기 이름(단어/스탯/관용구)
+  value: number // 깡수치는 더할 값, 배율은 곱할 값
+  source: 'word' | 'stat' | 'combo' | 'coherence'
+  hint?: string // "공격 ×1" 처럼 어디서 나온 수치인지
 }
 
 export interface Tables {

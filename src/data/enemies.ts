@@ -10,8 +10,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
   moth: {
     id: 'moth',
     name: '좀나방',
-    hp: 15,
-    atk: 5,
+    hp: 6,
+    atk: 4,
     every: 2,
     initiative: 'first',
     sprite: 'enemy_moth',
@@ -20,8 +20,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
   roach: {
     id: 'roach',
     name: '바퀴벌레',
-    hp: 26,
-    atk: 8,
+    hp: 10,
+    atk: 6,
     every: 2,
     initiative: 'second',
     sprite: 'enemy_roach',
