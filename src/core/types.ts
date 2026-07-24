@@ -58,6 +58,9 @@ export interface Word {
   kind?: IntentKind // verb 전용
   timing?: 'immediate' | 'delayed'
   targetMode?: TargetMode // subject 전용
+  // 문법 인칭 — 주어 슬롯의 "역할 계약"에 쓰인다. 일기는 1인칭이라 주어는 first만 허용.
+  // 미지정은 인칭 중립(주어가 아닌 슬롯 단어). 상대(2인칭)는 주어가 아니라 목적어로 간다.
+  person?: 'first' | 'second' | 'third'
   aoe?: AoeMode // subject/verb가 지정 가능
   note: string // UI 한 줄 설명(효과 요약)
   rarity?: Rarity // 등급(발광 색). 기본 common

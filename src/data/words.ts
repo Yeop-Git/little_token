@@ -7,9 +7,8 @@ import type { Word } from '@core/types'
 
 export const WORDS: Record<string, Word[]> = {
   subj: [
-    { id: 'na', text: '나는', slot: 'subj', tags: ['self'], bonus: 0, targetMode: 'enemy', rarity: 'common', note: '균형', lore: '일기의 화자. 언제나 여기서 시작한다.' },
-    { id: 'neo', text: '너는', slot: 'subj', tags: ['enemy'], bonus: 0.25, targetMode: 'enemy', rarity: 'rare', note: '공격 특화 · 방어 무효', lore: '손끝을 겨눈다. 방어를 잊을 만큼.' },
-    { id: 'uri', text: '우리는', slot: 'subj', tags: ['both'], bonus: 0.5, targetMode: 'both', rarity: 'epic', note: '피해 40% 되돌아옴', lore: '함께 타오르면, 함께 그을린다.' },
+    { id: 'na', text: '나는', slot: 'subj', tags: ['self'], person: 'first', bonus: 0, targetMode: 'enemy', rarity: 'common', note: '균형', lore: '일기의 화자. 언제나 여기서 시작한다.' },
+    { id: 'uri', text: '우리는', slot: 'subj', tags: ['both'], person: 'first', bonus: 0.5, targetMode: 'both', rarity: 'epic', note: '피해 40% 되돌아옴', lore: '함께 타오르면, 함께 그을린다.' },
   ],
   adv: [
     { id: 'holo', text: '홀로', slot: 'adv', tags: ['solo'], bonus: 0.3, effects: { guard: -2 }, rarity: 'rare', note: '방어 −2', lore: '혼자 선 자의 각오. 등이 시리다.' },
@@ -24,6 +23,8 @@ export const WORDS: Record<string, Word[]> = {
     { id: 'sil', text: '침묵', slot: 'obj', tags: ['quiet'], power: 3, effects: { guard: 4 }, rarity: 'common', note: '위력 3 · 방어 +4', lore: '아무 말도 적지 않은 칸의 힘.' },
     { id: 'mem', text: '기억', slot: 'obj', tags: ['mind'], power: 4, effects: { heal: 3 }, rarity: 'rare', note: '위력 4 · 회복 3', lore: '지난 장을 넘기면 상처가 아문다.' },
     { id: 'bit', text: '빗물', slot: 'obj', tags: ['water', 'wide'], power: 5, aoe: 'all', rarity: 'rare', note: '위력 5 · 전체', lore: '번지는 잉크, 젖는 날개들.' },
+    // 상대(2인칭)는 주어가 아니라 목적어로 온다 — "나는 힘껏 너를 때렸다". 조사가 '너 → 너를'.
+    { id: 'neo', text: '너', slot: 'obj', tags: ['foe'], person: 'second', power: 5, rarity: 'rare', note: '위력 5 · 상대를 직접 지목', lore: '손끝을 겨눈다. 이름을 부르듯 정확히.' },
   ],
   verb: [
     { id: 'jin', text: '진행', slot: 'verb', tags: ['atk'], power: 4, kind: 'attack', rarity: 'common', note: '공격', lore: '그냥, 앞으로.' },
