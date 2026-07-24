@@ -40,7 +40,7 @@ export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; d
 
 export function defaultPlayer(): PlayerState {
   return {
-    stats: { hp: 40, atk: 3, guard: 1, heal: 1, luck: 2 },
+    stats: { hp: 40, atk: 3, guard: 3, heal: 3, luck: 2 },
     items: [
       { id: 'candle', name: '몽당 양초', grade: '흔함', art: 'candle', line: '와! 정말 예뻐!', stats: { atk: 3, luck: 5 } },
       { id: 'ribbon', name: '낡은 리본', grade: '흔함', art: 'ribbon', line: '음? 살짝 튼튼해!', stats: { guard: 3, luck: 2 } },
