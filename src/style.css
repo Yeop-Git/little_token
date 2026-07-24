@@ -219,7 +219,6 @@ button {
   image-rendering: auto;
 }
 .actor.foe img.sprite {
-  transform: scaleX(-1);
   height: 300px;
 }
 /* 타원 그림자 레이어(반투명 도형) */
@@ -253,19 +252,25 @@ button {
   transform: translateY(20px) scale(0.7);
   filter: grayscale(1) brightness(0.6);
 }
+/* 타깃 표시 — 회전 링 대신 은은한 빛 웅덩이 + 하강 화살표 */
 .actor.target::after {
   content: '';
   position: absolute;
-  bottom: -12px;
-  width: 150px;
-  height: 30px;
+  bottom: -8px;
+  width: 176px;
+  height: 34px;
   border-radius: 50%;
-  border: 3px solid var(--gold);
-  border-top-color: transparent;
-  box-shadow: 0 0 18px var(--glow);
-  animation: ring-spin 3s linear infinite;
+  background: radial-gradient(ellipse at center, rgba(255, 210, 122, 0.55), transparent 68%);
+  filter: blur(2px);
+  animation: target-pulse 1.5s ease-in-out infinite;
 }
-@keyframes ring-spin { to { transform: rotate(360deg); } }
+.actor.foe.target img.sprite {
+  filter: drop-shadow(0 0 14px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+}
+@keyframes target-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.92); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
 
 /* 이름표 + 귀여운 HP 바 */
 .nameplate {
@@ -411,6 +416,13 @@ button {
   0%, 100% { transform: translateY(0) scale(1); }
   40% { transform: translateY(-18px) scale(1.16); }
 }
+/* 자동 완성 직전 반짝 */
+.chain-rail.sparkle { animation: rail-sparkle 0.3s ease; }
+@keyframes rail-sparkle {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.9) drop-shadow(0 0 20px var(--glow)); transform: translateX(-50%) scale(1.04); }
+  100% { filter: brightness(1); }
+}
 
 /* 관용구(맥락) 발동 배너 */
 .combo-flash {
@@ -498,12 +510,12 @@ button {
   position: absolute;
   left: 356px;
   right: 420px;
-  bottom: 26px;
+  bottom: 70px;
   z-index: 7;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 /* 단어 영역 아래 은은한 어둠 스크림(가독성) */
 .word-zone::before {
@@ -519,6 +531,21 @@ button {
   -webkit-backdrop-filter: blur(2px);
   border-radius: 40px;
 }
+/* 단어 ↔ 가방 슬라이드 토글(같은 자리) */
+.pane-stack { position: relative; width: 100%; height: 168px; }
+.pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: transform 0.38s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.3s ease;
+}
+.pane.bag { transform: translateY(70px); opacity: 0; pointer-events: none; }
+.word-zone.bag-mode .pane.words { transform: translateY(70px); opacity: 0; pointer-events: none; }
+.word-zone.bag-mode .pane.bag { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
 /* 슬롯 진행 스텝(텍스트) */
 .slot-step {
@@ -538,7 +565,13 @@ button {
 .slot-step .step.done { color: var(--hp-you); }
 .slot-step .sep { color: var(--ink-faint); opacity: 0.5; }
 
-/* 가로 단어 행 */
+/* 무드(효과별) 색 — 단어 발광/정보 패널 강조 */
+.mood-attack { --wglow: #ff8a5c; }
+.mood-guard { --wglow: #6fc6dd; }
+.mood-heal { --wglow: #8fd66a; }
+.mood-gamble { --wglow: #c79bf0; }
+.mood-sacrifice { --wglow: #ff5c6e; }
+.mood-buff { --wglow: #ffcf76; }
 .rarity-common { --wglow: #e0c48a; }
 .rarity-rare { --wglow: #6fc6dd; }
 .rarity-epic { --wglow: #c79bf0; }
@@ -570,10 +603,13 @@ button {
 }
 .word-cell .n {
   font-size: 15px;
-  font-weight: 700;
-  color: var(--ink-dim);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  font-weight: 800;
+  /* 효과별 무드 색을 항상 노출(한눈에 공격/방어/회복 구분) */
+  color: var(--wglow);
+  opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
+.word-cell.blocked .n { color: var(--danger); opacity: 1; }
 .word-cell:hover { transform: translateY(-8px); }
 .word-cell:hover .w,
 .word-cell.picked .w {
@@ -590,7 +626,6 @@ button {
 .word-cell.blocked { opacity: 0.4; cursor: not-allowed; }
 .word-cell.blocked:hover { transform: none; }
 .word-cell.blocked:hover .w { color: #fff2da; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); }
-.word-cell.blocked .n { color: var(--danger); }
 
 /* ───────── 우측 정보 패널(단어 상세) ───────── */
 .info-dock {
@@ -641,6 +676,29 @@ button {
 .wd-values .v.guard { color: #86d6ea; }
 .wd-lore { margin-top: 10px; font-size: 15px; font-style: italic; color: var(--ink-faint); opacity: 0.75; line-height: 1.4; }
 
+/* 가방 아이템 정보(스탯표 위 · 일러스트 아래) */
+.info-dock.item-detail { --wglow: var(--gold); }
+.id-stats { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+.idrow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.idrow .iv { color: #b6f38a; font-weight: 900; }
+.id-art {
+  margin-top: auto;
+  align-self: center;
+  width: 92px;
+  height: 92px;
+  color: var(--gold);
+  filter: drop-shadow(0 0 16px rgba(255, 210, 122, 0.45));
+}
+
 .zone-actions { display: flex; align-items: center; gap: 36px; margin-top: 2px; }
 .btn {
   font-size: 23px;
@@ -654,6 +712,31 @@ button {
 .btn.primary:not(:disabled):hover { text-shadow: 0 0 24px var(--glow), 0 2px 6px rgba(0, 0, 0, 0.6); transform: scale(1.1); }
 .btn.primary:disabled { color: var(--ink-faint); cursor: not-allowed; text-shadow: none; }
 .btn.ghost { font-size: 19px; }
+
+/* 되돌리기 — 하단 중앙, 회색 연하게 */
+.undo-btn {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  opacity: 0.7;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.14s, color 0.14s, transform 0.14s;
+}
+.undo-btn:hover { opacity: 1; color: var(--ink-dim); transform: scale(1.04); }
+
+/* 가방 아이템 가로 목록(단어 자리 토글) */
+.bag-row { display: flex; justify-content: center; align-items: flex-start; gap: 34px; flex-wrap: wrap; }
+.bag-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.16s cubic-bezier(0.2, 1.4, 0.4, 1), filter 0.16s;
+}
+.bag-art { width: 74px; height: 74px; color: var(--gold); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
+.bag-name { font-size: 17px; font-weight: 800; color: #fff2da; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
+.bag-item:hover { transform: translateY(-6px); filter: drop-shadow(0 0 16px var(--glow)); }
+.bag-empty { font-size: 18px; color: var(--ink-faint); }
 
 /* ───────── 우측 플레이어 스탯표 ───────── */
 .stat-dock {
@@ -686,24 +769,23 @@ button {
 .stat .si svg { width: 100%; height: 100%; }
 .stat .sl { font-size: 17px; font-weight: 700; color: var(--ink); }
 .stat .sv { margin-left: auto; font-size: 22px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
+/* 단어장 — 배경/테두리 없이, 두껍고 깊은 그림자 + 아이콘 + 글자만 */
 .wordbook-btn {
-  margin-top: 16px;
+  margin-top: 18px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 13px;
-  border-radius: 14px;
-  font-size: 19px;
+  padding: 6px;
+  font-size: 21px;
   font-weight: 900;
-  color: #2a1f10;
-  background: linear-gradient(180deg, var(--gold-hi), var(--gold-deep));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: transform 0.14s, box-shadow 0.14s;
+  color: var(--gold-hi);
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
+  transition: transform 0.14s, color 0.14s, text-shadow 0.14s;
 }
-.wordbook-btn svg { width: 24px; height: 24px; }
-.wordbook-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 22px rgba(255, 210, 122, 0.4); }
+.wordbook-btn svg { width: 26px; height: 26px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85)); }
+.wordbook-btn:hover { transform: scale(1.05); color: #fff4d8; text-shadow: 0 0 18px var(--glow), 0 3px 8px rgba(0, 0, 0, 0.9); }
 
 /* ───────── 플레이어 뒤쪽 배낭 ───────── */
 .backpack {
@@ -723,6 +805,20 @@ button {
 .backpack svg { width: 52px; height: 52px; }
 .backpack span { font-size: 13px; font-weight: 800; color: var(--ink); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
 .backpack:hover { transform: translateY(-4px) scale(1.06); filter: drop-shadow(0 0 16px var(--glow)); }
+/* 가방 활성(아이템 목록 열림) 상태 */
+.backpack.active {
+  color: #fff4d8;
+  filter: drop-shadow(0 0 18px var(--glow));
+  transform: translateY(-4px) scale(1.08);
+}
+.backpack.active::after {
+  content: '';
+  position: absolute;
+  inset: -8px -6px -6px;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at center, rgba(255, 210, 122, 0.22), transparent 70%);
+  z-index: -1;
+}
 
 /* ───────── 오버레이(단어장/가방) ───────── */
 #overlay { position: absolute; inset: 0; z-index: 300; display: none; }
@@ -761,24 +857,6 @@ button {
 .deck-word:last-child { border-bottom: none; }
 .deck-word .dw { display: block; font-size: 21px; font-weight: 900; color: var(--wglow, #fff2da); text-shadow: 0 0 12px var(--wglow, transparent); }
 .deck-word .dn { font-size: 13px; color: var(--ink-faint); }
-
-.inv-panel { width: 760px; }
-.inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.inv-cell {
-  aspect-ratio: 1;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-}
-.inv-cell.empty { background: rgba(0, 0, 0, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04); }
-.inv-art { width: 62px; height: 62px; color: var(--gold); filter: drop-shadow(0 0 10px rgba(255, 210, 122, 0.35)); }
-.inv-name { font-size: 15px; font-weight: 800; color: #fff2da; }
 
 /* ==========================================================================
    보상 뷰 · 아이템 뷰 — 같은 배경 + 유리 톤으로 통일

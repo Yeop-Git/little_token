@@ -1,14 +1,16 @@
 /**
- * 전투 뷰 v3 — 배경 일러스트 위 쉐이더틱 UI.
- *  · 상단: 완성 중인 문장(체인)을 그림자로 강조
- *  · 중앙 하단: 고를 수 있는 단어를 "가로"로, 아래에 짧은 문구. hover 시 상세(정확한 수치)
- *  · 우측: 플레이어 스탯표(공격력/행운 등 스킬 배율) + 단어장 버튼 → 슬롯별 덱 오버레이
- *  · 플레이어 옆 배낭 아이콘 → 아이템 그리드 오버레이
+ * 전투 뷰 v4 — 배경 일러스트 위 쉐이더틱 UI.
+ *  · 상단: 완성 중인 문장(체인) 그림자 강조
+ *  · 중앙 하단: 단어를 가로 배치(효과별 무드 색). 전부 채우면 자동 완성(반짝 후 발동)
+ *  · 되돌리기: 하단 중앙 회색 연한 글자, 한 단계씩 되돌림
+ *  · 좌측: 스탯표 + 단어장(전체 덱 오버레이) 버튼
+ *  · 우측: 정보 패널 — "해당 단어"만의 효과/수치(누적 아님) 또는 가방 아이템 정보
+ *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
  */
 
 import { compile, matchCombos, sentenceTokens } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
-import type { FieldDef, Intent, Selection, Tables, Word } from '@core/types'
+import type { Selection, Tables, Word, FieldDef } from '@core/types'
 import { RARITY_LABEL } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ENEMIES } from '@data/enemies'
@@ -23,7 +25,8 @@ import {
 import { BACKGROUNDS, SPRITES } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
-import { defaultPlayer, STAT_META, type PlayerState } from '@core/player'
+import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
+import { STAT_LABEL, type StatKey } from '@data/items'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -33,6 +36,9 @@ interface Opts {
   onWin: () => void
   player?: PlayerState
 }
+
+type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
+const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
 
 export class BattleView {
   private t: Tables = TABLES
@@ -45,6 +51,7 @@ export class BattleView {
   private target = 0
   private busy = false
   private over = false
+  private bagMode = false
   private timers: number[] = []
 
   constructor(private root: HTMLElement, opts: Opts) {
@@ -83,12 +90,16 @@ export class BattleView {
         </div>
 
         <div class="word-zone">
-          <div class="slot-step" id="steps"></div>
-          <div class="word-row" id="grid"></div>
-          <div class="zone-actions">
-            <button class="btn primary" id="go">문장 완성!</button>
-            <button class="btn ghost" id="undo">되돌리기</button>
+          <div class="pane-stack">
+            <div class="pane words">
+              <div class="slot-step" id="steps"></div>
+              <div class="word-row" id="grid"></div>
+            </div>
+            <div class="pane bag">
+              <div class="bag-row" id="bagrow"></div>
+            </div>
           </div>
+          <button class="undo-btn" id="undo">되돌리기</button>
         </div>
 
         <div class="stat-dock glass">
@@ -107,16 +118,15 @@ export class BattleView {
     this.q('#f-desc').textContent = this.field.desc.replace(/<[^>]+>/g, '')
     this.q('#f-weather').innerHTML = weatherIcon(this.field.weather)
 
-    this.q('#go').addEventListener('click', () => this.execute())
     this.q('#undo').addEventListener('click', () => this.undo())
-    this.q('#bag').addEventListener('click', () => this.openInventory())
+    this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
 
     this.renderActors()
     this.renderChain()
     this.renderWords()
     this.renderStats()
-    this.updateGo()
+    this.renderBag()
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -127,6 +137,16 @@ export class BattleView {
   }
   private filledCount() {
     return this.order().filter((k) => this.sel[k]).length
+  }
+
+  // 단어 효과별 무드(색) 분류.
+  private moodOf(w: Word): Mood {
+    if (w.variance) return 'gamble'
+    if (w.kind === 'heal' || w.effects?.heal) return 'heal'
+    if (w.kind === 'guard' || w.effects?.guard) return 'guard'
+    if (w.kind === 'attack' || (w.power ?? 0) > 0) return 'attack'
+    if (w.effects?.recoil) return 'sacrifice'
+    return 'buff'
   }
 
   // ── 배우 ──
@@ -190,9 +210,8 @@ export class BattleView {
     host.innerHTML = words + (words ? preview : '')
   }
 
-  // ── 중앙 하단: 슬롯 스텝 + 가로 단어 + hover 상세 ──
+  // ── 중앙 하단: 슬롯 스텝 + 가로 단어 ──
   private renderWords() {
-    // 슬롯 진행 표시
     this.q('#steps').innerHTML = this.t.template.slots
       .map((s, i) => {
         const key = s.key
@@ -216,7 +235,7 @@ export class BattleView {
       .map((w) => {
         const why = conflictReason(w, this.slotIndex, this.sel, this.t)
         const picked = this.sel[key]?.id === w.id
-        const cls = ['word-cell', `rarity-${w.rarity ?? 'common'}`, picked ? 'picked' : '', why ? 'blocked' : ''].join(' ')
+        const cls = ['word-cell', `mood-${this.moodOf(w)}`, picked ? 'picked' : '', why ? 'blocked' : ''].join(' ')
         return `<button class="${cls}" data-id="${w.id}">
           <span class="w">${w.text}</span>
           <span class="n">${why ?? w.note}</span>
@@ -233,10 +252,10 @@ export class BattleView {
         this.pick(btn.dataset.id!)
       })
     })
-    this.renderDetail(null)
+    if (!this.bagMode) this.renderDetail(null)
   }
 
-  // 우측 정보 패널 — 등급/범위/정확한 수치/줄거리 (현재 문장 투영 기반)
+  // ── 우측 정보 패널: "해당 단어"만의 효과(누적 아님) ──
   private renderDetail(word: Word | null) {
     const detail = this.q('#detail')
     const key = this.order()[this.slotIndex]
@@ -248,59 +267,41 @@ export class BattleView {
     }
     const rarity = w.rarity ?? 'common'
     const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
-    const trial: Selection = { ...this.sel, [w.slot]: w }
-    const intent = compile(trial, this.t)
-    const values = this.projectValues(w, intent)
-    detail.className = `info-dock glass rarity-${rarity}`
+    const mood = this.moodOf(w)
+    const values = this.wordOwnValues(w)
+    detail.className = `info-dock glass mood-${mood}`
     detail.innerHTML = `
       <div class="wd-name">${w.text}</div>
       <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel}</div>
-      <div class="wd-range">범위 · ${this.rangeText(intent)}</div>
+      <div class="wd-range">범위 · ${this.wordRange(w)}</div>
       <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
       <div class="wd-lore">“${w.lore ?? ''}”</div>`
   }
 
-  private rangeText(intent: Intent): string {
-    if (intent.kind === 'heal') return '자신'
-    const core = intent.aoe === 'all' ? '적 전체' : '적 하나'
-    return intent.targetMode === 'both' ? `${core} + 자신` : core
+  // 단어 하나의 범위(대상) — 다른 슬롯과 무관.
+  private wordRange(w: Word): string {
+    if (w.kind === 'heal') return '자신'
+    if (w.aoe === 'all') return w.targetMode === 'both' ? '적 전체 + 자신' : '적 전체'
+    if (w.targetMode === 'both') return '적 하나 + 자신'
+    if (w.targetMode === 'enemy' || w.kind === 'attack' || (w.power ?? 0) > 0) return '적 하나'
+    return '문장 보정'
   }
 
-  // 정확한 수치 — 규칙대로. 공격력 스탯 가산 포함. 문장이 덜 됐으면 단어 고유 수치.
-  private projectValues(w: Word, intent: Intent): { text: string; cls: string }[] {
+  // 단어 하나의 고유 수치 — 누적하지 않는다.
+  private wordOwnValues(w: Word): { text: string; cls: string }[] {
     const out: { text: string; cls: string }[] = []
-    const atk = this.player.stats.atk
-    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
-    const dmg = Math.round(effBase * intent.multiplier)
-
-    if (dmg > 0) {
-      const who = intent.aoe === 'all' ? '적 전체에게' : '적에게'
-      if (intent.variance) {
-        const lo = Math.round(dmg * intent.variance.lo)
-        const hi = Math.round(dmg * intent.variance.hi)
-        out.push({ text: `${who} ${lo}~${hi}의 피해 (도박 ${Math.round(intent.variance.p * 100)}%)`, cls: 'dmg' })
-      } else {
-        out.push({ text: `${who} ${dmg}의 피해`, cls: 'dmg' })
-      }
-      const self = intent.recoil + (intent.targetMode === 'both' ? Math.round(dmg * 0.4) : 0)
-      if (self > 0) out.push({ text: `나에게 ${self}의 피해`, cls: 'self' })
-    }
-    const heal = intent.heal + (intent.kind === 'heal' ? this.player.stats.heal : 0)
-    if (heal > 0) out.push({ text: `${heal} 회복`, cls: 'heal' })
-    if (intent.guard > 0) out.push({ text: `방어 +${intent.guard}`, cls: 'guard' })
-    if (intent.evade > 0) out.push({ text: `회피 +${intent.evade}`, cls: 'guard' })
-    if (intent.timing === 'delayed' && dmg > 0) out.push({ text: '다음 턴에 발동', cls: '' })
-
-    if (!out.length) {
-      if (w.power) out.push({ text: `기본 위력 +${w.power}`, cls: 'dmg' })
-      if (w.bonus) out.push({ text: `위력 배수 ${w.bonus >= 0 ? '+' : ''}${Math.round(w.bonus * 100)}%`, cls: '' })
-      if (w.effects?.guard) out.push({ text: `방어 ${w.effects.guard >= 0 ? '+' : ''}${w.effects.guard}`, cls: 'guard' })
-      if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
-      if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
-      if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: '' })
-      if (w.timing === 'delayed') out.push({ text: '다음 턴에 발동', cls: '' })
-      if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
-    }
+    if (w.power) out.push({ text: `기본 위력 +${w.power}`, cls: 'dmg' })
+    if (w.kind === 'attack' && !w.power) out.push({ text: '적을 공격', cls: 'dmg' })
+    if (w.bonus) out.push({ text: `위력 배수 ${w.bonus >= 0 ? '+' : ''}${Math.round(w.bonus * 100)}%`, cls: 'buff' })
+    if (w.effects?.guard) out.push({ text: `방어(임시 체력) ${w.effects.guard >= 0 ? '+' : ''}${w.effects.guard}`, cls: 'guard' })
+    if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
+    if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
+    if (w.effects?.evade) out.push({ text: `회피 +${w.effects.evade}`, cls: 'guard' })
+    if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: 'buff' })
+    if (w.timing === 'delayed') out.push({ text: '다음 턴에 발동', cls: '' })
+    if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
+    if (w.targetMode === 'both') out.push({ text: '피해 40% 나에게 되돌아옴', cls: 'self' })
+    if (!out.length) out.push({ text: w.note, cls: '' })
     return out
   }
 
@@ -315,7 +316,58 @@ export class BattleView {
     ).join('')
   }
 
-  // ── 단어장(덱) 오버레이 ──
+  // ── 가방(아이템) — 하단 인라인 토글 ──
+  private renderBag() {
+    const row = this.q('#bagrow')
+    if (!this.player.items.length) {
+      row.innerHTML = `<div class="bag-empty">가방이 비었다.</div>`
+      return
+    }
+    row.innerHTML = this.player.items
+      .map(
+        (it, i) => `<button class="bag-item" data-i="${i}">
+        <div class="bag-art">${itemArt(it.art)}</div>
+        <div class="bag-name">${it.name}</div>
+      </button>`,
+      )
+      .join('')
+    row.querySelectorAll<HTMLElement>('.bag-item').forEach((btn) => {
+      const it = this.player.items[Number(btn.dataset.i)]
+      btn.addEventListener('mouseenter', () => this.renderItemDetail(it))
+      btn.addEventListener('mouseleave', () => this.renderItemDetail(null))
+    })
+  }
+
+  private toggleBag() {
+    this.bagMode = !this.bagMode
+    this.q('.word-zone').classList.toggle('bag-mode', this.bagMode)
+    this.q('#bag').classList.toggle('active', this.bagMode)
+    this.renderItemDetail(null)
+    if (!this.bagMode) this.renderDetail(null)
+  }
+
+  // 우측 정보 패널에 아이템 정보(스탯표 + 일러스트).
+  private renderItemDetail(item: OwnedItem | null) {
+    const detail = this.q('#detail')
+    if (!item) {
+      detail.className = 'info-dock glass empty'
+      detail.innerHTML = this.bagMode
+        ? '아이템에 마우스를 올리면<br>스탯과 일러스트가 여기 표시된다.'
+        : '단어에 마우스를 올리면<br>등급 · 범위 · 수치가 여기 표시된다.'
+      return
+    }
+    const rows = STAT_ORDER.filter((k) => item.stats[k])
+      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
+      .join('')
+    detail.className = 'info-dock glass item-detail'
+    detail.innerHTML = `
+      <div class="wd-name">${item.name}</div>
+      <div class="wd-grade">✦ ${item.grade} · 「${item.line}」</div>
+      <div class="id-stats">${rows}</div>
+      <div class="id-art">${itemArt(item.art)}</div>`
+  }
+
+  // ── 단어장(전체 덱) 오버레이 ──
   private openDeck() {
     const host = this.q('#overlay')
     const slots = this.t.template.slots
@@ -330,7 +382,7 @@ export class BattleView {
               <div class="deck-col-h"><b>${i + 1}</b> ${s.label}</div>
               ${(this.player.deck[s.key] ?? [])
                 .map(
-                  (w) => `<div class="deck-word rarity-${w.rarity ?? 'common'}">
+                  (w) => `<div class="deck-word mood-${this.moodOf(w)}">
                     <span class="dw">${w.text}</span><span class="dn">${w.note}</span>
                   </div>`,
                 )
@@ -345,31 +397,6 @@ export class BattleView {
     host.querySelector('#ov-x')!.addEventListener('click', close)
     host.querySelector('.ov-backdrop')!.addEventListener('click', close)
   }
-
-  // ── 배낭(아이템) 그리드 오버레이 ──
-  private openInventory() {
-    const host = this.q('#overlay')
-    const CELLS = 12
-    const cells = Array.from({ length: CELLS }, (_, i) => {
-      const it = this.player.items[i]
-      if (!it) return `<div class="inv-cell empty"></div>`
-      return `<div class="inv-cell rarity-common" title="${it.line}">
-        <div class="inv-art">${itemArt(it.art)}</div>
-        <div class="inv-name">${it.name}</div>
-      </div>`
-    }).join('')
-    host.innerHTML = `
-      <div class="ov-backdrop"></div>
-      <div class="ov-panel glass inv-panel">
-        <div class="ov-head"><div class="ov-title">${icon('backpack')} 가방</div><button class="ov-close" id="ov-x">${icon('close')}</button></div>
-        <div class="inv-grid">${cells}</div>
-      </div>`
-    host.classList.add('open')
-    const close = () => this.closeOverlay()
-    host.querySelector('#ov-x')!.addEventListener('click', close)
-    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
-  }
-
   private closeOverlay() {
     const host = this.q('#overlay')
     host.classList.remove('open')
@@ -392,31 +419,43 @@ export class BattleView {
     this.slotIndex = Math.min(next, order.length - 1)
     this.renderChain()
     this.renderWords()
-    this.updateGo()
+    // 전부 채우면 자동 완성(반짝 → 발동)
+    if (this.complete() && !this.busy && !this.over) void this.autoComplete()
   }
 
+  // 한 단계 되돌리기 — 마지막으로 채운 단어만 제거.
   private undo() {
     if (this.busy || this.over) return
-    this.sel = {}
-    this.slotIndex = 0
+    const order = this.order()
+    for (let i = order.length - 1; i >= 0; i--) {
+      if (this.sel[order[i]]) {
+        const next = { ...this.sel }
+        delete next[order[i]]
+        this.sel = next
+        this.slotIndex = i
+        break
+      }
+    }
     this.renderChain()
     this.renderWords()
-    this.updateGo()
   }
 
   private complete(): boolean {
     return this.order().every((k) => !!this.sel[k])
   }
-  private updateGo() {
-    const go = this.q<HTMLButtonElement>('#go')
-    go.disabled = !this.complete() || this.busy || this.over
+
+  private async autoComplete() {
+    const rail = this.q('#chain')
+    rail.classList.add('sparkle')
+    await sleep(300)
+    rail.classList.remove('sparkle')
+    await this.execute()
   }
 
-  // ── 문장 완성 → 타다다닥 → 발동 → 적 턴 ──
+  // ── 발동 → 적 턴 ──
   private async execute() {
     if (!this.complete() || this.busy || this.over) return
     this.busy = true
-    this.updateGo()
 
     const intent = compile(this.sel, this.t)
 
@@ -496,7 +535,6 @@ export class BattleView {
     this.busy = false
     this.renderChain()
     this.renderWords()
-    this.updateGo()
   }
 
   // ── 피드백 ──
