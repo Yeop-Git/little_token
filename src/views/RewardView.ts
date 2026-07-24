@@ -5,7 +5,7 @@
 
 import type { FieldDef } from '@core/types'
 import { BACKGROUNDS } from '@/assets'
-import { itemArt } from './sprites'
+import { itemArt } from '@/ui/Icons'
 
 interface RewardPick {
   kind: 'word' | 'item'

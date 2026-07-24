@@ -50,10 +50,12 @@ export function applyIntent(
   multCap: number,
   target: number,
   rng: () => number,
+  atkBonus = 0, // 플레이어 공격력 스탯(공격 문장 위력에 가산)
 ): ApplyResult {
   const roll = intent.variance ? rng() : null
   const mult = finalMultiplier(intent, multCap, roll)
-  const dmg = Math.round(intent.base * mult)
+  const effBase = intent.kind === 'heal' ? intent.base : intent.base + atkBonus
+  const dmg = Math.round(effBase * mult)
   const note = intent.variance ? (roll! < intent.variance.p ? ' (도박 성공)' : ' (도박 실패)') : ''
 
   // 지연 발동은 예약만 한다.

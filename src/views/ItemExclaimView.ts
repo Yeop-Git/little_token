@@ -1,13 +1,14 @@
 /**
- * 아이템 감탄사 뷰 — 획득 시 아이템은 낮은 기본 스탯으로 나오고, 플레이어가
- * 감탄 문장(감탄 / 정도 / 평가)을 조립하면 그 단어들의 mods가 스탯에 가산된다.
- * 코어(문장 조립)의 축소판. 왼쪽=아이템/스탯, 오른쪽=감탄 조립.
+ * 아이템 감탄사(재련) 뷰 — 전투와 같은 패턴.
+ *  · 상단: 감탄 문장이 점차 완성되는 체인
+ *  · 그 아래: 아이템 일러스트(좌) + 감정 스탯표(우, ▲로 증가 표시)
+ *  · 하단: 감탄/정도/평가 선택지를 "텍스트"로 순차 선택(버튼 아님, 인게임 스타일)
  */
 
 import type { ItemDef, StatKey } from '@data/items'
 import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
 import { BACKGROUNDS } from '@/assets'
-import { itemArt } from './sprites'
+import { itemArt } from '@/ui/Icons'
 
 interface Opts {
   item: ItemDef
@@ -18,96 +19,134 @@ const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
 
 export class ItemExclaimView {
   private picks: Record<string, string | undefined> = {}
+  private slotIndex = 0
 
   constructor(private root: HTMLElement, private opts: Opts) {
-    this.render()
+    this.mount()
   }
-
   destroy() {}
 
   private totals() {
     const t: Record<StatKey, number> = { ...this.opts.item.base }
     for (const slot of EXCLAIM_SLOTS) {
-      const id = this.picks[slot.key]
-      const w = slot.words.find((x) => x.id === id)
+      const w = slot.words.find((x) => x.id === this.picks[slot.key])
       if (!w) continue
       for (const k of STAT_ORDER) t[k] += w.mods[k] ?? 0
     }
     return t
   }
 
-  private render() {
+  private complete() {
+    return EXCLAIM_SLOTS.every((s) => this.picks[s.key])
+  }
+
+  private mount() {
     const item = this.opts.item
-    const totals = this.totals()
-    const complete = EXCLAIM_SLOTS.every((s) => this.picks[s.key])
-
-    // 감탄 문장 미리보기
-    const sentence = EXCLAIM_SLOTS.map((s) => {
-      const w = s.words.find((x) => x.id === this.picks[s.key])
-      return w
-        ? `<span class="tok bang">${w.text}</span>`
-        : `<span class="tok empty">${s.label}</span>`
-    }).join(' ')
-
     this.root.innerHTML = `
       <div class="scene item-scene" style="background-image:url(${BACKGROUNDS.bg001})">
-        <div class="item-card">
-          <div class="item-left">
-            <div class="glint">✦ 새 아이템 ✦</div>
-            <div class="art">${itemArt(item.art)}</div>
-            <div class="iname hand">${item.name}</div>
-            <div class="grade">등급 · ${item.grade}</div>
-            <div class="item-stats">
-              ${STAT_ORDER.map((k) => {
-                const base = item.base[k]
-                const now = totals[k]
-                const up = now - base
-                return `<div class="stat-row"><span>${STAT_LABEL[k]}</span>
-                  <span class="sv">${now}${up ? `<span class="up">▲${up}</span>` : ''}</span></div>`
-              }).join('')}
+        <div class="iforge">
+          <div class="iforge-chain" id="chain"></div>
+
+          <div class="iforge-top">
+            <div class="iforge-illust glass">
+              <div class="glint">✦ 새 아이템 ✦</div>
+              <div class="art">${itemArt(item.art)}</div>
+              <div class="iname">${item.name}</div>
+              <div class="grade">등급 · ${item.grade}</div>
+            </div>
+            <div class="iforge-stats glass">
+              <div class="dock-title">감정된 스탯</div>
+              <div class="stat-list" id="stats"></div>
+              <div class="iforge-flavor">“${item.flavor}”</div>
             </div>
           </div>
 
-          <div class="item-right">
-            <div class="head">"${item.flavor}" — 뭐라고 감탄할까?</div>
-            <div class="exclaim-line">${sentence}</div>
-            <div class="exclaim-slots">
-              ${EXCLAIM_SLOTS.map(
-                (s) => `
-                <div class="exclaim-slot" data-key="${s.key}">
-                  <div class="lbl">${s.label}</div>
-                  <div class="exclaim-opts">
-                    ${s.words
-                      .map(
-                        (w) => `<button class="exclaim-opt ${this.picks[s.key] === w.id ? 'picked' : ''}"
-                          data-slot="${s.key}" data-id="${w.id}">
-                          ${w.text}<span class="eff">${w.note}</span></button>`,
-                      )
-                      .join('')}
-                  </div>
-                </div>`,
-              ).join('')}
-            </div>
-            <div class="item-confirm">
-              <button class="btn primary" id="confirm" ${complete ? '' : 'disabled'}>
-                ${complete ? '이 감탄으로 확정!' : '감탄을 완성해줘'}
-              </button>
+          <div class="iforge-choose">
+            <div class="slot-step" id="esteps"></div>
+            <div class="word-row" id="egrid"></div>
+            <div class="zone-actions">
+              <button class="btn primary" id="confirm" disabled>감탄을 완성해줘</button>
+              <button class="btn ghost" id="undo">되돌리기</button>
             </div>
           </div>
         </div>
       </div>`
 
-    this.root.querySelectorAll<HTMLElement>('.exclaim-opt').forEach((btn) =>
-      btn.addEventListener('click', () => {
-        const slot = btn.dataset.slot!
-        this.picks[slot] = this.picks[slot] === btn.dataset.id ? undefined : btn.dataset.id
-        this.render()
-      }),
-    )
-    const confirm = this.root.querySelector<HTMLButtonElement>('#confirm')
-    confirm?.addEventListener('click', () => {
-      if (confirm.disabled) return
-      this.opts.onDone()
+    this.root.querySelector('#confirm')!.addEventListener('click', () => {
+      if (this.complete()) this.opts.onDone()
     })
+    this.root.querySelector('#undo')!.addEventListener('click', () => {
+      this.picks = {}
+      this.slotIndex = 0
+      this.refresh()
+    })
+    this.refresh()
+  }
+
+  private q<T extends HTMLElement = HTMLElement>(s: string): T {
+    return this.root.querySelector(s) as T
+  }
+
+  private refresh() {
+    // 상단 감탄 체인
+    this.q('#chain').innerHTML = EXCLAIM_SLOTS.map((s) => {
+      const w = s.words.find((x) => x.id === this.picks[s.key])
+      return w
+        ? `<span class="chain-word">${w.text}</span>`
+        : `<span class="chain-ghost">${s.label}</span>`
+    }).join(' ')
+
+    // 스탯표(▲ 증가)
+    const totals = this.totals()
+    this.q('#stats').innerHTML = STAT_ORDER.map((k) => {
+      const up = totals[k] - this.opts.item.base[k]
+      return `<div class="stat"><span class="sl">${STAT_LABEL[k]}</span>
+        <span class="sv">${totals[k]}${up ? `<span class="up">▲${up}</span>` : ''}</span></div>`
+    }).join('')
+
+    // 슬롯 스텝
+    this.q('#esteps').innerHTML = EXCLAIM_SLOTS.map((s, i) => {
+      const cls = i === this.slotIndex ? 'active' : this.picks[s.key] ? 'done' : ''
+      return `<button class="step ${cls}" data-i="${i}"><b>${i + 1}</b> ${s.label}</button>`
+    }).join('<span class="sep">·</span>')
+    this.q('#esteps')
+      .querySelectorAll<HTMLElement>('.step')
+      .forEach((st) =>
+        st.addEventListener('click', () => {
+          const i = Number(st.dataset.i)
+          const filled = EXCLAIM_SLOTS.filter((s) => this.picks[s.key]).length
+          if (i <= filled) {
+            this.slotIndex = i
+            this.refresh()
+          }
+        }),
+      )
+
+    // 현재 슬롯의 텍스트 선택지
+    const slot = EXCLAIM_SLOTS[this.slotIndex]
+    this.q('#egrid').innerHTML = slot.words
+      .map((w) => {
+        const picked = this.picks[slot.key] === w.id
+        return `<button class="word-cell rarity-common ${picked ? 'picked' : ''}" data-id="${w.id}">
+          <span class="w">${w.text}</span><span class="n">${w.note}</span>
+        </button>`
+      })
+      .join('')
+    this.q('#egrid')
+      .querySelectorAll<HTMLElement>('.word-cell')
+      .forEach((btn) =>
+        btn.addEventListener('click', () => {
+          this.picks[slot.key] = btn.dataset.id
+          // 다음 빈 슬롯으로 진행
+          let next = this.slotIndex + 1
+          while (next < EXCLAIM_SLOTS.length && this.picks[EXCLAIM_SLOTS[next].key]) next++
+          this.slotIndex = Math.min(next, EXCLAIM_SLOTS.length - 1)
+          this.refresh()
+        }),
+      )
+
+    const confirm = this.q<HTMLButtonElement>('#confirm')
+    confirm.disabled = !this.complete()
+    confirm.textContent = this.complete() ? '이 감탄으로 확정!' : '감탄을 완성해줘'
   }
 }
