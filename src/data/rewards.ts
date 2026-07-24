@@ -4,6 +4,7 @@
  */
 
 import type { Rarity, Word } from '@core/types'
+import type { PlayerState } from '@core/player'
 import { luckRarityCap, rarityAllowed } from '@core/run'
 import { REWARD_WORDS } from './earlyWords'
 import { ITEMS, type ItemDef } from './items'
@@ -14,6 +15,7 @@ export interface RewardOption {
   name: string
   desc: string
   art: string
+  reinforce?: boolean // 보유 단어 강화 옵션(신규 등록이 아니라 단계 상승)
   word?: Word
   item?: ItemDef
 }
@@ -29,16 +31,39 @@ function shuffle<T>(a: T[]): T[] {
   return b
 }
 
-export function genRewards(luck: number): RewardOption[] {
-  const cap = luckRarityCap(luck)
-  const words: RewardOption[] = REWARD_WORDS.filter((w) => rarityAllowed(w.rarity ?? 'common', cap)).map((w) => ({
-    kind: 'word',
-    rarity: w.rarity ?? 'common',
-    name: w.text,
-    desc: `${SLOT_LABEL[w.slot] ?? ''} · ${w.note}`,
-    art: 'word',
-    word: w,
-  }))
+export function genRewards(player: PlayerState): RewardOption[] {
+  const cap = luckRarityCap(player.stats.luck)
+  const deckWords = Object.values(player.deck).flat()
+  const ownedIds = new Set(deckWords.map((w) => w.id))
+
+  // 다양성 — 아직 없는 새 단어(스킬업).
+  const newWords: RewardOption[] = REWARD_WORDS
+    .filter((w) => rarityAllowed(w.rarity ?? 'common', cap) && !ownedIds.has(w.id))
+    .map((w) => ({
+      kind: 'word',
+      rarity: w.rarity ?? 'common',
+      name: w.text,
+      desc: `${SLOT_LABEL[w.slot] ?? ''} · 새 단어`,
+      art: 'word',
+      word: w,
+    }))
+
+  // 반복강화 — 보유 단어를 강화(단계 상승). 매번 몇 개만 후보로.
+  const reinforce: RewardOption[] = shuffle(deckWords)
+    .slice(0, 3)
+    .map((w) => {
+      const lv = w.level ?? 1
+      return {
+        kind: 'word',
+        reinforce: true,
+        rarity: w.rarity ?? 'common',
+        name: w.text,
+        desc: `${SLOT_LABEL[w.slot] ?? ''} · 강화 Lv.${lv} → ${lv + 1}`,
+        art: 'word',
+        word: w,
+      }
+    })
+
   const items: RewardOption[] = Object.values(ITEMS).map((it) => ({
     kind: 'item',
     rarity: 'common',
@@ -48,7 +73,7 @@ export function genRewards(luck: number): RewardOption[] {
     item: it,
   }))
 
-  const picks = shuffle([...words, ...items]).slice(0, 3)
+  const picks = shuffle([...newWords, ...reinforce, ...items]).slice(0, 3)
   // 최소 한 칸은 아이템이 뜨도록 보장.
   if (!picks.some((p) => p.kind === 'item') && items.length) {
     picks[picks.length - 1] = items[Math.floor(Math.random() * items.length)]

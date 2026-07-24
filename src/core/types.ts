@@ -67,6 +67,7 @@ export interface Word {
   note: string // UI 한 줄 설명(효과 요약)
   rarity?: Rarity // 보상 티어 표기용(맥락카드 등급제는 폐지 — gradeBonus 없음)
   art?: string // 맥락카드 풀 일러스트 키(assets SKILL_ART: 1xxx 주어·2xxx 수식·3xxx 목적)
+  level?: number // 반복강화 단계(1=기본). 중복 보상을 먹으면 오른다.
   lore?: string // 우측 상세 패널 줄거리
 }
 
