@@ -2,9 +2,12 @@ import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
-  onStart: () => void
+  /** fresh=true면 이어하던 런을 버리고 처음부터 시작한다. */
+  onStart: (fresh: boolean) => void
   onSettings?: () => void
   onExit?: () => void
+  /** 이어할 런이 있으면 메뉴가 이어하기/새로하기로 갈린다. */
+  hasSave?: boolean
 }
 
 interface Fly {
@@ -24,6 +27,7 @@ export class TitleView {
   private onResize = () => {}
   private toastTimer = 0
   private startTimer = 0
+  private confirmTimer = 0
 
   constructor(
     private root: HTMLElement,
@@ -36,6 +40,7 @@ export class TitleView {
     cancelAnimationFrame(this.raf)
     clearTimeout(this.toastTimer)
     clearTimeout(this.startTimer)
+    clearTimeout(this.confirmTimer)
     window.removeEventListener('resize', this.onResize)
   }
 
@@ -49,7 +54,7 @@ export class TitleView {
                 calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
                 values="0.005 0.009;0.010 0.006;0.005 0.009" />
             </feTurbulence>
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </svg>
         <div class="title-reveal">
@@ -64,7 +69,12 @@ export class TitleView {
           </div>
           <h1 class="sr-only">Little Token</h1>
           <nav class="title-menu" aria-label="타이틀 메뉴">
-            <button class="tmenu-btn" type="button" data-act="start">시작하기</button>
+            ${
+              this.opts.hasSave
+                ? `<button class="tmenu-btn" type="button" data-act="continue">이어하기</button>
+            <button class="tmenu-btn" type="button" data-act="fresh">새로하기</button>`
+                : `<button class="tmenu-btn" type="button" data-act="continue">시작하기</button>`
+            }
             <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
             <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
           </nav>
@@ -93,13 +103,14 @@ export class TitleView {
     Promise.all(preload).then(() => {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
-        this.root.querySelector<HTMLButtonElement>('[data-act="start"]')?.focus()
+        this.root.querySelector<HTMLButtonElement>('[data-act="continue"]')?.focus()
       })
     })
   }
 
   private onAct(act: string) {
-    if (act === 'start') return this.start()
+    if (act === 'continue') return this.start(false)
+    if (act === 'fresh') return this.askFresh()
     if (act === 'settings') return this.opts.onSettings ? this.opts.onSettings() : this.toast('설정은 곧 추가돼요')
     if (act === 'exit') {
       if (this.opts.onExit) return this.opts.onExit()
@@ -117,13 +128,28 @@ export class TitleView {
     this.toastTimer = window.setTimeout(() => el.classList.remove('show'), 2200)
   }
 
+  // 새로하기는 진행 중인 런을 지운다 — 실수로 날리지 않게 한 번 더 눌러야 확정된다.
+  private askFresh() {
+    const btn = this.root.querySelector<HTMLButtonElement>('[data-act="fresh"]')
+    if (!btn) return
+    if (btn.classList.contains('is-danger')) return this.start(true)
+    btn.classList.add('is-danger')
+    btn.textContent = '정말 새로할까요?'
+    this.toast('여태 쓴 일기가 지워져요')
+    clearTimeout(this.confirmTimer)
+    this.confirmTimer = window.setTimeout(() => {
+      btn.classList.remove('is-danger')
+      btn.textContent = '새로하기'
+    }, 3400)
+  }
+
   // 시작 → 화면이 은은하게 어두워진 뒤 다음 화면으로 넘어간다(로딩은 대개 이미 끝나 즉시).
-  private start() {
+  private start(fresh: boolean) {
     if (this.started) return
     this.started = true
     GameAudio.startBgm()
     this.root.querySelector('.title-scene')?.classList.add('starting')
-    this.startTimer = window.setTimeout(() => this.opts.onStart(), 560)
+    this.startTimer = window.setTimeout(() => this.opts.onStart(fresh), 560)
   }
 
   // 은은한 반딧불이 — 불규칙하게 배회하며 반짝인다. 가산 합성으로 부드럽게 발광.

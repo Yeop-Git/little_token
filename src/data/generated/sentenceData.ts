@@ -13,12 +13,113 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
-      "bonus": 0,
+      "person": "first",
+      "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "common",
       "art": "1001",
-      "note": "배율 0%",
+      "note": "배율 ×1.20",
       "lore": "오늘도 일기를 편다."
+    },
+    {
+      "id": "eoje",
+      "text": "어제의 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "mind"
+      ],
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "note": "배율 ×1.20",
+      "lore": "지난 장을 손끝으로 짚는다."
+    },
+    {
+      "id": "nado",
+      "text": "나도",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "echo"
+      ],
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "note": "배율 ×1.20",
+      "lore": "누가 먼저였는지는 중요하지 않다."
+    },
+    {
+      "id": "oneul",
+      "text": "오늘의 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "now"
+      ],
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "note": "배율 ×1.20",
+      "lore": "오늘 몫은 오늘 적는다."
+    },
+    {
+      "id": "gyeop",
+      "text": "겁먹은 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "fear"
+      ],
+      "person": "first",
+      "bonus": 0,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "note": "도박 50% — ×1.40 / ×1.00",
+      "lore": "연필 쥔 손이 떨린다. 그래서 가끔 더 세게.",
+      "variance": {
+        "p": 0.5,
+        "hi": 1.4,
+        "lo": 1
+      }
+    },
+    {
+      "id": "naman",
+      "text": "나만은",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "solo"
+      ],
+      "person": "first",
+      "bonus": 0.6,
+      "targetMode": "enemy",
+      "rarity": "rare",
+      "note": "배율 ×1.60",
+      "lore": "아무도 없어도 나는 남는다."
+    },
+    {
+      "id": "dachin",
+      "text": "다친 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "hurt"
+      ],
+      "person": "first",
+      "bonus": 0,
+      "targetMode": "enemy",
+      "rarity": "rare",
+      "note": "도박 50% — ×2.20 / ×1.00",
+      "lore": "아픈 자리가 오히려 뜨겁다.",
+      "variance": {
+        "p": 0.5,
+        "hi": 2.2,
+        "lo": 1
+      }
     }
   ],
   "adv": [
@@ -29,27 +130,13 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "force"
       ],
-      "bonus": 0.6,
+      "stat": "atk",
+      "bonus": 0.15,
       "crit": 0.1,
-      "fail": 0.2,
       "rarity": "common",
       "art": "2001",
-      "note": "배율 +60% · 실패 20% · 대성공 10%",
+      "note": "배율 ×1.15 · 대성공 10%",
       "lore": "팔에 힘을 준다."
-    },
-    {
-      "id": "saljjak",
-      "text": "살짝",
-      "slot": "adv",
-      "tags": [
-        "soft"
-      ],
-      "bonus": -0.2,
-      "crit": 0.3,
-      "rarity": "common",
-      "art": "2003",
-      "note": "배율 −20% · 대성공 30%",
-      "lore": "조심스럽게."
     },
     {
       "id": "dandanhi",
@@ -58,14 +145,70 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "solid"
       ],
-      "bonus": 0,
+      "stat": "guard",
+      "bonus": 0.1,
+      "crit": 0.2,
       "rarity": "common",
       "art": "2002",
-      "note": "방어 +2",
-      "lore": "이를 악문다.",
-      "effects": {
-        "guard": 2
-      }
+      "note": "배율 ×1.10 · 대성공 20%",
+      "lore": "이를 악문다."
+    },
+    {
+      "id": "saljjak",
+      "text": "살짝",
+      "slot": "adv",
+      "tags": [
+        "soft"
+      ],
+      "stat": "heal",
+      "bonus": 0,
+      "crit": 0.4,
+      "rarity": "common",
+      "art": "2003",
+      "note": "배율 ×1.00 · 대성공 40%",
+      "lore": "조심스럽게."
+    },
+    {
+      "id": "naepda",
+      "text": "냅다",
+      "slot": "adv",
+      "tags": [
+        "rush"
+      ],
+      "stat": "atk",
+      "bonus": 0.15,
+      "crit": 0.1,
+      "rarity": "common",
+      "note": "배율 ×1.15 · 대성공 10%",
+      "lore": "앞뒤 안 가리고."
+    },
+    {
+      "id": "kkuk",
+      "text": "꾹 참고",
+      "slot": "adv",
+      "tags": [
+        "grit"
+      ],
+      "stat": "guard",
+      "bonus": 0.1,
+      "crit": 0.2,
+      "rarity": "common",
+      "note": "배율 ×1.10 · 대성공 20%",
+      "lore": "울음을 삼킨다."
+    },
+    {
+      "id": "nunmullo",
+      "text": "눈물로",
+      "slot": "adv",
+      "tags": [
+        "tear"
+      ],
+      "stat": "heal",
+      "bonus": 0,
+      "crit": 0.4,
+      "rarity": "common",
+      "note": "배율 ×1.00 · 대성공 40%",
+      "lore": "젖은 눈으로 쓴다."
     }
   ],
   "verb": [
@@ -76,11 +219,12 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "atk"
       ],
-      "power": 6,
+      "stat": "atk",
+      "statMult": 1,
       "kind": "attack",
       "rarity": "common",
       "art": "3001",
-      "note": "공격 · 위력 6",
+      "note": "공격 ×1",
       "lore": "정직한 한 방."
     },
     {
@@ -90,15 +234,13 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "grd"
       ],
-      "power": 0,
+      "stat": "guard",
+      "statMult": 1.4,
       "kind": "guard",
       "rarity": "common",
       "art": "3002",
-      "note": "방어 +6",
-      "lore": "한 발 버틴다.",
-      "effects": {
-        "guard": 6
-      }
+      "note": "방어 ×1.4",
+      "lore": "한 발 버틴다."
     },
     {
       "id": "gamssat",
@@ -107,20 +249,83 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "mend"
       ],
-      "power": 0,
+      "stat": "heal",
+      "statMult": 1.4,
       "kind": "heal",
       "rarity": "common",
       "art": "3003",
-      "note": "회복 +5",
-      "lore": "상처를 매만진다.",
-      "effects": {
-        "heal": 5
-      }
+      "note": "회복 ×1.4",
+      "lore": "상처를 매만진다."
+    },
+    {
+      "id": "huryeo",
+      "text": "후려쳤다",
+      "slot": "verb",
+      "tags": [
+        "atk",
+        "swing"
+      ],
+      "stat": "atk",
+      "statMult": 1,
+      "kind": "attack",
+      "rarity": "common",
+      "note": "공격 ×1",
+      "lore": "크게 휘두른다."
+    },
+    {
+      "id": "jikyeot",
+      "text": "지켰다",
+      "slot": "verb",
+      "tags": [
+        "grd",
+        "hold"
+      ],
+      "stat": "guard",
+      "statMult": 1.4,
+      "kind": "guard",
+      "rarity": "common",
+      "note": "방어 ×1.4",
+      "lore": "한 뼘도 안 내준다."
+    },
+    {
+      "id": "pumeot",
+      "text": "품었다",
+      "slot": "verb",
+      "tags": [
+        "mend",
+        "warm"
+      ],
+      "stat": "heal",
+      "statMult": 1.4,
+      "kind": "heal",
+      "rarity": "common",
+      "note": "회복 ×1.4",
+      "lore": "가슴에 안는다."
     }
   ]
 }
 
 export const REWARD_WORDS: Word[] = [
+  {
+    "id": "uri",
+    "text": "우리는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "both"
+    ],
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "epic",
+    "note": "도박 50% — ×3.20 / ×1.00",
+    "lore": "함께라면 크게 타오른다.",
+    "variance": {
+      "p": 0.5,
+      "hi": 3.2,
+      "lo": 1
+    }
+  },
   {
     "id": "jaeppalli",
     "text": "재빨리",
@@ -128,10 +333,26 @@ export const REWARD_WORDS: Word[] = [
     "tags": [
       "swift"
     ],
-    "bonus": 0.2,
+    "stat": "luck",
+    "bonus": 0.5,
+    "crit": 0.15,
     "rarity": "rare",
-    "note": "배율 +20%",
+    "note": "배율 ×1.50 · 대성공 15%",
     "lore": "숨 돌릴 틈 없이."
+  },
+  {
+    "id": "motdohage",
+    "text": "못 이기는 척",
+    "slot": "adv",
+    "tags": [
+      "mad"
+    ],
+    "stat": "luck",
+    "bonus": 0.3,
+    "crit": 0.45,
+    "rarity": "rare",
+    "note": "배율 ×1.30 · 대성공 45%",
+    "lore": "안 하려 했는데, 손이 먼저 나갔다."
   },
   {
     "id": "naedeonjyeot",
@@ -141,10 +362,11 @@ export const REWARD_WORDS: Word[] = [
       "atk",
       "hurl"
     ],
-    "power": 9,
+    "stat": "atk",
+    "statMult": 1.5,
     "kind": "attack",
     "rarity": "rare",
-    "note": "강공 · 위력 9",
+    "note": "공격 ×1.5",
     "lore": "있는 힘껏 내던진다."
   },
   {
@@ -155,15 +377,12 @@ export const REWARD_WORDS: Word[] = [
       "grd",
       "mend"
     ],
-    "power": 1,
+    "stat": "guard",
+    "statMult": 1.5,
     "kind": "guard",
     "rarity": "rare",
-    "note": "방어 +4 · 회복 +3",
-    "lore": "몸을 말아 지킨다.",
-    "effects": {
-      "guard": 4,
-      "heal": 3
-    }
+    "note": "방어 ×1.5",
+    "lore": "몸을 말아 지킨다."
   }
 ]
 
@@ -176,10 +395,11 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
-      "bonus": 0,
+      "person": "first",
+      "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "common",
-      "note": "배율 0%",
+      "note": "배율 ×1.20",
       "lore": "일기의 화자. 언제나 여기서 시작한다."
     },
     {
@@ -189,11 +409,26 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "enemy"
       ],
-      "bonus": 0.25,
+      "person": "second",
+      "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "rare",
-      "note": "공격 특화 · 방어 무효",
-      "lore": "손끝을 겨눈다. 방어를 잊을 만큼."
+      "note": "주어로 쓸 수 없다 — 일기의 주어는 나·우리",
+      "lore": "손끝을 겨눈다. 하지만 이건 내 일기다."
+    },
+    {
+      "id": "geu",
+      "text": "그 애는",
+      "slot": "subj",
+      "tags": [
+        "other"
+      ],
+      "person": "third",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "rare",
+      "note": "주어로 쓸 수 없다 — 일기의 주어는 나·우리",
+      "lore": "남의 이야기는 남의 공책에."
     },
     {
       "id": "uri",
@@ -202,11 +437,17 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "both"
       ],
-      "bonus": 0.5,
-      "targetMode": "both",
+      "person": "first",
+      "bonus": 0,
+      "targetMode": "enemy",
       "rarity": "epic",
-      "note": "피해 40% 되돌아옴",
-      "lore": "함께 타오르면, 함께 그을린다."
+      "note": "도박 50% — ×3.20 / ×1.00",
+      "lore": "함께라면 크게 타오른다.",
+      "variance": {
+        "p": 0.5,
+        "hi": 3.2,
+        "lo": 1
+      }
     }
   ],
   "adv": [
@@ -217,13 +458,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "solo"
       ],
-      "bonus": 0.3,
+      "stat": "guard",
+      "bonus": 0.55,
+      "crit": 0.1,
       "rarity": "rare",
-      "note": "방어 −2",
-      "lore": "혼자 선 자의 각오. 등이 시리다.",
-      "effects": {
-        "guard": -2
-      }
+      "note": "배율 ×1.55 · 대성공 10%",
+      "lore": "혼자 선 자의 각오."
     },
     {
       "id": "joy",
@@ -232,9 +472,11 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "quiet"
       ],
-      "bonus": -0.1,
+      "stat": "luck",
+      "bonus": 0,
+      "crit": 0.4,
       "rarity": "common",
-      "note": "배율 −10%",
+      "note": "배율 ×1.00 · 대성공 40%",
       "lore": "숨을 죽이면 벌레도 방심한다."
     },
     {
@@ -244,13 +486,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "mad"
       ],
+      "stat": "atk",
       "bonus": 0.7,
+      "crit": 0.45,
       "rarity": "epic",
-      "note": "자해 3",
-      "lore": "종이가 타는 냄새. 멈출 수 없다.",
-      "effects": {
-        "recoil": 3
-      }
+      "note": "배율 ×1.70 · 대성공 45%",
+      "lore": "종이가 타는 냄새. 멈출 수 없다."
     },
     {
       "id": "slow",
@@ -259,13 +500,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "slow"
       ],
+      "stat": "guard",
       "bonus": 0.1,
+      "crit": 0.2,
       "rarity": "common",
-      "note": "방어 +2",
-      "lore": "느린 붓질에도 단단함이 깃든다.",
-      "effects": {
-        "guard": 2
-      }
+      "note": "배율 ×1.10 · 대성공 20%",
+      "lore": "느린 붓질에도 단단함이 깃든다."
     },
     {
       "id": "neolli",
@@ -274,10 +514,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "wide"
       ],
-      "bonus": -0.15,
+      "stat": "luck",
+      "bonus": 0.1,
+      "crit": 0.2,
       "aoe": "all",
       "rarity": "rare",
-      "note": "전체 적중 · 위력 −",
+      "note": "배율 ×1.10 · 대성공 20% · 전체 적중",
       "lore": "한 방울이 온 페이지로 번진다."
     }
   ],
@@ -359,10 +601,11 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "atk"
       ],
-      "power": 4,
+      "stat": "atk",
+      "statMult": 1,
       "kind": "attack",
       "rarity": "common",
-      "note": "공격",
+      "note": "공격 ×1",
       "lore": "그냥, 앞으로."
     },
     {
@@ -372,14 +615,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "grd"
       ],
-      "power": 1,
+      "stat": "guard",
+      "statMult": 1,
       "kind": "guard",
       "rarity": "common",
-      "note": "방어 +5",
-      "lore": "한 발 물러서는 것도 문장이다.",
-      "effects": {
-        "guard": 5
-      }
+      "note": "방어 ×1",
+      "lore": "한 발 물러서는 것도 문장이다."
     },
     {
       "id": "jum",
@@ -388,10 +629,11 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "fire"
       ],
-      "power": 6,
+      "stat": "atk",
+      "statMult": 1.5,
       "kind": "attack",
       "rarity": "rare",
-      "note": "공격",
+      "note": "공격 ×1.5",
       "lore": "심지에 불을 붙이는 한 획."
     },
     {
@@ -401,14 +643,12 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "mind"
       ],
-      "power": 2,
+      "stat": "heal",
+      "statMult": 1,
       "kind": "heal",
       "rarity": "common",
-      "note": "회복 +4",
-      "lore": "잊는 편이 나을 때가 있다.",
-      "effects": {
-        "heal": 4
-      }
+      "note": "회복 ×1",
+      "lore": "잊는 편이 나을 때가 있다."
     },
     {
       "id": "hui",
@@ -418,11 +658,12 @@ export const WORDS: Record<string, Word[]> = {
         "atk",
         "wide"
       ],
-      "power": 3,
+      "stat": "atk",
+      "statMult": 1,
       "kind": "attack",
       "aoe": "all",
       "rarity": "rare",
-      "note": "공격 · 전체",
+      "note": "공격 ×1 · 전체",
       "lore": "빗자루처럼, 페이지 끝에서 끝까지."
     }
   ],
@@ -432,10 +673,10 @@ export const WORDS: Record<string, Word[]> = {
       "text": "했다",
       "slot": "end",
       "tags": [],
-      "bonus": 0,
+      "bonus": 0.2,
       "timing": "immediate",
       "rarity": "common",
-      "note": "즉발",
+      "note": "배율 ×1.20 · 즉발",
       "lore": "담담한 마침표."
     },
     {
@@ -443,10 +684,10 @@ export const WORDS: Record<string, Word[]> = {
       "text": "하려고 했다",
       "slot": "end",
       "tags": [],
-      "bonus": 0.9,
+      "bonus": 0.6,
       "timing": "delayed",
       "rarity": "rare",
-      "note": "다음 턴 발동",
+      "note": "배율 ×1.60 · 다음 턴 발동",
       "lore": "다짐은 다음 장에서 터진다."
     },
     {
@@ -457,12 +698,12 @@ export const WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "timing": "immediate",
       "rarity": "epic",
-      "note": "50%: ×2.5 / ×0.3",
+      "note": "도박 50% — ×3.20 / ×1.00",
       "lore": "기억이 흐릿하다… 운에 맡긴다.",
       "variance": {
         "p": 0.5,
-        "hi": 2.5,
-        "lo": 0.3
+        "hi": 3.2,
+        "lo": 1
       }
     },
     {
@@ -470,14 +711,12 @@ export const WORDS: Record<string, Word[]> = {
       "text": "하고 말았다!",
       "slot": "end",
       "tags": [],
-      "bonus": 0.4,
+      "bonus": 0.7,
+      "crit": 0.45,
       "timing": "immediate",
       "rarity": "epic",
-      "note": "자해 4",
-      "lore": "저지르고야 말았다. 손이 떨린다.",
-      "effects": {
-        "recoil": 4
-      }
+      "note": "배율 ×1.70 · 대성공 45%",
+      "lore": "저지르고야 말았다. 손이 떨린다."
     }
   ]
 }
@@ -490,7 +729,7 @@ export const EARLY_COMBOS: Combo[] = [
       "force",
       "atk"
     ],
-    "mult": 1.4,
+    "mult": 1.5,
     "flavor": "망설임 없이"
   },
   {
@@ -500,8 +739,128 @@ export const EARLY_COMBOS: Combo[] = [
       "solid",
       "grd"
     ],
-    "mult": 1.3,
+    "mult": 1.45,
     "flavor": "한 치도 안 밀린다"
+  },
+  {
+    "id": "ec3",
+    "name": "함께라면",
+    "need": [
+      "both",
+      "force"
+    ],
+    "mult": 1.6,
+    "flavor": "둘이 쥔 연필은 안 부러진다"
+  },
+  {
+    "id": "ec4",
+    "name": "홀로서기",
+    "need": [
+      "solo",
+      "solid"
+    ],
+    "mult": 1.55,
+    "flavor": "혼자여도 무너지지 않는다"
+  },
+  {
+    "id": "ec5",
+    "name": "오늘의 다짐",
+    "need": [
+      "now",
+      "atk"
+    ],
+    "mult": 1.5,
+    "flavor": "오늘 일은 오늘 끝낸다"
+  },
+  {
+    "id": "ec6",
+    "name": "상처의 값",
+    "need": [
+      "hurt",
+      "force"
+    ],
+    "mult": 1.7,
+    "flavor": "아픈 만큼 세게"
+  },
+  {
+    "id": "ec7",
+    "name": "메아리",
+    "need": [
+      "echo",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "너를 감싸며 나도 아문다"
+  },
+  {
+    "id": "ec8",
+    "name": "지난 일은 잊고",
+    "need": [
+      "mind",
+      "mend"
+    ],
+    "mult": 1.55,
+    "flavor": "덮으면 낫는 것도 있다"
+  },
+  {
+    "id": "ec9",
+    "name": "조심스러운 손길",
+    "need": [
+      "soft",
+      "mend"
+    ],
+    "mult": 1.6,
+    "flavor": "살살, 그래서 더 잘 아문다"
+  },
+  {
+    "id": "ec10",
+    "name": "겁먹고도 한 발",
+    "need": [
+      "fear",
+      "solid"
+    ],
+    "mult": 1.5,
+    "flavor": "떨면서도 물러서지 않았다"
+  },
+  {
+    "id": "ec11",
+    "name": "거침없이",
+    "need": [
+      "rush",
+      "atk"
+    ],
+    "mult": 1.5,
+    "flavor": "앞뒤 없이 내지른다"
+  },
+  {
+    "id": "ec12",
+    "name": "이 악물고",
+    "need": [
+      "grit",
+      "grd"
+    ],
+    "mult": 1.45,
+    "flavor": "삼킨 울음이 방패가 된다"
+  },
+  {
+    "id": "ec13",
+    "name": "눈물 닦고",
+    "need": [
+      "tear",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "울면서도 손은 낫게 한다"
+  },
+  {
+    "id": "ec14",
+    "name": "크게 휘둘러",
+    "need": [
+      "swing",
+      "force"
+    ],
+    "mult": 1.55,
+    "flavor": "온몸으로 후려친다"
   }
 ]
 
@@ -514,7 +873,7 @@ export const COMBOS: Combo[] = [
       "war",
       "atk"
     ],
-    "mult": 1.4,
+    "mult": 1.55,
     "flavor": "혼자서 맞서는 자"
   },
   {
@@ -525,7 +884,7 @@ export const COMBOS: Combo[] = [
       "fire",
       "fire"
     ],
-    "mult": 1.8,
+    "mult": 1.9,
     "flavor": "미쳐 타오르다"
   },
   {
@@ -535,7 +894,7 @@ export const COMBOS: Combo[] = [
       "quiet",
       "quiet"
     ],
-    "mult": 1.2,
+    "mult": 1.6,
     "flavor": "숨죽인 방어"
   },
   {
@@ -545,7 +904,7 @@ export const COMBOS: Combo[] = [
       "mind",
       "mind"
     ],
-    "mult": 1.3,
+    "mult": 1.5,
     "flavor": "잊으며 회복하다"
   },
   {
@@ -565,74 +924,15 @@ export const COMBOS: Combo[] = [
       "wide",
       "water"
     ],
-    "mult": 1.5,
+    "mult": 1.6,
     "flavor": "모두를 적시는 비"
   }
 ]
 
 export const EARLY_CONFLICTS: Conflict[] = []
 
-export const CONFLICTS: Conflict[] = [
-  {
-    "a": "both",
-    "b": "solo",
-    "reason": "혼자일 수 없다"
-  },
-  {
-    "a": "mad",
-    "b": "quiet",
-    "reason": "광기와 정적은 공존 못 한다"
-  },
-  {
-    "a": "quiet",
-    "b": "fire",
-    "reason": "조용히 불태울 수 없다"
-  },
-  {
-    "a": "slow",
-    "b": "mad",
-    "reason": "속도가 모순된다"
-  }
-]
+export const CONFLICTS: Conflict[] = []
 
-export const EARLY_DISSONANCES: Dissonance[] = [
-  {
-    "a": "soft",
-    "b": "atk",
-    "penalty": 0.55,
-    "reason": "살살 때려선 아프지 않다"
-  },
-  {
-    "a": "force",
-    "b": "mend",
-    "penalty": 0.6,
-    "reason": "거칠게 감쌀 순 없다"
-  },
-  {
-    "a": "swift",
-    "b": "grd",
-    "penalty": 0.7,
-    "reason": "급히 막으면 엉성하다"
-  }
-]
+export const EARLY_DISSONANCES: Dissonance[] = []
 
-export const DISSONANCES: Dissonance[] = [
-  {
-    "a": "slow",
-    "b": "fire",
-    "penalty": 0.7,
-    "reason": "천천히 불태우면 김이 샌다"
-  },
-  {
-    "a": "quiet",
-    "b": "war",
-    "penalty": 0.75,
-    "reason": "조용한 전투는 미적지근하다"
-  },
-  {
-    "a": "mind",
-    "b": "war",
-    "penalty": 0.8,
-    "reason": "기억으로 전투를 논하니 어긋난다"
-  }
-]
+export const DISSONANCES: Dissonance[] = []

@@ -82,6 +82,22 @@ function poolOf(row: Row, file: string, line: number): Pool {
   return pool
 }
 
+const STATS = ['atk', 'guard', 'heal', 'luck']
+function statOf(row: Row, file: string, line: number): string | undefined {
+  const value = row.stat?.trim()
+  if (!value) return undefined
+  if (!STATS.includes(value)) throw new Error(`${file}:${line}: 알 수 없는 stat '${value}'입니다. (${STATS.join('/')})`)
+  return value
+}
+
+const PERSONS = ['first', 'second', 'third']
+function personOf(row: Row, file: string, line: number): string | undefined {
+  const value = row.person?.trim()
+  if (!value) return undefined
+  if (!PERSONS.includes(value)) throw new Error(`${file}:${line}: 알 수 없는 person '${value}'입니다. (${PERSONS.join('/')})`)
+  return value
+}
+
 function compact<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T
 }
@@ -120,6 +136,9 @@ wordRows.forEach((row, index) => {
     slot: required(row, 'slot', 'words.csv', line),
     tags: row.tags ? row.tags.split('|').filter(Boolean) : [],
     power: optionalNumber(row.power, 'words.csv', line, 'power'),
+    stat: statOf(row, 'words.csv', line),
+    statMult: optionalNumber(row.stat_mult, 'words.csv', line, 'stat_mult'),
+    person: personOf(row, 'words.csv', line),
     bonus: optionalNumber(row.bonus, 'words.csv', line, 'bonus'),
     crit: optionalNumber(row.crit, 'words.csv', line, 'crit'),
     fail: optionalNumber(row.fail, 'words.csv', line, 'fail'),

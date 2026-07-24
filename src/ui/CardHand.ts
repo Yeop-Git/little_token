@@ -1,6 +1,9 @@
 import { SKILL_ART } from '@/assets'
 import type { Word } from '@core/types'
 
+// 클릭으로 카드를 먹일 때 고스트가 부풀어 사라지는 시간.
+const COMMIT_ANIM_MS = 340
+
 export const CARD_HAND_CONFIG = {
   maxHand: 6,
   cardWidth: 158,
@@ -268,13 +271,13 @@ export class CardHand {
           if (selected) this.opts.onPreview(selected.word)
         } else this.opts.onPreviewEnd()
       })
+      // 클릭 = 바로 문장에 넣기. 드래그는 그대로 두되, 굳이 끌지 않아도 되게.
       button.addEventListener('click', () => {
         if (this.suppressClickId === card.instanceId) {
           this.suppressClickId = null
           return
         }
-        if (button.disabled || this.drawingId === card.instanceId) return
-        this.select(this.selectedId === card.instanceId ? null : card.instanceId)
+        this.commit(card, button)
       })
       button.addEventListener('dragstart', (event) => this.beginDrag(event, button, card))
       button.addEventListener('dragend', () => this.endDrag(button))
@@ -370,6 +373,107 @@ export class CardHand {
     }
   }
 
+  // 카드를 문장에 넣는 단 하나의 경로 — 클릭·키보드·드롭이 전부 여기로 모인다.
+  // 게임 진행(onConfirm)은 즉시 일어나고, 카드가 부풀어 빨려드는 연출은 뒤에서 따로 논다.
+  // 이렇게 분리해야 연출이 입력을 삼키지 않는다(예전엔 190ms 동안 클릭이 먹혔다).
+  private commit(card: CardInstance, button?: HTMLButtonElement) {
+    if (this.destroyed || this.draggingId) return
+    // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
+    if (button && !button.isConnected) return
+    if (this.drawingId === card.instanceId) return
+    if (this.conflictOf(card.word)) return
+
+    this.selectedId = card.instanceId
+    this.pulseSlotStep()
+    // 연출은 진행 전에 미리 찍어 둔다 — onConfirm이 손패를 다시 그리면 버튼이 사라지기 때문.
+    if (button && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.playCommitFx(button, card.word)
+    }
+    this.opts.onConfirm(card.word)
+  }
+
+  // 순수 연출 — 원본 위치에서 고스트를 복제해 화면 쪽으로 부풀리며 빛으로 흩어 보낸다.
+  private playCommitFx(button: HTMLButtonElement, word: Word) {
+    const ghost = this.spawnCommitGhost(button)
+    this.burstAt(button, word)
+    // 좌표는 숫자로 계산한다(키프레임 안의 calc()는 브라우저가 거부할 수 있다).
+    const x = parseFloat(ghost.style.getPropertyValue('--drag-x')) || 0
+    const y = parseFloat(ghost.style.getPropertyValue('--drag-y')) || 0
+    const at = (dy: number, s: number) => `translate3d(${x.toFixed(1)}px, ${(y + dy).toFixed(1)}px, 0) scale(${s})`
+    ghost.animate(
+      [
+        { transform: at(0, 1), opacity: 1, filter: 'brightness(1)' },
+        { transform: at(-34, 1.34), opacity: 1, filter: 'brightness(1.75) saturate(1.25)', offset: 0.45 },
+        { transform: at(-96, 2.05), opacity: 0, filter: 'brightness(2.6) saturate(1.4)' },
+      ],
+      { duration: COMMIT_ANIM_MS, easing: 'cubic-bezier(.2,.72,.24,1)' },
+    )
+    window.setTimeout(() => ghost.remove(), COMMIT_ANIM_MS + 80)
+  }
+
+  private pulseSlotStep() {
+    const steps = this.wordZone?.querySelector<HTMLElement>('.slot-step')
+    if (!steps) return
+    steps.classList.remove('commit-pulse')
+    void steps.offsetWidth
+    steps.classList.add('commit-pulse')
+    window.setTimeout(() => steps.classList.remove('commit-pulse'), 420)
+  }
+
+  private spawnCommitGhost(button: HTMLElement): HTMLElement {
+    const stageRect = this.stage.getBoundingClientRect()
+    const rect = button.getBoundingClientRect()
+    const scaleX = stageRect.width / this.stage.offsetWidth || 1
+    const scaleY = stageRect.height / this.stage.offsetHeight || 1
+    const ghost = button.cloneNode(true) as HTMLElement
+    ghost.classList.remove('selected', 'dragging', 'committing')
+    ghost.classList.add('drag-ghost', 'commit-ghost')
+    ghost.removeAttribute('data-instance-id')
+    ghost.removeAttribute('draggable')
+    ghost.setAttribute('aria-hidden', 'true')
+    ghost.style.setProperty('--drag-x', `${((rect.left - stageRect.left) / scaleX).toFixed(1)}px`)
+    ghost.style.setProperty('--drag-y', `${((rect.top - stageRect.top) / scaleY).toFixed(1)}px`)
+    ghost.style.setProperty('--drag-tilt', '0deg')
+    this.stage.append(ghost)
+    return ghost
+  }
+
+  // 카드 색(--wglow)으로 사방에 튀는 빛 파편 + 중앙 링.
+  private burstAt(button: HTMLElement, word: Word) {
+    const stageRect = this.stage.getBoundingClientRect()
+    const rect = button.getBoundingClientRect()
+    const scaleX = stageRect.width / this.stage.offsetWidth || 1
+    const scaleY = stageRect.height / this.stage.offsetHeight || 1
+    const cx = (rect.left + rect.width / 2 - stageRect.left) / scaleX
+    const cy = (rect.top + rect.height / 2 - stageRect.top) / scaleY
+
+    const burst = document.createElement('div')
+    burst.className = `card-burst mood-${this.moodOf(word)}`
+    burst.style.left = `${cx.toFixed(1)}px`
+    burst.style.top = `${cy.toFixed(1)}px`
+    burst.innerHTML = '<i class="cb-ring"></i>'
+    this.stage.append(burst)
+
+    for (let i = 0; i < 14; i++) {
+      const shard = document.createElement('i')
+      shard.className = 'cb-shard'
+      burst.append(shard)
+      const ang = (Math.PI * 2 * i) / 14 + Math.random() * 0.4
+      const dist = 90 + Math.random() * 140
+      shard.animate(
+        [
+          { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+          {
+            transform: `translate(calc(-50% + ${(Math.cos(ang) * dist).toFixed(0)}px), calc(-50% + ${(Math.sin(ang) * dist - 30).toFixed(0)}px)) scale(0.2)`,
+            opacity: 0,
+          },
+        ],
+        { duration: 420 + Math.random() * 260, easing: 'cubic-bezier(.2,.7,.3,1)' },
+      )
+    }
+    window.setTimeout(() => burst.remove(), 760)
+  }
+
   private beginDrag(event: DragEvent, button: HTMLButtonElement, card: CardInstance) {
     if (button.disabled || this.drawingId === card.instanceId) {
       event.preventDefault()
@@ -419,12 +523,8 @@ export class CardHand {
     if (!card || this.conflictOf(card.word)) return
     this.dragAccepted = true
     this.draggingId = null
-    const steps = this.wordZone?.querySelector<HTMLElement>('.slot-step')
-    steps?.classList.remove('commit-pulse')
-    void steps?.offsetWidth
-    steps?.classList.add('commit-pulse')
-    window.setTimeout(() => steps?.classList.remove('commit-pulse'), 420)
-    this.opts.onConfirm(card.word)
+    // 드래그는 고스트(settleDragGhost)가 따로 있으니 커밋 연출은 붙이지 않는다.
+    this.commit(card)
   }
 
   private stagePoint(clientX: number, clientY: number) {
@@ -563,9 +663,7 @@ export class CardHand {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       const card = hand.find((item) => item.instanceId === button.dataset.instanceId)
-      if (!card || this.conflictOf(card.word)) return
-      this.selectedId = card.instanceId
-      this.opts.onConfirm(card.word)
+      if (card) this.commit(card, button)
       return
     }
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return

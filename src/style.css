@@ -300,6 +300,17 @@ button {
   opacity: 1;
   transform: translateX(0);
 }
+/* 새로하기 확인 대기 — 지워진다는 걸 색으로 먼저 알린다. */
+.tmenu-btn.is-danger {
+  color: #ffd0b0;
+  text-shadow: 0 0 18px rgba(255, 132, 82, 0.7), 0 3px 12px rgba(0, 0, 0, 0.88);
+}
+.tmenu-btn.is-danger::before {
+  content: '✕';
+  color: rgba(255, 160, 110, 0.95);
+  opacity: 1;
+  transform: translateX(0);
+}
 
 .title-toast {
   position: absolute;
@@ -510,7 +521,8 @@ button {
   flex-direction: column;
   align-items: center;
   /* right/opacity 트랜지션 = 앞 적이 죽으면 뒷줄이 "한 칸씩 당겨오는" 레일 이동 */
-  transition: transform 0.25s ease, opacity 0.4s ease, right 0.42s cubic-bezier(0.2, 1, 0.3, 1);
+  transition: transform 0.25s ease, opacity 0.4s ease, right 0.42s cubic-bezier(0.2, 1, 0.3, 1),
+    bottom 0.42s cubic-bezier(0.2, 1, 0.3, 1);
   cursor: pointer;
   outline: none;
 }
@@ -567,6 +579,7 @@ button {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+.inspect-hint.gone { display: none; }
 /* 타원 그림자 레이어(반투명 도형) */
 .actor .shadow {
   position: absolute;
@@ -607,6 +620,8 @@ button {
 }
 .actor.foe.dying .nameplate { opacity: 0; transition: opacity 0.18s ease; }
 .actor.foe.dying::after { display: none; }
+/* 쓸어담기 중 — 쓰러지는 동작이 흐름을 끊지 않게 짧고 세게 */
+.actor.foe.dying.fast { animation-duration: 0.24s; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
 @keyframes foe-die {
   0%   { transform: translateY(0) rotate(0deg) scale(1); filter: none; opacity: 1; }
   18%  { transform: translateY(-8px) rotate(5deg) scale(1.05); filter: brightness(1.25); }
@@ -672,6 +687,37 @@ button {
   50% { opacity: 0.9; transform: scale(1.06); }
 }
 
+/* ── 오버킬 쓸어담기 — 늘어진 시간 → 고속 레일 ── */
+#actors {
+  /* 무대와 같은 크기의 실제 박스를 가져야 타격점 기준 줌의 원점이 성립한다.
+     자식(.actor)은 어차피 절대 배치라 자리는 그대로다. */
+  position: absolute;
+  inset: 0;
+  transform-origin: var(--zoom-x, 70%) 82%;
+  transition: transform 0.34s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.34s ease;
+}
+#actors.slowmo {
+  transform: scale(1.06);
+  filter: saturate(1.22) contrast(1.06);
+}
+/* 시간이 늘어지는 동안 주변이 가라앉으며 타격점만 남는다 */
+.stage-area.slowmo-veil::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background: radial-gradient(circle 520px at var(--zoom-x, 70%) 70%, transparent 30%, rgba(6, 4, 10, 0.62) 100%);
+  animation: slowmo-veil 0.34s ease forwards;
+}
+@keyframes slowmo-veil { from { opacity: 0; } to { opacity: 1; } }
+/* 꽂히는 순간 레일이 고속도로가 된다 — 뒷줄이 파바바박 당겨온다 */
+#actors.rail-rush .actor {
+  transition: transform 0.14s ease, opacity 0.12s ease, right 0.17s cubic-bezier(0.2, 1.5, 0.35, 1);
+}
+#actors.rail-rush .nameplate { transition: opacity 0.12s ease, filter 0.12s ease; }
+#actors.rail-rush .hpbar > .fill { transition: width 0.16s cubic-bezier(0.22, 1, 0.36, 1); }
+
 /* 이름표 + 귀여운 HP 바 */
 .nameplate {
   position: absolute;
@@ -684,7 +730,17 @@ button {
   border-radius: 16px;
   z-index: 5;
 }
-.actor.foe .nameplate { transform: translateX(-50%); }
+.actor.foe .nameplate {
+  transform: translateX(-50%);
+  transition: opacity 0.32s ease, filter 0.32s ease;
+}
+/* 2번째 적 — 있다는 것만 알 정도로 은은하게 */
+.actor.foe .nameplate.faint {
+  opacity: 0.44;
+  filter: saturate(0.65);
+}
+.actor.foe .nameplate.faint .initiative-chip { display: none; }
+.actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
 .nameplate .row {
   display: flex;
   justify-content: space-between;
@@ -828,6 +884,110 @@ button {
   to { transform: translate(-50%, -58%) scale(1.25); opacity: 0; }
 }
 
+/* ───────── 점수 집계판 — 깡 점수 × 배율이 하나씩 꽂힌다 ───────── */
+.tally {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  z-index: 43;
+  transform: translate(-50%, -50%) scale(0.86);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.tally.in { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+/* 준비 효과·선공이 지나가는 동안 총합은 한쪽에 물러나 대기한다(다시 계산하지 않는다) */
+.tally.parked {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(0.72);
+  top: 30%;
+}
+.tally.parked .tally-feed { opacity: 0.45; }
+.tally.out { opacity: 0; transform: translate(-50%, -58%) scale(1.06); }
+.tally-slots { display: flex; align-items: center; gap: 14px; }
+.tally-box {
+  min-width: 168px;
+  padding: 10px 20px 12px;
+  border-radius: 16px;
+  text-align: center;
+  background: rgba(10, 7, 16, 0.74);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.tally-box .tl {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--ink-faint);
+}
+.tally-box b { display: block; margin-top: 2px; font-size: 52px; font-weight: 900; line-height: 1.05; }
+.tally-box.base b { color: #9fd8ff; text-shadow: 0 0 22px rgba(120, 190, 255, 0.6); }
+/* 배율은 겹칠수록 뜨거워진다 */
+.tally-box.mult b {
+  color: color-mix(in srgb, #ff9a5c calc(var(--heat, 0) * 100%), #ffd27a);
+  text-shadow: 0 0 calc(16px + var(--heat, 0) * 26px) rgba(255, 140, 70, calc(0.4 + var(--heat, 0) * 0.5));
+}
+.tally-x { font-size: 34px; font-weight: 900; color: var(--ink-faint); }
+.tally-box.bump { animation: tally-bump 0.28s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes tally-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+.tally-feed {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 620px;
+}
+.tally-chip {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff2da;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  animation: tally-chip-in 0.26s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+@keyframes tally-chip-in {
+  from { transform: translateY(10px) scale(0.7); opacity: 0; }
+}
+.tally-chip.dmg { color: #ffb08c; box-shadow: inset 0 0 0 1px rgba(255, 140, 90, 0.4); }
+.tally-chip.heal { color: #c6f39a; box-shadow: inset 0 0 0 1px rgba(160, 230, 120, 0.4); }
+.tally-chip.stat { color: #9fd8ff; box-shadow: inset 0 0 0 1px rgba(120, 190, 255, 0.4); }
+.tally-chip.buff { color: #ffd27a; box-shadow: inset 0 0 0 1px rgba(255, 205, 120, 0.45); }
+.tally-chip.combo {
+  color: #fff0c0;
+  background: rgba(255, 168, 60, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 90, 0.7), 0 0 16px rgba(255, 150, 50, 0.35);
+}
+.tally-chip.crit {
+  color: #fff;
+  background: rgba(255, 90, 28, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 160, 90, 0.9), 0 0 22px rgba(255, 90, 28, 0.6);
+}
+.tally-chip.down { color: #b7a9c8; box-shadow: inset 0 0 0 1px rgba(150, 130, 175, 0.45); }
+.tally-total {
+  font-size: 92px;
+  font-weight: 900;
+  line-height: 1;
+  color: #ff9a72;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 34px currentColor;
+}
+.tally.heal .tally-total { color: #b6f38a; }
+.tally-total.slam { animation: tally-slam 0.4s cubic-bezier(0.2, 1.5, 0.35, 1); }
+@keyframes tally-slam {
+  0% { transform: scale(2.1); opacity: 0; filter: blur(6px); }
+  55% { transform: scale(0.94); opacity: 1; filter: none; }
+  100% { transform: scale(1); }
+}
+
 /* 오버플로우 — 활활 타오르는 초과 피해 숫자 */
 .ember-num {
   position: absolute;
@@ -898,14 +1058,48 @@ button {
   -webkit-backdrop-filter: blur(3px);
 }
 .chain-word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   padding: 2px 6px;
+  animation: chain-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.chain-word .cw-text {
   font-size: 34px;
   font-weight: 900;
   color: var(--gold-hi);
   /* 발광 + 뚜렷한 드롭 섀도로 상단 문구 강조 */
   text-shadow: 0 0 20px var(--glow), 0 0 6px var(--glow), 0 5px 12px rgba(0, 0, 0, 0.9), 0 2px 2px rgba(0, 0, 0, 0.8);
-  animation: chain-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
+/* 단어 바로 밑 설명 — 이 단어가 무엇을 얼마나 주는지 */
+.chain-word .cw-note {
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  padding: 2px 9px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.46);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+.cw-note.dmg { color: #ffb08c; }
+.cw-note.heal { color: #c6f39a; }
+.cw-note.guard { color: #9ec9ff; }
+.cw-note.buff { color: #ffd27a; }
+.cw-note.down { color: #ffa0a0; }
+.cw-note.flat { color: var(--ink-faint); }
+.cw-note.gamble { color: #d7b0f5; background: rgba(120, 60, 170, 0.34); }
+.cw-note.combo { color: #fff0c0; background: rgba(255, 168, 60, 0.28); }
+/* 맨 끝 맥락 칸 — 완벽한 맥락은 금빛, 어긋남은 붉게 */
+.chain-word.ctx .cw-text { font-size: 24px; }
+.chain-word.ctx.perfect .cw-text { color: #fff0c0; }
+.chain-word.ctx.broken .cw-text {
+  color: #ff9a9a;
+  text-shadow: 0 0 16px rgba(255, 90, 90, 0.7), 0 4px 10px rgba(0, 0, 0, 0.85);
+}
+.chain-word.ctx.broken .cw-note { background: rgba(120, 20, 20, 0.5); }
 .chain-combo {
   padding: 2px 6px;
   font-size: 22px;
@@ -1410,6 +1604,45 @@ button {
   transform: translateY(-12px);
   filter: none;
 }
+/* 클릭으로 먹힌 카드 — 고스트만 부풀어 오른다(원본은 곧바로 손패에서 사라진다) */
+.word-card.commit-ghost {
+  transition: none;
+  filter: drop-shadow(0 0 26px var(--wglow)) drop-shadow(0 28px 24px rgba(0, 0, 0, 0.6));
+}
+/* 카드가 빨려 들어가며 터지는 빛 */
+.card-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1399;
+  pointer-events: none;
+}
+.card-burst .cb-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 130px;
+  height: 130px;
+  margin: -65px 0 0 -65px;
+  border-radius: 50%;
+  border: 4px solid var(--wglow, #ffcf76);
+  box-shadow: 0 0 26px var(--wglow, #ffcf76), inset 0 0 22px var(--wglow, #ffcf76);
+  animation: cb-ring 0.44s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes cb-ring {
+  from { transform: scale(0.35); opacity: 0.95; }
+  to { transform: scale(1.9); opacity: 0; }
+}
+.card-burst .cb-shard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--wglow, #ffcf76) 55%, transparent 100%);
+  box-shadow: 0 0 14px var(--wglow, #ffcf76);
+}
 
 .card-drop-zone {
   display: none;
@@ -1569,6 +1802,47 @@ button {
 .cast-entry.enemy .cast-meta b { color: var(--danger); }
 .cast-entry.system .cast-meta b { color: var(--teal); }
 .cast-text { margin-top: 6px; color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.45; }
+/* 로그 아래 점수 요약 — "깡 24 × 배율 3.20 = 77" */
+.cast-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.cast-score .cs-cell { display: flex; flex-direction: column; line-height: 1.15; }
+.cast-score .cs-cell em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--ink-faint);
+}
+.cast-score .cs-cell b { font-size: 19px; font-weight: 900; color: #fff2da; }
+.cast-score .cs-cell:first-child b { color: #9fd8ff; }
+.cast-score .cs-cell:nth-child(3) b { color: var(--gold); }
+.cast-score .cs-cell.total { margin-left: auto; text-align: right; }
+.cast-score.dmg .cs-cell.total b { color: #ff9a72; }
+.cast-score.heal .cs-cell.total b { color: #b6f38a; }
+.cast-score .cs-op { font-size: 15px; font-weight: 900; color: var(--ink-faint); }
+.cast-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.cs-chip {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-dim);
+  background: rgba(255, 255, 255, 0.06);
+}
+.cs-chip.dmg { color: #ffb08c; }
+.cs-chip.heal { color: #c6f39a; }
+.cs-chip.stat { color: #9fd8ff; }
+.cs-chip.buff { color: #ffd27a; }
+.cs-chip.combo { color: #fff0c0; background: rgba(255, 168, 60, 0.2); }
+.cs-chip.crit { color: #fff; background: rgba(255, 90, 28, 0.3); }
+.cs-chip.down { color: #b7a9c8; }
 .cast-empty { margin: auto 0; padding: 28px 10px; color: var(--ink-faint); font-size: 15px; line-height: 1.7; text-align: center; }
 .wd-name { font-size: 40px; font-weight: 900; color: #fff6e2; line-height: 1.05; text-shadow: 0 0 20px rgba(255, 210, 122, 0.3); }
 .wd-grade { margin-top: 6px; font-size: 14px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); text-shadow: 0 0 12px var(--wglow, var(--gold)); }
