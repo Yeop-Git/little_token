@@ -6,6 +6,7 @@
 
 import type { ItemDef, StatKey } from '@data/items'
 import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
+import { BACKGROUNDS } from '@/assets'
 import { itemArt } from './sprites'
 
 interface Opts {
@@ -49,7 +50,7 @@ export class ItemExclaimView {
     }).join(' ')
 
     this.root.innerHTML = `
-      <div class="scene item-scene">
+      <div class="scene item-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="item-card">
           <div class="item-left">
             <div class="glint">✦ 새 아이템 ✦</div>

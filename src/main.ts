@@ -8,6 +8,7 @@ import './style.css'
 import { BattleView } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
+import { FontManager } from '@/ui/FontManager'
 import { FIELDS } from '@data/fields'
 import { DEMO_ENCOUNTER } from '@data/enemies'
 import { ITEMS } from '@data/items'
@@ -57,6 +58,6 @@ function go(scene: SceneName) {
   stage.appendChild(el)
 }
 
-// URL ?scene= 로 직접 진입(스샷 자동화용).
+// URL ?scene= 로 직접 진입(스샷 자동화용). 폰트 로드 후 첫 씬 구성.
 const start = (new URLSearchParams(location.search).get('scene') as SceneName) || 'battle'
-go(start)
+FontManager.load().finally(() => go(start))

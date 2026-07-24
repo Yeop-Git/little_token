@@ -1,10 +1,9 @@
 /**
- * 전투 뷰 — 그림일기 한 페이지.
- *  · 머리글(날짜/날씨/제목) = 필드 효과
- *  · 그림 칸 = 포켓로그형 측면 전투(주인공 vs 벌레 무리) + 상단 발광 체인 + 맥락 배너
- *  · 글 칸 = 순차 단어 선택(1→N), 완성 시 "타다다닥!" 웨이브 → 효과 발동 → 하단 로그
- *
- * 렌더는 셸을 1회 구성하고 영역별로 부분 갱신한다(애니메이션 보존).
+ * 전투 뷰 v2 — 실제 배경 일러스트 위의 쉐이더틱 UI.
+ *  · 배경(폐허 광장) 위에 주인공(우비 검사) vs 벌레 소녀 무리
+ *  · 배우 하단 타원 그림자 · 귀여운 캡슐 HP 바 · 상단 발광 체인
+ *  · 하단 유리 컴포저: 넓은 좌측 단어 목록 + 우측 정사각 상세 패널
+ *  · 상세 패널은 현재 문장 기준 "정확한 수치"(적에게 N의 피해 등)를 규칙대로 표기
  */
 
 import { compile, matchCombos, sentenceTokens } from '@core/compiler'
@@ -21,7 +20,8 @@ import {
   makeEnemy,
   type BattleState,
 } from '@/sim/reference'
-import { SPRITE, weatherIcon } from './sprites'
+import { BACKGROUNDS, SPRITES } from '@/assets'
+import { weatherIcon } from './sprites'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -29,6 +29,14 @@ interface Opts {
   field: FieldDef
   encounter: string[]
   onWin: () => void
+}
+
+const ROLE_TEXT: Record<string, string> = {
+  subject: '문장의 주어. 공격 대상과 위력 배수를 정한다.',
+  modifier: '수식어. 위력 배수와 부가 효과를 더한다.',
+  object: '목적어. 기본 위력의 근원.',
+  verb: '동사. 행동의 종류와 위력을 정한다.',
+  ending: '어미. 발동 시점과 배수를 정한다.',
 }
 
 export class BattleView {
@@ -46,7 +54,6 @@ export class BattleView {
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
     this.onWin = opts.onWin
-    // 적 무리 구성 + 필드 수정자.
     const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], this.field.enemyAtkMult ?? 1))
     this.state = { playerHp: 40, playerMax: 40, guard: 0, turn: 1, enemies, pending: null }
     this.target = aliveIdx(this.state)[0] ?? 0
@@ -57,49 +64,46 @@ export class BattleView {
     this.timers.forEach((t) => clearTimeout(t))
   }
 
-  // ── 셸 구성(1회) ──
   private mount() {
     const order = this.t.template.slots
     this.root.innerHTML = `
-      <div class="scene">
-        <div class="diary-page">
-          <div class="diary-head">
-            <div class="head-cell"><span class="label">날짜</span><span class="value" id="f-date"></span></div>
-            <div class="head-cell head-title"><span class="value hand" id="f-title"></span><span class="sub" id="f-desc"></span></div>
-            <div class="head-cell head-weather"><span id="f-weather"></span></div>
-          </div>
+      <div class="scene battle" style="background-image:url(${BACKGROUNDS.bg001})">
+        <div class="vignette"></div>
 
-          <div class="picture-box" id="pbox">
-            <div class="turn-badge">턴 <b id="turn">1</b></div>
-            <div class="ground-line"></div>
-            <div class="chain-rail" id="chain"></div>
-            <div class="combo-flash" id="combo"></div>
-            <div class="flash" id="flash"></div>
-            <div id="actors"></div>
-            <div class="effect-log" id="log"></div>
-          </div>
+        <div class="hud-top">
+          <div class="hud-date" id="f-date"></div>
+          <div class="hud-title glass"><div class="t hand" id="f-title"></div><div class="s" id="f-desc"></div></div>
+          <div class="hud-weather"><span id="f-weather"></span></div>
+        </div>
+        <div class="turn-badge glass">턴 <b id="turn">1</b></div>
 
-          <div class="writing-box">
-            <div class="sentence-line" id="sentence"></div>
-            <div class="slot-strip" id="tabs">
-              ${order.map((s, i) => `<button class="slot-tab" data-i="${i}"><span class="step">${i + 1}</span>${s.label}</button>`).join('')}
-            </div>
-            <div class="compose">
-              <div class="word-list" id="grid"></div>
-              <div class="word-detail empty" id="detail"></div>
-            </div>
-            <div class="action-row">
-              <button class="btn primary" id="go">문장 완성!</button>
-              <button class="btn ghost" id="undo">되돌리기</button>
-            </div>
+        <div class="stage-area" id="pbox">
+          <div class="chain-rail" id="chain"></div>
+          <div class="combo-flash" id="combo"></div>
+          <div class="flash" id="flash"></div>
+          <div id="actors"></div>
+          <div class="effect-log" id="log"></div>
+        </div>
+
+        <div class="composer">
+          <div class="sentence-line" id="sentence"></div>
+          <div class="slot-strip" id="tabs">
+            ${order.map((s, i) => `<button class="slot-tab" data-i="${i}"><span class="step">${i + 1}</span>${s.label}</button>`).join('')}
+          </div>
+          <div class="compose">
+            <div class="word-list" id="grid"></div>
+            <div class="word-detail empty" id="detail"></div>
+          </div>
+          <div class="action-row">
+            <button class="btn primary" id="go">문장 완성!</button>
+            <button class="btn ghost" id="undo">되돌리기</button>
           </div>
         </div>
       </div>`
 
-    // 머리글 채우기
     this.q('#f-date').textContent = this.field.date
     this.q('#f-title').textContent = this.field.title
-    this.q('#f-desc').innerHTML = this.field.desc
+    this.q('#f-desc').innerHTML = this.field.desc.replace(/<[^>]+>/g, '') // HUD 부제는 순수 텍스트
     this.q('#f-weather').innerHTML = weatherIcon(this.field.weather)
 
     this.q('#go').addEventListener('click', () => this.execute())
@@ -123,7 +127,6 @@ export class BattleView {
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
     return this.root.querySelector(sel) as T
   }
-
   private order() {
     return this.t.template.slots.map((s) => s.key)
   }
@@ -131,30 +134,27 @@ export class BattleView {
     return this.order().filter((k) => this.sel[k]).length
   }
 
-  // ── 그림 칸: 배우(주인공 + 적 무리) ──
+  // ── 배우 ──
   private renderActors() {
     const host = this.q('#actors')
     const s = this.state
     const alive = aliveIdx(s)
-    // 적을 오른쪽에 고르게 배치.
     const n = s.enemies.length
-    const spacing = 236 // 무리 간격
-    const base = 80 // 오른쪽 가장자리 여백
+    const spacing = 250
+    const base = 120
     const enemyHtml = s.enemies
       .map((e, i) => {
-        // 오른쪽 앵커: 마지막 적이 가장 오른쪽. 마리 수가 달라도 안 잘린다.
         const right = base + (n - 1 - i) * spacing
         const pct = Math.max(0, (e.hp / e.maxHp) * 100)
         const isTarget = this.target === i && !e.dead
         return `
-        <div class="actor foe ${e.dead ? 'dead' : ''} ${isTarget ? 'target' : ''}" data-i="${i}"
-             style="right:${right}px;">
-          <div class="nameplate">
+        <div class="actor foe ${e.dead ? 'dead' : ''} ${isTarget ? 'target' : ''}" data-i="${i}" style="right:${right}px;">
+          <div class="nameplate glass">
             <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
             <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
           </div>
-          ${SPRITE[e.def.sprite]()}
-          ${isTarget ? '<div class="sprite-cap target-ring"></div>' : ''}
+          <div class="shadow"></div>
+          <img class="sprite" src="${SPRITES[e.def.sprite]}" alt="${e.def.name}">
         </div>`
       })
       .join('')
@@ -162,16 +162,15 @@ export class BattleView {
     const php = Math.max(0, (s.playerHp / s.playerMax) * 100)
     host.innerHTML = `
       <div class="actor you">
-        <div class="nameplate">
-          <div class="row"><span class="nm">일기 지킴이</span><span class="hpn">${Math.max(0, s.playerHp)}/${s.playerMax}
-            ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}</span></div>
+        <div class="nameplate glass">
+          <div class="row"><span class="nm">우비 아이</span><span class="hpn">${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}</span></div>
           <div class="hpbar you"><div class="fill" style="width:${php}%"></div></div>
         </div>
-        ${SPRITE.diarist()}
+        <div class="shadow"></div>
+        <img class="sprite" src="${SPRITES.player_001}" alt="우비 아이">
       </div>
       ${enemyHtml}`
 
-    // 적 클릭 → 타깃 지정(단일 공격 대상)
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) =>
       el.addEventListener('click', () => {
         const i = Number(el.dataset.i)
@@ -181,7 +180,6 @@ export class BattleView {
         }
       }),
     )
-    // 살아있는 타깃 보정
     if (this.state.enemies[this.target]?.dead) this.target = alive[0] ?? 0
   }
 
@@ -190,15 +188,11 @@ export class BattleView {
     const host = this.q('#chain')
     const toks = sentenceTokens(this.sel, this.t)
     host.innerHTML = this.order()
-      .map((k, i) => {
-        const on = !!this.sel[k]
-        if (!on) return ''
-        return `<span class="chain-word lit" data-i="${i}">${toks[i]}</span>`
-      })
+      .map((k, i) => (this.sel[k] ? `<span class="chain-word" data-i="${i}">${toks[i]}</span>` : ''))
       .join('')
   }
 
-  // ── 글 칸: 완성 문장 줄 ──
+  // ── 완성 문장 줄 ──
   private renderSentence() {
     const host = this.q('#sentence')
     const toks = sentenceTokens(this.sel, this.t)
@@ -208,19 +202,15 @@ export class BattleView {
       const cursor = i === this.slotIndex && !filled ? '<span class="cursor"></span>' : ''
       return `<span class="${cls}">${filled ? toks[i] : this.t.template.slots[i].label}</span>${cursor}`
     })
-    // 관용구 미리보기
     const combos = matchCombos(this.sel, this.t.combos, this.order())
     const preview = combos.length
-      ? `<span style="margin-left:auto;font-size:18px;color:var(--accent);font-weight:800">${combos
-          .map((c) => `「${c.name}」×${c.mult}`)
-          .join('  ')}</span>`
+      ? `<span class="combo-preview">${combos.map((c) => `「${c.name}」×${c.mult}`).join('  ')}</span>`
       : ''
     host.innerHTML = parts.join(' ') + preview
   }
 
-  // ── 글 칸: 슬롯 탭 + 단어 그리드 ──
+  // ── 슬롯 탭 + 단어 목록 ──
   private renderSlots() {
-    // 탭 상태
     this.q('#tabs')
       .querySelectorAll<HTMLElement>('.slot-tab')
       .forEach((tab, i) => {
@@ -252,38 +242,81 @@ export class BattleView {
         this.pick(btn.dataset.id!)
       })
     })
-
-    // 마우스가 없을 때 기본: 현재 슬롯의 선택 단어 또는 안내.
     this.renderDetail(null)
   }
 
-  // 우측 상세 패널 — 등급/설명/줄거리. word=null이면 기본(선택 단어 or 안내).
+  // ── 우측 정사각 상세 패널: 제목/등급/범위/내용/수치/줄거리 ──
   private renderDetail(word: Word | null) {
     const detail = this.q('#detail')
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
       detail.className = 'word-detail empty'
-      detail.innerHTML = '단어에 마우스를 올리면<br>등급과 줄거리가 보인다.'
+      detail.innerHTML = '단어에 마우스를 올리면<br>등급 · 범위 · 수치가 여기 표시된다.'
       return
     }
     const rarity = w.rarity ?? 'common'
-    const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
-    const roleDesc: Record<string, string> = {
-      subject: '주어 · 문장의 화자 · 대상 결정',
-      modifier: '수식 · 위력 배수 풀',
-      object: '목적어 · 기본 위력',
-      verb: '동사 · 위력 + 행동 종류',
-      ending: '어미 · 발동 시점 · 배수',
-    }
     const role = this.t.template.slots.find((s) => s.key === w.slot)?.role ?? 'object'
+    const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
+
+    // 현재 문장에 이 단어를 끼운 투영(projection)으로 정확한 수치를 뽑는다.
+    const trial: Selection = { ...this.sel, [w.slot]: w }
+    const intent = compile(trial, this.t)
+    const values = this.projectValues(w, intent)
+    const range = this.rangeText(intent)
+
     detail.className = `word-detail rarity-${rarity}`
     detail.innerHTML = `
-      <div class="detail-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel}</div>
-      <div class="detail-name">${w.text}</div>
-      <div class="detail-role">${roleDesc[role]}</div>
-      <div class="detail-effect">${w.note}${w.aoe === 'all' ? ' · 전체 적중' : ''}</div>
-      <div class="detail-lore">“${w.lore ?? ''}”</div>`
+      <div class="wd-name">${w.text}</div>
+      <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel}</div>
+      <div class="wd-range">범위 · ${range}</div>
+      <div class="wd-content">${ROLE_TEXT[role]}</div>
+      <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+      <div class="wd-lore">“${w.lore ?? ''}”</div>`
+  }
+
+  // 범위(대상) 표기.
+  private rangeText(intent: ReturnType<typeof compile>): string {
+    if (intent.kind === 'heal') return '자신'
+    const core = intent.aoe === 'all' ? '적 전체' : '적 하나'
+    return intent.targetMode === 'both' ? `${core} + 자신` : core
+  }
+
+  // 정확한 수치 라인 — 규칙(공식)대로. 문장이 덜 됐으면 단어 고유 수치로 폴백.
+  private projectValues(w: Word, intent: ReturnType<typeof compile>): { text: string; cls: string }[] {
+    const out: { text: string; cls: string }[] = []
+    const dmg = intent.kind === 'heal' ? 0 : Math.round(intent.base * intent.multiplier)
+
+    if (dmg > 0) {
+      const who = intent.aoe === 'all' ? '적 전체에게' : '적에게'
+      if (intent.variance) {
+        const lo = Math.round(dmg * intent.variance.lo)
+        const hi = Math.round(dmg * intent.variance.hi)
+        out.push({ text: `${who} ${lo}~${hi}의 피해 (도박 ${Math.round(intent.variance.p * 100)}%)`, cls: 'dmg' })
+      } else {
+        out.push({ text: `${who} ${dmg}의 피해`, cls: 'dmg' })
+      }
+      const self = intent.recoil + (intent.targetMode === 'both' ? Math.round(dmg * 0.4) : 0)
+      if (self > 0) out.push({ text: `나에게 ${self}의 피해`, cls: 'self' })
+    }
+    if (intent.heal > 0) out.push({ text: `${intent.heal} 회복`, cls: 'heal' })
+    if (intent.guard > 0) out.push({ text: `방어 +${intent.guard}`, cls: 'guard' })
+    if (intent.evade > 0) out.push({ text: `회피 +${intent.evade}`, cls: 'guard' })
+    if (intent.timing === 'delayed' && dmg > 0) out.push({ text: '다음 턴에 발동', cls: '' })
+
+    // 폴백: 아직 위력이 없어 피해가 0이면 단어 고유 수치를 정확히 보여준다.
+    if (!out.length) {
+      if (w.power) out.push({ text: `기본 위력 +${w.power}`, cls: 'dmg' })
+      if (w.bonus) out.push({ text: `위력 배수 ${w.bonus >= 0 ? '+' : ''}${Math.round(w.bonus * 100)}%`, cls: '' })
+      if (w.effects?.guard) out.push({ text: `방어 ${w.effects.guard >= 0 ? '+' : ''}${w.effects.guard}`, cls: 'guard' })
+      if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
+      if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
+      if (w.effects?.evade) out.push({ text: `회피 +${w.effects.evade}`, cls: 'guard' })
+      if (w.variance) out.push({ text: `도박: ${Math.round(w.variance.p * 100)}%로 ×${w.variance.hi}, 아니면 ×${w.variance.lo}`, cls: '' })
+      if (w.timing === 'delayed') out.push({ text: '다음 턴에 발동', cls: '' })
+      if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
+    }
+    return out
   }
 
   private setSlot(i: number) {
@@ -297,12 +330,10 @@ export class BattleView {
     const w = this.t.words[key].find((x) => x.id === id)!
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
-    // 다음 빈 슬롯으로 이동
     const order = this.order()
     let next = this.slotIndex + 1
     while (next < order.length && this.sel[order[next]]) next++
     this.slotIndex = Math.min(next, order.length - 1)
-
     this.renderChain()
     this.renderSentence()
     this.renderSlots()
@@ -322,7 +353,6 @@ export class BattleView {
   private complete(): boolean {
     return this.order().every((k) => !!this.sel[k])
   }
-
   private updateGo() {
     const go = this.q<HTMLButtonElement>('#go')
     go.disabled = !this.complete() || this.busy || this.over
@@ -336,7 +366,6 @@ export class BattleView {
 
     const intent = compile(this.sel, this.t)
 
-    // 1) 타다다닥! 체인 웨이브
     const words = this.q('#chain').querySelectorAll<HTMLElement>('.chain-word')
     for (let i = 0; i < words.length; i++) {
       words[i].classList.add('wave')
@@ -345,21 +374,17 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(180)
 
-    // 2) 맥락(관용구) 발동 배너
     if (intent.combos.length) {
       const combos = matchCombos(this.sel, this.t.combos, this.order())
       const mult = combos.reduce((m, c) => m * c.mult, 1)
       const el = this.q('#combo')
-      el.innerHTML = `<div class="kicker">맥락 발동</div>
-        <div class="name">${intent.combos.join(' · ')}</div>
-        <div class="mult">위력 ×${mult.toFixed(1)}</div>`
+      el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">위력 ×${mult.toFixed(1)}</div>`
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
       await sleep(720)
     }
 
-    // 3) 효과 발동(피해/자해/회복)
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random)
     for (const h of res.hits) this.popAt(h.target, `${h.dmg}`, 'dmg')
     if (res.selfDmg) this.popPlayer(`${res.selfDmg}`, 'self')
@@ -370,20 +395,17 @@ export class BattleView {
     await sleep(420)
     this.renderActors()
 
-    // 승리 판정
     if (allDead(this.state)) {
       this.over = true
-      this.log('마지막 벌레가 종이 밖으로 떨어졌다.')
+      this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
       await sleep(900)
       this.onWin()
       return
     }
 
-    // 4) 적 턴 + 지연 예약 발동
     this.state.turn++
     this.q('#turn').textContent = String(this.state.turn)
-    const strikes = enemyTurn(this.state, Math.random)
-    for (const st of strikes) {
+    for (const st of enemyTurn(this.state, Math.random)) {
       if (st.dealt) this.popPlayer(`${st.dealt}`, 'dmg')
       this.log(st.text)
     }
@@ -415,7 +437,6 @@ export class BattleView {
       return
     }
 
-    // 다음 턴 초기화
     this.sel = {}
     this.slotIndex = 0
     this.busy = false
@@ -428,25 +449,26 @@ export class BattleView {
   // ── 피드백 ──
   private popAt(enemyIdx: number, txt: string, cls: string) {
     const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
-    const pbox = this.q('#pbox').getBoundingClientRect()
+    const pboxEl = this.q('#pbox')
     if (!el) return
     const r = el.getBoundingClientRect()
-    const scale = pbox.width / this.q('#pbox').offsetWidth
-    const x = (r.left + r.width / 2 - pbox.left) / scale
-    const y = (r.top - pbox.top) / scale
+    const box = pboxEl.getBoundingClientRect()
+    const scale = box.width / pboxEl.offsetWidth
+    const x = (r.left + r.width / 2 - box.left) / scale
+    const y = (r.top - box.top) / scale + 30
     this.spawnPop(x, y, txt, cls)
   }
   private popPlayer(txt: string, cls: string) {
-    this.spawnPop(300, 90, txt, cls)
+    this.spawnPop(320, 120, txt, cls)
   }
   private spawnPop(x: number, y: number, txt: string, cls: string) {
     const p = document.createElement('div')
     p.className = `pop ${cls}`
     p.textContent = (cls === 'heal' ? '+' : '') + txt
-    p.style.left = `${x - 20}px`
-    p.style.top = `${y}px`
+    p.style.left = `${x - 24}px`
+    p.style.top = `${Math.max(20, y)}px`
     this.q('#pbox').appendChild(p)
-    this.timers.push(window.setTimeout(() => p.remove(), 950))
+    this.timers.push(window.setTimeout(() => p.remove(), 1000))
   }
   private hitFlash(enemyIdxs: number[], player: boolean) {
     for (const i of enemyIdxs) {
@@ -470,7 +492,6 @@ export class BattleView {
     line.innerHTML = html
     host.appendChild(line)
     this.timers.push(window.setTimeout(() => line.remove(), 3100))
-    // 최근 로그 3개만 유지
     while (host.children.length > 3) host.removeChild(host.firstChild!)
   }
 }

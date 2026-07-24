@@ -4,6 +4,7 @@
  */
 
 import type { FieldDef } from '@core/types'
+import { BACKGROUNDS } from '@/assets'
 import { itemArt } from './sprites'
 
 interface RewardPick {
@@ -31,7 +32,7 @@ export class RewardView {
   constructor(private root: HTMLElement, opts: Opts) {
     const f = opts.nextField
     this.root.innerHTML = `
-      <div class="scene reward-scene">
+      <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-card">
           <div class="reward-head">
             <div class="k">오늘의 일기, 한 장</div>
