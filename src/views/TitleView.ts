@@ -38,30 +38,58 @@ export class TitleView {
 
   private mount() {
     this.root.innerHTML = `
-      <main class="scene title-scene" style="background-image:url(${TITLE.bg})">
-        <div class="title-scrim-left" aria-hidden="true"></div>
-        <div class="title-glow" aria-hidden="true"></div>
-        <canvas class="title-fireflies" aria-hidden="true"></canvas>
-        <div class="title-vignette" aria-hidden="true"></div>
-        <div class="title-logo-wrap" aria-hidden="true">
-          <img class="title-logo" src="${TITLE.logo}" alt="Little Token" />
+      <main class="scene title-scene">
+        <svg class="title-warp-defs" aria-hidden="true" width="0" height="0">
+          <filter id="title-warp" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="2" seed="7" result="n">
+              <animate attributeName="baseFrequency" dur="19s" repeatCount="indefinite"
+                calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
+                values="0.006 0.011;0.011 0.007;0.006 0.011" />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="24" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </svg>
+        <div class="title-reveal" style="background-image:url(${TITLE.bg})">
+          <div class="title-scrim-left" aria-hidden="true"></div>
+          <div class="title-glow" aria-hidden="true"></div>
+          <canvas class="title-fireflies" aria-hidden="true"></canvas>
+          <div class="title-vignette" aria-hidden="true"></div>
+          <div class="title-logo-wrap" aria-hidden="true">
+            <img class="title-logo" src="${TITLE.logo}" alt="Little Token" />
+          </div>
+          <h1 class="sr-only">Little Token</h1>
+          <nav class="title-menu" aria-label="타이틀 메뉴">
+            <button class="tmenu-btn" type="button" data-act="start">시작하기</button>
+            <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
+            <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
+          </nav>
+          <div class="title-toast" id="title-toast" aria-live="polite"></div>
         </div>
-        <h1 class="sr-only">Little Token</h1>
-        <nav class="title-menu" aria-label="타이틀 메뉴">
-          <button class="tmenu-btn" type="button" data-act="start">시작하기</button>
-          <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
-          <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
-        </nav>
-        <div class="title-toast" id="title-toast" aria-live="polite"></div>
       </main>`
 
     this.root.querySelectorAll<HTMLButtonElement>('.tmenu-btn').forEach((btn) => {
       btn.addEventListener('click', () => this.onAct(btn.dataset.act ?? ''))
     })
-    // 엔터/스페이스로 바로 시작할 수 있게 시작 버튼에 포커스.
-    this.root.querySelector<HTMLButtonElement>('[data-act="start"]')?.focus()
 
     this.setupFireflies(this.root.querySelector<HTMLCanvasElement>('.title-fireflies')!)
+
+    // 로딩 전에는 검은 화면 — 배경/로고가 준비되면 중앙을 기점으로 페이드인.
+    const reveal = this.root.querySelector<HTMLElement>('.title-reveal')
+    const preload = [TITLE.bg, TITLE.logo].map(
+      (src) =>
+        new Promise<void>((res) => {
+          const im = new Image()
+          im.onload = im.onerror = () => res()
+          im.src = src
+        }),
+    )
+    Promise.all(preload).then(() => {
+      requestAnimationFrame(() => {
+        reveal?.classList.add('ready')
+        // 엔터/스페이스로 바로 시작할 수 있게 시작 버튼에 포커스.
+        this.root.querySelector<HTMLButtonElement>('[data-act="start"]')?.focus()
+      })
+    })
   }
 
   private onAct(act: string) {
