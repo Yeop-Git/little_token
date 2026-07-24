@@ -1,4 +1,5 @@
 import { TITLE } from '@/assets'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   onStart: () => void
@@ -120,6 +121,7 @@ export class TitleView {
   private start() {
     if (this.started) return
     this.started = true
+    GameAudio.startBgm()
     this.root.querySelector('.title-scene')?.classList.add('starting')
     this.startTimer = window.setTimeout(() => this.opts.onStart(), 560)
   }
