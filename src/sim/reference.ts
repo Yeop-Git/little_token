@@ -111,26 +111,29 @@ export interface EnemyStrike {
   idx: number // 공격한 적 인덱스(연출용)
 }
 
-// 적 턴 — every 주기에 맞는 적만 공격. guard로 흡수.
+// 적 턴 — 레일 최전방(플레이어와 가장 가까운) 적만 전투에 참여한다.
+// 뒷줄은 대기열이라 공격하지 않는다.
 export function enemyTurn(state: BattleState, rng: () => number): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
-  let guard = state.guard
-  state.enemies.forEach((e, idx) => {
-    if (e.dead) return
-    if (state.turn % e.def.every !== 0) return
+  const front = frontIdx(state)
+  if (front < 0) return strikes
+  const e = state.enemies[front]
+  if (state.turn % e.def.every === 0) {
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)
-    const dealt = Math.max(0, raw - guard)
-    const absorbed = Math.min(guard, raw)
-    guard = Math.max(0, guard - raw)
+    const dealt = Math.max(0, raw - state.guard)
+    const absorbed = Math.min(state.guard, raw)
     state.playerHp -= dealt
     strikes.push({
       text: `${e.def.name}의 습격 → ${dealt} 피해` + (absorbed ? ` (방어 ${absorbed} 흡수)` : ''),
       dealt,
-      idx,
+      idx: front,
     })
-  })
+  }
   state.guard = 0
   return strikes
 }
+
+// 레일 최전방(살아있는 첫 번째) 적 인덱스. 없으면 -1.
+export const frontIdx = (s: BattleState): number => s.enemies.findIndex((e) => !e.dead)
 
 export const allDead = (s: BattleState): boolean => s.enemies.every((e) => e.dead)

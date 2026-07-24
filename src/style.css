@@ -208,7 +208,8 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transition: transform 0.25s ease, filter 0.25s ease, opacity 0.45s ease;
+  /* right/opacity 트랜지션 = 앞 적이 죽으면 뒷줄이 "한 칸씩 당겨오는" 레일 이동 */
+  transition: transform 0.25s ease, opacity 0.4s ease, right 0.42s cubic-bezier(0.2, 1, 0.3, 1);
 }
 .actor.you {
   left: 250px;
@@ -220,7 +221,13 @@ button {
 }
 .actor.foe img.sprite {
   height: 300px;
+  transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), filter 0.4s ease;
 }
+/* 최전방 적만 선명 + 발광, 뒷줄은 인라인 blur로 흐릿 */
+.actor.foe.front img.sprite {
+  filter: drop-shadow(0 0 16px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+}
+.actor.foe.back { pointer-events: none; }
 /* 타원 그림자 레이어(반투명 도형) */
 .actor .shadow {
   position: absolute;
@@ -263,9 +270,6 @@ button {
   background: radial-gradient(ellipse at center, rgba(255, 210, 122, 0.55), transparent 68%);
   filter: blur(2px);
   animation: target-pulse 1.5s ease-in-out infinite;
-}
-.actor.foe.target img.sprite {
-  filter: drop-shadow(0 0 14px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
 }
 @keyframes target-pulse {
   0%, 100% { opacity: 0.5; transform: scale(0.92); }

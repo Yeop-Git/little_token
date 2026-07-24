@@ -19,6 +19,7 @@ import {
   aliveIdx,
   applyIntent,
   enemyTurn,
+  frontIdx,
   makeEnemy,
   type BattleState,
 } from '@/sim/reference'
@@ -152,27 +153,40 @@ export class BattleView {
     return 'buff'
   }
 
-  // ── 배우 ──
+  // ── 배우 — 적은 "레일 대기열": 최전방만 선명·전투 참여, 뒷줄은 흐릿·대기 ──
   private renderActors() {
     const host = this.q('#actors')
     const s = this.state
-    const alive = aliveIdx(s)
-    const n = s.enemies.length
-    const spacing = 250
-    const base = 120
+    const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
+    // 전투 대상은 항상 최전방.
+    this.target = frontIdx(s)
+
+    // rank 0 = 최전방(플레이어와 가장 가까움). 뒤로 갈수록 축소·블러·감광.
+    const FRONT_RIGHT = 660
+    const GAP = 235
     const enemyHtml = s.enemies
       .map((e, i) => {
-        const right = base + (n - 1 - i) * spacing
+        if (e.dead) return ''
+        const rank = alive.indexOf(i)
+        const right = FRONT_RIGHT - rank * GAP
+        const scale = Math.max(0.6, 1 - rank * 0.16)
+        const blur = rank * 2.6
+        const op = Math.max(0.42, 1 - rank * 0.26)
+        const front = rank === 0
         const pct = Math.max(0, (e.hp / e.maxHp) * 100)
-        const isTarget = this.target === i && !e.dead
+        const imgStyle = front
+          ? `transform:scale(${scale.toFixed(2)});`
+          : `transform:scale(${scale.toFixed(2)}); filter: blur(${blur.toFixed(1)}px) drop-shadow(0 12px 12px rgba(0,0,0,0.4));`
         return `
-        <div class="actor foe ${e.dead ? 'dead' : ''} ${isTarget ? 'target' : ''}" data-i="${i}" style="right:${right}px;">
-          <div class="nameplate glass">
-            <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
-            <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
-          </div>
+        <div class="actor foe ${front ? 'front target' : 'back'}" data-i="${i}" style="right:${right}px; opacity:${op.toFixed(2)};">
+          ${front
+            ? `<div class="nameplate glass">
+                 <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
+                 <div class="hpbar foe"><div class="fill" style="width:${pct}%"></div></div>
+               </div>`
+            : ''}
           <div class="shadow"></div>
-          <img class="sprite" src="${SPRITES[e.def.sprite]}" alt="${e.def.name}">
+          <img class="sprite" src="${SPRITES[e.def.sprite]}" alt="${e.def.name}" style="${imgStyle}">
         </div>`
       })
       .join('')
@@ -188,17 +202,6 @@ export class BattleView {
         <img class="sprite" src="${SPRITES.player_001}" alt="우비 아이">
       </div>
       ${enemyHtml}`
-
-    host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) =>
-      el.addEventListener('click', () => {
-        const i = Number(el.dataset.i)
-        if (!this.state.enemies[i].dead) {
-          this.target = i
-          this.renderActors()
-        }
-      }),
-    )
-    if (this.state.enemies[this.target]?.dead) this.target = alive[0] ?? 0
   }
 
   // ── 상단 발광 체인(문장) ──
