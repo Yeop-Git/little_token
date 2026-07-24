@@ -21,11 +21,15 @@ const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
 export class ItemExclaimView {
   private picks: Record<string, string | undefined> = {}
   private slotIndex = 0
+  private finalizing = false
+  private timers: number[] = []
 
   constructor(private root: HTMLElement, private opts: Opts) {
     this.mount()
   }
-  destroy() {}
+  destroy() {
+    this.timers.forEach((t) => clearTimeout(t))
+  }
 
   private totals() {
     const t: Record<StatKey, number> = { ...this.opts.item.base }
@@ -65,34 +69,42 @@ export class ItemExclaimView {
           <div class="iforge-choose">
             <div class="slot-step" id="esteps"></div>
             <div class="word-row" id="egrid"></div>
-            <div class="zone-actions">
-              <button class="btn primary" id="confirm" disabled>감탄을 완성해줘</button>
-              <button class="btn ghost" id="undo">되돌리기</button>
-            </div>
+            <button class="undo-btn" id="undo">되돌리기</button>
           </div>
         </div>
       </div>`
 
-    this.root.querySelector('#confirm')!.addEventListener('click', () => {
-      if (!this.complete()) return
-      const totals = this.totals()
-      const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
-      // 최종 스탯(기본+감탄사) 전체가 플레이어 스탯에 더해진다(스펙업).
-      this.opts.onDone({
-        id: item.id,
-        name: item.name,
-        grade: item.grade,
-        art: item.art,
-        line,
-        stats: { atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
-      })
-    })
+    // 확정 버튼 없음 — 단어 선택처럼 모두 고르면 자동 확정(반짝 후 발동).
     this.root.querySelector('#undo')!.addEventListener('click', () => {
+      if (this.finalizing) return
       this.picks = {}
       this.slotIndex = 0
       this.refresh()
     })
     this.refresh()
+  }
+
+  // 모든 감탄사를 고르면 자동으로 확정 — 상단 체인이 반짝인 뒤 스탯이 확정된다.
+  private finalize() {
+    if (this.finalizing || !this.complete()) return
+    this.finalizing = true
+    const item = this.opts.item
+    this.q('#chain').classList.add('sparkle')
+    this.timers.push(
+      window.setTimeout(() => {
+        const totals = this.totals()
+        const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
+        // 최종 스탯(기본+감탄사) 전체가 플레이어 스탯에 더해진다(스펙업).
+        this.opts.onDone({
+          id: item.id,
+          name: item.name,
+          grade: item.grade,
+          art: item.art,
+          line,
+          stats: { atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
+        })
+      }, 340),
+    )
   }
 
   private q<T extends HTMLElement = HTMLElement>(s: string): T {
@@ -148,17 +160,16 @@ export class ItemExclaimView {
       .querySelectorAll<HTMLElement>('.word-cell')
       .forEach((btn) =>
         btn.addEventListener('click', () => {
+          if (this.finalizing) return
           this.picks[slot.key] = btn.dataset.id
           // 다음 빈 슬롯으로 진행
           let next = this.slotIndex + 1
           while (next < EXCLAIM_SLOTS.length && this.picks[EXCLAIM_SLOTS[next].key]) next++
           this.slotIndex = Math.min(next, EXCLAIM_SLOTS.length - 1)
           this.refresh()
+          // 전부 고르면 단어 선택처럼 자동 확정
+          if (this.complete()) this.finalize()
         }),
       )
-
-    const confirm = this.q<HTMLButtonElement>('#confirm')
-    confirm.disabled = !this.complete()
-    confirm.textContent = this.complete() ? '이 감탄으로 확정!' : '감탄을 완성해줘'
   }
 }

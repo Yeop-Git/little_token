@@ -922,20 +922,6 @@ button {
   filter: drop-shadow(0 0 16px rgba(255, 210, 122, 0.45));
 }
 
-.zone-actions { display: flex; align-items: center; gap: 36px; margin-top: 2px; }
-.btn {
-  font-size: 23px;
-  font-weight: 900;
-  color: var(--ink-dim);
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  transition: transform 0.14s, color 0.14s, text-shadow 0.14s;
-}
-.btn:hover { transform: scale(1.06); color: var(--ink); }
-.btn.primary { color: var(--gold); }
-.btn.primary:not(:disabled):hover { text-shadow: 0 0 24px var(--glow), 0 2px 6px rgba(0, 0, 0, 0.6); transform: scale(1.1); }
-.btn.primary:disabled { color: var(--ink-faint); cursor: not-allowed; text-shadow: none; }
-.btn.ghost { font-size: 19px; }
-
 /* 되돌리기 — 하단 중앙, 회색 연하게 */
 .undo-btn {
   font-size: 18px;
@@ -1185,6 +1171,13 @@ button {
   gap: 14px;
 }
 .iforge-chain .chain-word { font-size: 54px; }
+/* 감탄사 자동 확정 직전 반짝 */
+.iforge-chain.sparkle { animation: iforge-sparkle 0.34s ease; }
+@keyframes iforge-sparkle {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.9) drop-shadow(0 0 22px var(--glow)); transform: scale(1.05); }
+  100% { filter: brightness(1); }
+}
 .chain-ghost {
   font-size: 34px;
   font-weight: 800;
@@ -1215,7 +1208,7 @@ button {
 
 /* 하단 순차 텍스트 선택 */
 .iforge-choose { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
-.iforge-choose .zone-actions { margin-top: 4px; }
+.iforge-choose .undo-btn { margin-top: 4px; }
 /* 개발용 씬 점퍼 */
 .dev-jump {
   position: absolute;
