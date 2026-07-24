@@ -83,12 +83,12 @@ export class IntroDialogue {
         <img class="intro-dlg-portrait-shadow" alt="" />
         <img class="intro-dlg-portrait-main" alt="" />
       </div>
+      <div class="intro-dlg-choice" aria-label="대사 단어 선택"></div>
       <div class="intro-dlg-box">
         <div class="intro-dlg-box-inner">
           <div class="intro-dlg-name">${TOKEN_NAME}</div>
           <div class="intro-dlg-divider" aria-hidden="true"></div>
           <div class="intro-dlg-text"></div>
-          <div class="intro-dlg-choice" aria-label="대사 단어 선택"></div>
         </div>
       </div>
       <button type="button" class="intro-dlg-skip">SKIP ▸</button>`
@@ -245,8 +245,8 @@ export class IntroDialogue {
     await this.waitAdvance(ADVANCE_TIMEOUT_MS)
   }
 
-  /** 플레이어 대사 — 인게임 맥락조합의 맛보기. 대화창 안, 문장 아래에 단어 칩이
-   * 순서대로 떠오르고, 지금 고를 수 있는 칩(맨 앞)만 손짓하듯 발광한다. 고른 단어는
+  /** 플레이어 대사 — 인게임 맥락조합의 맛보기. 대화창 위에 단어 칩이 순서대로
+   * 떠오르고, 지금 고를 수 있는 칩(맨 앞)만 손짓하듯 발광한다. 고른 단어는
    * 그대로 대화창 문장에 타자되어 이어붙는다. */
   private async showChoiceLine(words: string[]): Promise<void> {
     this.setSpeaker('player')

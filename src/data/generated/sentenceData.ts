@@ -77,12 +77,12 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
-      "rarity": "common",
-      "note": "도박 50% — ×1.40 / ×1.00",
-      "lore": "연필 쥔 손이 떨린다. 그래서 가끔 더 세게.",
+      "rarity": "rare",
+      "note": "도박 40% — ×2.50 / ×1.00",
+      "lore": "연필 쥔 손이 떨린다. 그래서 터질 땐 크게.",
       "variance": {
-        "p": 0.5,
-        "hi": 1.4,
+        "p": 0.4,
+        "hi": 2.5,
         "lo": 1
       }
     },
@@ -176,10 +176,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "rush"
       ],
       "stat": "atk",
-      "bonus": 0.15,
-      "crit": 0.1,
-      "rarity": "common",
-      "note": "배율 ×1.15 · 대성공 10%",
+      "bonus": 0.4,
+      "crit": 0.25,
+      "rarity": "rare",
+      "note": "배율 ×1.40 · 대성공 25%",
       "lore": "앞뒤 안 가리고."
     },
     {
@@ -266,10 +266,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "swing"
       ],
       "stat": "atk",
-      "statMult": 1,
+      "statMult": 1.5,
       "kind": "attack",
-      "rarity": "common",
-      "note": "공격 ×1",
+      "rarity": "rare",
+      "note": "공격 ×1.5",
       "lore": "크게 휘두른다."
     },
     {
@@ -383,6 +383,69 @@ export const REWARD_WORDS: Word[] = [
     "rarity": "rare",
     "note": "방어 ×1.5",
     "lore": "몸을 말아 지킨다."
+  },
+  {
+    "id": "michin",
+    "text": "미친듯이",
+    "slot": "adv",
+    "tags": [
+      "mad"
+    ],
+    "stat": "atk",
+    "bonus": 0.7,
+    "crit": 0.45,
+    "rarity": "epic",
+    "note": "배율 ×1.70 · 대성공 45%",
+    "lore": "종이가 타는 냄새. 멈출 수 없다."
+  },
+  {
+    "id": "ipan",
+    "text": "이판사판",
+    "slot": "adv",
+    "tags": [
+      "reckless"
+    ],
+    "stat": "atk",
+    "bonus": 0,
+    "rarity": "epic",
+    "note": "도박 50% — ×3.20 / ×1.00",
+    "lore": "이래 죽으나 저래 죽으나.",
+    "variance": {
+      "p": 0.5,
+      "hi": 3.2,
+      "lo": 1
+    }
+  },
+  {
+    "id": "baksal",
+    "text": "박살냈다",
+    "slot": "verb",
+    "tags": [
+      "atk",
+      "smash"
+    ],
+    "stat": "atk",
+    "statMult": 2,
+    "kind": "attack",
+    "rarity": "epic",
+    "note": "공격 ×2",
+    "lore": "산산조각 낸다."
+  },
+  {
+    "id": "hwissda",
+    "text": "휩쓸어버렸다",
+    "slot": "verb",
+    "tags": [
+      "atk",
+      "wide"
+    ],
+    "stat": "atk",
+    "statMult": 1.4,
+    "kind": "attack",
+    "aoe": "all",
+    "rarity": "epic",
+    "note": "공격 ×1.4 · 전체 적중",
+    "lore": "페이지 끝에서 끝까지 쓸어버린다."
   }
 ]
 
@@ -861,6 +924,26 @@ export const EARLY_COMBOS: Combo[] = [
     ],
     "mult": 1.55,
     "flavor": "온몸으로 후려친다"
+  },
+  {
+    "id": "ec15",
+    "name": "폭주",
+    "need": [
+      "mad",
+      "atk"
+    ],
+    "mult": 1.6,
+    "flavor": "눈이 뒤집힌다"
+  },
+  {
+    "id": "ec16",
+    "name": "전력 강타",
+    "need": [
+      "force",
+      "smash"
+    ],
+    "mult": 1.7,
+    "flavor": "온 힘을 실은 일격"
   }
 ]
 
