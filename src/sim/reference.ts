@@ -3,7 +3,7 @@
  * 교체한다(View/Compiler 불변). 다중 적 + 범위(aoe)를 지원한다.
  */
 
-import { finalMultiplier } from '@core/compiler'
+import { finalMultiplier, isDamageIntent } from '@core/compiler'
 import type { EnemyDef, Intent } from '@core/types'
 
 export interface EnemyInst {
@@ -50,12 +50,23 @@ export interface ApplyResult {
   heal: number
   killed: number[]
   overflow: number // 단일 공격이 최전방 적을 넘겨 죽였을 때 남는 초과 피해
-  guardGain: number // 이번 문장으로 얻은 방어(임시 체력)
+}
+
+export interface PreparationResult {
+  guardGain: number // 이번 문장으로 선공 전에 얻은 방어(임시 체력)
 }
 
 // 살아있는 적 인덱스 목록.
 export const aliveIdx = (s: BattleState): number[] =>
   s.enemies.map((e, i) => (e.dead ? -1 : i)).filter((i) => i >= 0)
+
+// 준비 효과는 적 선공보다 먼저 적용한다. 이전 문장의 미사용 방어는 다음 문장의
+// 준비 단계까지만 유지되며, 새 방어와 중첩하지 않고 이번 문장의 값으로 교체한다.
+export function applyPreparation(state: BattleState, intent: Intent): PreparationResult {
+  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
+  state.guard = guardGain
+  return { guardGain }
+}
 
 export function applyIntent(
   state: BattleState,
@@ -67,7 +78,8 @@ export function applyIntent(
 ): ApplyResult {
   const roll = intent.variance ? rng() : null
   const mult = finalMultiplier(intent, multCap, roll)
-  const effBase = intent.kind === 'heal' ? intent.base : intent.base + atkBonus
+  const dealsDamage = isDamageIntent(intent)
+  const effBase = dealsDamage ? intent.base + atkBonus : 0
   const dmg = Math.round(effBase * mult)
   const note = intent.variance ? (roll! < intent.variance.p ? ' (도박 성공)' : ' (도박 실패)') : ''
 
@@ -82,13 +94,12 @@ export function applyIntent(
       heal: 0,
       killed: [],
       overflow: 0,
-      guardGain: 0,
     }
   }
 
   const hits: HitFx[] = []
   const killed: number[] = []
-  const targets = intent.kind === 'heal' ? [] : intent.aoe === 'all' ? aliveIdx(state) : [target]
+  const targets = !dealsDamage ? [] : intent.aoe === 'all' ? aliveIdx(state) : [target]
 
   let overflow = 0
   for (const ti of targets) {
@@ -110,11 +121,7 @@ export function applyIntent(
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
   state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + intent.heal)
 
-  // 주어가 '너는'(enemy 태그)이면 이번 턴 방어 포기.
-  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, intent.guard)
-  state.guard = guardGain
-
-  const label = intent.kind === 'heal' ? `${intent.heal} 회복` : `${dmg} 피해${note}`
+  const label = dealsDamage ? `${dmg} 피해${note}` : intent.heal > 0 ? `${intent.heal} 회복` : '준비 완료'
   return {
     text: `${intent.sentence} → ${label}` + (selfDmg ? ` · 자신 ${selfDmg}` : ''),
     combos: intent.combos,
@@ -123,7 +130,6 @@ export function applyIntent(
     heal: intent.heal,
     killed,
     overflow: Math.max(0, overflow),
-    guardGain,
   }
 }
 

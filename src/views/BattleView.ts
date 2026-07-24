@@ -8,7 +8,7 @@
  *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
  */
 
-import { compile, matchCombos, sentenceTokens } from '@core/compiler'
+import { compile, isDamageIntent, matchCombos, sentenceTokens } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import type { Selection, Tables, Word, FieldDef } from '@core/types'
 import { RARITY_LABEL } from '@core/types'
@@ -18,6 +18,7 @@ import {
   allDead,
   aliveIdx,
   applyIntent,
+  applyPreparation,
   enemyTurn,
   frontIdx,
   makeEnemy,
@@ -417,8 +418,9 @@ export class BattleView {
     if (guard > 0) guard += this.player.stats.guard
     if (heal > 0) heal += this.player.stats.heal
     const atk = this.player.stats.atk
-    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
-    const dmg = intent.kind === 'heal' ? 0 : Math.round(effBase * intent.multiplier)
+    const dealsDamage = isDamageIntent(intent)
+    const effBase = dealsDamage ? intent.base + atk : 0
+    const dmg = dealsDamage ? Math.round(effBase * intent.multiplier) : 0
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: intent.multiplier }
     return { dmg, heal, guard, self: intent.recoil, multiplier: intent.multiplier }
   }
@@ -458,7 +460,7 @@ export class BattleView {
 
   // 단어 하나의 범위(대상) — 다른 슬롯과 무관.
   private wordRange(w: Word): string {
-    if (w.kind === 'heal') return '자신'
+    if (w.kind === 'heal' || w.kind === 'guard') return '자신'
     if (w.aoe === 'all') return w.targetMode === 'both' ? '적 전체 + 자신' : '적 전체'
     if (w.targetMode === 'both') return '적 하나 + 자신'
     if (w.targetMode === 'enemy' || w.kind === 'attack' || (w.power ?? 0) > 0) return '적 하나'
@@ -650,24 +652,12 @@ export class BattleView {
     if (intent.guard > 0) intent.guard += this.player.stats.guard
     if (intent.heal > 0) intent.heal += this.player.stats.heal
     const atk = this.player.stats.atk
-    const effBase = intent.kind === 'heal' ? 0 : intent.base + atk
+    const dealsDamage = isDamageIntent(intent)
+    const effBase = dealsDamage ? intent.base + atk : 0
     const dmg = Math.round(effBase * intent.multiplier)
     const heal = intent.heal
 
-    // 5) 선공 상대 행동 — 현재 선공 표시이며 행동 쿨다운이 끝난 최전방 적.
-    this.setPhase('선공 상대 행동')
-    await this.enemyPhase('first')
-    if (this.state.playerHp <= 0) {
-      this.over = true
-      this.setPhase('패배')
-      this.log('일기장이 너무 상했다… (패배)')
-      return
-    }
-
-    // 6) 본인 캐릭터 행동 — 완성한 문장을 실제 전투 행동으로 적용한다.
-    this.setPhase('본인 캐릭터 행동')
-
-    // 1) 팅팅팅 — 각 단어의 기여 수치가 문장 위로 톡톡 튄다
+    // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
     for (let i = 0; i < order.length; i++) {
       const w = this.sel[order[i]]
@@ -680,7 +670,7 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(150)
 
-    // 2) 맥락(관용구) 발동 배너
+    // 맥락(관용구) 발동 배너
     if (intent.combos.length) {
       const combos = matchCombos(this.sel, this.t.combos, order)
       const mult = combos.reduce((m, c) => m * c.mult, 1)
@@ -692,11 +682,34 @@ export class BattleView {
       await sleep(760)
     }
 
-    // 3) 총합이 띠리리릭 차오른다
+    // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
+    this.setPhase('준비 효과')
+    const prep = applyPreparation(this.state, intent)
+    if (prep.guardGain > 0) {
+      await this.rollTotal(prep.guardGain, 'guard')
+      await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
+      this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
+    }
+    this.renderActors()
+
+    // 6) 선공 상대 행동 — 이번 문장의 준비 효과를 받은 뒤 공격한다.
+    this.setPhase('선공 상대 행동')
+    await this.enemyPhase('first')
+    if (this.state.playerHp <= 0) {
+      this.over = true
+      this.setPhase('패배')
+      this.log('일기장이 너무 상했다… (패배)')
+      return
+    }
+
+    // 7) 본인 캐릭터 행동 — 공격·회복·자해 등 나머지 효과를 적용한다.
+    this.setPhase('본인 캐릭터 행동')
+
+    // 본행동 총합이 띠리리릭 차오른다.
     const totalVal = dmg > 0 ? dmg : heal
     if (totalVal > 0) await this.rollTotal(totalVal, dmg > 0 ? 'dmg' : 'heal')
 
-    // 4) 실제 발동 + 꽂힘 연출
+    // 실제 본행동 발동 + 꽂힘 연출
     const res = applyIntent(this.state, intent, this.t.multCap, this.target, Math.random, atk)
     await this.strike(res)
     this.log(
@@ -718,7 +731,7 @@ export class BattleView {
       return
     }
 
-    // 7) 후공 상대 행동 — 플레이어 문장이 끝난 뒤 행동한다.
+    // 8) 후공 상대 행동 — 플레이어 본행동이 끝난 뒤 행동한다.
     this.setPhase('후공 상대 행동')
     await this.enemyPhase('second')
 
@@ -773,7 +786,6 @@ export class BattleView {
     hits: { target: number; dmg: number }[]
     selfDmg: number
     heal: number
-    guardGain: number
     killed: number[]
   }) {
     const you = this.q<HTMLElement>('.actor.you')
@@ -793,10 +805,9 @@ export class BattleView {
       await sleep(250)
       you.classList.remove('lunge')
     }
-    // 방어/회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다.
+    // 회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다. 방어는 준비 단계에서 처리한다.
     if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
     if (res.heal) await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
-    if (res.guardGain > 0) await this.flyToPlayer(`방어+${res.guardGain}`, 'guard', 'guard')
     // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
     for (const k of res.killed) await this.playDeath(k, 1)
   }

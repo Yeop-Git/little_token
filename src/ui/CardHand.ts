@@ -4,43 +4,30 @@ export const CARD_HAND_CONFIG = {
   maxHand: 6,
   cardWidth: 158,
   cardHeight: 218,
-  maxSpacing: 132,
-  minSpacing: 64,
-  maxRotation: 12,
-  fanCurve: 34,
+  maxSpacing: 170,
+  minSpacing: 112,
   selectedLift: 82,
   selectedScale: 1.12,
   drawDuration: 620,
 } as const
 
-export interface FanTransform {
-  normalized: number
+export interface LineTransform {
   translateX: number
-  translateY: number
-  rotate: number
-  scale: number
   zIndex: number
 }
 
-/** DOM과 무관한 손패 좌표 계산. 인덱스를 -1..1로 정규화해 부채꼴을 만든다. */
-export function calculateFanTransform(index: number, count: number, availableWidth = 900): FanTransform {
+/** DOM과 무관한 일렬 손패 좌표 계산. 카드 묶음의 중심을 항상 화면 중앙에 맞춘다. */
+export function calculateLineTransform(index: number, count: number, availableWidth = 900): LineTransform {
   const safeCount = Math.max(1, count)
-  const normalized = safeCount === 1 ? 0 : (index / (safeCount - 1)) * 2 - 1
-  const density = Math.max(0, safeCount - 2)
-  const desiredSpacing = CARD_HAND_CONFIG.maxSpacing - density * 10
+  const desiredSpacing = CARD_HAND_CONFIG.maxSpacing
   const fitSpacing = safeCount === 1
     ? desiredSpacing
-    : Math.max(54, (availableWidth - CARD_HAND_CONFIG.cardWidth) / (safeCount - 1))
+    : (availableWidth - CARD_HAND_CONFIG.cardWidth) / (safeCount - 1)
   const spacing = Math.max(CARD_HAND_CONFIG.minSpacing, Math.min(desiredSpacing, fitSpacing))
   const centerOffset = index - (safeCount - 1) / 2
-  const edge = Math.abs(normalized)
 
   return {
-    normalized,
     translateX: centerOffset * spacing,
-    translateY: edge * edge * CARD_HAND_CONFIG.fanCurve,
-    rotate: normalized * CARD_HAND_CONFIG.maxRotation,
-    scale: 1 - edge * 0.035,
     zIndex: 100 + index,
   }
 }
@@ -79,6 +66,7 @@ export class CardHand {
   private epoch = 0
   private conflictOf: ConflictResolver = () => null
   private destroyed = false
+  private readonly battlefield: HTMLElement
 
   private readonly onResize = () => this.render()
   private readonly onOutsidePointer = (event: PointerEvent) => {
@@ -88,25 +76,17 @@ export class CardHand {
   }
 
   constructor(private readonly opts: CardHandOptions) {
+    this.battlefield = this.opts.handRoot.closest('.scene')?.querySelector<HTMLElement>('.stage-area')
+      ?? this.opts.handRoot.parentElement!
+    this.opts.dropZone.setAttribute('aria-hidden', 'true')
+    this.opts.dropZone.setAttribute('tabindex', '-1')
     this.opts.deckButton.addEventListener('click', () => this.enqueueDraw())
-    this.opts.dropZone.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        this.confirmSelection()
-      }
-    })
-    this.opts.dropZone.addEventListener('dragover', (event) => {
+    this.battlefield.addEventListener('dragover', (event) => {
       if (!this.draggingId) return
       event.preventDefault()
-      event.dataTransfer!.dropEffect = 'move'
-      this.opts.dropZone.classList.add('drag-ready')
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
     })
-    this.opts.dropZone.addEventListener('dragleave', (event) => {
-      if (!this.opts.dropZone.contains(event.relatedTarget as Node | null)) {
-        this.opts.dropZone.classList.remove('drag-ready')
-      }
-    })
-    this.opts.dropZone.addEventListener('drop', (event) => this.dropCard(event))
+    this.battlefield.addEventListener('drop', (event) => this.dropCard(event))
     window.addEventListener('resize', this.onResize)
     document.addEventListener('pointerdown', this.onOutsidePointer)
   }
@@ -283,7 +263,7 @@ export class CardHand {
   }
 
   private cardHtml(card: CardInstance, index: number, count: number, availableWidth: number): string {
-    const fan = calculateFanTransform(index, count, availableWidth)
+    const line = calculateLineTransform(index, count, availableWidth)
     const blocked = this.conflictOf(card.word)
     const selected = this.selectedId === card.instanceId
     const rarity = card.word.rarity ?? 'common'
@@ -292,7 +272,7 @@ export class CardHand {
     return `<button class="word-card mood-${this.moodOf(card.word)} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
       draggable="${!blocked && !isDrawing}"
-      style="--card-x:${fan.translateX.toFixed(1)}px;--card-y:${fan.translateY.toFixed(1)}px;--card-r:${fan.rotate.toFixed(2)}deg;--card-s:${fan.scale.toFixed(3)};--card-z:${fan.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
+      style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
         <span class="card-face card-front">
@@ -340,13 +320,6 @@ export class CardHand {
     }
   }
 
-  private confirmSelection() {
-    const state = this.currentState()
-    const selected = state?.hand.find((item) => item.instanceId === this.selectedId)
-    if (!selected || this.conflictOf(selected.word)) return
-    this.opts.onConfirm(selected.word)
-  }
-
   private beginDrag(event: DragEvent, button: HTMLButtonElement, card: CardInstance) {
     if (button.disabled || this.drawingId === card.instanceId) {
       event.preventDefault()
@@ -363,7 +336,6 @@ export class CardHand {
     button.setAttribute('aria-pressed', 'true')
     this.opts.onPreview(card.word)
     this.updateDropZone(this.currentState())
-    this.opts.dropZone.classList.add('visible')
     event.dataTransfer?.setData('text/plain', card.instanceId)
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
   }
@@ -372,7 +344,6 @@ export class CardHand {
     if (this.draggingId) this.suppressClickId = this.draggingId
     this.draggingId = null
     button.classList.remove('dragging')
-    this.opts.dropZone.classList.remove('visible', 'drag-ready')
     this.render()
   }
 
@@ -381,7 +352,6 @@ export class CardHand {
     const instanceId = event.dataTransfer?.getData('text/plain') || this.draggingId
     const state = this.currentState()
     const card = state?.hand.find((item) => item.instanceId === instanceId)
-    this.opts.dropZone.classList.remove('visible', 'drag-ready')
     if (!card || this.conflictOf(card.word)) return
     this.draggingId = null
     this.opts.onConfirm(card.word)
@@ -408,6 +378,14 @@ export class CardHand {
   }
 
   private handleCardKey(event: KeyboardEvent, button: HTMLButtonElement, hand: CardInstance[]) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      const card = hand.find((item) => item.instanceId === button.dataset.instanceId)
+      if (!card || this.conflictOf(card.word)) return
+      this.selectedId = card.instanceId
+      this.opts.onConfirm(card.word)
+      return
+    }
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const index = hand.findIndex((item) => item.instanceId === button.dataset.instanceId)
