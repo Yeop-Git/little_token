@@ -234,24 +234,62 @@ button {
   align-items: center;
   /* right/opacity 트랜지션 = 앞 적이 죽으면 뒷줄이 "한 칸씩 당겨오는" 레일 이동 */
   transition: transform 0.25s ease, opacity 0.4s ease, right 0.42s cubic-bezier(0.2, 1, 0.3, 1);
+  cursor: pointer;
+  outline: none;
 }
 .actor.you {
   left: 250px;
 }
-.actor img.sprite {
+.actor .model-shell {
+  position: relative;
+  width: 310px;
   height: 360px;
-  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
-  image-rendering: auto;
-}
-.actor.foe img.sprite {
-  height: 300px;
+  transform: scale(var(--model-scale, 1));
+  transform-origin: center bottom;
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
   transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), filter 0.4s ease;
 }
-/* 최전방 적만 선명 + 발광, 뒷줄은 인라인 blur로 흐릿 */
-.actor.foe.front img.sprite {
+.actor.foe .model-shell {
+  width: 280px;
+  height: 330px;
+}
+/* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
+.actor.foe.front .model-shell {
   filter: drop-shadow(0 0 16px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
 }
-.actor.foe.back { pointer-events: none; }
+.battle-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+.actor:hover .model-shell,
+.actor:focus-visible .model-shell {
+  filter: drop-shadow(0 0 22px var(--gold)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+}
+.inspect-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  z-index: 7;
+  transform: translate(-50%, 8px);
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 18px;
+  background: rgba(12, 8, 16, 0.72);
+  color: var(--gold-hi);
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.actor:hover .inspect-hint,
+.actor:focus-visible .inspect-hint {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 /* 타원 그림자 레이어(반투명 도형) */
 .actor .shadow {
   position: absolute;
@@ -1066,6 +1104,106 @@ button {
 .deck-word:last-child { border-bottom: none; }
 .deck-word .dw { display: block; font-size: 21px; font-weight: 900; color: var(--wglow, #fff2da); text-shadow: 0 0 12px var(--wglow, transparent); }
 .deck-word .dn { font-size: 13px; color: var(--ink-faint); }
+
+/* 캐릭터 상세 — 전장의 3D 모델과 대응하는 2D 스프라이트 카드 */
+.character-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 920px;
+  min-height: 560px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  overflow: hidden;
+  border-radius: 30px;
+  animation: ov-rise 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+}
+.character-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 4;
+}
+.character-portrait {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  min-height: 560px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 213, 126, 0.28), transparent 42%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(14, 9, 18, 0.45));
+}
+.character-portrait::after {
+  content: '';
+  position: absolute;
+  inset: auto 8% 20px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.5), transparent 68%);
+}
+.character-portrait img {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  height: 510px;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 22px 24px rgba(0, 0, 0, 0.55));
+}
+.character-copy {
+  padding: 72px 54px 46px;
+}
+.character-kicker {
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 3px;
+}
+.character-copy h2 {
+  margin-top: 8px;
+  color: #fff6e2;
+  font-size: 48px;
+  line-height: 1.1;
+  text-shadow: 0 0 22px rgba(255, 210, 122, 0.32);
+}
+.character-copy h3 {
+  margin-top: 10px;
+  color: var(--gold-hi);
+  font-size: 20px;
+}
+.character-copy p {
+  margin-top: 24px;
+  color: var(--ink-dim);
+  font-size: 17px;
+  line-height: 1.7;
+}
+.character-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 28px;
+}
+.character-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--ink-dim);
+  font-size: 15px;
+}
+.character-stats b { color: #fff2da; }
+.character-note {
+  margin-top: 22px;
+  padding-left: 14px;
+  border-left: 3px solid var(--gold-deep);
+  color: var(--ink-faint);
+  font-size: 15px;
+  line-height: 1.55;
+}
 
 /* ==========================================================================
    보상 뷰 · 아이템 뷰 — 같은 배경 + 유리 톤으로 통일

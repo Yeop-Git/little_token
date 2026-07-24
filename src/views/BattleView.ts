@@ -23,12 +23,13 @@ import {
   makeEnemy,
   type BattleState,
 } from '@/sim/reference'
-import { BACKGROUNDS, SPRITES } from '@/assets'
+import { BACKGROUNDS } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { STAT_LABEL, type StatKey } from '@data/items'
+import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -199,11 +200,11 @@ export class BattleView {
         const op = Math.max(0.42, 1 - rank * 0.26)
         const front = rank === 0
         const pct = Math.max(0, (e.hp / e.maxHp) * 100)
-        const imgStyle = front
-          ? `transform:scale(${scale.toFixed(2)});`
-          : `transform:scale(${scale.toFixed(2)}); filter: blur(${blur.toFixed(1)}px) drop-shadow(0 12px 12px rgba(0,0,0,0.4));`
+        const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
         return `
-        <div class="actor foe ${front ? 'front target' : 'back'}" data-i="${i}" style="right:${right}px; opacity:${op.toFixed(2)};">
+        <div class="actor foe ${front ? 'front target' : 'back'}" data-i="${i}" data-character="${visual.id}"
+          role="button" tabindex="0" aria-label="${e.def.name} 상세 보기"
+          style="right:${right}px; opacity:${op.toFixed(2)}; --model-scale:${scale.toFixed(2)}; --model-blur:${blur.toFixed(1)}px;">
           ${front
             ? `<div class="nameplate glass">
                  <div class="row"><span class="nm">${e.def.name}</span><span class="hpn">${Math.max(0, e.hp)}/${e.maxHp}</span></div>
@@ -211,22 +212,82 @@ export class BattleView {
                </div>`
             : ''}
           <div class="shadow"></div>
-          <img class="sprite" src="${SPRITES[e.def.sprite]}" alt="${e.def.name}" style="${imgStyle}">
+          <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+          ${front ? '<span class="inspect-hint">클릭해서 상세 보기</span>' : ''}
         </div>`
       })
       .join('')
 
     const php = Math.max(0, (s.playerHp / s.playerMax) * 100)
     host.innerHTML = `
-      <div class="actor you">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="우비 아이 상세 보기">
         <div class="nameplate glass">
           <div class="row"><span class="nm">우비 아이</span><span class="hpn">${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}</span></div>
           <div class="hpbar you"><div class="fill" style="width:${php}%"></div></div>
         </div>
         <div class="shadow"></div>
-        <img class="sprite" src="${SPRITES.player_001}" alt="우비 아이">
+        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="우비 아이"></div>
+        <span class="inspect-hint">클릭해서 상세 보기</span>
       </div>
       ${enemyHtml}`
+
+    host.querySelectorAll<HTMLElement>('.actor[role="button"]').forEach((actor) => {
+      const open = () => {
+        const id = actor.dataset.character as CharacterVisualDef['id']
+        this.openCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
+      }
+      actor.addEventListener('click', open)
+      actor.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          open()
+        }
+      })
+    })
+  }
+
+  // 모델이 준비되기 전 전장은 2D 대체 스프라이트를 쓰며, 상세도 같은 매핑을 따른다.
+  private openCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
+    const visual = CHARACTER_VISUALS[id]
+    const host = this.q('#overlay')
+    let stats: string
+    if (id === 'player') {
+      const p = this.player.stats
+      stats = [
+        ['체력', `${Math.max(0, this.state.playerHp)} / ${this.state.playerMax}`],
+        ['공격', String(p.atk)],
+        ['방어', String(p.guard)],
+        ['회복', String(p.heal)],
+        ['운', String(p.luck)],
+      ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
+    } else {
+      const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
+      stats = enemy
+        ? [
+            ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
+            ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
+            ['행동 주기', `${enemy.def.every}턴`],
+          ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
+        : ''
+    }
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <article class="character-card glass" aria-modal="true" role="dialog" aria-label="${visual.name} 상세 정보">
+        <button class="ov-close character-close" id="character-x" aria-label="닫기">${icon('close')}</button>
+        <div class="character-portrait"><img src="${visual.portrait2d}" alt="${visual.name} 2D 스프라이트"></div>
+        <div class="character-copy">
+          <div class="character-kicker">3D MODEL ↔ 2D SPRITE</div>
+          <h2>${visual.name}</h2>
+          <h3>${visual.title}</h3>
+          <p>${visual.description}</p>
+          <div class="character-stats">${stats}</div>
+          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${this.state.enemies[enemyIndex ?? 0]?.def.note ?? ''}</div>`}
+        </div>
+      </article>`
+    host.classList.add('open')
+    const close = () => this.closeOverlay()
+    host.querySelector('#character-x')?.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')?.addEventListener('click', close)
   }
 
   // ── 상단 발광 체인(문장) + 맥락/어긋남 미리보기 ──
