@@ -11,7 +11,6 @@
 import { compile, isDamageIntent, matchCombos, resolveMultiplier, sentenceTokens } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import type { Intent, Selection, Tables, Word, FieldDef } from '@core/types'
-import { RARITY_LABEL } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ENEMIES } from '@data/enemies'
 import {
@@ -388,7 +387,6 @@ export class BattleView {
       return
     }
     this.dockMode = 'word'
-    const rarity = w.rarity ?? 'common'
     const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
     const mood = this.moodOf(w)
     const values = this.wordOwnValues(w)
@@ -402,7 +400,7 @@ export class BattleView {
     detail.className = `info-dock glass mood-${mood}`
     detail.innerHTML = `
       <div class="wd-name">${w.text}</div>
-      <div class="wd-grade">✦ ${RARITY_LABEL[rarity]} · ${slotLabel} · 범위 ${this.wordRange(w)}</div>
+      <div class="wd-grade">✦ ${slotLabel} · 범위 ${this.wordRange(w)}</div>
       ${this.projectionHtml(w)}
       <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
       ${warn}`

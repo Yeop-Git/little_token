@@ -65,7 +65,8 @@ export interface Word {
   person?: 'first' | 'second' | 'third'
   aoe?: AoeMode // subject/verb가 지정 가능
   note: string // UI 한 줄 설명(효과 요약)
-  rarity?: Rarity // 등급(발광 색). 기본 common
+  rarity?: Rarity // 보상 티어 표기용(맥락카드 등급제는 폐지 — gradeBonus 없음)
+  art?: string // 맥락카드 풀 일러스트 키(assets SKILL_ART: 1xxx 주어·2xxx 수식·3xxx 목적)
   lore?: string // 우측 상세 패널 줄거리
 }
 

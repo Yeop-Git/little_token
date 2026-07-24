@@ -128,6 +128,7 @@ wordRows.forEach((row, index) => {
     targetMode: row.target_mode || undefined,
     aoe: row.aoe || undefined,
     rarity: row.rarity || undefined,
+    art: row.art || undefined,
     note: required(row, 'note', 'words.csv', line),
     lore: row.lore || undefined,
     effects: Object.keys(effects).length ? effects : undefined,
