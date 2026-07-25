@@ -19,12 +19,18 @@ import { startGrade } from '@core/grade'
 import { clearRun, loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
+import { REWARD_WORDS } from '@data/earlyWords'
+import { RARITY_LABEL, type Word } from '@core/types'
+import { preloadBattleResources } from '@/ui/ResourcePreloader'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
+let battleRequest = 0
+// 타이틀을 보는 동안 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
+const battleResourcesReady = preloadBattleResources()
 GraphicsSettings.apply()
 
 function fit() {
@@ -58,9 +64,19 @@ function grantItem(def: ItemDef) {
   else goBattle()
 }
 
+// 디버그 단어 해금 — 실제 보상과 같은 등록 경로를 타므로 이미 보유한 카드는 반복강화된다.
+function grantWord(word: Word) {
+  registerWord(run.player, word)
+  saveRun(run)
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
 // 좌상단 모서리를 다섯 번 누르면 열리는 개발용 치트 패널.
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
+  const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
+  const rewardWords = Object.values(REWARD_WORDS).flat()
   const sceneLabel: Record<SceneName, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
@@ -81,6 +97,15 @@ function mountDevCheat(active: SceneName) {
         <section class="dev-cheat-section">
           <h3>ITEM GRANT</h3>
           <div class="dev-cheat-items">${Object.values(ALL_ITEMS).map(itemButton).join('')}</div>
+        </section>
+        <section class="dev-cheat-section">
+          <h3>WORD CARD UNLOCK</h3>
+          <div class="dev-cheat-word-grant">
+            <select id="dev-word-select" aria-label="해금할 단어 카드">
+              ${rewardWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}${ownedWords.has(word.id) ? ' · 보유 중(강화)' : ''}</option>`).join('')}
+            </select>
+            <button type="button" data-word-grant>바로 해금</button>
+          </div>
         </section>
       </div>
     </section>`
@@ -120,6 +145,11 @@ function mountDevCheat(active: SceneName) {
   shell.querySelectorAll<HTMLElement>('[data-item]').forEach((button) =>
     button.addEventListener('click', () => grantItem(ALL_ITEMS[button.dataset.item!])),
   )
+  shell.querySelector<HTMLElement>('[data-word-grant]')!.addEventListener('click', () => {
+    const selected = shell.querySelector<HTMLSelectElement>('#dev-word-select')!.value
+    const word = rewardWords.find((entry) => entry.id === selected)
+    if (word) grantWord(word)
+  })
   stage.appendChild(shell)
   viewport.appendChild(corner)
 
@@ -160,6 +190,7 @@ function reset() {
 }
 
 function goTitle() {
+  battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
   current = new TitleView(stage, {
@@ -176,7 +207,10 @@ function goTitle() {
   mountMeta('title')
 }
 
-function goBattle(intro = false) {
+async function goBattle(intro = false) {
+  const request = ++battleRequest
+  await battleResourcesReady
+  if (request !== battleRequest) return
   reset()
   const st = stageFor(run.day)
   stage.setAttribute('data-theme', st.field.theme)
@@ -196,6 +230,7 @@ function goBattle(intro = false) {
 
 // 전투에서 들고 나온 보상등급이 희귀도 확률을 정한다. 씬 점퍼 직행이면 운 기준 시작 등급.
 function goReward(grade = startGrade(run.player.stats.luck)) {
+  battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
   const options = genRewards(run.player, grade, run.day)
@@ -219,6 +254,7 @@ function goReward(grade = startGrade(run.player.stats.luck)) {
 }
 
 function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
+  battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
   current = new ItemExclaimView(stage, {

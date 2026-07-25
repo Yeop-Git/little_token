@@ -24,6 +24,7 @@ import {
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
+import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import {
   allDead,
@@ -36,14 +37,14 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { BACKGROUNDS, SKILL_ART } from '@/assets'
+import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { hasPassive, modsFor, passivesOf, PASSIVES } from '@core/passives'
-import { STAT_LABEL, type StatKey } from '@data/items'
+import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
@@ -68,16 +69,13 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-// 적 레일 — rank 0이 최전방. 우측 정보창(오른쪽에서 406px)에 뒷줄이 깔리지 않도록
-// 라인 전체를 플레이어 쪽으로 당겨 두었다.
+// 적 레일 — 전장에는 앞의 세 마리만 같은 크기·같은 바닥선에 세운다.
 const RAIL_FRONT_RIGHT = 860
-const RAIL_GAP = 215
-// 맨 뒤가 여기보다 오른쪽으로 가면 정보창에 가린다. 마릿수가 늘면 간격을 좁혀 이 안에 접는다.
-const RAIL_BACK_RIGHT = 430
-// 체력 표기는 여기까지 — 0은 또렷, 1은 은은, 그 뒤는 감춤.
-const HP_VISIBLE_RANK = 1
-// 이름표 폭(210)이 겹치지 않을 최소 간격. 이보다 좁으면 최전방 것만 남긴다.
-const PLATE_MIN_GAP = 170
+const RAIL_GAP = 260
+const MAX_VISIBLE_ENEMIES = 3
+const BUG_COUNT_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <ellipse cx="24" cy="26" rx="10" ry="14" fill="currentColor" fill-opacity=".16"/><path d="M19 14c0-5 10-5 10 0M14 21 8 17M34 21l6-4M14 29l-7 2M34 29l7 2M17 37l-5 5M31 37l5 5M24 16v24"/>
+</svg>`
 
 /** 발라트로식 점수 분해 — 더해지는 "깡 점수"와 곱해지는 "배율"을 출처별로 쪼갠 것. */
 interface TallyPart {
@@ -121,6 +119,10 @@ export class BattleView {
   private dockRestore: (() => void) | null = null
   private dockTimer = 0
   private pointerDown = false
+  private phaseLabel = '주어 선택'
+  private playerPreempting = false
+  private actionOrderSignature = ''
+  private readonly enemyPool = new Map<string, HTMLElement[]>()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
   private killsThisBattle = 0
 
@@ -149,6 +151,7 @@ export class BattleView {
     document.removeEventListener('pointercancel', this.onPointerUp, true)
     this.cardHand.destroy()
     this.introDialogue?.destroy()
+    this.enemyPool.clear()
   }
 
   private onPointerDown = () => {
@@ -207,19 +210,25 @@ export class BattleView {
         <div class="weather-wash"></div>
 
         <div class="hud-top">
-          <div class="hud-left">
-            <div class="hud-weather"><span id="f-weather"></span></div>
-            <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
+          <div class="hud-left-stack">
+            <div class="hud-left">
+              <div class="hud-weather"><span id="f-weather"></span></div>
+              <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
+            </div>
+            <aside class="action-order" aria-label="이번 문장 행동 순서">
+              <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
+              <ol id="action-order-list"></ol>
+            </aside>
+            <div class="hud-left-status">
+              <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+            </div>
           </div>
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-status">
-            <div class="top-badges">
-              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
-              <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
-              <div class="hud-actions glass" aria-label="시스템 메뉴">
-                <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
-                <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
-              </div>
+            <div class="hud-actions glass" aria-label="시스템 메뉴">
+              <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
+              <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
             </div>
             <div class="effect-log" id="log"></div>
           </div>
@@ -251,6 +260,8 @@ export class BattleView {
         <div class="battle-tools" aria-label="전투 보조 메뉴">
           <button class="battle-tool wordbook-btn" id="deck-btn" type="button">${icon('book')}<span>단어장</span></button>
           <button class="battle-tool backpack" id="bag" type="button" title="가방">${icon('backpack')}<span>가방</span></button>
+          <button class="battle-tool codex-btn" id="codex-btn" type="button">${icon('collection')}<span>도감</span></button>
+          <button class="battle-tool harvest-btn" id="harvest-btn" type="button">${icon('jar')}<span>채집통</span></button>
         </div>
 
         <div class="stat-dock glass">
@@ -271,6 +282,8 @@ export class BattleView {
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
+    this.q('#codex-btn').addEventListener('click', () => this.openCodex())
+    this.q('#harvest-btn').addEventListener('click', () => this.openHarvest())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
     this.q('#home-btn').addEventListener('click', () => this.onHome?.())
 
@@ -290,6 +303,7 @@ export class BattleView {
     document.addEventListener('pointerup', this.onPointerUp, true)
     document.addEventListener('pointercancel', this.onPointerUp, true)
     this.renderActors()
+    this.renderActionOrder()
     this.renderChain()
     this.renderWords()
     this.renderStats()
@@ -326,10 +340,9 @@ export class BattleView {
     const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
     // 전투 대상은 항상 최전방.
     this.target = frontIdx(s)
-    // 무리가 커지면 간격을 좁혀 레일을 화면 안에 접는다(뒤로 갈수록 작아지니 겹쳐도 깊이로 읽힌다).
-    const gap = Math.min(RAIL_GAP, (RAIL_FRONT_RIGHT - RAIL_BACK_RIGHT) / Math.max(1, alive.length - 1))
-    // 간격이 좁아진 만큼 뒷줄을 위로 물려 세운다 — 가로로만 접으면 한 덩어리로 뭉개진다.
-    const lift = Math.min(38, (RAIL_GAP - gap) * 0.3)
+    const visible = alive.slice(0, MAX_VISIBLE_ENEMIES)
+    const visibleSet = new Set(visible)
+    const hiddenCount = Math.max(0, alive.length - visible.length)
 
     let you = host.querySelector<HTMLElement>('.actor.you')
     if (!you) {
@@ -339,18 +352,175 @@ export class BattleView {
     }
     this.updatePlayer(you)
 
-    s.enemies.forEach((e, i) => {
+    host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
+      if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
+    })
+    visible.forEach((i, rank) => {
+      const e = s.enemies[i]
       let el = host.querySelector<HTMLElement>(`.actor.foe[data-i="${i}"]`)
-      if (e.dead) {
-        el?.remove()
-        return
-      }
       if (!el) {
-        host.insertAdjacentHTML('beforeend', this.foeHtml(i, e))
-        el = host.querySelector<HTMLElement>(`.actor.foe[data-i="${i}"]`)!
-        this.bindActor(el)
+        el = this.acquireFoe(i, e)
+        host.append(el)
       }
-      this.updateFoe(el, e, alive.indexOf(i), gap, lift)
+      this.updateFoe(el, e, rank)
+    })
+    let overflow = host.querySelector<HTMLElement>('.enemy-overflow-count')
+    if (hiddenCount > 0) {
+      if (!overflow) {
+        host.insertAdjacentHTML('beforeend', `<div class="enemy-overflow-count" aria-live="polite">${BUG_COUNT_ICON}<b></b><span>대기 중</span></div>`)
+        overflow = host.querySelector<HTMLElement>('.enemy-overflow-count')!
+      }
+      overflow.querySelector('b')!.textContent = `×${hiddenCount}`
+      overflow.setAttribute('aria-label', `화면 밖에 적 ${hiddenCount}마리 대기 중`)
+    } else {
+      overflow?.remove()
+    }
+    this.renderActionOrder()
+  }
+
+  private releaseFoe(el: HTMLElement) {
+    const key = el.dataset.poolKey
+    el.getAnimations().forEach((animation) => animation.cancel())
+    el.classList.remove('front', 'target', 'back', 'strikes-first', 'hit', 'lunge')
+    el.remove()
+    if (!key) return
+    const pool = this.enemyPool.get(key) ?? []
+    pool.push(el)
+    this.enemyPool.set(key, pool)
+  }
+
+  private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
+    const key = enemy.def.id
+    const el = this.enemyPool.get(key)?.pop() ?? (() => {
+      const template = document.createElement('template')
+      template.innerHTML = this.foeHtml(i, enemy).trim()
+      const actor = template.content.firstElementChild as HTMLElement
+      this.bindActor(actor)
+      return actor
+    })()
+    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
+    el.dataset.i = String(i)
+    el.dataset.character = visual.id
+    el.dataset.poolKey = key
+    el.setAttribute('aria-label', `${enemy.def.name} 상세 보기`)
+    el.querySelector<HTMLElement>('.nm')!.textContent = enemy.def.name
+    const image = el.querySelector<HTMLImageElement>('.battle-sprite')!
+    image.src = visual.portrait2d
+    image.alt = enemy.def.name
+    return el
+  }
+
+  // 날짜 아래 행동 순서 — 레퍼런스의 세로 초상화 열을 가져오되, 실제 전투 규칙처럼
+  // 최전방 적만 순서에 넣는다. 뒷줄은 행동자가 아니라 레일 대기임을 흐리게 분리한다.
+  private renderActionOrder() {
+    const host = this.root.querySelector<HTMLOListElement>('#action-order-list')
+    if (!host) return
+
+    type OrderEntry = {
+      key: string
+      name: string
+      portrait: string
+      side: 'player' | 'enemy'
+      timing: 'first' | 'player' | 'second' | 'displaced' | 'cooldown' | 'waiting' | 'summary'
+      note: string
+      active: boolean
+    }
+
+    const entries: OrderEntry[] = []
+    const front = frontIdx(this.state)
+    const enemy = front >= 0 ? this.state.enemies[front] : null
+    const enemyReady = !!enemy && this.state.turn >= enemy.nextAttackTurn
+    const enemyActive = this.phaseLabel.includes('상대 행동')
+    const playerActive = this.phaseLabel.includes('본인 캐릭터') || this.phaseLabel.includes('선수')
+    const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
+      key: `enemy-${front}`,
+      name: enemy!.def.name,
+      portrait: CHARACTER_VISUALS[enemy!.def.id as 'moth' | 'roach'].portrait2d,
+      side: 'enemy',
+      timing,
+      note,
+      active,
+    })
+    const playerEntry: OrderEntry = {
+      key: 'player',
+      name: '프롬',
+      portrait: CHARACTER_VISUALS.player.portrait2d,
+      side: 'player',
+      timing: 'player',
+      note: '문장 행동',
+      active: playerActive,
+    }
+
+    if (enemy && enemyReady && enemy.initiativePhase === 'first' && this.playerPreempting) {
+      playerEntry.active = true
+      entries.push(playerEntry)
+      entries.push(enemyEntry('displaced', '선공 빼앗김'))
+    } else if (enemy && enemyReady && enemy.initiativePhase === 'first') {
+      entries.push(enemyEntry('first', '선공', enemyActive))
+      entries.push(playerEntry)
+    } else {
+      entries.push(playerEntry)
+    }
+    if (enemy && enemyReady && enemy.initiativePhase === 'second') {
+      entries.push(enemyEntry('second', '후공', enemyActive))
+    } else if (enemy && !enemyReady) {
+      entries.push(enemyEntry('cooldown', `${enemy.nextAttackTurn - this.state.turn}턴 뒤`))
+    }
+
+    const waitingEnemies = aliveIdx(this.state).filter((i) => i !== front)
+    waitingEnemies.slice(0, MAX_VISIBLE_ENEMIES - 1).forEach((i) => {
+      const waiting = this.state.enemies[i]
+      entries.push({
+        key: `enemy-${i}`,
+        name: waiting.def.name,
+        portrait: CHARACTER_VISUALS[waiting.def.id as 'moth' | 'roach'].portrait2d,
+        side: 'enemy',
+        timing: 'waiting',
+        note: '레일 대기',
+        active: false,
+      })
+    })
+    const hiddenWaiting = Math.max(0, waitingEnemies.length - (MAX_VISIBLE_ENEMIES - 1))
+    if (hiddenWaiting > 0) {
+      entries.push({
+        key: 'enemy-overflow',
+        name: `×${hiddenWaiting}`,
+        portrait: '',
+        side: 'enemy',
+        timing: 'summary',
+        note: '추가 대기',
+        active: false,
+      })
+    }
+
+    if (!entries.some((entry) => entry.active)) {
+      const next = entries.find((entry) => entry.timing !== 'waiting' && entry.timing !== 'cooldown')
+      if (next) next.active = true
+    }
+
+    const signature = JSON.stringify(entries.map(({ key, name, timing, note, active }) => [key, name, timing, note, active]))
+    if (signature === this.actionOrderSignature) return
+    this.actionOrderSignature = signature
+
+    const previous = new Map([...host.querySelectorAll<HTMLElement>('[data-order-key]')]
+      .map((item) => [item.dataset.orderKey!, item.getBoundingClientRect()]))
+    host.closest('.action-order')?.classList.toggle('is-preempting', this.playerPreempting)
+    host.innerHTML = entries.map((entry, index) => `
+      <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
+        data-order-key="${entry.key}" style="--order-i:${index}">
+        <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
+        <div class="action-order-copy"><b>${entry.name}</b><span>${entry.note}</span></div>
+      </li>`).join('')
+    host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
+      const before = previous.get(item.dataset.orderKey!)
+      if (!before) return
+      const after = item.getBoundingClientRect()
+      const dy = before.top - after.top
+      if (Math.abs(dy) < 1) return
+      item.animate(
+        [{ translate: `0 ${dy}px` }, { translate: '0 -7px', offset: .72 }, { translate: '0 0' }],
+        { duration: 520, easing: 'cubic-bezier(.2, .9, .25, 1)' },
+      )
     })
   }
 
@@ -397,29 +567,26 @@ export class BattleView {
       </div>`
   }
 
-  private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, gap: number, lift: number) {
+  private updateFoe(el: HTMLElement, e: EnemyInst, rank: number) {
     const front = rank === 0
-    el.style.right = `${(RAIL_FRONT_RIGHT - rank * gap).toFixed(0)}px`
-    el.style.bottom = `${(26 + rank * lift).toFixed(0)}px`
+    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
+    el.style.bottom = '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
-    el.style.opacity = Math.max(0.34, 1 - rank * 0.19).toFixed(2)
-    el.style.setProperty('--model-scale', Math.max(0.44, 1 - rank * 0.13).toFixed(2))
-    // 대기열 깊이와 무관하게 대기 중인 적은 같은 블러를 써서 상태가 흔들리지 않게 한다.
-    el.style.setProperty('--model-blur', front ? '0px' : '3px')
+    el.style.opacity = front ? '1' : '0.68'
+    el.style.setProperty('--model-scale', '1')
+    el.style.setProperty('--model-blur', front ? '0px' : '2px')
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
 
-    // 체력은 2번째 적까지만 — 최전방은 또렷하게, 그 뒤는 은은하게, 더 뒤는 감춘다.
-    // 다만 무리가 커져 간격이 좁아지면 이름표끼리 겹치므로 최전방만 남긴다.
+    // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
-    const faint = rank > 0 && rank <= HP_VISIBLE_RANK && gap >= PLATE_MIN_GAP
-    plate.classList.toggle('faint', faint)
-    plate.classList.toggle('gone', rank > 0 && !faint)
+    plate.classList.toggle('faint', rank > 0)
+    plate.classList.remove('gone')
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
-    el.classList.toggle('strikes-first', !e.dead && e.initiativePhase === 'first')
+    el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
 
   private bindActor(actor: HTMLElement) {
@@ -446,8 +613,10 @@ export class BattleView {
   }
 
   private setPhase(label: string) {
+    this.phaseLabel = label
     const el = this.root.querySelector<HTMLElement>('#phase')
     if (el) el.textContent = label
+    this.renderActionOrder()
   }
 
   // 캐릭터 호버 상세는 우측 캐스트 로그 패널 위에 그대로 겹쳐 표시한다.
@@ -982,6 +1151,146 @@ export class BattleView {
       row.addEventListener('mouseleave', () => preview.classList.remove('show'))
     })
   }
+
+  // ── 도감 — 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
+  private openCodex() {
+    const host = this.q('#overlay')
+    const owned = new Set(Object.values(this.player.deck).flat().map((word) => word.id))
+    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()]
+      .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
+    const found = catalog.filter((word) => owned.has(word.id)).length
+    const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미' }
+    const groups = [...new Set(catalog.map((word) => word.slot))]
+    const encountered = new Set(this.state.enemies.map((enemy) => enemy.def.id))
+    const enemyCatalog = Object.values(ENEMIES)
+    const foundEnemies = enemyCatalog.filter((enemy) => encountered.has(enemy.id)).length
+    const ownedItems = new Set(this.player.items.map((item) => item.id))
+    const itemCatalog = Object.values(ALL_ITEMS)
+    const foundItems = itemCatalog.filter((item) => ownedItems.has(item.id)).length
+
+    const cardContent = `<div class="codex-groups" data-codex-page="card">
+      ${groups.map((slot) => `<section class="codex-group">
+        <h3>${slotLabel[slot] ?? slot}</h3>
+        <div class="codex-grid">
+          ${catalog.filter((word) => word.slot === slot).map((word) => {
+            const discovered = owned.has(word.id)
+            return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered' : ' missing'}">
+              <span class="codex-mark">${discovered ? '✦' : '?'}</span>
+              <div><b>${discovered ? word.text : '미발견 카드'}</b><span>${discovered ? word.note : '보상에서 만나면 기록된다.'}</span></div>
+            </article>`
+          }).join('')}
+        </div>
+      </section>`).join('')}
+    </div>`
+
+    const enemyContent = `<div class="codex-page" data-codex-page="enemy" hidden>
+      <p class="codex-intro">이번 런에서 직접 마주친 벌레만 그림일기에 기록됩니다.</p>
+      <div class="codex-portrait-grid">
+        ${enemyCatalog.map((enemy) => {
+          const discovered = encountered.has(enemy.id)
+          const sprite = SPRITES[enemy.sprite]
+          return `<article class="codex-portrait-entry${discovered ? ' discovered' : ' missing'}">
+            <div class="codex-portrait-art">${discovered && sprite ? `<img src="${sprite}" alt="">` : '<span>?</span>'}</div>
+            <div><b>${discovered ? enemy.name : '미발견 벌레'}</b><span>${discovered ? enemy.note : '전장에서 만나면 기록된다.'}</span></div>
+            <dl><div><dt>체력</dt><dd>${discovered ? enemy.hp : '—'}</dd></div><div><dt>공격</dt><dd>${discovered ? enemy.atk : '—'}</dd></div><div><dt>행동</dt><dd>${discovered ? `${enemy.every}턴` : '—'}</dd></div></dl>
+          </article>`
+        }).join('')}
+      </div>
+    </div>`
+
+    const itemContent = `<div class="codex-page" data-codex-page="item" hidden>
+      <p class="codex-intro">획득해 감탄 문장을 붙인 소품만 온전한 모습으로 남습니다.</p>
+      <div class="codex-item-grid">
+        ${itemCatalog.map((item) => {
+          const discovered = ownedItems.has(item.id)
+          return `<article class="codex-item-entry rarity-${item.rarity}${discovered ? ' discovered' : ' missing'}">
+            <div class="codex-item-art">${discovered ? itemArt(item.art) : '<span>?</span>'}</div>
+            <div><b>${discovered ? item.name : '미발견 아이템'}</b><em>${discovered ? RARITY_LABEL[item.rarity] : '기록 없음'}</em><span>${discovered ? item.flavor : '보상에서 만나면 기록된다.'}</span></div>
+          </article>`
+        }).join('')}
+      </div>
+    </div>`
+
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <section class="ov-panel glass codex-panel" aria-label="도감">
+        <div class="ov-head">
+          <div class="ov-title">${icon('collection')} 그림일기 도감 <span class="codex-current-count">카드 ${found} / ${catalog.length}</span></div>
+          <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
+        </div>
+        <div class="codex-layout">
+          <nav class="codex-index" aria-label="도감 분류">
+            <button type="button" class="on" data-codex-tab="card" data-count="카드 ${found} / ${catalog.length}"><span>01</span><b>카드 도감</b><small>${found} / ${catalog.length}</small></button>
+            <button type="button" data-codex-tab="enemy" data-count="적 ${foundEnemies} / ${enemyCatalog.length}"><span>02</span><b>적 도감</b><small>${foundEnemies} / ${enemyCatalog.length}</small></button>
+            <button type="button" data-codex-tab="item" data-count="아이템 ${foundItems} / ${itemCatalog.length}"><span>03</span><b>아이템 도감</b><small>${foundItems} / ${itemCatalog.length}</small></button>
+          </nav>
+          <div class="codex-content">
+            ${cardContent}
+            ${enemyContent}
+            ${itemContent}
+          </div>
+        </div>
+      </section>`
+    host.classList.add('open')
+    const close = () => this.closeOverlay()
+    host.querySelector('#ov-x')!.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+    const count = host.querySelector<HTMLElement>('.codex-current-count')!
+    host.querySelectorAll<HTMLButtonElement>('[data-codex-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const tab = button.dataset.codexTab!
+        host.querySelectorAll('[data-codex-tab]').forEach((entry) => entry.classList.toggle('on', entry === button))
+        host.querySelectorAll<HTMLElement>('[data-codex-page]').forEach((page) => { page.hidden = page.dataset.codexPage !== tab })
+        count.textContent = button.dataset.count ?? ''
+      })
+    })
+  }
+
+  // 채집통 — 현재 단어장 조합으로 완성할 수 있는 이름 있는 맥락을 모아 보여준다.
+  private openHarvest() {
+    const host = this.q('#overlay')
+    const canForm = (need: string[]) => {
+      const full = (1 << need.length) - 1
+      let states = new Set([0])
+      for (const slot of this.t.template.slots) {
+        const next = new Set<number>()
+        for (const state of states) {
+          for (const word of this.t.words[slot.key] ?? []) {
+            let mask = state
+            for (const tag of word.tags) {
+              const target = need.findIndex((wanted, index) => wanted === tag && (mask & (1 << index)) === 0)
+              if (target >= 0) mask |= 1 << target
+            }
+            next.add(mask)
+          }
+        }
+        states = next
+      }
+      return states.has(full)
+    }
+    const combos = this.t.combos.map((combo) => ({ combo, collected: canForm(combo.need) }))
+    const collected = combos.filter((entry) => entry.collected).length
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <section class="ov-panel glass harvest-panel" aria-label="관용구 채집통">
+        <div class="ov-head">
+          <div class="ov-title">${icon('jar')} 관용구 채집통 <span class="codex-count">${collected} / ${combos.length}</span></div>
+          <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
+        </div>
+        <p class="harvest-intro">현재 단어장으로 완성할 수 있는 좋은 맥락이 금빛으로 기록됩니다.</p>
+        <div class="harvest-grid">
+          ${combos.map(({ combo, collected: ready }) => `<article class="harvest-entry${ready ? ' collected' : ' missing'}">
+            <div class="harvest-seal">${ready ? '✦' : '?'}</div>
+            <div><b>${ready ? combo.name : '아직 모르는 맥락'}</b><span>${ready ? (combo.flavor ?? '단어가 맞물려 힘이 폭발한다.') : '새 단어를 모아 맥락을 완성하자.'}</span></div>
+            <strong>${ready ? `×${combo.mult.toFixed(1)}` : '—'}</strong>
+          </article>`).join('')}
+        </div>
+      </section>`
+    host.classList.add('open')
+    const close = () => this.closeOverlay()
+    host.querySelector('#ov-x')!.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+  }
   private closeOverlay() {
     const host = this.q('#overlay')
     host.classList.remove('open')
@@ -1299,6 +1608,7 @@ export class BattleView {
     //    문장부호 '!'가 붙었으면 이 페이즈를 건너뛴다. 선공 적은 이번 턴에 못 때리고,
     //    쿨다운도 소모하지 않으므로 다음 턴에 그대로 돌아온다(미루기지 없애기가 아니다).
     if (intent.preempt) {
+      this.playerPreempting = true
       this.setPhase('선수 · 먼저 움직였다')
       this.log('느낌표 — 상대보다 먼저 움직였다.')
       await sleep(260)
@@ -1407,6 +1717,7 @@ export class BattleView {
 
     this.sel = {}
     this.slotIndex = 0
+    this.playerPreempting = false
     this.state.turn++
     this.q('#turn').textContent = String(this.state.turn)
     // 턴이 넘어가면 등급이 식는다 — 운이 보장하는 바닥까지만.

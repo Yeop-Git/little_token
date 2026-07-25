@@ -16,6 +16,15 @@ export const icon = (key: string): string => {
         <path d="M8 10h13a5 5 0 015 5v25a4 4 0 00-4-4H8z" fill="currentColor" fill-opacity="0.14"/>
         <path d="M40 10H27a5 5 0 00-5 5v25a4 4 0 014-4h14z" fill="currentColor" fill-opacity="0.14"/>
         <path d="M22 15v25"/></svg>`
+    case 'collection': // 카드 도감
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M9 9h25a5 5 0 015 5v25H14a5 5 0 01-5-5z" fill="currentColor" fill-opacity="0.14"/>
+        <path d="M14 9v30M20 17h12M20 24h12M20 31h7"/>
+        <path d="M37 5v8M33 9h8"/></svg>`
+    case 'jar': // 관용구 채집통
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M15 10h18M17 10v7c-4 3-6 7-6 13 0 8 5 12 13 12s13-4 13-12c0-6-2-10-6-13v-7" fill="currentColor" fill-opacity="0.14"/>
+        <path d="M16 25c5 3 11-3 16 0M20 32l3 3 6-7"/></svg>`
     case 'close':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M14 14l20 20M34 14L14 34"/></svg>`
     case 'settings':

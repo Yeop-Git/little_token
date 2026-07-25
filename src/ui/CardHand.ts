@@ -60,6 +60,9 @@ type ConflictResolver = (word: Word) => string | null
 
 export class CardHand {
   private readonly states = new Map<string, SlotHandState>()
+  // 같은 단어 카드는 바깥 button 객체를 풀에서 재사용한다. 내부 표시는 강화도·충돌 상태가
+  // 달라질 수 있어 빌릴 때 갱신하고, 슬롯 이동/사용 뒤에는 분리해 대기시킨다.
+  private readonly cardPool = new Map<string, HTMLButtonElement[]>()
   private slotKey = ''
   private selectedId: string | null = null
   private drawingId: string | null = null
@@ -74,11 +77,45 @@ export class CardHand {
   private readonly wordZone: HTMLElement | null
 
   private readonly onResize = () => this.render()
+  private readonly onHandPointerOver = (event: PointerEvent) => {
+    const button = this.cardButton(event.target)
+    if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return
+    const card = this.cardFor(button)
+    if (card) this.opts.onPreview(card.word)
+  }
+  private readonly onHandPointerOut = (event: PointerEvent) => {
+    const button = this.cardButton(event.target)
+    if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return
+    button.classList.remove('pressing')
+    const state = this.currentState()
+    const selected = state?.hand.find((item) => item.instanceId === this.selectedId)
+    if (selected) this.opts.onPreview(selected.word)
+    else this.opts.onPreviewEnd()
+  }
+  private readonly onHandClick = (event: MouseEvent) => {
+    const button = this.cardButton(event.target)
+    const card = button ? this.cardFor(button) : undefined
+    if (button && card) this.commit(card, button)
+  }
+  private readonly onHandPointerDown = (event: PointerEvent) => this.cardButton(event.target)?.classList.add('pressing')
+  private readonly onHandPointerUp = (event: PointerEvent) => this.cardButton(event.target)?.classList.remove('pressing')
+  private readonly onHandKeyDown = (event: KeyboardEvent) => {
+    const button = this.cardButton(event.target)
+    const state = this.currentState()
+    if (button && state) this.handleCardKey(event, button, state.hand)
+  }
 
   constructor(private readonly opts: CardHandOptions) {
     this.stage = this.opts.handRoot.closest<HTMLElement>('.stage') ?? this.opts.handRoot.parentElement!
     this.wordZone = this.opts.handRoot.closest<HTMLElement>('.word-zone')
     this.opts.deckButton.addEventListener('click', () => void this.drawOne())
+    this.opts.handRoot.addEventListener('pointerover', this.onHandPointerOver)
+    this.opts.handRoot.addEventListener('pointerout', this.onHandPointerOut)
+    this.opts.handRoot.addEventListener('click', this.onHandClick)
+    this.opts.handRoot.addEventListener('pointerdown', this.onHandPointerDown)
+    this.opts.handRoot.addEventListener('pointerup', this.onHandPointerUp)
+    this.opts.handRoot.addEventListener('pointercancel', this.onHandPointerUp)
+    this.opts.handRoot.addEventListener('keydown', this.onHandKeyDown)
     window.addEventListener('resize', this.onResize)
   }
 
@@ -127,6 +164,15 @@ export class CardHand {
     this.destroyed = true
     this.epoch++
     window.removeEventListener('resize', this.onResize)
+    this.opts.handRoot.removeEventListener('pointerover', this.onHandPointerOver)
+    this.opts.handRoot.removeEventListener('pointerout', this.onHandPointerOut)
+    this.opts.handRoot.removeEventListener('click', this.onHandClick)
+    this.opts.handRoot.removeEventListener('pointerdown', this.onHandPointerDown)
+    this.opts.handRoot.removeEventListener('pointerup', this.onHandPointerUp)
+    this.opts.handRoot.removeEventListener('pointercancel', this.onHandPointerUp)
+    this.opts.handRoot.removeEventListener('keydown', this.onHandKeyDown)
+    this.releaseRenderedCards()
+    this.cardPool.clear()
   }
 
   private makeInstance(slotKey: string, word: Word): CardInstance {
@@ -209,7 +255,7 @@ export class CardHand {
   private render() {
     const state = this.currentState()
     if (!state) {
-      this.opts.handRoot.innerHTML = ''
+      this.releaseRenderedCards()
       return
     }
     const previousPositions = new Map(
@@ -219,27 +265,16 @@ export class CardHand {
       ]),
     )
     const availableWidth = Math.max(520, this.opts.handRoot.clientWidth - 40)
-    this.opts.handRoot.innerHTML = state.hand
-      .map((card, index) => this.cardHtml(card, index, state.hand.length, availableWidth))
-      .join('')
+    this.releaseRenderedCards()
+    const fragment = document.createDocumentFragment()
+    state.hand.forEach((card, index) => {
+      const button = this.acquireCard(card, index, state.hand.length, availableWidth)
+      fragment.append(button)
+    })
+    this.opts.handRoot.append(fragment)
 
     this.opts.handRoot.querySelectorAll<HTMLButtonElement>('.word-card').forEach((button) => {
       const card = state.hand.find((item) => item.instanceId === button.dataset.instanceId)!
-      button.addEventListener('mouseenter', () => this.opts.onPreview(card.word))
-      button.addEventListener('mouseleave', () => {
-        if (this.selectedId) {
-          const selected = state.hand.find((item) => item.instanceId === this.selectedId)
-          if (selected) this.opts.onPreview(selected.word)
-        } else this.opts.onPreviewEnd()
-      })
-      // 카드는 클릭(키보드는 Enter/Space)으로만 발동한다.
-      button.addEventListener('click', () => this.commit(card, button))
-      button.addEventListener('pointerdown', () => button.classList.add('pressing'))
-      ;['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
-        button.addEventListener(type, () => button.classList.remove('pressing'))
-      })
-      button.addEventListener('keydown', (event) => this.handleCardKey(event, button, state.hand))
-
       const previous = previousPositions.get(card.instanceId)
       if (previous && this.drawingId !== card.instanceId) {
         const current = button.getBoundingClientRect()
@@ -254,6 +289,61 @@ export class CardHand {
       }
     })
     this.updateDeckButton(state)
+  }
+
+  private cardButton(target: EventTarget | null): HTMLButtonElement | null {
+    return target instanceof Element ? target.closest<HTMLButtonElement>('.word-card') : null
+  }
+
+  private cardFor(button: HTMLButtonElement): CardInstance | undefined {
+    return this.currentState()?.hand.find((item) => item.instanceId === button.dataset.instanceId)
+  }
+
+  private releaseRenderedCards() {
+    this.opts.handRoot.querySelectorAll<HTMLButtonElement>(':scope > .word-card').forEach((button) => {
+      button.getAnimations().forEach((animation) => animation.cancel())
+      button.classList.remove('pressing', 'selected', 'drawing')
+      button.remove()
+      const key = button.dataset.poolKey
+      if (!key) return
+      const pool = this.cardPool.get(key) ?? []
+      pool.push(button)
+      this.cardPool.set(key, pool)
+    })
+  }
+
+  private acquireCard(card: CardInstance, index: number, count: number, availableWidth: number): HTMLButtonElement {
+    const pool = this.cardPool.get(card.word.id)
+    let button = pool?.pop()
+    if (!button) {
+      const template = document.createElement('template')
+      template.innerHTML = this.cardHtml(card, index, count, availableWidth).trim()
+      button = template.content.firstElementChild as HTMLButtonElement
+    } else {
+      const line = calculateLineTransform(index, count, availableWidth)
+      const blocked = this.conflictOf(card.word)
+      const selected = this.selectedId === card.instanceId
+      const drawing = this.drawingId === card.instanceId
+      const rarity = card.word.rarity ?? 'common'
+      button.className = `word-card mood-${this.moodOf(card.word)} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${drawing ? ' drawing' : ''}`
+      button.dataset.instanceId = card.instanceId
+      button.disabled = !!blocked
+      button.setAttribute('aria-label', blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`)
+      button.setAttribute('aria-pressed', String(selected))
+      button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
+      button.style.setProperty('--card-z', String(line.zIndex))
+      button.style.setProperty('--selected-lift', `${CARD_HAND_CONFIG.selectedLift}px`)
+      button.style.setProperty('--selected-scale', String(CARD_HAND_CONFIG.selectedScale))
+      const level = card.word.level ?? 1
+      const badge = button.querySelector<HTMLElement>('.card-level')
+      if (badge) badge.textContent = `${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}`
+      const note = button.querySelector<HTMLElement>('.card-note')
+      if (note) note.textContent = blocked ?? card.word.note
+      const footer = button.querySelector<HTMLElement>('.card-front > small')
+      if (footer) footer.textContent = blocked ? '맥락 충돌' : 'WORD CARD'
+    }
+    button.dataset.poolKey = card.word.id
+    return button
   }
 
   private cardHtml(card: CardInstance, index: number, count: number, availableWidth: number): string {
