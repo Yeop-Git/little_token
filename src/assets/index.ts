@@ -8,6 +8,7 @@ import backgroundDark from './backgrounds/backgroundDark.png'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import player001 from './sprites/player_001.webp'
+import playerModel from './models/player.glb?url'
 import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
@@ -67,6 +68,11 @@ export const SPRITES: Record<string, string> = {
   player_001: player001,
   enemy_moth: enemyMoth,
   enemy_roach: enemyRoach,
+}
+
+// 전장용 GLB. 상세 카드에는 계속 대응되는 SPRITES 초상을 사용한다.
+export const MODELS: Record<string, string> = {
+  player: playerModel,
 }
 
 // 맥락카드 일러스트 — Word.art가 이 키를 참조한다.

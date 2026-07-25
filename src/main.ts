@@ -25,6 +25,7 @@ import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { GameAudio } from '@/audio/GameAudio'
+import { installFoilShaders } from '@/ui/FoilShader'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -34,6 +35,7 @@ let devCheatCleanup: (() => void) | null = null
 let battleRequest = 0
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
+installFoilShaders()
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)

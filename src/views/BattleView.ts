@@ -50,6 +50,12 @@ import { CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
+import {
+  destroyCharacterModels,
+  mountCharacterModel,
+  playCharacterAnimation,
+  suspendCharacterModel,
+} from '@views/BattleCharacterModel'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -157,6 +163,8 @@ export class BattleView {
     document.removeEventListener('pointercancel', this.onPointerUp, true)
     this.cardHand.destroy()
     this.introDialogue?.destroy()
+    destroyCharacterModels(this.root)
+    this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
   }
 
@@ -368,6 +376,7 @@ export class BattleView {
       this.bindActor(you)
     }
     this.updatePlayer(you)
+    mountCharacterModel(you, CHARACTER_VISUALS.player)
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -407,6 +416,7 @@ export class BattleView {
     const key = el.dataset.poolKey
     el.getAnimations().forEach((animation) => animation.cancel())
     el.classList.remove('front', 'target', 'back', 'strikes-first', 'hit', 'lunge')
+    suspendCharacterModel(el)
     el.remove()
     if (!key) return
     const pool = this.enemyPool.get(key) ?? []
@@ -432,6 +442,7 @@ export class BattleView {
     const image = el.querySelector<HTMLImageElement>('.battle-sprite')!
     image.src = visual.portrait2d
     image.alt = enemy.def.name
+    mountCharacterModel(el, visual)
     return el
   }
 
@@ -1704,6 +1715,7 @@ export class BattleView {
     const attacking = res.hits.length > 0
     if (attacking) {
       GameAudio.play('paperAttack')
+      playCharacterAnimation(you, 'attack')
       you.classList.add('lunge')
     }
     await sleep(attacking ? (sweep ? 120 : 170) : 40)
@@ -2011,6 +2023,7 @@ export class BattleView {
         this.log(st.text)
         continue
       }
+      playCharacterAnimation(foe ?? null, 'attack')
       foe?.classList.add('lunge')
       await sleep(170)
       const you = this.q<HTMLElement>('.actor.you')
