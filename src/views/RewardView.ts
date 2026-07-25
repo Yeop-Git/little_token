@@ -3,7 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고, 상단=종류 / 하단=메인 효과 / 자세히보기=우측 정보창.
  */
 
-import { EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
+import { emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -14,7 +14,7 @@ import { STAT_LABEL, type StatKey } from '@data/items'
 import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
 import { critText, multText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { emotionBadgeContent } from '@/ui/EmotionBadge'
+import { emotionIconBadge } from '@/ui/EmotionBadge'
 
 interface Opts {
   day: number
@@ -65,7 +65,7 @@ function mainEffect(opt: RewardOption): string {
 function emotionBadge(opt: RewardOption): string {
   if (opt.kind !== 'word' || !opt.word) return ''
   const emotion = emotionOrNeutral(opt.word.emotion)
-  return `<span class="rp-emotion emotion-${emotion}" title="감정: ${EMOTION_LABEL[emotion]}">${emotionBadgeContent(emotion)}</span>`
+  return emotionIconBadge(emotion, 'rp-emotion')
 }
 
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채운다. 아직 그림이 없는 단어도 공용 아이콘을
@@ -128,7 +128,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
   const w = opt.word!
   const values = ownValues(w)
   return `
-    <div class="wd-name">${w.text}</div>
+    <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(w.emotion), 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${w.level ?? 1}` : ' · 새 단어'}</div>
     <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
     ${comboHintHtml(w, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}

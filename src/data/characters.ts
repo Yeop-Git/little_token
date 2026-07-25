@@ -29,6 +29,9 @@ export interface CharacterVisualDef {
   modelYaw?: number
   /** 자동으로 맞춘 지면에서 모델을 추가로 들어 올릴 월드 좌표값. */
   modelGroundOffset?: number
+  /** 깊이가 긴 모델의 투영 왜곡을 줄이는 캐릭터별 정사영 카메라 높이. */
+  cameraPositionY?: number
+  cameraTargetY?: number
   portrait2d: string
   title: string
   description: string
@@ -222,9 +225,19 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
   queenBee: {
     id: 'queenBee',
     name: '여왕벌',
-    model3d: null,
-    animations: null,
+    model3d: MODELS.boss_queen_bee,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack1|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
     modelYaw: BOSS_MODEL_YAW,
+    // 앞뒤 깊이가 키보다 큰 모델이라 공용 하향 시점을 쓰면 팔다리가
+    // 세로로 늘어나 보인다. 보스를 정면에서 마주 보는 직교 시점으로 맞춘다.
+    cameraPositionY: 1.45,
+    cameraTargetY: 1.45,
     portrait2d: SPRITES.boss_queen_bee,
     title: '찢어진 종이의 벌집 여왕',
     description: '달콤한 잉크와 밀랍으로 빈 칸을 벌집처럼 막아 버린다.',
