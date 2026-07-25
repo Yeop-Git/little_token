@@ -948,27 +948,6 @@ button {
   z-index: 3;
 }
 
-.boss-ribbon {
-  position: absolute;
-  top: 116px;
-  left: 50%;
-  z-index: 20;
-  display: grid;
-  gap: 2px;
-  min-width: 300px;
-  padding: 8px 24px 10px;
-  color: #ffe5b5;
-  text-align: center;
-  transform: translateX(-50%) rotate(-1deg);
-  background: linear-gradient(100deg, rgba(72, 20, 31, .88), rgba(145, 51, 35, .92), rgba(72, 20, 31, .88));
-  border: 2px solid rgba(255, 205, 132, .74);
-  box-shadow: 0 8px 22px rgba(24, 3, 12, .46), inset 0 1px rgba(255,255,255,.28);
-  clip-path: polygon(4% 0, 96% 0, 100% 22%, 97% 50%, 100% 78%, 96% 100%, 4% 100%, 0 78%, 3% 50%, 0 22%);
-  pointer-events: none;
-}
-.boss-ribbon span { font-size: 12px; font-weight: 900; letter-spacing: .2em; opacity: .78; }
-.boss-ribbon b { font-size: 21px; letter-spacing: .04em; text-shadow: 0 2px 0 rgba(48, 7, 13, .7); }
-
 /* 보스 진입 전환. 추후 컷신이 준비되면 data-entrance 값과 이 한 레이어만
    컷신 호스트로 교체하고, 아래의 전용 대치 구도는 그대로 이어받는다. */
 .boss-entry-fade {
@@ -1002,36 +981,201 @@ button {
 }
 .endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
 .endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
-.actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.16)); }
+.actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.5)); }
 .actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
 
-/* 레퍼런스처럼 카메라를 프롬의 등 뒤로 낮추고, 보스를 맞은편 높은 축에 둔다. */
+/* 보스전은 프롬의 1인칭 시점이다. 배우 본체는 걷어 내고 체력 HUD만 좌하단에 둔다. */
 .scene.battle[data-boss='true'] .actor.you {
-  left: 24%;
-  bottom: -18px;
-  z-index: 54;
+  left: 38px;
+  bottom: -316px;
+  z-index: 58;
+  width: 360px;
+  height: 100px;
 }
-.scene.battle[data-boss='true'] .actor.you .model-shell {
-  transform: scale(1.2);
-  transform-origin: center bottom;
-  filter: drop-shadow(0 22px 28px rgba(0, 0, 0, .4));
-}
+.scene.battle[data-boss='true'] .actor.you .model-shell,
+.scene.battle[data-boss='true'] .actor.you .shadow { display: none; }
 .scene.battle[data-boss='true'] .actor.you .nameplate {
-  transform: translate(-54%, -8px);
+  left: 0;
+  bottom: 0;
+  width: 360px;
+  margin: 0;
+  padding: 14px 18px 16px;
+  transform: none;
+  border: 1px solid rgba(255, 225, 170, .34);
+  box-shadow: inset 0 0 0 3px rgba(255, 245, 214, .05), 0 10px 28px rgba(0, 0, 0, .56);
 }
+.scene.battle[data-boss='true'] .actor.you .nameplate .row { margin-bottom: 9px; }
+.scene.battle[data-boss='true'] .actor.you .nameplate .nm { font-size: 19px; }
+.scene.battle[data-boss='true'] .actor.you .nameplate .hpn { font-size: 15px; }
+.scene.battle[data-boss='true'] .actor.you .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
   z-index: 38 !important;
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
   width: 390px;
   height: 430px;
-  transform: scale(1.08);
+  transform: scale(1.5);
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
-  width: 330px;
-  margin-bottom: 4px;
+  display: none;
 }
+
+/* 상단 중앙을 통째로 쓰는 보스 전용 체력 HUD. 막 수는 텍스트 대신 분절로만 보여 준다. */
+.boss-health-hud {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  z-index: 62;
+  /* 좌측 주인공 스탯과 우측 시스템 메뉴 사이의 안전 여백을 남긴다. */
+  width: min(820px, 60vw);
+  padding: 10px 24px 14px;
+  color: #fff1d2;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 176, 113, .66);
+  border-radius: 7px 7px 18px 18px;
+  background:
+    linear-gradient(90deg, rgba(32, 12, 20, .9), rgba(75, 24, 28, .94) 50%, rgba(32, 12, 20, .9)),
+    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255, 220, 158, .04) 10px 12px);
+  box-shadow: inset 0 0 0 3px rgba(255, 232, 190, .06), 0 9px 30px rgba(12, 2, 8, .66), 0 0 28px rgba(178, 47, 31, .2);
+  pointer-events: none;
+}
+.boss-health-heading {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  min-height: 28px;
+  margin-bottom: 7px;
+}
+.boss-health-heading .boss-health-mark {
+  justify-self: start;
+  color: #ffad72;
+  font: 900 10px/1 Georgia, serif;
+  letter-spacing: .28em;
+  opacity: .76;
+}
+.boss-health-heading .nm {
+  justify-self: center;
+  color: #fff4d9;
+  font-size: 23px;
+  letter-spacing: .12em;
+  text-shadow: 0 0 14px rgba(255, 144, 91, .48), 0 2px 5px rgba(0, 0, 0, .8);
+}
+.boss-health-heading .hpn {
+  justify-self: end;
+  color: #ffd6aa;
+  font-size: 14px;
+  font-weight: 900;
+}
+.boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
+.boss-health-hud .enemy-traits {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  justify-content: center;
+  width: 100%;
+  transform: translateX(-50%);
+}
+.boss-health-hud .shieldbar { margin-top: 7px; }
+
+/* 좌하단 플레이어 체력 위에서 토큰 GLB가 불안하게 부산을 떤다. */
+.boss-token {
+  position: absolute;
+  left: 68px;
+  bottom: -206px;
+  z-index: 57;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  transform-origin: 50% 80%;
+  animation: token-float 3.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 14px rgba(255, 222, 112, .5));
+}
+.boss-token .model-shell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 62%;
+  animation: token-fret .86s ease-in-out infinite alternate;
+}
+.boss-token .battle-sprite { object-position: center; }
+.token-speech {
+  position: absolute;
+  left: 158px;
+  top: 8px;
+  z-index: 5;
+  width: 260px;
+  padding: 13px 17px 15px;
+  color: #4a3225;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-14px, 12px) rotate(-2deg) scale(.82);
+  transform-origin: left bottom;
+  border: 2px solid rgba(91, 58, 38, .78);
+  border-radius: 48% 44% 46% 42% / 54% 48% 52% 46%;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 17px, rgba(112, 82, 59, .065) 18px),
+    #f3e5c6;
+  box-shadow: inset 0 0 0 3px rgba(255, 251, 231, .52), 0 9px 22px rgba(0, 0, 0, .42);
+  text-shadow: 0 1px rgba(255, 255, 255, .5);
+}
+.token-speech::after {
+  content: '';
+  position: absolute;
+  left: -17px;
+  bottom: 7px;
+  width: 31px;
+  height: 25px;
+  background: #f3e5c6;
+  border-bottom: 2px solid rgba(91, 58, 38, .78);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  transform: rotate(14deg);
+}
+.token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
+.token-panic-lines {
+  position: absolute;
+  inset: 28px 28px auto auto;
+  z-index: 2;
+  width: 52px;
+  height: 46px;
+}
+.token-panic-lines i {
+  position: absolute;
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffe991;
+  box-shadow: 0 0 8px rgba(255, 220, 90, .85);
+  transform-origin: 50% 34px;
+}
+.token-panic-lines i:nth-child(1) { left: 4px; transform: rotate(-42deg); }
+.token-panic-lines i:nth-child(2) { left: 23px; top: -7px; transform: rotate(-5deg); }
+.token-panic-lines i:nth-child(3) { right: 4px; transform: rotate(34deg); }
+@keyframes token-float {
+  0%, 100% { transform: translate(-4px, 7px) rotate(-2.5deg); }
+  45% { transform: translate(7px, -12px) rotate(2deg); }
+  72% { transform: translate(2px, -5px) rotate(-1deg); }
+}
+@keyframes token-fret {
+  from { transform: translateX(-3px) rotate(-3deg) scale(.985); }
+  to { transform: translateX(4px) rotate(3.5deg) scale(1.02); }
+}
+@keyframes token-speech-pop {
+  0% { opacity: 0; transform: translate(-14px, 12px) rotate(-2deg) scale(.82); }
+  10%, 78% { opacity: 1; transform: translate(0, 0) rotate(-1deg) scale(1); }
+  88% { opacity: 1; transform: translate(2px, -3px) rotate(.5deg) scale(1.01); }
+  100% { opacity: 0; transform: translate(7px, -12px) rotate(1deg) scale(.94); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boss-token, .boss-token .model-shell { animation-duration: 8s; }
+  .token-speech.is-speaking { animation-timing-function: ease; }
+}
+.scene.battle[data-boss='true'] .hud-player-stats .hud-stat[data-stat-key='hp'] { display: none; }
 
 /* 배우 */
 .actor {
