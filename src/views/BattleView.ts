@@ -43,6 +43,7 @@ import {
   nextEnemyAttackStep,
   spiderWebAtTurnStart,
   spiderSealSlotForTurn,
+  spiderWebTension,
   summonAtTurnStart,
   summonCount,
   type TurnSummon,
@@ -681,7 +682,6 @@ export class BattleView {
       const template = document.createElement('template')
       template.innerHTML = this.foeHtml(i, enemy).trim()
       const actor = template.content.firstElementChild as HTMLElement
-      this.bindActor(actor)
       return actor
     })()
     // 풀에 들어오기 전 경로와 무관하게 재취득 시 한 번 더 방어적으로 초기화한다.
@@ -970,8 +970,7 @@ export class BattleView {
         </div>`
       : ''
     return `
-      <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}"
-        role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
+      <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}">
         <div class="nameplate glass">
           <div class="row">
             <span class="nm">${e.def.name}</span>
@@ -987,13 +986,13 @@ export class BattleView {
           </div>
           <div class="enemy-traits"></div>
         </div>
+        <div class="enemy-intel" aria-label="${e.def.name} 전투 정보"></div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
         </span>
         ${summonedAllies}
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
-        <span class="guard-hint" aria-hidden="true">우선 방어하세요!</span>
       </div>`
   }
 
@@ -1031,6 +1030,7 @@ export class BattleView {
     el.classList.toggle('groggy', this.state.turn <= e.groggyUntilTurn)
     el.dataset.brokenLegs = String(e.parts.filter((part) => part.def.kind === 'leg' && part.broken).length)
     this.updateSummonedAllies(el, e)
+    this.updateEnemyIntel(el, e)
     // 맨 뒷줄은 한 번 더 물러난다(CSS의 .rank-last).
     el.classList.toggle('rank-last', visibleCount > 1 && rank === visibleCount - 1)
 
@@ -1045,6 +1045,49 @@ export class BattleView {
     }
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
+  }
+
+  /** 적 모델을 가리지 않는 작은 상태 아이콘. 숫자와 규칙은 호버 툴팁에서만 풀어 쓴다. */
+  private updateEnemyIntel(el: HTMLElement, e: EnemyInst) {
+    const host = el.querySelector<HTMLElement>('.enemy-intel')!
+    const activePart = activeEnemyPart(e)
+    const attackStep = nextEnemyAttackStep(e)
+    const summonPattern = e.def.summonPattern
+    const summons = summonCount(e)
+    const weak = activePart?.def.weakness ?? (e.def.weakEmotion ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: e.def.weakEmotion } : null)
+    const icons: string[] = []
+    const add = (kind: string, glyph: string, tooltip: string) => {
+      icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}">${glyph}</span>`)
+    }
+
+    if (weak?.kind === 'emotion') {
+      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), `약점 · ${weak.label} 감정 피해 ×1.5`)
+    } else if (weak) {
+      add('weak', '<b>!</b>', `약점 · ${weak.label} 태그 피해 ×1.5`)
+    }
+    if (attackStep) {
+      const detail = attackStep.damageScale === 0
+        ? '피해 없음 · 다음 공격 준비'
+        : attackStep.damageScale != null && attackStep.damageScale !== 1
+          ? `위력 ${Math.round(attackStep.damageScale * 100)}%`
+          : attackStep.bonusAtk > 0
+            ? `공격 +${attackStep.bonusAtk}`
+            : '기본 위력'
+      add('attack', icon('sword'), `다음 행동 · ${attackStep.name} · ${detail}`)
+    }
+    if (e.def.boss) {
+      const stage = bossAttackStage(e)
+      add(`stage stage-${stage}`, `<b>${stage}</b>`, `공격 단계 ${stage} · 위력 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)}`)
+    }
+    if (e.guard > 0) add('guard', icon('shield'), `방어 ${e.guard} · 다음 피해부터 먼저 흡수`)
+    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, `마법실드 ${e.magicShield} · 공격 ${e.magicShield}회를 완전히 차단`)
+    if (e.def.pierceGuard) add('pierce', icon('sword'), '관통 · 방어를 무시하고 체력에 피해')
+    if (summonPattern) add(`summon${summons >= summonPattern.releaseAt ? ' ready' : ''}`, icon('jar'), `${summonPattern.name} ${summons}/${summonPattern.max} · 공격력 +${summons * summonPattern.attackBonusPerUnit}`)
+    if (e.def.webPattern) add(`web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`, '<b>✣</b>', `거미줄 봉인 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards} · 현재 다리 약점을 맞히면 봉인 해제`)
+    if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', `그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}`)
+
+    host.hidden = icons.length === 0
+    host.innerHTML = icons.join('')
   }
 
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
@@ -1073,6 +1116,8 @@ export class BattleView {
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
+    // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다. 보스 상단 HUD만 보조 텍스트를 유지한다.
+    traits.hidden = !bossHud
     const weak = e.def.weakEmotion
     const attackStage = bossAttackStage(e)
     const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]

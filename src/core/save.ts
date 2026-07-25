@@ -1,4 +1,4 @@
-import { DECK_LIMITS, reinforceWord, type RunState } from './run'
+import { COMBAT_BALANCE_VERSION, DECK_LIMITS, reinforceWord, type RunState } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import type { Emotion, Word } from './types'
 
@@ -65,6 +65,18 @@ function migrateCardDefinitions(run: RunState): boolean {
   return migrated
 }
 
+/**
+ * v0.4.34: 기존 런도 새 기본 체력 여유를 받고, 이전 기본 방어 5에서만 2를 뺀다.
+ * 아이템·무럭무럭 성장분은 같은 차이만큼 보존하며, 버전으로 중복 보정을 막는다.
+ */
+export function migrateCombatBalance(run: RunState): boolean {
+  if ((run.balanceVersion ?? 0) >= COMBAT_BALANCE_VERSION) return false
+  run.player.stats.hp += 32
+  run.player.stats.guard = Math.max(3, run.player.stats.guard - 2)
+  run.balanceVersion = COMBAT_BALANCE_VERSION
+  return true
+}
+
 function isRunState(value: unknown): value is RunState {
   if (!value || typeof value !== 'object') return false
   const run = value as Partial<RunState>
@@ -104,6 +116,7 @@ export function loadRun(): RunState | null {
       parsed.reward = null
       migrated = true
     }
+    migrated = migrateCombatBalance(parsed) || migrated
     for (const words of Object.values(parsed.player.deck)) {
       for (const word of words) {
         const subjectEmotion = LEGACY_SUBJECT_EMOTIONS[word.id]

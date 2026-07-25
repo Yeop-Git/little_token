@@ -1,5 +1,7 @@
 import { compile } from '@core/compiler'
-import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer } from '@core/run'
+import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
+import { defaultPlayer } from '@core/player'
+import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
 import { wordValueLines } from '@core/wordText'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -29,6 +31,24 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
 }
 const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, counterMultiplier: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra });
+
+{ const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
+{ const player = defaultPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'battle fallback starts at hp 52 and guard 3') }
+{
+  const legacy = { player: { ...startingPlayer(), stats: { hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 } }, day: 4, endless: false, endingSeen: false } as Omit<RunState, 'balanceVersion'>
+  assert(migrateCombatBalance(legacy as RunState) && legacy.player.stats.hp === 52 && legacy.player.stats.guard === 3, 'legacy base stats migrate once')
+  assert(!migrateCombatBalance(legacy as RunState) && legacy.player.stats.hp === 52 && legacy.player.stats.guard === 3, 'combat balance migration is idempotent')
+}
+{
+  const legacy = { player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } }, day: 9, balanceVersion: 0, endless: false, endingSeen: false, reward: null }
+  migrateCombatBalance(legacy)
+  assert(legacy.player.stats.hp === 100 && legacy.player.stats.guard === 7, 'legacy growth survives combat balance migration')
+}
+{
+  const stage = stageFor(5)
+  const baseHit = Math.round(ENEMIES.mantis.atk * stage.atkMult)
+  assert(startingPlayer().stats.hp > baseHit * 4, 'base hp survives four day-5 mantis baseline strikes')
+}
 
 { const s = state([makeEnemy(foe('shield', { magicShield: 2, hp: 20 }))]); const r = applyIntent(s, attack({ hitCount: 3 }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].magicShieldRemaining === 1 && r.hits[1].magicShieldRemaining === 0 && r.hits[2].dmg === 10 && s.enemies[0].hp === 10, 'layered magic shield and multihit') }
 { const s = state([makeEnemy(foe('guard', { guard: 8, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].guard === 8, 'pierce guard') }

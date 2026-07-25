@@ -1751,8 +1751,8 @@ button {
 .model-shell[data-model-status='ready-3d'] .battle-model { opacity: 1; }
 .model-shell[data-model-status='ready-3d'] .battle-sprite { visibility: hidden; }
 .model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
-.actor .model-shell:hover,
-.actor:focus-visible .model-shell {
+.actor.you .model-shell:hover,
+.actor.you:focus-visible .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
 }
 /* 투영 그림자 대신 발선만 배경에 살짝 묻는 접지 흔적을 둔다. */
@@ -2061,6 +2061,80 @@ button {
   font-weight: 700;
 }
 .enemy-traits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; min-height: 17px; }
+.enemy-intel {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 82px);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.enemy-intel[hidden] { display: none; }
+.enemy-intel-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 221, 165, .5);
+  border-radius: 11px 5px 10px 5px;
+  color: #ffe4ad;
+  background: linear-gradient(145deg, rgba(52, 32, 38, .96), rgba(19, 12, 22, .94));
+  box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .06), 0 4px 11px rgba(0, 0, 0, .56);
+  cursor: help;
+  outline: none;
+  transition: transform .14s ease, filter .14s ease;
+}
+.enemy-intel-icon svg { width: 23px; height: 23px; }
+.enemy-intel-icon > b { font: 900 17px/1 Georgia, serif; }
+.enemy-intel-icon .emotion-face { width: 26px; height: 26px; object-fit: contain; }
+.enemy-intel-icon .emotion-symbol { font-size: 20px; }
+.enemy-intel-icon.magic > b { position: absolute; right: -5px; bottom: -5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; color: #2b1d3e; background: #e5d0ff; font: 900 10px/1 sans-serif; }
+.enemy-intel-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 120;
+  width: max-content;
+  max-width: 250px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff3d4;
+  background: rgba(16, 11, 21, .97);
+  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .22), 0 8px 18px rgba(0, 0, 0, .56);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.enemy-intel-icon:hover,
+.enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
+.enemy-intel-icon:hover::after,
+.enemy-intel-icon:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.enemy-intel-icon.weak { color: #ffe69a; border-color: rgba(255, 220, 113, .7); }
+.enemy-intel-icon.weak.emotion-joy { color: #ffdf72; }
+.enemy-intel-icon.weak.emotion-anger { color: #ff9587; }
+.enemy-intel-icon.weak.emotion-sorrow { color: #8fc5ff; }
+.enemy-intel-icon.weak.emotion-pleasure { color: #f5a0eb; }
+.enemy-intel-icon.attack, .enemy-intel-icon.stage { color: #ffb37d; border-color: rgba(255, 137, 83, .7); }
+.enemy-intel-icon.guard { color: #8ee4f4; border-color: rgba(142, 228, 244, .65); }
+.enemy-intel-icon.magic { color: #d9aaff; border-color: rgba(217, 170, 255, .72); }
+.enemy-intel-icon.pierce { color: #ff9d81; border-color: rgba(255, 157, 129, .72); }
+.enemy-intel-icon.summon { color: #ffe47d; border-color: rgba(255, 213, 73, .72); }
+.enemy-intel-icon.web { color: #ded4ee; border-color: rgba(210, 198, 231, .58); }
+.enemy-intel-icon.groggy { color: #fff1a6; border-color: rgba(255, 226, 102, .72); }
+.enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
+.actor.foe { cursor: default; }
+.actor.foe .model-shell { cursor: default; }
 .trait { padding: 2px 5px; border-radius: 7px; font-size: 10px; font-weight: 900; line-height: 1.2; background: rgba(10, 8, 16, .58); }
 .trait.guard { color: #8ee4f4; border: 1px solid rgba(142, 228, 244, .42); }
 .trait.magic { color: #d9aaff; border: 1px solid rgba(217, 170, 255, .48); }
