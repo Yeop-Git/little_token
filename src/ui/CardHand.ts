@@ -4,8 +4,12 @@ import type { Word } from '@core/types'
 // 클릭으로 카드를 먹일 때 고스트가 부풀어 사라지는 시간.
 const COMMIT_ANIM_MS = 340
 
+const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
+
 export const CARD_HAND_CONFIG = {
   maxHand: 6,
+  /** 한 스테이지에서 추가로 뽑을 수 있는 횟수. 전투를 시작할 때 이 값으로 초기화된다. */
+  drawsPerStage: 2,
   cardWidth: 158,
   cardHeight: 218,
   maxSpacing: 170,
@@ -71,6 +75,8 @@ export class CardHand {
   private lastDragX = 0
   private dragAccepted = false
   private drawQueue = 0
+  // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
+  private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
   private serial = 0
   private epoch = 0
@@ -183,13 +189,15 @@ export class CardHand {
     const state = this.currentState()
     if (!state || this.destroyed) return
     const reserved = state.hand.length + this.drawQueue
-    if (reserved >= CARD_HAND_CONFIG.maxHand || this.drawQueue >= state.deck.length) {
+    // 예산·손패 상한·남은 덱 중 하나라도 막히면 거절(흔들기).
+    if (this.drawsLeft <= 0 || reserved >= CARD_HAND_CONFIG.maxHand || this.drawQueue >= state.deck.length) {
       this.opts.deckButton.animate(
         [{ transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' }, { transform: 'translateX(0)' }],
         { duration: 180 },
       )
       return
     }
+    this.drawsLeft--
     this.drawQueue++
     this.updateDeckButton(state)
     if (!this.processing) void this.processDrawQueue(this.epoch)
@@ -241,7 +249,10 @@ export class CardHand {
       [{ transform: 'rotateY(180deg)' }, { transform: 'rotateY(180deg)', offset: 0.38 }, { transform: 'rotateY(0deg)' }],
       { duration, easing: 'ease-out' },
     )
-    await Promise.allSettled([movement.finished, flip?.finished ?? Promise.resolve()])
+    // 애니메이션이 끝나지 않는 상황(백그라운드 탭 등)에서도 드로우는 반드시 완료돼야 한다.
+    // 여기서 멈추면 예산만 깎이고 카드가 오지 않는다.
+    const settled = Promise.allSettled([movement.finished, flip?.finished ?? Promise.resolve()])
+    await Promise.race([settled, new Promise((r) => window.setTimeout(r, duration + 200))])
     if (epoch !== this.epoch) movement.cancel()
   }
 
@@ -312,7 +323,9 @@ export class CardHand {
     const aria = blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`
     const artUrl = card.word.art ? SKILL_ART[card.word.art] : undefined
     const level = card.word.level ?? 1
-    const levelBadge = level > 1 ? `<span class="card-level">Lv.${level}</span>` : ''
+    // 대상 범위 대신 등급·강화 단계를 보여준다 — 카드에서 알고 싶은 건 이쪽이다.
+    const rarity = card.word.rarity ?? 'common'
+    const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
     // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
     const front = artUrl
       ? `<span class="card-face card-front art">
@@ -387,15 +400,14 @@ export class CardHand {
     this.pulseSlotStep()
     // 연출은 진행 전에 미리 찍어 둔다 — onConfirm이 손패를 다시 그리면 버튼이 사라지기 때문.
     if (button && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      this.playCommitFx(button, card.word)
+      this.playCommitFx(button)
     }
     this.opts.onConfirm(card.word)
   }
 
   // 순수 연출 — 원본 위치에서 고스트를 복제해 화면 쪽으로 부풀리며 빛으로 흩어 보낸다.
-  private playCommitFx(button: HTMLButtonElement, word: Word) {
+  private playCommitFx(button: HTMLButtonElement) {
     const ghost = this.spawnCommitGhost(button)
-    this.burstAt(button, word)
     // 좌표는 숫자로 계산한다(키프레임 안의 calc()는 브라우저가 거부할 수 있다).
     const x = parseFloat(ghost.style.getPropertyValue('--drag-x')) || 0
     const y = parseFloat(ghost.style.getPropertyValue('--drag-y')) || 0
@@ -436,42 +448,6 @@ export class CardHand {
     ghost.style.setProperty('--drag-tilt', '0deg')
     this.stage.append(ghost)
     return ghost
-  }
-
-  // 카드 색(--wglow)으로 사방에 튀는 빛 파편 + 중앙 링.
-  private burstAt(button: HTMLElement, word: Word) {
-    const stageRect = this.stage.getBoundingClientRect()
-    const rect = button.getBoundingClientRect()
-    const scaleX = stageRect.width / this.stage.offsetWidth || 1
-    const scaleY = stageRect.height / this.stage.offsetHeight || 1
-    const cx = (rect.left + rect.width / 2 - stageRect.left) / scaleX
-    const cy = (rect.top + rect.height / 2 - stageRect.top) / scaleY
-
-    const burst = document.createElement('div')
-    burst.className = `card-burst mood-${this.moodOf(word)}`
-    burst.style.left = `${cx.toFixed(1)}px`
-    burst.style.top = `${cy.toFixed(1)}px`
-    burst.innerHTML = '<i class="cb-ring"></i>'
-    this.stage.append(burst)
-
-    for (let i = 0; i < 14; i++) {
-      const shard = document.createElement('i')
-      shard.className = 'cb-shard'
-      burst.append(shard)
-      const ang = (Math.PI * 2 * i) / 14 + Math.random() * 0.4
-      const dist = 90 + Math.random() * 140
-      shard.animate(
-        [
-          { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
-          {
-            transform: `translate(calc(-50% + ${(Math.cos(ang) * dist).toFixed(0)}px), calc(-50% + ${(Math.sin(ang) * dist - 30).toFixed(0)}px)) scale(0.2)`,
-            opacity: 0,
-          },
-        ],
-        { duration: 420 + Math.random() * 260, easing: 'cubic-bezier(.2,.7,.3,1)' },
-      )
-    }
-    window.setTimeout(() => burst.remove(), 760)
   }
 
   private beginDrag(event: DragEvent, button: HTMLButtonElement, card: CardInstance) {
@@ -639,13 +615,16 @@ export class CardHand {
     this.wordZone?.querySelector('.slot-step .step.receiving')?.classList.remove('receiving')
   }
 
+  // 덱 버튼 — 이번 스테이지에 남은 추가 드로우 횟수를 보여준다(덱 장수가 아니다).
   private updateDeckButton(state: SlotHandState) {
-    const remaining = Math.max(0, state.deck.length - this.drawQueue)
+    const pileLeft = Math.max(0, state.deck.length - this.drawQueue)
     const full = state.hand.length + this.drawQueue >= CARD_HAND_CONFIG.maxHand
-    const disabled = full || remaining === 0
+    const spent = this.drawsLeft <= 0
+    const disabled = full || spent || pileLeft === 0
+    const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
     this.opts.deckButton.disabled = disabled
-    this.opts.deckButton.setAttribute('aria-label', disabled ? (full ? '손패가 가득 참' : '덱이 비었음') : `카드 뽑기, ${remaining}장 남음`)
-    this.opts.deckButton.innerHTML = `<span class="deck-stack" aria-hidden="true"><i></i><i></i><b>그림일기</b></span><span class="deck-copy"><b>카드 뽑기</b><small>${full ? '손패 가득' : `${remaining}장 남음`}</small></span>`
+    this.opts.deckButton.setAttribute('aria-label', disabled ? `카드 뽑기 불가: ${note}` : `카드 뽑기, ${note}`)
+    this.opts.deckButton.innerHTML = `<span class="deck-stack" aria-hidden="true"><i></i><i></i><b>그림일기</b></span><span class="deck-copy"><b>카드 뽑기</b><small>${note}</small></span>`
   }
 
   private updateDropZone(state: SlotHandState | undefined) {

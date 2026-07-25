@@ -12,6 +12,10 @@ export const BASE_SLOTS: Record<string, SlotDef> = {
   obj: { key: 'obj', label: '목적어', role: 'object', josa: true },
   verb: { key: 'verb', label: '동사', role: 'verb' },
   end: { key: 'end', label: '어미', role: 'ending' },
+  // 아이템 패시브로 열리는 칸 — 기본 템플릿에는 없다(core/passives.ts).
+  subj2: { key: 'subj2', label: '주어 2', role: 'subject' },
+  verb2: { key: 'verb2', label: '동사 2', role: 'verb' },
+  punct: { key: 'punct', label: '문장부호', role: 'ending', attach: true },
 }
 
 export const DEFAULT_ORDER = ['subj', 'adv', 'obj', 'verb', 'end']

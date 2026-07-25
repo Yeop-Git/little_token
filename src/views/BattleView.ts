@@ -17,11 +17,12 @@ import {
   sentenceTokens,
   statBiasOf,
   wordFlat,
+  PREEMPT_TAG,
   STAT_NAME,
   type ResolvedMult,
 } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
-import type { Intent, Selection, Tables, Word, FieldDef } from '@core/types'
+import type { CompileMods, Intent, Selection, Tables, Word, FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ENEMIES } from '@data/enemies'
 import {
@@ -35,12 +36,13 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { BACKGROUNDS } from '@/assets'
+import { BACKGROUNDS, SKILL_ART } from '@/assets'
 import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
+import { hasPassive, modsFor, passivesOf, PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
@@ -63,7 +65,8 @@ interface Opts {
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
-const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
+const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
+const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
 
 // 적 레일 — rank 0이 최전방. 우측 정보창(오른쪽에서 406px)에 뒷줄이 깔리지 않도록
 // 라인 전체를 플레이어 쪽으로 당겨 두었다.
@@ -111,10 +114,14 @@ export class BattleView {
   private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string; tally?: Tally }[] = []
   private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
   // 정보창 유지용 — 클릭 중 호버가 잠깐 풀려도 패널이 꺼지지 않게 붙잡는다.
+  // 배율 릴 세대 — 새 선택이 들어오면 이전 릴은 조용히 물러난다.
+  private multReelToken = 0
   private parkedTally: HTMLElement | null = null
   private dockRestore: (() => void) | null = null
   private dockTimer = 0
   private pointerDown = false
+  /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
+  private killsThisBattle = 0
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -202,11 +209,14 @@ export class BattleView {
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-weather"><span id="f-weather"></span></div>
         </div>
-        <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
-        <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+        <div class="top-badges">
+          <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+          <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+        </div>
 
         <div class="stage-area" id="pbox">
           <div class="chain-rail" id="chain"></div>
+          <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
@@ -217,7 +227,6 @@ export class BattleView {
         <div class="word-zone">
           <div class="pane-stack">
             <div class="pane words">
-              <div class="slot-step" id="steps"></div>
               <div class="card-drop-zone disabled" id="card-drop-zone" role="button" tabindex="0"
                 aria-label="카드를 이곳으로 드래그해 단어 확정" aria-disabled="true">
                 <b>문장에 넣기</b><span>카드를 여기로 끌어 놓기</span>
@@ -226,6 +235,7 @@ export class BattleView {
                 <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
                 <button class="draw-deck" id="draw-deck" type="button"></button>
               </div>
+              <div class="slot-step" id="steps"></div>
             </div>
             <div class="pane bag">
               <div class="bag-row" id="bagrow"></div>
@@ -361,14 +371,20 @@ export class BattleView {
       <div class="actor foe" data-i="${i}" data-character="${visual.id}"
         role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
         <div class="nameplate glass">
-          <div class="row"><span class="nm">${e.def.name}</span><span class="hpn"></span></div>
+          <div class="row">
+            <span class="nm">${e.def.name}</span>
+            <span class="hpn"></span>
+          </div>
           <div class="hp-row">
             <div class="hpbar foe"><div class="fill"></div></div>
-            ${this.initiativeHtml(e.initiativePhase)}
           </div>
         </div>
+        <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
+        </span>
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+        <span class="guard-hint" aria-hidden="true">우선 방어하세요!</span>
         <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>`
   }
@@ -393,8 +409,8 @@ export class BattleView {
     plate.classList.toggle('gone', rank > 0 && !faint)
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
-    const chip = plate.querySelector<HTMLElement>('.initiative-chip')
-    if (chip && !chip.classList.contains(e.initiativePhase)) chip.outerHTML = this.initiativeHtml(e.initiativePhase)
+    // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
+    el.classList.toggle('strikes-first', !e.dead && e.initiativePhase === 'first')
     el.querySelector<HTMLElement>('.inspect-hint')!.classList.toggle('gone', !front)
   }
 
@@ -416,18 +432,6 @@ export class BattleView {
         show()
       }
     })
-  }
-
-  private initiativeHtml(phase: 'first' | 'second') {
-    const first = phase === 'first'
-    const label = first ? '선공' : '후공'
-    const desc = first ? '문장 완성 직후, 플레이어보다 먼저 행동' : '플레이어 행동이 끝난 뒤 행동'
-    const glyph = first
-      ? '<path d="M5 12h12M13 7l5 5-5 5"/><path d="M3 7l5 5-5 5"/>'
-      : '<path d="M19 12H7M11 7l-5 5 5 5"/><circle cx="18" cy="12" r="2"/>'
-    return `<span class="initiative-chip ${phase}" title="${label} · ${desc}" aria-label="${label}: ${desc}">
-      <svg viewBox="0 0 24 24" aria-hidden="true">${glyph}</svg><b>${label}</b>
-    </span>`
   }
 
   private setPhase(label: string) {
@@ -521,7 +525,9 @@ export class BattleView {
         const w = this.sel[k]
         if (!w) return ''
         const note = this.chainNote(w)
-        return `<span class="chain-word" data-i="${i}">
+        // 문장부호는 한 글자짜리 칸이라 좁게 붙인다.
+        const attach = this.t.template.slots[i]?.attach ? ' is-punct' : ''
+        return `<span class="chain-word${attach}" data-i="${i}">
           <b class="cw-text">${toks[i]}</b>
           ${note ? `<em class="cw-note ${note.cls}">${note.text}</em>` : ''}
         </span>`
@@ -529,7 +535,7 @@ export class BattleView {
       .join('')
     let extra = ''
     if (anyPicked) {
-      const intent = compile(this.sel, this.t, this.player.stats)
+      const intent = compile(this.sel, this.t, this.player.stats, this.mods())
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
         extra += `<span class="chain-word ctx perfect"><b class="cw-text">「${c.name}」</b><em class="cw-note combo">완벽한 맥락 ×${c.mult}</em></span>`
       }
@@ -539,6 +545,53 @@ export class BattleView {
       }
     }
     host.innerHTML = words + extra
+    this.renderMultNow(anyPicked)
+  }
+
+  // 체인 아래 "지금 배율" — 카드를 고르는 즉시 숫자가 삐리릭 돌다가 팅! 하고 확정된다.
+  // 발동을 기다리지 않고 이번 선택이 얼마짜리인지 바로 읽게 하는 게 목적이다.
+  private renderMultNow(anyPicked: boolean) {
+    const host = this.q('#mult-now')
+    if (!anyPicked) {
+      host.innerHTML = ''
+      host.className = 'mult-now'
+      this.multReelToken++
+      return
+    }
+    const intent = compile(this.sel, this.t, this.player.stats, this.mods())
+    const mult = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
+    // 정산판과 같은 출처(컴파일러가 쌓아 둔 깡수치)를 쓴다 — 방어·회복 문장도 0이 되지 않는다.
+    const flat = intent.breakdown.flats.reduce((n, f) => n + f.value, 0)
+    const lane = isDamageIntent(intent) ? '위력' : intent.heal > 0 ? '회복' : intent.guard > 0 ? '방어' : '위력'
+    if (!host.querySelector('.mn-mult')) {
+      host.innerHTML = `<span class="mn-lane"></span><span class="mn-flat"></span><span class="mn-x">×</span><span class="mn-mult"></span>`
+    }
+    // 동사를 아직 안 골라 깡수치가 없으면 배율만 보여준다("위력 0 ×1.4"는 오해를 부른다).
+    host.classList.toggle('no-flat', flat <= 0)
+    host.querySelector<HTMLElement>('.mn-lane')!.textContent = flat > 0 ? lane : '지금 배율'
+    host.querySelector<HTMLElement>('.mn-flat')!.textContent = String(flat)
+    void this.spinMult(host.querySelector<HTMLElement>('.mn-mult')!, mult, host)
+  }
+
+  // 숫자 릴 — 무작위 값이 몇 번 튀다가 실제 값에 멈추고 팅! 하며 발광한다.
+  private async spinMult(el: HTMLElement, target: number, host: HTMLElement) {
+    const token = ++this.multReelToken
+    host.classList.add('spinning')
+    host.classList.remove('landed', 'hot')
+    for (let i = 0; i < 5; i++) {
+      if (token !== this.multReelToken) return
+      const jitter = Math.max(0.2, target * (0.55 + Math.random() * 0.9))
+      el.textContent = jitter.toFixed(2)
+      await sleep(48)
+    }
+    if (token !== this.multReelToken) return
+    el.textContent = target.toFixed(2)
+    host.classList.remove('spinning')
+    host.classList.add('landed')
+    // 배율이 크게 붙었으면 더 뜨겁게 빛난다.
+    host.classList.toggle('hot', target >= 2)
+    GameAudio.play('wordSelect')
+    this.timers.push(window.setTimeout(() => host.classList.remove('landed'), 620))
   }
 
   // 체인에 붙는 한 줄 설명 — 동사는 "공격 ×1 = 3", 주어/수식은 배율.
@@ -570,6 +623,9 @@ export class BattleView {
       const parts = [`배율 ×${(1 + (w.bonus ?? 0)).toFixed(2)}`, odds, risk].filter(Boolean)
       return { text: parts.join(' · '), cls: risk ? 'down' : (w.bonus ?? 0) >= 0 ? 'buff' : 'down' }
     }
+    // 대성공만 밀어 주는 단어('?')와 순수 규칙 단어('!')는 배율이 아니라 그 규칙을 적는다.
+    if (w.crit) return { text: `대성공 +${Math.round(w.crit * 100)}%`, cls: 'buff' }
+    if (w.tags.includes(PREEMPT_TAG)) return { text: w.note, cls: 'buff' }
     return { text: '배율 ×1.00', cls: 'flat' }
   }
 
@@ -609,34 +665,62 @@ export class BattleView {
       return
     }
     this.dockMode = 'word'
-    const slotLabel = this.t.template.slots.find((s) => s.key === w.slot)?.label ?? ''
+    // 슬롯 키로 잡는다 — 겹동사(verb2)처럼 한 단어가 여러 칸에 들어갈 수 있어서
+    // w.slot을 쓰면 지금 고르는 칸이 아니라 원래 칸을 가리킨다.
+    const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
     const mood = this.moodOf(w)
     const values = this.wordOwnValues(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
-    const trial: Selection = { ...this.sel, [w.slot]: w }
-    const intent = compile(trial, this.t, this.player.stats)
+    const trial: Selection = { ...this.sel, [key]: w }
+    const intent = compile(trial, this.t, this.player.stats, this.mods())
     const warn = intent.penalties.length
       ? `<div class="wd-warn">⚠ ${intent.penalties[0]} · 위력 ×${intent.coherence.toFixed(2)}</div>`
       : ''
 
-    detail.className = `info-dock glass mood-${mood}`
+    // 일러스트가 있으면 패널 전체에 풀로 깔고, 글은 아래쪽 스크림 위에 얹는다.
+    const art = w.art ? SKILL_ART[w.art] : undefined
+    detail.className = `info-dock glass word-detail mood-${mood}`
     detail.innerHTML = `
-      <div class="wd-name">${w.text}</div>
-      <div class="wd-grade">✦ ${slotLabel} · 범위 ${this.wordRange(w)}</div>
-      ${this.projectionHtml(w)}
-      <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
-      ${warn}`
+      ${art ? `<div class="wd-art"><img src="${art}" alt="" /></div>` : ''}
+      <div class="wd-scrim" aria-hidden="true"></div>
+      <div class="wd-body">
+        <div class="wd-name">${w.text}</div>
+        <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
+        ${this.projectionHtml(w, key)}
+        <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+        ${warn}
+      </div>`
   }
 
   private multCtx(intent: Intent) {
     return { luck: this.player.stats.luck, statBias: statBiasOf(intent, this.player.stats) }
   }
 
+  /** 보유 패시브 → 컴파일러 수정자. 바베큐는 이번 전투 처치 수를 먹는다. */
+  private mods(): CompileMods {
+    return modsFor(this.player, this.killsThisBattle)
+  }
+
+  /**
+   * 신데렐라의 황금사과 — 대성공에 실패하면 한 번 더 굴린다.
+   * 낮은 굴림일수록 대성공이므로 두 번 굴려 낮은 쪽을 쓰면 "재시도"와 같다.
+   */
+  private rouletteRoll(): number {
+    const a = Math.random()
+    if (!hasPassive(this.player, 'retry')) return a
+    return Math.min(a, Math.random())
+  }
+
+  /** 피노키오의 미아핑 — 맥락 수만큼 "근데?"를 굴린다. */
+  private doubtRolls(intent: Intent): number[] {
+    return Array.from({ length: intent.doubtCount }, () => Math.random())
+  }
+
   // 이 문장(현재 선택 + 이 단어)이 발동될 때의 미리보기 수치 — 운은 반영, 룰렛은 보통(normal) 가정.
   // 공/방/회 모두 하나의 배율을 공유한다(execute와 동일 규칙, 룰렛만 미확정).
   // 스탯은 이미 동사의 깡수치로 들어가 있으니 여기서 또 더하지 않는다.
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
-    const intent = compile(sel, this.t, this.player.stats)
+    const intent = compile(sel, this.t, this.player.stats, this.mods())
     const m = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     const guard = Math.round(intent.guard * m)
     const heal = Math.round(intent.heal * m)
@@ -646,10 +730,11 @@ export class BattleView {
   }
 
   // "적용(이 단어가 더하는 값) · 최종(현재 문장 총합)" 프로젝션 블록.
-  private projectionHtml(w: Word): string {
+  // slotKey는 지금 고르고 있는 칸 — 겹동사면 verb2일 수 있다.
+  private projectionHtml(w: Word, slotKey: string): string {
     const base: Selection = { ...this.sel }
-    delete base[w.slot]
-    const now = this.projectFinal({ ...this.sel, [w.slot]: w })
+    delete base[slotKey]
+    const now = this.projectFinal({ ...this.sel, [slotKey]: w })
     const prev = this.projectFinal(base)
     const metrics: { key: 'dmg' | 'heal' | 'guard' | 'self'; label: string }[] = [
       { key: 'dmg', label: '피해' },
@@ -678,15 +763,6 @@ export class BattleView {
     </div>`
   }
 
-  // 단어 하나의 범위(대상) — 다른 슬롯과 무관.
-  private wordRange(w: Word): string {
-    if (w.kind === 'heal' || w.kind === 'guard') return '자신'
-    if (w.aoe === 'all') return w.targetMode === 'both' ? '적 전체 + 자신' : '적 전체'
-    if (w.targetMode === 'both') return '적 하나 + 자신'
-    if (w.targetMode === 'enemy' || w.kind === 'attack' || (w.power ?? 0) > 0) return '적 하나'
-    return '문장 보정'
-  }
-
   // 단어 하나의 고유 수치 — 누적하지 않는다.
   private wordOwnValues(w: Word): { text: string; cls: string }[] {
     const out: { text: string; cls: string }[] = []
@@ -707,13 +783,18 @@ export class BattleView {
 
   // ── 우측 스탯표 ──
   private renderStats() {
-    this.q('#stats').innerHTML = STAT_META.map(
-      (m) => `<div class="stat" title="${m.desc}">
+    // 스탯 아래에 지금 걸려 있는 규칙(전설 아이템 패시브)을 늘 보이게 둔다.
+    const passives = passivesOf(this.player)
+      .map((p) => `<div class="stat-passive" title="${p.desc}">✦ ${p.name}</div>`)
+      .join('')
+    this.q('#stats').innerHTML =
+      STAT_META.map(
+        (m) => `<div class="stat" title="${m.desc}">
         <span class="si">${icon(m.icon)}</span>
         <span class="sl">${m.label}</span>
         <span class="sv">${this.player.stats[m.key]}</span>
       </div>`,
-    ).join('')
+      ).join('') + passives
   }
 
   // ── 가방(아이템) — 하단 인라인 토글 ──
@@ -760,10 +841,14 @@ export class BattleView {
     const rows = STAT_ORDER.filter((k) => item.stats[k])
       .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
       .join('')
-    detail.className = 'info-dock glass item-detail'
+    // 전설 아이템은 스탯이 아니라 규칙을 준다 — 그 규칙을 그대로 적어 준다.
+    const p = item.passive ? PASSIVES[item.passive] : null
+    const passive = p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''
+    detail.className = `info-dock glass item-detail${p ? ' is-passive' : ''}`
     detail.innerHTML = `
       <div class="wd-name">${item.name}</div>
       <div class="wd-grade">✦ ${item.grade} · 「${item.line}」</div>
+      ${passive}
       <div class="id-stats">${rows}</div>
       <div class="id-art">${itemArt(item.art)}</div>`
   }
@@ -851,16 +936,23 @@ export class BattleView {
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
     const cls = (p: { source: string; value: number }) =>
       p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
-    const flats: TallyPart[] = intent.breakdown.flats.map((p) => ({
-      label: p.hint ? `${p.label} (${p.hint})` : p.label,
-      value: p.value,
-      cls: dealsDamage ? 'dmg' : 'heal',
-    }))
+    // 동사가 둘이면 한 문장이 피해와 회복을 동시에 만든다 — 집계판은 자기 풀만 더한다.
+    // (안 그러면 방어 깡수치가 피해 총합에 섞여 화면 숫자와 실제 피해가 어긋난다.)
+    const lane = dealsDamage ? 'damage' : 'heal'
+    const flats: TallyPart[] = intent.breakdown.flats
+      .filter((p) => (p.lane ?? 'damage') === lane)
+      .map((p) => ({
+        label: p.hint ? `${p.label} (${p.hint})` : p.label,
+        value: p.value,
+        cls: dealsDamage ? 'dmg' : 'heal',
+      }))
     const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
 
     const p = resolved.parts
     if (p.variance !== 1) mults.push({ label: '도박', value: p.variance, cls: p.variance >= 1 ? 'buff' : 'down' })
     if (p.luck !== 1) mults.push({ label: '운', value: p.luck, cls: 'stat' })
+    // 피노키오의 미아핑 — 맥락마다 따로 굴린 "근데?"를 하나씩 늘어놓는다.
+    for (const d of resolved.doubtRolls) mults.push({ label: '근데?', value: d, cls: 'gamble' })
     if (resolved.outcome === 'crit') mults.push({ label: '대성공', value: p.roulette, cls: 'crit' })
     if (resolved.outcome === 'fail') mults.push({ label: '실패', value: p.roulette, cls: 'down' })
 
@@ -907,13 +999,102 @@ export class BattleView {
       await sleep(185)
     }
 
-    const total = el.querySelector<HTMLElement>('.tally-total')!
-    total.textContent = String(tally.total)
-    total.classList.add('slam')
-    await sleep(420)
+    // 깡 × 배율이 다 모이면 잠깐 멈춰 읽을 시간을 준다 — 호버 중이면 더 기다리고, 클릭하면 즉시.
+    await this.tallyDwell(el)
+
+    // 총합 롤업 — 깡·배율 상자에서 불꽃이 중앙으로 날아가 꽂힐 때마다 숫자가 뽀로롱 오른다.
+    await this.rollUpTotal(el, tally)
+
     // 여기서 지우지 않는다 — 준비 효과·선공을 지나 내 공격이 꽂힐 때까지 이 숫자가 머문다.
     el.classList.add('parked')
     this.parkedTally = el
+  }
+
+  // 집계판 체류 — 기본 1.3초. 패널에 마우스를 올려두면 놓을 때까지(최대 8초) 기다리고,
+  // 아무 곳이나 클릭하면 바로 진행한다.
+  private tallyDwell(el: HTMLElement): Promise<void> {
+    el.classList.add('dwell')
+    return new Promise((resolve) => {
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        el.classList.remove('dwell')
+        this.root.removeEventListener('pointerdown', onClick, true)
+        resolve()
+      }
+      const onClick = () => finish()
+      this.root.addEventListener('pointerdown', onClick, true)
+      const started = Date.now()
+      const tick = () => {
+        if (done) return
+        const elapsed = Date.now() - started
+        const holding = el.matches(':hover') && elapsed < 8000
+        if (elapsed >= 1300 && !holding) return finish()
+        this.timers.push(window.setTimeout(tick, 140))
+      }
+      tick()
+    })
+  }
+
+  // 총합 문턱 — 넘을 때마다 판이 한 단계 더 화려해진다(발광·확대).
+  private applyHeatTier(el: HTMLElement, v: number) {
+    el.classList.toggle('hot1', v >= 50)
+    el.classList.toggle('hot2', v >= 90)
+    el.classList.toggle('hot3', v >= 140)
+  }
+
+  // 뽀로롱 롤업 — 스텝마다 깡/배율 상자에서 불꽃이 총합으로 날아가 꽂히고 숫자가 오른다.
+  private async rollUpTotal(el: HTMLElement, tally: Tally) {
+    const total = el.querySelector<HTMLElement>('.tally-total')!
+    const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
+    const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
+    total.textContent = '0'
+    const steps = Math.min(11, Math.max(5, Math.round(tally.total / 14)))
+    for (let i = 1; i <= steps; i++) {
+      const eased = 1 - Math.pow(1 - i / steps, 2)
+      void this.flingSpark(i % 2 ? baseBox : multBox, total, el)
+      await sleep(i === steps ? 150 : 95)
+      total.textContent = String(Math.round(tally.total * eased))
+      total.classList.remove('tick')
+      void total.offsetWidth
+      total.classList.add('tick')
+      this.applyHeatTier(el, Math.round(tally.total * eased))
+      if (i % 2 === 0) GameAudio.play('wordSelect')
+    }
+    total.textContent = String(tally.total)
+    this.applyHeatTier(el, tally.total)
+    total.classList.remove('tick')
+    total.classList.add('slam')
+    GameAudio.play('sentenceComplete') // 팅!!!!
+    await sleep(380)
+  }
+
+  // 상자 중심 → 총합 중심으로 날아가는 불꽃 하나. 무대가 scale()로 줄어 있으므로
+  // 화면 좌표 차이를 무대 배율로 되돌려 적용한다.
+  private flingSpark(from: HTMLElement, to: HTMLElement, host: HTMLElement): Promise<void> {
+    const f = from.getBoundingClientRect()
+    const t = to.getBoundingClientRect()
+    const h = host.getBoundingClientRect()
+    const scale = h.width / Math.max(1, host.offsetWidth)
+    const s = document.createElement('span')
+    s.className = 'tally-spark'
+    s.style.left = `${(f.left + f.width / 2 - h.left) / scale}px`
+    s.style.top = `${(f.top + f.height / 2 - h.top) / scale}px`
+    host.appendChild(s)
+    const dx = (t.left + t.width / 2 - (f.left + f.width / 2)) / scale
+    const dy = (t.top + t.height / 2 - (f.top + f.height / 2)) / scale
+    const anim = s.animate(
+      [
+        { transform: 'translate(-50%,-50%) scale(0.7)', opacity: 0.9 },
+        { transform: `translate(calc(-50% + ${(dx * 0.5).toFixed(0)}px), calc(-50% + ${(dy * 0.5 - 24).toFixed(0)}px) ) scale(1.25)`, opacity: 1, offset: 0.55 },
+        { transform: `translate(calc(-50% + ${dx.toFixed(0)}px), calc(-50% + ${dy.toFixed(0)}px)) scale(0.5)`, opacity: 0.85 },
+      ],
+      { duration: 230, easing: 'cubic-bezier(0.3,0.1,0.4,1)' },
+    )
+    // 배경 탭 등 애니메이션이 진행되지 않는 상황에서도 반드시 치워지도록 타이머로도 건다.
+    this.timers.push(window.setTimeout(() => s.remove(), 400))
+    return anim.finished.then(() => s.remove()).catch(() => s.remove())
   }
 
   // 머물러 있던 총합을 거둔다 — 그 수치가 그대로 적에게 들어간 직후에 부른다.
@@ -953,17 +1134,20 @@ export class BattleView {
   private async execute() {
     if (!this.complete() || this.busy || this.over) return
     this.busy = true
+    // 정산이 도는 동안 손패는 "이미 쓴" 상태로 흐려지고 입력을 받지 않는다(연타 방지).
+    this.q('.word-zone').classList.add('is-resolving')
 
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
-    const intent = compile(this.sel, this.t, this.player.stats)
+    const intent = compile(this.sel, this.t, this.player.stats, this.mods())
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
       intent,
       this.multCtx(intent),
-      Math.random(),
+      this.rouletteRoll(),
       intent.variance ? Math.random() : null,
+      this.doubtRolls(intent),
     )
     const mult = resolved.mult
     const dmg = Math.round(effectiveBase(intent) * mult)
@@ -998,6 +1182,10 @@ export class BattleView {
     const tally = this.buildTally(intent, resolved, dealsDamage)
     if (tally.total > 0) await this.playTally(tally)
 
+    // 무럭무럭 — 배율을 받지 않는 고정 성장이라 배율 정산과 별개로 먼저 자란다.
+    // 최대 체력과 현재 체력을 함께 올려야 "자랐다"가 체감된다.
+    if (intent.growHp > 0) await this.growUp(intent.growHp)
+
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
@@ -1009,14 +1197,22 @@ export class BattleView {
     this.renderActors()
 
     // 6) 선공 상대 행동 — 이번 문장의 준비 효과를 받은 뒤 공격한다.
-    this.setPhase('선공 상대 행동')
-    await this.enemyPhase('first')
-    if (this.state.playerHp <= 0) {
-      this.releaseTally()
-      this.over = true
-      this.setPhase('패배')
-      this.log('일기장이 너무 상했다… (패배)')
-      return
+    //    문장부호 '!'가 붙었으면 이 페이즈를 건너뛴다. 선공 적은 이번 턴에 못 때리고,
+    //    쿨다운도 소모하지 않으므로 다음 턴에 그대로 돌아온다(미루기지 없애기가 아니다).
+    if (intent.preempt) {
+      this.setPhase('선수 · 먼저 움직였다')
+      this.log('느낌표 — 상대보다 먼저 움직였다.')
+      await sleep(260)
+    } else {
+      this.setPhase('선공 상대 행동')
+      await this.enemyPhase('first')
+      if (this.state.playerHp <= 0) {
+        this.releaseTally()
+        this.over = true
+        this.setPhase('패배')
+        this.log('일기장이 너무 상했다… (패배)')
+        return
+      }
     }
 
     // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
@@ -1044,6 +1240,15 @@ export class BattleView {
     let kills = res.killed.length
     if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
 
+    // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
+    // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
+    if (resolved.outcome === 'crit' && hasPassive(this.player, 'echo') && !allDead(this.state)) {
+      kills += await this.echoStrike(intent, mult, sweep)
+    }
+
+    // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
+    this.killsThisBattle += kills
+
     // 한 턴에 두 마리 이상 쓸어담으면 보상등급이 띵·띵·띵 오른다. 전멸 마무리면 +1.
     const gradeGain = overkillGain(kills, allDead(this.state))
     if (gradeGain > 0) await this.dingGrade(gradeGain)
@@ -1052,7 +1257,8 @@ export class BattleView {
       this.over = true
       this.setPhase('전투 승리')
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
-      await sleep(800)
+      await sleep(500)
+      await this.gradeFinale()
       this.onWin(this.grade)
       return
     }
@@ -1094,7 +1300,8 @@ export class BattleView {
     } else if (allDead(this.state)) {
       this.over = true
       this.setPhase('전투 승리')
-      await sleep(500)
+      await sleep(300)
+      await this.gradeFinale()
       this.onWin(this.grade)
       return
     }
@@ -1109,9 +1316,54 @@ export class BattleView {
     if (this.grade < prevGrade) this.tickGradeDown()
     this.setPhase('주어 선택')
     this.busy = false
+    this.q('.word-zone').classList.remove('is-resolving')
     this.cardHand.resetTurn()
     this.renderChain()
     this.renderWords()
+  }
+
+  /**
+   * 무럭무럭 — 최대 체력이 영구히 자란다. 배율을 받지 않는 고정 수치다.
+   * 런 전체에 남아야 하므로 플레이어 스탯(hp)까지 함께 올린다.
+   * 겹칠수록 이름이 길어진다: 무럭무럭 → 무럭무럭무럭무럭.
+   */
+  private async growUp(n: number): Promise<void> {
+    this.player.stats.hp += n
+    this.state.playerMax += n
+    this.state.playerHp += n
+    const label = '무럭'.repeat(Math.min(n * 2, 8)) + (n * 2 > 8 ? '…' : '')
+    this.popPlayer(`${label} 최대체력+${n}`, 'heal')
+    this.log(`${label} — 최대 체력이 ${n} 자랐다.`)
+    this.renderStats()
+    this.renderActors()
+    await sleep(420)
+  }
+
+  /**
+   * 메아리 재발동 — 같은 문장을 같은 배율로 한 번 더 꽂는다.
+   * 배율을 다시 굴리지 않으므로 대성공 ×1.5가 두 번 그대로 들어간다.
+   * 반환값은 이번 재발동으로 늘어난 처치 수(오버킬 등급에 합산).
+   */
+  private async echoStrike(intent: Intent, mult: number, sweep: boolean): Promise<number> {
+    // 살아 있는 적으로 조준을 옮긴다 — 원래 대상이 이미 쓰러졌을 수 있다.
+    if (this.state.enemies[this.target]?.dead) this.target = aliveIdx(this.state)[0] ?? this.target
+
+    const banner = this.q('#combo')
+    banner.innerHTML = `<div class="kicker">누댕의 메아리</div><div class="name">한 번 더</div><div class="mult">대성공</div>`
+    banner.classList.remove('show')
+    void banner.offsetWidth
+    banner.classList.add('show')
+    GameAudio.play('sentenceComplete')
+    await sleep(420)
+
+    const res = applyIntent(this.state, intent, mult, this.target)
+    await this.strike(res, sweep)
+    this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
+    this.renderActors()
+
+    let kills = res.killed.length
+    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
+    return kills
   }
 
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
@@ -1194,16 +1446,19 @@ export class BattleView {
     if (front) {
       const box = this.q('#pbox')
       const x = this.toStage(front.getBoundingClientRect()).x
-      actors.style.setProperty('--zoom-x', `${((x / box.offsetWidth) * 100).toFixed(1)}%`)
+      const pct = `${((x / box.offsetWidth) * 100).toFixed(1)}%`
+      actors.style.setProperty('--zoom-x', pct)
+      this.q('.scene.battle').style.setProperty('--zoom-x', pct) // 씬 전체 딤도 같은 초점을 쓴다
     }
     actors.classList.add('slowmo')
-    this.q('#pbox').classList.add('slowmo-veil')
+    // 딤은 씬 전체에 건다 — 무대(.stage-area)에 걸면 하단 350px에서 잘린다.
+    this.q('.scene.battle').classList.add('slowmo-veil')
     await sleep(340)
   }
 
   private endSlowmo() {
     this.q('#actors').classList.remove('slowmo')
-    this.q('#pbox').classList.remove('slowmo-veil')
+    this.q('.scene.battle').classList.remove('slowmo-veil')
   }
 
   // 불꽃 파편 — 지정 배우 근처에서 사방으로 튀며 사그라든다.
@@ -1336,6 +1591,30 @@ export class BattleView {
     }
   }
 
+  // 승리 피날레 — 보상등급 배지가 무대 중앙으로 날아와 커지며 팅! 하고 전리품에 적용된다.
+  private async gradeFinale() {
+    const badge = this.q('#grade-badge')
+    const scene = this.q('.scene.battle')
+    const b = badge.getBoundingClientRect()
+    const s = scene.getBoundingClientRect()
+    const scale = s.width / Math.max(1, scene.offsetWidth)
+    const dx = (s.left + s.width / 2 - (b.left + b.width / 2)) / scale
+    const dy = (s.top + s.height * 0.44 - (b.top + b.height / 2)) / scale
+    badge.classList.add('finale')
+    GameAudio.play('sentenceComplete')
+    const anim = badge.animate(
+      [
+        { transform: 'translate(0,0) scale(1)' },
+        { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(2.5)`, offset: 0.55 },
+        { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(2.25)` },
+      ],
+      { duration: 700, easing: 'cubic-bezier(0.2, 1.2, 0.3, 1)', fill: 'forwards' },
+    )
+    // 애니메이션이 끝나지 않는 환경에서도 보상 화면으로는 반드시 넘어가야 한다.
+    await Promise.race([anim.finished.catch(() => undefined), sleep(900)])
+    await sleep(420)
+  }
+
   // 턴 경과 감쇠 — 배지가 살짝 가라앉으며 식는다.
   private tickGradeDown() {
     this.renderGrade()
@@ -1368,7 +1647,7 @@ export class BattleView {
     p.style.top = `${fy}px`
     p.style.animation = 'none'
     pboxEl.appendChild(p)
-    await p.animate(
+    const fly = p.animate(
       [
         { transform: 'translate(0,0) scale(0.6)', opacity: 0 },
         { transform: 'translate(0,0) scale(1.15)', opacity: 1, offset: 0.22 },
@@ -1376,7 +1655,10 @@ export class BattleView {
         { transform: `translate(${to.x - fx}px, ${to.y + 40 - fy}px) scale(0.7)`, opacity: 0 },
       ],
       { duration: 520, easing: 'cubic-bezier(0.4,0,0.3,1)' },
-    ).finished
+    )
+    // 애니메이션이 진행되지 않는 상황에서도 턴은 흘러가야 한다 — 여기서 멈추면
+    // 손패가 사라진 채로 전투가 갇힌다.
+    await Promise.race([fly.finished.catch(() => undefined), sleep(700)])
     SquareBurst.playOn(you, theme, { spread: 95 })
     this.hitOne(you)
     p.remove()
@@ -1411,7 +1693,8 @@ export class BattleView {
     host.appendChild(el)
     const dur = 440
     const t0 = performance.now()
-    await new Promise<void>((resolve) => {
+    // rAF는 탭이 가려지면 멈춘다. 굴림이 안 끝나도 턴은 이어지도록 시간 제한을 둔다.
+    const rollUp = new Promise<void>((resolve) => {
       const tick = (t: number) => {
         const p = Math.min(1, (t - t0) / dur)
         el.textContent = String(Math.round(val * (0.15 + 0.85 * p)))
@@ -1420,6 +1703,7 @@ export class BattleView {
       }
       requestAnimationFrame(tick)
     })
+    await Promise.race([rollUp, sleep(dur + 220)])
     el.textContent = String(val)
     await sleep(160)
     el.classList.add('out')

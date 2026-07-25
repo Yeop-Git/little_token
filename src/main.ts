@@ -10,7 +10,8 @@ import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
 import { FontManager } from '@/ui/FontManager'
-import { ITEMS, type ItemDef } from '@data/items'
+import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
+import { PASSIVES } from '@core/passives'
 import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
@@ -33,22 +34,64 @@ fit()
 let run = newRun()
 let current: { destroy?: () => void } | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item'
+// 디버그 지급 후 어느 씬으로 되돌아갈지.
+let lastScene: SceneName = 'battle'
 
-// 개발/검수용 씬 점퍼.
+// 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
+// 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
+function grantItem(def: ItemDef) {
+  applyItemReward(run.player, {
+    id: def.id,
+    name: def.name,
+    grade: def.grade,
+    art: def.art,
+    line: '디버그 지급',
+    stats: { ...def.base },
+    passive: def.passive,
+  })
+  saveRun(run)
+  // 슬롯을 늘리는 패시브는 테이블을 다시 만들어야 하므로 현재 씬을 새로 연다.
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
+// 개발/검수용 씬 점퍼 + 아이템 서랍.
 function mountDev(active: SceneName) {
   const b = (id: SceneName, label: string) => `<button data-scene="${id}" class="${id === active ? 'on' : ''}">${label}</button>`
+  const owned = new Set(run.player.items.map((it) => it.id))
+  const chip = (def: ItemDef) =>
+    `<button class="dev-item${def.passive ? ' is-passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
+      <b>${def.name}</b><span>${def.passive ? PASSIVES[def.passive].desc : '스탯 아이템'}</span>
+    </button>`
+
   const bar = document.createElement('div')
   bar.className = 'dev-jump'
-  bar.innerHTML = b('title', '타이틀') + b('intro', '인트로') + b('battle', '전투') + b('reward', '보상') + b('item', '아이템')
-  bar.querySelectorAll('button').forEach((btn) =>
+  bar.innerHTML =
+    b('title', '타이틀') +
+    b('intro', '인트로') +
+    b('battle', '전투') +
+    b('reward', '보상') +
+    b('item', '감탄') +
+    `<button class="dev-grant" data-grant="1">아이템 ▾</button>
+     <div class="dev-drawer" id="devdrawer">
+       <div class="dev-drawer-head">디버그 지급 — 누르면 바로 획득</div>
+       <div class="dev-drawer-grid">${Object.values(ALL_ITEMS).map(chip).join('')}</div>
+     </div>`
+
+  bar.querySelectorAll<HTMLElement>('button[data-scene]').forEach((btn) =>
     btn.addEventListener('click', () => {
-      const s = (btn as HTMLElement).dataset.scene as SceneName
+      const s = btn.dataset.scene as SceneName
       if (s === 'title') goTitle()
       else if (s === 'intro') goBattle(true)
       else if (s === 'battle') goBattle()
       else if (s === 'reward') goReward()
       else goItem(ITEMS.candle)
     }),
+  )
+  const drawer = bar.querySelector<HTMLElement>('#devdrawer')!
+  bar.querySelector<HTMLElement>('[data-grant]')!.addEventListener('click', () => drawer.classList.toggle('open'))
+  bar.querySelectorAll<HTMLElement>('.dev-item').forEach((btn) =>
+    btn.addEventListener('click', () => grantItem(ALL_ITEMS[btn.dataset.item!])),
   )
   stage.appendChild(bar)
 }
@@ -62,6 +105,7 @@ function mountVersion() {
 }
 
 function mountMeta(active: SceneName) {
+  lastScene = active
   mountDev(active)
   mountVersion()
 }
@@ -98,7 +142,7 @@ function goBattle(intro = false) {
     hpMult: st.hpMult,
     atkMult: st.atkMult,
     player: run.player,
-    tables: makeEarlyTables(run.player.deck),
+    tables: makeEarlyTables(run.player.deck, run.player),
     onWin: (grade) => goReward(grade),
     intro,
   })
@@ -109,7 +153,7 @@ function goBattle(intro = false) {
 function goReward(grade = startGrade(run.player.stats.luck)) {
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player, grade)
+  const options = genRewards(run.player, grade, run.day)
   current = new RewardView(stage, {
     day: run.day,
     grade,
@@ -122,18 +166,19 @@ function goReward(grade = startGrade(run.player.stats.luck)) {
         saveRun(run)
         goBattle()
       } else if (opt.item) {
-        goItem(opt.item) // 아이템 = 감탄사 커스텀(스펙업)
+        goItem(opt.item, grade) // 아이템 = 감탄사 커스텀(스펙업) — 등급이 행운 감탄 확률이 된다
       }
     },
   })
   mountMeta('reward')
 }
 
-function goItem(itemDef: ItemDef) {
+function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
   reset()
   stage.setAttribute('data-theme', 'day')
   current = new ItemExclaimView(stage, {
     item: itemDef,
+    grade,
     onDone: (result) => {
       applyItemReward(run.player, result)
       run.day++

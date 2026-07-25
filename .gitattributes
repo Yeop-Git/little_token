@@ -1,0 +1,16 @@
+# 데이터 원본은 줄바꿈에 민감하다 — 생성기가 헤더 열 이름을 그대로 키로 쓰기 때문에
+# 줄 끝 CR이 섞이면 그 열이 조용히 사라진다. 항상 LF로 고정한다.
+*.csv text eol=lf
+
+# 소스도 LF로 통일해 diff에 줄바꿈 변경이 섞이지 않게 한다.
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# 바이너리 — 변환 금지.
+*.png binary
+*.woff2 binary
+*.mp3 binary
