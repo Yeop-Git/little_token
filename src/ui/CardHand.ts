@@ -8,7 +8,9 @@ const COMMIT_FLIGHT_MS = 480
 const COMMIT_POP_MS = 180
 
 export const CARD_HAND_CONFIG = {
+  /** Subjects/modifiers open three choices; the eight-card verb deck opens four. */
   initialHand: 3,
+  verbInitialHand: 4,
   maxHand: 6,
   /** 한 스테이지에서 추가로 뽑을 수 있는 횟수. 전투를 시작할 때 이 값으로 초기화된다. */
   drawsPerStage: 2,
@@ -266,7 +268,10 @@ export class CardHand {
 
     let state = this.states.get(slotKey)
     if (!state) {
-      const initialCount = Math.min(CARD_HAND_CONFIG.initialHand, words.length)
+      const handTarget = slotKey === 'verb' || slotKey === 'verb2'
+        ? CARD_HAND_CONFIG.verbInitialHand
+        : CARD_HAND_CONFIG.initialHand
+      const initialCount = Math.min(handTarget, words.length)
       const shuffled = ensureCardInInitialDraw(
         this.shuffle(words),
         initialCount,

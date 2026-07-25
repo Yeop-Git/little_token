@@ -87,9 +87,9 @@ export type RegisterWordResult =
   | { kind: 'added' | 'reinforced' }
   | { kind: 'needs-discard'; candidates: Word[] }
 
-/** 상한을 넘길 때 보여 줄 후보. 배열 앞쪽이 오래된 카드이므로 첫 세 장만 제시한다. */
-export function oldestDiscardCandidates(player: PlayerState, slotKey: string): Word[] {
-  return (player.deck[slotKey] ?? []).slice(0, 3)
+/** 상한을 넘기면 같은 문법으로 보유한 모든 카드 중에서 교체 대상을 고른다. */
+export function discardCandidates(player: PlayerState, slotKey: string): Word[] {
+  return [...(player.deck[slotKey] ?? [])]
 }
 
 export function registerWord(player: PlayerState, word: Word, discardId?: string): RegisterWordResult {
@@ -103,7 +103,7 @@ export function registerWord(player: PlayerState, word: Word, discardId?: string
   } else {
     const limit = DECK_LIMITS[word.slot]
     if (limit != null && slot.length >= limit) {
-      const candidates = oldestDiscardCandidates(player, word.slot)
+      const candidates = discardCandidates(player, word.slot)
       const discardIndex = discardId ? slot.findIndex((w) => w.id === discardId) : -1
       if (discardIndex < 0 || !candidates.some((w) => w.id === discardId)) {
         return { kind: 'needs-discard', candidates }

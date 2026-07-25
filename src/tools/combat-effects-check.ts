@@ -9,6 +9,7 @@ import { ENEMIES } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardGradeForDay } from '@data/rewards'
+import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
   activeEnemyPart,
   applyIntent,
@@ -176,6 +177,11 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(first.length === 3 && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward offers three subject/modifier cards with both slots represented')
   assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
   assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
+  for (const day of [4, 9, 14]) {
+    const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
+    const reward = genRewards(player, 5, day, 'verb')
+    assert(reward.some((option) => option.word && tacticalIds.has(option.word.id)), `boss-eve day ${day} offers a matching tactical verb`)
+  }
   assert(genRewards(player, 5, 10, 'item').some((option) => option.rarity === 'legendary'), 'floor ten guarantees a legendary item each cycle')
   assert(genRewards(player, 5, 25, 'item').some((option) => option.rarity === 'legendary'), 'endless floor ten repeats the legendary item guarantee')
   assert(rewardGradeForDay(5, 15) > rewardGradeForDay(5, 1) && rewardGradeForDay(5, 16) === rewardGradeForDay(5, 1), 'reward grade rises through fifteen floors and resets next cycle')
@@ -183,8 +189,8 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   for (let i = 0; i < 4; i++) registerWord(player, { id: `limit-${i}`, text: `limit-${i}`, slot: 'subj', tags: [], emotion: 'joy', note: '' })
   const incoming: Word = { id: 'limit-new', text: 'limit-new', slot: 'subj', tags: [], emotion: 'joy', note: '' }
   const full = registerWord(player, incoming)
-  assert(full.kind === 'needs-discard' && full.candidates.map((card) => card.id).join(',') === player.deck.subj.slice(0, 3).map((card) => card.id).join(','), 'full grammar deck exposes the three oldest cards')
-  if (full.kind === 'needs-discard') registerWord(player, incoming, full.candidates[1].id)
+  assert(full.kind === 'needs-discard' && full.candidates.map((card) => card.id).join(',') === player.deck.subj.map((card) => card.id).join(','), 'full grammar deck exposes every owned card')
+  if (full.kind === 'needs-discard') registerWord(player, incoming, full.candidates[full.candidates.length - 1].id)
   assert(player.deck.subj.length === 6 && player.deck.subj[player.deck.subj.length - 1]?.id === incoming.id, 'discarding an old card keeps the grammar deck at its cap')
 }
 
