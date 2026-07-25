@@ -59,8 +59,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'leg-pleasure', name: '넷째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'pleasure', label: '즐거움' } },
       { id: 'body', name: '본체', kind: 'body' },
     ],
-    webPattern: { sealPerTurn: 1, attackPerTension: 1, maxAttackBonus: 4 },
-    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 현재 다리의 약점을 맞히면 피해 ×1.5와 함께 거미줄을 하나 끊는다. 다리 체력 한 칸을 전부 깎거나 같은 감정 2장으로 감정 공명을 터뜨리면 사방의 거미줄을 전부 날려 장력을 0으로 만든다. 매 문장마다 손패 한 장이 봉인되며, 장력 4에서는 사방의 거미줄이 한꺼번에 조여든 뒤 터진다.',
+    webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점을 맞히면 피해 ×1.5와 함께 봉인 하나를 풀고, 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',

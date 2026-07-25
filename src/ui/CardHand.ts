@@ -133,7 +133,8 @@ export class CardHand {
   private slotKey = ''
   private selectedId: string | null = null
   private drawingId: string | null = null
-  private sealedId: string | null = null
+  /** 장로거미 봉인은 턴이 아니라 전투 동안 단어 카드에 남는다. */
+  private readonly sealedWordIds = new Set<string>()
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
@@ -196,21 +197,41 @@ export class CardHand {
     this.slotKey = ''
     this.selectedId = null
     this.drawingId = null
-    this.sealedId = null
     this.processing = false
   }
 
-  /** 장로거미 전용 — 보이는 카드 중 하나를 묶되 선택 가능한 카드를 반드시 남긴다. */
-  sealRandom(rng: () => number = Math.random): Word | null {
+  /** 장로거미 전용 — 봉인을 누적하되 현재 손패에는 선택 가능한 카드를 반드시 남긴다. */
+  sealRandom(maxSealed: number, rng: () => number = Math.random): Word | null {
     const state = this.currentState()
-    if (!state || this.processing) return null
-    const candidates = state.hand.filter((card) => !this.conflictOf(card.word))
-    if (candidates.length <= 1) return null
+    if (!state || this.processing || this.sealedWordIds.size >= maxSealed) return null
+    const usable = state.hand.filter((card) => !this.conflictOf(card.word) && !this.sealedWordIds.has(card.word.id))
+    if (usable.length <= 1) return null
+    const candidates = usable
     const picked = candidates[Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))]
-    this.sealedId = picked.instanceId
+    this.sealedWordIds.add(picked.word.id)
     if (this.selectedId === picked.instanceId) this.selectedId = null
     this.render()
     return picked.word
+  }
+
+  /** 가장 오래된 봉인부터 지정한 수만큼 푼다. */
+  releaseSealed(count = 1): number {
+    let released = 0
+    for (const id of this.sealedWordIds) {
+      if (released >= count) break
+      this.sealedWordIds.delete(id)
+      released++
+    }
+    if (released > 0) this.render()
+    return released
+  }
+
+  releaseAllSealed(): number {
+    return this.releaseSealed(this.sealedWordIds.size)
+  }
+
+  get sealedCount(): number {
+    return this.sealedWordIds.size
   }
 
   showSlot(slotKey: string, words: Word[], chosen: Word | undefined, conflictOf: ConflictResolver) {
@@ -226,16 +247,27 @@ export class CardHand {
     let state = this.states.get(slotKey)
     if (!state) {
       const initialCount = Math.min(CARD_HAND_CONFIG.initialHand, words.length)
-      const shuffled = this.shuffle(words)
+      const shuffled = ensureCardInInitialDraw(
+        this.shuffle(words),
+        initialCount,
+        (word) => !this.sealedWordIds.has(word.id) && !this.conflictOf(word),
+      )
       // 동사와 겹동사의 첫 손패에는 현재 문맥에서 선택 가능한 공격·방어·회복을
       // 각각 한 장씩 보장한다. 모순 카드를 억지로 살리지는 않는다.
-      const orderedWords = slotKey === 'verb' || slotKey === 'verb2'
+      const roleOrderedWords = slotKey === 'verb' || slotKey === 'verb2'
         ? ensureCardsInInitialDraw(shuffled, initialCount, [
             (word) => word.kind === 'attack' && !this.conflictOf(word),
             (word) => word.kind === 'guard' && !this.conflictOf(word),
             (word) => word.kind === 'heal' && !this.conflictOf(word),
           ])
         : shuffled
+      // 역할별 보장 카드가 앞쪽을 다시 채운 뒤에도 거미줄에 묶이지 않은 선택지 하나는
+      // 반드시 첫 손패에 남긴다. 누적 봉인이 문장 완성을 막아서는 안 된다.
+      const orderedWords = ensureCardInInitialDraw(
+        roleOrderedWords,
+        initialCount,
+        (word) => !this.sealedWordIds.has(word.id) && !this.conflictOf(word),
+      )
       const ordered = orderedWords.map((word) => this.makeInstance(slotKey, word))
       state = { hand: ordered.slice(0, initialCount), deck: ordered.slice(initialCount) }
       this.states.set(slotKey, state)
@@ -448,7 +480,7 @@ export class CardHand {
     } else {
       const line = calculateLineTransform(index, count, availableWidth)
       const blocked = this.conflictOf(card.word)
-      const sealed = this.sealedId === card.instanceId
+      const sealed = this.sealedWordIds.has(card.word.id)
       const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
       const selected = this.selectedId === card.instanceId
       const drawing = this.drawingId === card.instanceId
@@ -482,7 +514,7 @@ export class CardHand {
   private cardHtml(card: CardInstance, index: number, count: number, availableWidth: number): string {
     const line = calculateLineTransform(index, count, availableWidth)
     const blocked = this.conflictOf(card.word)
-    const sealed = this.sealedId === card.instanceId
+    const sealed = this.sealedWordIds.has(card.word.id)
     const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
@@ -561,7 +593,7 @@ export class CardHand {
     // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
     if (button && !button.isConnected) return
     if (this.drawingId === card.instanceId) return
-    if (this.sealedId === card.instanceId) return
+    if (this.sealedWordIds.has(card.word.id)) return
     if (this.conflictOf(card.word)) return
 
     this.selectedId = card.instanceId

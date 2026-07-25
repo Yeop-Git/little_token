@@ -23,6 +23,7 @@ import enemyFleaModel from './models/enemy_flea.glb?url'
 import enemyPillbugModel from './models/enemy_pillbug.glb?url'
 import enemyMosquitoModel from './models/enemy_mosquito.glb?url'
 import bossQueenBeeModel from './models/boss_queen_bee.glb?url'
+import bossElderSpiderModel from './models/boss_elder_spider.glb?url'
 import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
@@ -217,6 +218,7 @@ export const MODELS: Record<string, string> = {
   enemy_pillbug: enemyPillbugModel,
   enemy_mosquito: enemyMosquitoModel,
   boss_queen_bee: bossQueenBeeModel,
+  boss_elder_spider: bossElderSpiderModel,
 }
 
 // 맥락카드 일러스트 — Word.art가 이 키를 참조한다.

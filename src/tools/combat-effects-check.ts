@@ -14,7 +14,6 @@ import {
   enemyTurn,
   makeEnemy,
   spiderWebAtTurnStart,
-  spiderWebAttackBonus,
   spiderWebTension,
   summonAtTurnStart,
   summonCount,
@@ -59,7 +58,7 @@ assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(','
   assert(web.tension === 1 && spiderWebAtTurnStart(s) === null, 'spider web advances once per turn')
   let r = applyIntent(s, attack({ base: 28, emotions: ['joy'] }), 1, 0)
   assert(r.hits[0].weak && r.hits[0].dmg === 42 && r.hits[0].barsBroken === 1, 'active spider leg weakness grants x1.5 and drops one leg')
-  assert(r.hits[0].webBurst && r.hits[0].webBurstReason === 'part' && r.hits[0].tensionReduced === 1 && spiderWebTension(spider) === 0, 'dropping one spider health bar blows away every web layer')
+  assert(r.hits[0].webBurst && r.hits[0].tensionReduced === 1 && spiderWebTension(spider) === 0, 'dropping one spider health bar blows away every web layer')
   assert(activeEnemyPart(spider)?.def.id === 'leg-anger', 'next leg reveals a different weakness after the current leg drops')
   r = applyIntent(s, attack({ base: 10, emotions: ['joy'] }), 1, 0)
   assert(!r.hits[0].weak && r.hits[0].dmg === 10, 'old spider weakness no longer applies to the next leg')
@@ -67,16 +66,13 @@ assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(','
   web = spiderWebAtTurnStart(s)!
   s.turn = 3
   web = spiderWebAtTurnStart(s)!
-  assert(web.tension === 2 && spiderWebTension(spider) === 2 && spiderWebAttackBonus(spider) === 1, 'unchecked web tension gradually adds attack')
+  assert(web.tension === 2 && spiderWebTension(spider) === 2, 'unchecked card seals accumulate between turns')
   s.turn = 4
-  spiderWebAtTurnStart(s)
+  web = spiderWebAtTurnStart(s)!
+  assert(web.tension === 3, 'spider web seals stop at the configured three-card maximum')
   s.turn = 5
-  spiderWebAtTurnStart(s)
-  spider.nextAttackTurn = 1
-  spider.initiativePhase = 'first'
-  const finisher = enemyTurn(s, () => .999, 'first')[0]
-  assert(finisher.webFinisher && finisher.webReleased && finisher.dealt <= Math.round(s.playerMax * .55) && s.playerHp >= 1, 'web finisher is spectacular but explicitly nonlethal')
-  assert(spiderWebTension(spider) === 0, 'web finisher releases the arena tension after it lands')
+  web = spiderWebAtTurnStart(s)!
+  assert(web.tension === 3, 'spider web pressure does not grow past the card-seal maximum')
 }
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 99)
@@ -106,8 +102,8 @@ assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(','
   spiderWebAtTurnStart(s)
   const r = applyIntent(s, attack({ base: 1, emotions: ['anger', 'anger'] }), 1, 0)
   assert(r.hits[0].barsBroken === 0 && !r.hits[0].weak, 'emotion burst test does not accidentally break or match the active leg')
-  assert(r.hits[0].webBurst && r.hits[0].webBurstReason === 'emotion' && r.hits[0].tensionReduced === 3, 'two-card emotion resonance blows away every web layer')
-  assert(spiderWebTension(spider) === 0, 'emotion resonance leaves spider web tension at zero')
+  assert(!r.hits[0].webBurst && r.hits[0].tensionReduced === 0, 'emotion resonance alone does not clear card seals')
+  assert(spiderWebTension(spider) === 3, 'only a matching weakness or a broken leg releases spider seals')
 }
 
 const regularEnemyIds = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito']

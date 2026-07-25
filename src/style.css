@@ -1366,8 +1366,28 @@ button {
 .spider-part-bar i { display: block; height: 100%; background: linear-gradient(90deg, #a42331, #ff7359); transition: width .32s ease; }
 .spider-part.active .spider-part-bar i { box-shadow: 0 0 8px #ff765b; }
 .trait.spider-active { color: #ffe1a0; border: 1px solid rgba(255, 210, 111, .42); }
-.trait.web-tension { color: #ded4ee; border: 1px solid rgba(210, 198, 231, .34); }
 .trait.spider-tag-weak { color: #ffe392; border-color: rgba(255, 224, 130, .55); }
+.enemy-traits.spider-weakness-only {
+  top: calc(100% + 12px);
+}
+.enemy-traits.spider-weakness-only .trait {
+  min-height: 42px;
+  padding: 7px 18px;
+  gap: 9px;
+  border-width: 2px;
+  border-radius: 12px;
+  font-size: 22px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--emotion-color, #ffe392) 38%, transparent);
+}
+.enemy-traits.spider-weakness-only .emotion-face,
+.enemy-traits.spider-weakness-only .emotion-symbol {
+  width: 28px;
+  height: 28px;
+}
+.trait.spider-no-weakness {
+  color: #e8ded2;
+  border-color: rgba(232, 222, 210, .45);
+}
 .spider-part.breaking {
   z-index: 5;
   animation: spider-leg-drop .7s cubic-bezier(.2,.8,.3,1) forwards;
@@ -1420,63 +1440,6 @@ button {
   35% { opacity: 1; }
   to { opacity: 0; transform: translateY(40px) scaleY(1); }
 }
-.spider-web-pressure {
-  position: absolute;
-  inset: 0;
-  z-index: 52;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: calc(var(--web-tension, 0) * .14);
-  transition: opacity .45s ease;
-}
-.spider-web-pressure::before,
-.spider-web-pressure::after {
-  content: '';
-  position: absolute;
-  inset: calc(2% + var(--web-tension, 0) * 3.2%);
-  border: 2px solid rgba(231, 226, 238, .74);
-  border-radius: 46% 52% 44% 50%;
-  box-shadow:
-    inset 0 0 25px rgba(224, 217, 235, .18),
-    0 0 14px rgba(224, 217, 235, .2);
-  transition: inset .45s cubic-bezier(.2,.8,.3,1);
-}
-.spider-web-pressure::after {
-  inset: calc(5% + var(--web-tension, 0) * 4.1%);
-  border-width: 1px;
-  transform: rotate(-1.5deg);
-}
-.spider-web-pressure i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 140%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(231, 226, 238, .7) 16% 84%, transparent);
-  transform-origin: center;
-}
-.spider-web-pressure i:nth-child(1) { transform: translate(-50%,-50%) rotate(25deg); }
-.spider-web-pressure i:nth-child(2) { transform: translate(-50%,-50%) rotate(-24deg); }
-.spider-web-pressure i:nth-child(3) { transform: translate(-50%,-50%) rotate(67deg); }
-.spider-web-pressure i:nth-child(4) { transform: translate(-50%,-50%) rotate(-68deg); }
-.scene.battle.web-finisher-ready .spider-web-pressure {
-  opacity: .72;
-  animation: web-ring-ropes .62s ease-in-out infinite alternate;
-}
-.scene.battle.web-finisher-ready .trait.web-tension {
-  color: #ffb09e;
-  border-color: rgba(255, 112, 87, .74);
-  box-shadow: 0 0 12px rgba(255, 78, 62, .34);
-}
-.scene.battle.web-finisher-impact .spider-web-pressure {
-  animation: web-finisher-snap .72s cubic-bezier(.15,.8,.25,1) forwards;
-}
-.scene.battle.spider-web-cut .spider-web-pressure {
-  animation: web-cut-open .68s ease-out;
-}
-.scene.battle.spider-web-burst .spider-web-pressure {
-  animation: web-burst-clear .82s cubic-bezier(.12,.72,.2,1) forwards;
-}
 .web-burst-strand {
   position: absolute;
   left: 50%;
@@ -1491,25 +1454,6 @@ button {
   background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(220,211,231,.68), transparent);
   filter: drop-shadow(0 0 7px rgba(255,255,255,.8));
   animation: web-strand-fling .76s cubic-bezier(.15,.76,.25,1) var(--delay) forwards;
-}
-@keyframes web-ring-ropes {
-  from { filter: drop-shadow(0 0 2px rgba(255,255,255,.2)); transform: scale(.995); }
-  to { filter: drop-shadow(0 0 9px rgba(255,126,104,.55)); transform: scale(1.008); }
-}
-@keyframes web-finisher-snap {
-  0% { opacity: .8; transform: scale(1); filter: brightness(1); }
-  38% { opacity: 1; transform: scale(.78); filter: brightness(1.8); }
-  100% { opacity: 0; transform: scale(1.32); filter: brightness(2.2) blur(5px); }
-}
-@keyframes web-cut-open {
-  0% { filter: brightness(1); clip-path: inset(0); }
-  34% { filter: brightness(2.3); clip-path: polygon(0 0, 46% 0, 42% 100%, 0 100%, 0 0, 58% 0, 100% 0, 100% 100%, 62% 100%); }
-  100% { filter: brightness(1); clip-path: inset(0); }
-}
-@keyframes web-burst-clear {
-  0% { opacity: .88; transform: scale(1); filter: brightness(1); }
-  28% { opacity: 1; transform: scale(.86); filter: brightness(2.4); }
-  100% { opacity: 0; transform: scale(1.7) rotate(3deg); filter: brightness(2.8) blur(7px); }
 }
 @keyframes web-strand-fling {
   0% { opacity: 0; transform: rotate(var(--angle)) translateX(0) scaleX(.25); }
@@ -1543,13 +1487,19 @@ button {
   left: 158px;
   top: 8px;
   z-index: 5;
-  width: 260px;
-  padding: 13px 17px 15px;
+  box-sizing: border-box;
+  width: 330px;
+  min-height: 76px;
+  padding: 14px 28px 17px;
   color: #4a3225;
   font-size: 18px;
   font-weight: 900;
   line-height: 1.35;
   text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
   opacity: 0;
   transform: translate(-14px, 12px) rotate(-2deg) scale(.82);
   transform-origin: left bottom;
@@ -5614,10 +5564,13 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   pointer-events: none;
 }
 
+/* 이동 길이는 달리는 동작(440ms)의 배수로 맞춘다.
+   예전엔 3.6초를 미끄러지는데 동작은 앞 0.44초뿐이라, 나머지 3.1초는 idle 자세로
+   얼음판을 타는 것처럼 보였다. 이제 1.32초 = 세 걸음 동안만 이동한다. */
 .scene.battle.is-enemies-arriving .actor.foe {
   transition:
-    transform 3.6s cubic-bezier(0.22, 0.6, 0.3, 1),
-    opacity 2.6s ease;
+    transform 1.32s cubic-bezier(0.28, 0.62, 0.36, 1),
+    opacity 0.8s ease;
   pointer-events: none;
 }
 
