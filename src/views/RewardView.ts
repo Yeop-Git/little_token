@@ -11,9 +11,14 @@ import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
+import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
+import { gambleText } from '@core/wordText'
+import { comboHintHtml } from '@/ui/ComboHint'
 
 interface Opts {
   day: number
+  /** 짝 카드 안내용 플레이어 덱 — 없으면 시작 덱으로 안내한다. */
+  deck?: Record<string, Word[]>
   /** 전투에서 확정된 보상등급 — 카드 희귀도가 이 등급의 가중치로 굴려졌다. */
   grade: number
   nextField: FieldDef
@@ -78,7 +83,7 @@ function ownValues(w: Word): { text: string; cls: string }[] {
   if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
   if (w.crit) out.push({ text: `대성공 ${Math.round(w.crit * 100)}%`, cls: 'buff' })
   if (w.fail) out.push({ text: `실패 ${Math.round(w.fail * 100)}%`, cls: 'self' })
-  if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: 'buff' })
+  if (w.variance) out.push({ text: gambleText(w.variance), cls: 'buff' })
   if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
   if (!out.length) out.push({ text: w.note, cls: '' })
   return out
@@ -109,7 +114,7 @@ function reinforceDeltas(w: Word): string {
 }
 
 // 우측 정보창 내용.
-function detailHtml(opt: RewardOption): string {
+function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
   if (opt.kind === 'item' && opt.item) {
     const it = opt.item
     const rows = STAT_ORDER.filter((k) => it.base[k])
@@ -131,6 +136,7 @@ function detailHtml(opt: RewardOption): string {
     <div class="wd-name">${w.text}</div>
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${w.level ?? 1}` : ' · 새 단어'}</div>
     <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+    ${comboHintHtml(w, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}
     ${opt.reinforce ? reinforceDeltas(w) : ''}
     ${influenceNote(w)}`
 }
@@ -207,7 +213,7 @@ export class RewardView {
     const dock = this.root.querySelector<HTMLElement>('#rdetail')!
     const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
     dock.className = `info-dock glass reward-dock mood-${mood}`
-    dock.innerHTML = detailHtml(opt)
+    dock.innerHTML = detailHtml(opt, this.opts.deck)
     this.root.querySelectorAll('.reward-pick').forEach((p) => p.classList.remove('detailing'))
     el.classList.add('detailing')
   }

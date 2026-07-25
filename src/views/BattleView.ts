@@ -21,7 +21,9 @@ import {
   STAT_NAME,
   type ResolvedMult,
 } from '@core/compiler'
+import { gambleText } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
+import { comboHintHtml } from '@/ui/ComboHint'
 import { RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -807,10 +809,9 @@ export class BattleView {
       w.effects?.recoil ? `자해 ${w.effects.recoil}` : '',
       w.targetMode === 'both' ? '피해 40% 되돌아옴' : '',
     ].filter(Boolean).join(' · ')
-    // 도박 범위 — 낮은 배율에 "가끔 크게 터진다"를 붙인 카드.
+    // 도박 — 낮은 배율에 "가끔 크게 터진다"를 붙인 카드. 저점(×1.00)은 적지 않는다.
     if (w.variance) {
-      const v = w.variance
-      const text = `도박 ${Math.round(v.p * 100)}% — ×${v.hi.toFixed(2)} / ×${v.lo.toFixed(2)}`
+      const text = gambleText(w.variance)
       return { text: risk ? `${text} · ${risk}` : text, cls: 'gamble' }
     }
     if (w.bonus || risk) {
@@ -887,6 +888,7 @@ export class BattleView {
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
         ${this.projectionHtml(w, key)}
         <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+        ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
       </div>`
   }
@@ -972,7 +974,7 @@ export class BattleView {
     if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
     if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
     if (w.effects?.evade) out.push({ text: `회피 +${w.effects.evade}`, cls: 'guard' })
-    if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: 'buff' })
+    if (w.variance) out.push({ text: gambleText(w.variance), cls: 'buff' })
     if (w.timing === 'delayed') out.push({ text: '다음 턴에 발동', cls: '' })
     if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
     if (w.targetMode === 'both') out.push({ text: '피해 40% 나에게 되돌아옴', cls: 'self' })

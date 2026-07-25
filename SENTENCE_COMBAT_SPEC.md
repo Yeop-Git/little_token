@@ -57,10 +57,11 @@
 |---|---|---|
 | 슬롯 3칸 `subj → adv → verb` | `EARLY_TEMPLATE` | — |
 | 스탯 비례 깡수치 | `wordFlat()` | 동사 등 10개 |
-| 가산 보너스 풀 | `bonusPool` | 12개 |
+| 가산 보너스 풀 | `bonusPool` | 10개 |
 | 관용구 곱셈 | `matchCombos()` | **16개** |
 | 대성공 룰렛 | `rouletteOdds()` | crit 보유 9개 |
-| 도박(`variance`) | `resolveMultiplier()` | 4개 |
+| 도박(`variance`) | `resolveMultiplier()` | 7개 |
+| 등급 예산 계약 | `src/core/budget.ts` · `npm run check` | 노멀 1.20 · 희귀 1.60 · 영웅 2.10 |
 | 범위 공격(`aoe`) | `applyIntent()` | 1개 |
 | 지연 발동(`timing`) | `applyIntent()` | 어미 슬롯(현재 미사용) |
 | 운 배율 +2%/1 | `LUCK_MULT` | — |
@@ -78,7 +79,12 @@
 | `EARLY_COMBOS` | **16** | 일반 런 관용구 |
 | `WORDS` / `COMBOS` | 23단어 · 6관용구 | 5슬롯 확장용 보존 자료 (런에 미사용) |
 
-희귀도 분포(일반 런 28단어): 노멀 14 · 희귀 9 · 영웅 5 · 전설 0
+희귀도 분포(일반 런 28단어): 노멀 7 · 희귀 16 · 영웅 5 · 전설 0
+
+노멀은 **초기 덱 정원(주어 1 · 수식 3 · 동사 3)**만 남긴다. 같은 등급은 예산이 같아서
+노멀이 여러 장이면 수치가 똑같은 쌍둥이가 생기므로(`어제의 나는 = 나도 = ×1.20`),
+나머지는 예산이 큰 등급으로 올려 성향을 갈랐다. 규칙은 `src/data/csv/README.md`,
+값의 정본은 `src/core/budget.ts`, 검사는 `npm run check`다.
 
 ---
 
@@ -98,6 +104,7 @@
 | `effects.guard/heal` | `compiler.ts:129` | 동사 `kind` + `statMult`로 대체. 데이터 0개 |
 | 배수 상한(`multCap`) | `types.ts:159` · `earlyWords.ts:20` | **컴파일러가 읽지 않는다.** 배율에 천장 없음(`compiler.ts:125`) |
 | 맥락카드 등급 보너스 | `types.ts:81` | 다양성 + 반복강화로 대체 |
+| 도박 저점 표기(`×2.50 / ×1.00`) | — | `variance_lo`는 항상 1이라 "절반은 손해"로 읽혔다. `gambleText()`가 `40% 확률로 배율 ×2.50` 한 형식으로 통일 |
 
 > `multCap`은 `Tables`에 값이 남아 있으나 소비처가 없다. 실제 상한은 **없다.**
 > 남은 소비처는 `tools/dump-words.ts`의 설명 문구뿐이며, 그 문구는 현재 규칙과 다르다.
@@ -158,6 +165,22 @@ interface Word {
 ```
 
 > `power` · `effects` · `fail`은 타입에 남아 있으나 일반 런 데이터에서 쓰지 않는다(4장 참조).
+
+### 5.2-1 등급 예산 ★
+
+등급은 상한이 아니라 **예산**이다. `src/core/budget.ts`가 정본이고 `npm run check`가
+`EARLY_WORDS`·`REWARD_WORDS` 전체를 이 계약으로 검사한다.
+
+```
+배율 칸(주어·수식·어미)   기대배율 = (1 + bonus) × 도박기댓값 × (1 + 0.5 × crit)
+                          노멀 1.20 · 희귀 1.60 · 영웅 2.10  (허용 오차 ±0.05)
+동사 칸                   계수 = 노멀 ×1 · 희귀 ×1.5 · 영웅 ×2, 전체 적중이면 ×0.7
+노멀 정원                 초기 덱 subj 1 · adv 3 · verb 3
+표기                      note는 실제 수치를 전부 포함한다(numericNoteParts 검사)
+```
+
+동사는 같은 등급이면 계수가 같으므로 실질 차이는 **태그가 여는 관용구**다. 숨은 값이
+되지 않도록 카드 상세가 「여는 맥락」(`comboLeads()` · `ui/ComboHint.ts`)을 노출한다.
 
 ### 5.3 관용구 (Combo)
 
@@ -483,6 +506,9 @@ npm run build
 ### 불변식 (`src/tools/sweep.ts`)
 
 **배율에 천장이 없으므로 캡 기반 상한·비율 검사는 폐지했다.** 최대 스파이크는 설계상 허용한다.
+
+`npm run check`는 슬롯 중립 바닥·일러스트 키에 더해 **등급 예산·노멀 정원·카드 표기**를
+검사한다(5.2-1장). 예산을 바꿀 때는 `src/core/budget.ts`와 `src/data/csv/README.md`를 함께 고친다.
 
 | # | 조건 | 최근 결과 |
 |---|---|---|

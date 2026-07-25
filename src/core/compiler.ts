@@ -46,6 +46,34 @@ export function matchCombos(sel: Selection, combos: Combo[], order: string[]): C
   })
 }
 
+/**
+ * 이 단어가 열어 두는 맥락 — 태그가 관용구의 필요 태그를 하나라도 채우면 후보다.
+ * `missing`은 아직 비어 있는 필요 태그(멀티셋)이라 "무엇과 같이 써야 터지는지"가 된다.
+ *
+ * 태그로 붙는 맥락 접근권은 카드 수치에 안 적히는 숨은 값이었다. 같은 등급·같은
+ * 수치인 카드의 차이가 여기서만 갈리는데 화면에 없으면 플레이어는 알 수가 없으므로,
+ * 카드 상세가 이 목록을 그대로 내건다("숨은 정답 금지").
+ */
+export interface ComboLead {
+  combo: Combo
+  missing: string[]
+}
+export function comboLeads(w: Word, combos: Combo[]): ComboLead[] {
+  const leads: ComboLead[] = []
+  for (const c of combos) {
+    const rest = [...c.need]
+    let used = 0
+    for (const tag of w.tags) {
+      const i = rest.indexOf(tag)
+      if (i < 0) continue
+      rest.splice(i, 1)
+      used++
+    }
+    if (used > 0) leads.push({ combo: c, missing: rest })
+  }
+  return leads.sort((a, b) => a.missing.length - b.missing.length || b.combo.mult - a.combo.mult)
+}
+
 // 완성 문장 토큰 배열(빈 슬롯은 '____'). josa 슬롯만 조사 부착.
 export function sentenceTokens(sel: Selection, t: Tables): string[] {
   return t.template.slots.map((s) => {

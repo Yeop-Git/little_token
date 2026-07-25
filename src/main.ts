@@ -239,6 +239,7 @@ function goReward(grade = startGrade(run.player.stats.luck)) {
   const options = genRewards(run.player, grade, run.day)
   current = new RewardView(stage, {
     day: run.day,
+    deck: run.player.deck,
     grade,
     nextField: stageFor(run.day + 1).field,
     options,
