@@ -1684,6 +1684,7 @@ button {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, #ffd27a 52%, transparent), 0 0 28px color-mix(in srgb, #ffb35c 38%, transparent), 0 12px 30px rgba(0, 0, 0, .28);
 }
 .tally.mult-rising .tally-box.mult b { animation: mult-reel-glow .42s ease-in-out infinite alternate; }
+.tally-box.mult.rolling b { font-variant-numeric: tabular-nums; }
 .tally.mult-rising .tally-mult-feed { min-height: 28px; }
 .tally.mult-settled .tally-box.mult { animation: mult-settle .42s cubic-bezier(.2, 1.35, .35, 1); }
 @keyframes mult-reel-glow { to { filter: brightness(1.25); transform: translateY(-2px); } }
@@ -1826,17 +1827,27 @@ button {
   top: 74px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 1240px;
+  max-width: 1120px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
   z-index: 85;
   pointer-events: none;
   min-height: 64px;
-  padding: 10px 44px;
-  border-radius: 40px;
+  padding: 10px 34px;
+  border-radius: 24px;
+}
+.chain-rail.has-sentence {
+  background: linear-gradient(105deg, rgba(10, 7, 16, .82), rgba(26, 17, 25, .74) 52%, rgba(10, 7, 16, .82));
+  border: 1px solid rgba(255, 228, 168, .18);
+  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 14px 34px rgba(0, 0, 0, .28);
+}
+.chain-rail.sentence-ready {
+  background: linear-gradient(105deg, rgba(12, 8, 18, .93), rgba(58, 39, 31, .83) 52%, rgba(12, 8, 18, .93));
+  border-color: rgba(255, 220, 142, .42);
+  box-shadow: inset 0 1px rgba(255,255,255,.16), 0 0 28px rgba(255, 179, 79, .18), 0 14px 34px rgba(0, 0, 0, .34);
 }
 /* 어느 배경 위에서도 읽히도록 은은한 어둠 스크림.
    레일 박스에 직접 깔면 border-radius 경계에서 그림자가 뚝 잘려(카드 설명 칩 아래가
@@ -1864,7 +1875,7 @@ button {
   animation: chain-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .chain-word .cw-text {
-  font-size: 40px;
+  font-size: 36px;
   font-weight: 900;
   color: var(--gold-hi);
   /* 발광 + 뚜렷한 드롭 섀도로 상단 문구 강조 */
@@ -1873,7 +1884,7 @@ button {
 /* 단어 바로 밑 설명 — 이 단어가 무엇을 얼마나 주는지 */
 .chain-word .cw-note {
   font-style: normal;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.3px;
   white-space: nowrap;
@@ -1893,7 +1904,7 @@ button {
 /* 피노키오의 미아핑 — 문장 끝에 항상 붙는 "…근데?" */
 .chain-word.ctx.doubt .cw-text { color: #e7c6ff; }
 /* 맨 끝 맥락 칸 — 완벽한 맥락은 금빛, 어긋남은 붉게 */
-.chain-word.ctx .cw-text { font-size: 28px; }
+.chain-word.ctx .cw-text { font-size: 25px; }
 .chain-word.ctx.perfect .cw-text { color: #fff0c0; }
 .chain-word.ctx.broken .cw-text {
   color: #ff9a9a;
@@ -2419,6 +2430,11 @@ button {
     0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
 .card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 2px 7px 2px 3px; border-radius: 999px; color: #fff8e7; background: rgba(8, 6, 14, .74); font-size: 10px; font-weight: 900; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 10px color-mix(in srgb, var(--emotion-color) 28%, transparent); }
+.card-action { position: absolute; top: 8px; left: 50%; z-index: 4; display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid currentColor; border-radius: 9px; background: rgba(8, 6, 14, .78); box-shadow: 0 0 10px color-mix(in srgb, currentColor 42%, transparent), inset 0 0 8px color-mix(in srgb, currentColor 16%, transparent); transform: translateX(-50%); }
+.card-action svg { width: 18px; height: 18px; }
+.card-action.action-attack { color: #ff7966; }
+.card-action.action-guard { color: #7cc1ff; }
+.card-action.action-heal { color: #8bea76; }
 .emotion-face { display: block; width: 18px; height: 18px; flex: none; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .58)); }
 .emotion-symbol { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
 .emotion-joy { --emotion-color: #fdd355; --card-base-color: #fdd355; }
@@ -4185,6 +4201,11 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .dev-cheat-stage-presets button:hover,
 .dev-cheat-stage-presets button.on { color: #ffe9a8; border-color: rgba(255, 215, 106, .42); background: rgba(255, 215, 106, .12); }
+.dev-cheat-bosses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
+.dev-cheat-bosses button { min-height: 34px; padding: 5px 7px; display: grid; gap: 1px; justify-items: start; border: 1px solid rgba(255, 139, 91, .32); border-radius: 8px; color: #ffe7bf; text-align: left; background: linear-gradient(135deg, rgba(126, 39, 39, .4), rgba(255, 159, 82, .12)); }
+.dev-cheat-bosses button:hover { border-color: rgba(255, 220, 134, .82); background: linear-gradient(135deg, rgba(175, 52, 43, .65), rgba(255, 173, 75, .26)); }
+.dev-cheat-bosses small { color: rgba(255, 225, 178, .65); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.dev-cheat-bosses b { font-size: 11px; }
 .dev-cheat-items {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4872,8 +4893,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* ── 체인 아래 "지금 배율" — 카드를 고르는 즉시 삐리릭 돌다가 팅! 하고 확정 ── */
 .mult-now {
   position: absolute;
-  left: var(--mult-left, 62%);
-  top: 80px;
+  right: 52px;
+  top: 164px;
   z-index: 86;
   transform: none;
   display: flex;
@@ -4910,12 +4931,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 /* 삐리리릭 — 숫자가 튀는 동안은 살짝 흔들리고 흐릿하다 */
 .mult-now.spinning .mn-mult {
-  filter: blur(0.6px);
-  animation: mn-spin 0.1s linear infinite alternate;
-}
-@keyframes mn-spin {
-  from { transform: translateY(-1px) scale(0.98); }
-  to { transform: translateY(1px) scale(1.02); }
+  filter: brightness(1.12);
+  text-shadow: 0 0 24px rgba(255, 190, 90, .8), 0 4px 11px rgba(0, 0, 0, .36);
 }
 /* 팅! — 확정되는 순간 튀어오르며 발광 */
 .mult-now.landed .mn-mult { animation: mn-land 0.5s cubic-bezier(0.2, 1.6, 0.35, 1); }
