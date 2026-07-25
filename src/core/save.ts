@@ -1,7 +1,15 @@
 import type { RunState } from './run'
+import type { Emotion } from './types'
 
 const SAVE_KEY = 'little-token.run.v1'
 const TUTORIAL_KEY = 'little-token.tutorial-seen.v1'
+
+// v0.3.25 이전 런에는 이 주어들이 무감정으로 저장됐다. 현재 데이터의 감정 분포로
+// 한 번만 올려, 이어하기 런도 새 공명 경로를 바로 사용할 수 있게 한다.
+const LEGACY_SUBJECT_EMOTIONS: Record<string, Emotion> = {
+  na: 'joy', eoje: 'sorrow', nado: 'pleasure', oneul: 'joy',
+  gyeop: 'sorrow', naman: 'anger', dachin: 'anger', uri: 'pleasure',
+}
 
 function isRunState(value: unknown): value is RunState {
   if (!value || typeof value !== 'object') return false
@@ -31,8 +39,9 @@ export function loadRun(): RunState | null {
     let migrated = false
     for (const words of Object.values(parsed.player.deck)) {
       for (const word of words) {
-        if (!word.emotion) {
-          word.emotion = 'neutral'
+        const subjectEmotion = LEGACY_SUBJECT_EMOTIONS[word.id]
+        if (!word.emotion || (subjectEmotion && word.emotion === 'neutral')) {
+          word.emotion = subjectEmotion ?? 'neutral'
           migrated = true
         }
       }

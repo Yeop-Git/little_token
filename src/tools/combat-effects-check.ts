@@ -30,6 +30,7 @@ assert(neutralResult.emotionResonance === 1, 'neutral cards do not resonate')
 const legacyWord = { ...word('legacy', 'neutral'), emotion: undefined } as unknown as Word
 assert(wordValueLines(legacyWord)[0].text.includes('무감정'), 'legacy save emotion fallback')
 assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [], multCap: 9 }).emotionResonance === 1, 'legacy emotion does not resonate')
+assert(EARLY_WORDS.subj.every((subject) => subject.emotion !== 'neutral'), 'starting subjects carry emotions')
 
 for (const kind of ['attack', 'guard', 'heal'] as const) {
   const counts = new Map(['joy', 'anger', 'sorrow', 'pleasure'].map((emotion) => [emotion, 0]))

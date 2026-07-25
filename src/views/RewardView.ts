@@ -3,7 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고, 상단=종류 / 하단=메인 효과 / 자세히보기=우측 정보창.
  */
 
-import { RARITY_LABEL, type FieldDef, type Word } from '@core/types'
+import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -58,6 +58,13 @@ function mainEffect(opt: RewardOption): string {
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
   return opt.word!.note
+}
+
+/** 보상 선택 단계에서도 감정을 즉시 읽게 한다. 상세 창을 열 필요가 없다. */
+function emotionBadge(opt: RewardOption): string {
+  if (opt.kind !== 'word' || !opt.word) return ''
+  const emotion = emotionOrNeutral(opt.word.emotion)
+  return `<span class="rp-emotion emotion-${emotion}" title="감정: ${EMOTION_LABEL[emotion]}">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>`
 }
 
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(아이템/보상단어) 색 그라디언트 + 아이콘.
@@ -176,6 +183,7 @@ export class RewardView {
         <div class="rp-top">
           <span class="rp-type">${typeLabel(p)}</span>
           <span class="rp-tags">
+            ${emotionBadge(p)}
             <span class="rp-rarity rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</span>
             <span class="rp-badge">${badge}</span>
           </span>

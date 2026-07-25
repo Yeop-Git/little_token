@@ -13,7 +13,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
-      "emotion": "neutral",
+      "emotion": "joy",
       "person": "first",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -30,7 +30,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "mind"
       ],
-      "emotion": "neutral",
+      "emotion": "sorrow",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -52,7 +52,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "echo"
       ],
-      "emotion": "neutral",
+      "emotion": "pleasure",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -74,7 +74,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "now"
       ],
-      "emotion": "neutral",
+      "emotion": "joy",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -96,7 +96,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "fear"
       ],
-      "emotion": "neutral",
+      "emotion": "sorrow",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -118,7 +118,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "solo"
       ],
-      "emotion": "neutral",
+      "emotion": "anger",
       "person": "first",
       "bonus": 0.6,
       "targetMode": "enemy",
@@ -135,7 +135,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "hurt"
       ],
-      "emotion": "neutral",
+      "emotion": "anger",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -357,7 +357,7 @@ export const REWARD_WORDS: Word[] = [
       "self",
       "both"
     ],
-    "emotion": "neutral",
+    "emotion": "pleasure",
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -511,7 +511,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
-      "emotion": "neutral",
+      "emotion": "joy",
       "person": "first",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -526,7 +526,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "enemy"
       ],
-      "emotion": "neutral",
+      "emotion": "anger",
       "person": "second",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -541,7 +541,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "other"
       ],
-      "emotion": "neutral",
+      "emotion": "sorrow",
       "person": "third",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -556,7 +556,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "both"
       ],
-      "emotion": "neutral",
+      "emotion": "pleasure",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
