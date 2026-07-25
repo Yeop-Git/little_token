@@ -157,6 +157,13 @@ export class BattleView {
     this.enemyPool.clear()
   }
 
+  /** Developer-only shortcut; avoid interrupting an already resolving battle turn. */
+  debugDefeat() {
+    if (this.busy || this.over) return
+    this.state.playerHp = 0
+    void this.lose()
+  }
+
   private onPointerDown = () => {
     this.pointerDown = true
   }

@@ -20,7 +20,7 @@ import { startGrade } from '@core/grade'
 import { clearRun, loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
-import { REWARD_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
@@ -75,6 +75,34 @@ function grantWord(word: Word) {
   else goBattle()
 }
 
+function cardCatalog(): Word[] {
+  return [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()].filter(
+    (word, index, all) => all.findIndex((entry) => entry.id === word.id) === index,
+  )
+}
+
+function unlockAllCards() {
+  const owned = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
+  for (const word of cardCatalog()) {
+    if (!owned.has(word.id)) registerWord(run.player, word)
+  }
+  saveRun(run)
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
+function reinforceAllCards() {
+  const owned = Object.values(run.player.deck).flat()
+  for (const word of owned) registerWord(run.player, word)
+  saveRun(run)
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
+function defeatPlayer() {
+  if (current instanceof BattleView) current.debugDefeat()
+}
+
 // 좌상단 모서리를 다섯 번 누르면 열리는 개발용 치트 패널.
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
@@ -108,6 +136,14 @@ function mountDevCheat(active: SceneName) {
               ${rewardWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}${ownedWords.has(word.id) ? ' · 보유 중(강화)' : ''}</option>`).join('')}
             </select>
             <button type="button" data-word-grant>바로 해금</button>
+          </div>
+        </section>
+        <section class="dev-cheat-section">
+          <h3>RUN TOOLS</h3>
+          <div class="dev-cheat-run-tools">
+            <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망시키기</button>
+            <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
+            <button type="button" data-run-tool="reinforce-all">모든 카드 강화하기</button>
           </div>
         </section>
       </div>
@@ -153,6 +189,13 @@ function mountDevCheat(active: SceneName) {
     const word = rewardWords.find((entry) => entry.id === selected)
     if (word) grantWord(word)
   })
+  shell.querySelectorAll<HTMLButtonElement>('[data-run-tool]').forEach((button) =>
+    button.addEventListener('click', () => {
+      if (button.dataset.runTool === 'defeat') defeatPlayer()
+      else if (button.dataset.runTool === 'unlock-all') unlockAllCards()
+      else reinforceAllCards()
+    }),
+  )
   stage.appendChild(shell)
   viewport.appendChild(corner)
 
