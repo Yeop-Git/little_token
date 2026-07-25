@@ -1,6 +1,6 @@
 import { AUDIO } from '@/assets'
 
-type EffectName = 'wordSelect' | 'sentenceComplete' | 'paperAttack'
+type EffectName = 'sentenceComplete' | 'paperAttack' | 'paper' | 'cardHover' | 'pencil' | 'button'
 const VOLUME_KEY = 'little-token-master-volume'
 const BGM_VOLUME = 0.16
 
@@ -19,6 +19,10 @@ const savedVolume = () => {
 class GameAudioController {
   private bgm: HTMLAudioElement | null = null
   private effects: Partial<Record<EffectName, HTMLAudioElement>> = {}
+  private pencilVoice: HTMLAudioElement | null = null
+  private pencilStopTimer: number | null = null
+  private lastCardHoverAt = 0
+  private buttonSoundsInstalled = false
   private masterVolume = savedVolume()
 
   getVolume() {
@@ -45,10 +49,46 @@ class GameAudioController {
     void this.bgm.play().catch(() => undefined)
   }
 
+  installButtonSounds() {
+    if (this.buttonSoundsInstalled) return
+    this.buttonSoundsInstalled = true
+    document.addEventListener('click', (event) => {
+      const target = event.target
+      const button = target instanceof Element ? target.closest<HTMLButtonElement>('button') : null
+      if (!button || button.matches('.word-card')) return
+      this.play('button')
+    }, true)
+  }
+
   play(effect: EffectName) {
+    if (effect === 'cardHover') {
+      const now = performance.now()
+      if (now - this.lastCardHoverAt < 70) return
+      this.lastCardHoverAt = now
+    }
     const source = this.effects[effect] ?? this.createEffect(effect)
     const voice = source.cloneNode() as HTMLAudioElement
-    voice.volume = (effect === 'paperAttack' ? 0.38 : 0.46) * this.masterVolume
+    if (effect === 'pencil') {
+      if (this.pencilStopTimer != null) window.clearTimeout(this.pencilStopTimer)
+      this.pencilVoice?.pause()
+      this.pencilVoice = voice
+      voice.addEventListener('ended', () => {
+        if (this.pencilVoice !== voice) return
+        this.pencilVoice = null
+        if (this.pencilStopTimer != null) window.clearTimeout(this.pencilStopTimer)
+        this.pencilStopTimer = null
+      }, { once: true })
+      this.pencilStopTimer = window.setTimeout(() => {
+        if (this.pencilVoice === voice) {
+          voice.pause()
+          voice.currentTime = 0
+          this.pencilVoice = null
+        }
+        this.pencilStopTimer = null
+      }, 1000)
+    }
+    const effectVolume = effect === 'paperAttack' ? 0.38 : effect === 'cardHover' ? 0.28 : effect === 'pencil' ? 0.34 : effect === 'button' ? 0.36 : 0.46
+    voice.volume = effectVolume * this.masterVolume
     void voice.play().catch(() => undefined)
   }
 

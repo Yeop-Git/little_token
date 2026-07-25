@@ -4,6 +4,7 @@
  */
 
 import bg001 from './backgrounds/bg_001.webp'
+import backgroundDark from './backgrounds/backgroundDark.png'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import player001 from './sprites/player_001.webp'
@@ -35,13 +36,17 @@ import skill7002 from './sprites/skills/skill_7002.webp'
 import skill7003 from './sprites/skills/skill_7003.webp'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
 import paperMapParade from './audio/paper-map-parade.mp3'
-import wordSelect from './audio/word-select.mp3'
 import sentenceComplete from './audio/sentence-complete.mp3'
 import paperAttack from './audio/paper-attack.mp3'
+import paper from './audio/paper.mp3'
+import cardHover from './audio/cardhover.mp3'
+import pencil from './audio/pencil.mp3'
+import button from './audio/button.mp3'
 
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
   bg001,
+  battleDark: backgroundDark,
 }
 
 // 타이틀 화면 — 배경 일러스트 + 발광 로고
@@ -95,7 +100,10 @@ export const FONT_URL = griunFont
 
 export const AUDIO = {
   bgm: paperMapParade,
-  wordSelect,
   sentenceComplete,
   paperAttack,
+  paper,
+  cardHover,
+  pencil,
+  button,
 }

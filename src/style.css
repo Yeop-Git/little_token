@@ -417,7 +417,7 @@ button {
   opacity: 1;
 }
 
-/* 상단 HUD — 날짜/제목/날씨. 테두리 없이 발광 텍스트 + 얇은 유리. */
+/* 상단 HUD — 좌측 전투 상태와 원형 날씨, 우측 시스템 메뉴. */
 .hud-top {
   position: absolute;
   top: 26px;
@@ -425,7 +425,7 @@ button {
   right: 40px;
   z-index: 6;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: start;
   pointer-events: none;
 }
@@ -435,53 +435,8 @@ button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 18px;
+  gap: 14px;
 }
-.hud-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 64px;
-}
-.hud-date {
-  padding: 8px 14px;
-  border-radius: 22px;
-  background: rgba(12, 10, 18, 0.34);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--gold-hi);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
-}
-.hud-title {
-  justify-self: center;
-  align-self: start;
-  text-align: center;
-  padding: 8px 30px;
-  border-radius: 40px;
-}
-.hud-title .t {
-  font-size: 30px;
-  font-weight: 800;
-  color: #fff6e2;
-  text-shadow: 0 0 22px var(--glow), 0 2px 8px rgba(0, 0, 0, 0.7);
-}
-.hud-title .s {
-  font-size: 15px;
-  color: var(--ink-dim);
-  margin-top: 2px;
-}
-.hud-weather {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--gold-hi);
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.7));
-}
-.weather-icon {
-  width: 44px;
-  height: 44px;
-}
-
 /* 날짜 아래 행동 순서 — 세로 초상화 레일은 또렷하게, 프레임은 그림일기 종이 조각처럼. */
 .action-order {
   width: 196px;
@@ -621,7 +576,7 @@ button {
   .action-order-item.priority-taken::after,
   .enemy-overflow-count { animation: none; }
 }
-/* 우상단: 캐스트 로그 위에 턴·보상 → 설정·홈 순으로 한 행에 둔다. */
+/* 우상단: 캐스트 로그 위에는 설정·홈만 둔다. */
 .hud-status {
   justify-self: end;
   align-self: start;
@@ -638,20 +593,91 @@ button {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
-.hud-right-status {
+.hud-left-status {
   display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
   pointer-events: auto;
 }
-.hud-right-status .turn-badge { min-width: 124px; justify-content: center; gap: 7px; padding-inline: 13px; }
-.hud-right-status .turn-badge i { color: var(--ink-faint); font-size: 13px; font-style: normal; opacity: .65; }
-.hud-right-status .turn-badge em { padding-left: 0; border-left: 0; font-size: 13px; }
-.hud-right-status .grade-badge { min-width: 104px; justify-content: center; padding-inline: 13px; }
+.hud-left-status .grade-badge {
+  min-width: 164px;
+  min-height: 64px;
+  justify-content: center;
+  padding: 11px 24px;
+  font-size: 18px;
+  gap: 14px;
+}
+.hud-left-status .grade-badge b { font-size: 27px; }
+.hud-player-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 58px;
+  padding: 6px 9px;
+  border-radius: 30px;
+  background: rgba(18, 13, 24, .78);
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 170, .18), 0 8px 22px rgba(0, 0, 0, .42);
+}
+.hud-player-name {
+  padding: 0 9px 0 5px;
+  border-right: 1px solid rgba(255, 225, 170, .2);
+  color: #fff2cf;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.hud-stat {
+  position: relative;
+  width: 56px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 18px;
+  color: var(--gold-hi);
+  background: rgba(255, 255, 255, .035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .055);
+  cursor: help;
+  transition: color .14s ease, background .14s ease, transform .14s ease;
+}
+.hud-stat:first-child { width: 78px; }
+.hud-stat:hover, .hud-stat:focus-visible {
+  color: #fff6de;
+  background: rgba(255, 255, 255, .1);
+  transform: translateY(-2px);
+}
+.hud-stat .si { width: 22px; height: 22px; flex: none; }
+.hud-stat .si svg { width: 100%; height: 100%; }
+.hud-stat b { color: #fff0cb; font-size: 14px; font-weight: 900; white-space: nowrap; }
+.hud-stat::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  z-index: 120;
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff3d4;
+  background: rgba(16, 11, 21, .96);
+  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .2), 0 8px 18px rgba(0, 0, 0, .5);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.hud-stat:hover::after, .hud-stat:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.hud-passive { width: 44px; color: var(--gold); font-size: 21px; }
 .hud-actions {
   display: flex;
   align-items: center;
@@ -1333,19 +1359,19 @@ button {
 /* 상단 발광 체인(선택 단어) — 테두리/배경 없음, 글자 발광만 */
 .chain-rail {
   position: absolute;
-  top: 116px;
+  top: 74px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 1100px;
+  max-width: 1240px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   z-index: 85;
   pointer-events: none;
-  min-height: 52px;
-  padding: 8px 40px;
+  min-height: 64px;
+  padding: 10px 44px;
   border-radius: 40px;
 }
 /* 임시 로그가 어느 배경 위에서도 읽히도록 은은한 어둠 스크림 */
@@ -1363,7 +1389,7 @@ button {
   animation: chain-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .chain-word .cw-text {
-  font-size: 34px;
+  font-size: 40px;
   font-weight: 900;
   color: var(--gold-hi);
   /* 발광 + 뚜렷한 드롭 섀도로 상단 문구 강조 */
@@ -1372,7 +1398,7 @@ button {
 /* 단어 바로 밑 설명 — 이 단어가 무엇을 얼마나 주는지 */
 .chain-word .cw-note {
   font-style: normal;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.3px;
   white-space: nowrap;
@@ -1390,7 +1416,7 @@ button {
 .cw-note.gamble { color: #d7b0f5; background: rgba(120, 60, 170, 0.34); }
 .cw-note.combo { color: #fff0c0; background: rgba(255, 168, 60, 0.28); }
 /* 맨 끝 맥락 칸 — 완벽한 맥락은 금빛, 어긋남은 붉게 */
-.chain-word.ctx .cw-text { font-size: 24px; }
+.chain-word.ctx .cw-text { font-size: 28px; }
 .chain-word.ctx.perfect .cw-text { color: #fff0c0; }
 .chain-word.ctx.broken .cw-text {
   color: #ff9a9a;
@@ -1422,7 +1448,7 @@ button {
 .chain-word.wave { animation: chain-wave 0.5s ease; }
 /* 문장부호 칸 — 한 글자라 좁게 붙는다. */
 .chain-word.is-punct { min-width: 0; }
-.chain-word.is-punct .cw-text { font-size: 30px; letter-spacing: 0; }
+.chain-word.is-punct .cw-text { font-size: 36px; letter-spacing: 0; }
 @keyframes chain-wave {
   0%, 100% { transform: translateY(0) scale(1); }
   40% { transform: translateY(-18px) scale(1.16); }
@@ -1921,6 +1947,8 @@ button {
   z-index: 920;
   border-radius: 18px;
   outline: none;
+  transform: rotate(20deg);
+  transform-origin: center center;
   transition: transform .18s ease, filter .18s ease, opacity .18s ease;
 }
 .battle-tools .draw-deck {
@@ -1930,7 +1958,7 @@ button {
   flex: none;
 }
 .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) {
-  transform: translateY(-7px) rotate(1deg);
+  transform: translateY(-7px) rotate(21deg);
   filter: drop-shadow(0 0 15px var(--gold));
 }
 .draw-deck:disabled { opacity: .48; cursor: default; }
@@ -2120,6 +2148,7 @@ button {
   flex-direction: column;
   overflow: hidden;
 }
+.info-dock.detail-idle { display: none; }
 .info-dock::before {
   content: '';
   position: absolute;
@@ -2356,8 +2385,8 @@ button {
 .undo-btn:hover { opacity: 1; color: var(--ink-dim); transform: scale(1.04); }
 
 @media (max-width: 860px) {
-  .draw-deck { right: 8px; transform: scale(.88); }
-  .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) { transform: translateY(-6px) scale(.88); }
+  .draw-deck { right: 8px; transform: rotate(20deg) scale(.88); }
+  .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) { transform: translateY(-6px) rotate(21deg) scale(.88); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2445,17 +2474,17 @@ button {
 .stat .si svg { width: 100%; height: 100%; }
 .stat .sl { font-size: 17px; font-weight: 700; color: var(--ink); }
 .stat .sv { margin-left: auto; font-size: 22px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
-/* 캐스트 로그 아래 보조 메뉴 — 손패와 분리된 2×2 정사각 그리드. */
+/* 우하단 보조 메뉴 — 단어장은 도감에 통합하고 가방·도감만 남긴다. */
 .battle-tools {
   position: absolute;
   right: 34px;
   bottom: 109px;
   z-index: 8;
   width: 372px;
-  height: 218px;
+  height: 104px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px 12px;
 }
 .battle-tool {
@@ -3750,7 +3779,7 @@ button {
 .mult-now {
   position: absolute;
   left: var(--mult-left, 62%);
-  top: 118px;
+  top: 80px;
   z-index: 86;
   transform: none;
   display: flex;

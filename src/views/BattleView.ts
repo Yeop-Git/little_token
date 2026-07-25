@@ -38,7 +38,6 @@ import {
   type EnemyInst,
 } from '@/sim/reference'
 import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
-import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
@@ -114,8 +113,6 @@ export class BattleView {
   private timers: number[] = []
   private cardHand!: CardHand
   private introDialogue: IntroDialogue | null = null
-  private castLog: { turn: number; kind: 'cast' | 'enemy' | 'system'; text: string; tally?: Tally }[] = []
-  private dockMode: 'log' | 'word' | 'item' | 'character' = 'log'
   // 정보창 유지용 — 클릭 중 호버가 잠깐 풀려도 패널이 꺼지지 않게 붙잡는다.
   // 배율 릴 세대 — 새 선택이 들어오면 이전 릴은 조용히 물러난다.
   private multReelToken = 0
@@ -217,28 +214,23 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}" style="background-image:url(${BACKGROUNDS.bg001})">
+      <div class="scene battle" data-weather="${this.field.weather}" style="background-image:url(${BACKGROUNDS.battleDark})">
         <div class="vignette"></div>
         <div class="weather-wash"></div>
 
         <div class="hud-top">
           <div class="hud-left-stack">
-            <div class="hud-left">
-              <div class="hud-weather"><span id="f-weather"></span></div>
-              <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
+            <div class="hud-left-status" aria-label="전투 상태">
+              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+              <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
             <aside class="action-order" aria-label="이번 문장 행동 순서">
               <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
               <ol id="action-order-list"></ol>
             </aside>
           </div>
-          <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-status">
             <div class="hud-status-bar">
-              <div class="hud-right-status" aria-label="전투 상태">
-                <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><i aria-hidden="true">|</i><em id="phase">주어</em></div>
-                <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
-              </div>
               <div class="hud-actions glass" aria-label="시스템 메뉴">
                 <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
                 <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
@@ -272,32 +264,19 @@ export class BattleView {
         </div>
 
         <div class="battle-tools" aria-label="전투 보조 메뉴">
-          <button class="battle-tool wordbook-btn" id="deck-btn" type="button">${icon('book')}<span>단어장</span></button>
           <button class="battle-tool backpack" id="bag" type="button" title="가방">${icon('backpack')}<span>가방</span></button>
           <button class="battle-tool codex-btn" id="codex-btn" type="button">${icon('collection')}<span>도감</span></button>
-          <button class="battle-tool harvest-btn" id="harvest-btn" type="button">${icon('jar')}<span>채집통</span></button>
         </div>
 
-        <div class="stat-dock glass">
-          <div class="dock-title">프롬</div>
-          <div class="stat-list" id="stats"></div>
-        </div>
-
-        <aside class="info-dock glass cast-dock" id="detail" aria-live="polite"></aside>
+        <aside class="info-dock detail-idle" id="detail" aria-live="polite"></aside>
 
         <div id="overlay"></div>
       </div>`
 
-    this.q('#f-date').textContent = this.field.date
-    this.q('#f-title').textContent = this.field.title
-    this.q('#f-desc').textContent = this.field.desc.replace(/<[^>]+>/g, '')
-    this.q('#f-weather').innerHTML = weatherIcon(this.field.weather)
     this.renderGrade()
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
-    this.q('#deck-btn').addEventListener('click', () => this.openDeck())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
-    this.q('#harvest-btn').addEventListener('click', () => this.openHarvest())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
     this.q('#home-btn').addEventListener('click', () => this.onHome?.())
 
@@ -307,12 +286,14 @@ export class BattleView {
       onConfirm: (word) => {
         if (!this.busy && !this.over) this.pick(word.id)
       },
+      onHover: () => GameAudio.play('cardHover'),
       onPreview: (word) => {
         this.keepDock()
         this.renderDetail(word)
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
+    this.q('#draw-deck').addEventListener('pointerenter', () => GameAudio.play('cardHover'))
     document.addEventListener('pointerdown', this.onPointerDown, true)
     document.addEventListener('pointerup', this.onPointerUp, true)
     document.addEventListener('pointercancel', this.onPointerUp, true)
@@ -322,7 +303,7 @@ export class BattleView {
     this.renderWords()
     this.renderStats()
     this.renderBag()
-    this.renderCastLog()
+    this.clearDetailDock()
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -379,6 +360,7 @@ export class BattleView {
       }
       this.updateFoe(el, e, rank, visible.length)
     })
+    this.renderStats()
     this.renderActionOrder()
   }
 
@@ -606,7 +588,7 @@ export class BattleView {
       const id = actor.dataset.character as CharacterVisualDef['id']
       this.renderCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
     }
-    const leave = () => this.fadeDock(() => this.renderCastLog())
+    const leave = () => this.fadeDock(() => this.clearDetailDock())
     // 체력바뿐 아니라 캐릭터 본체도 각각 명시적인 상세보기 호버 영역으로 사용한다.
     actor.querySelectorAll<HTMLElement>('.nameplate, .model-shell').forEach((target) => {
       target.addEventListener('mouseenter', show)
@@ -645,7 +627,6 @@ export class BattleView {
   private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
     const visual = CHARACTER_VISUALS[id]
     const host = this.q('#detail')
-    this.dockMode = 'character'
     let stats: string
     if (id === 'player') {
       const p = this.player.stats
@@ -683,36 +664,10 @@ export class BattleView {
       </article>`
   }
 
-  private renderCastLog() {
+  private clearDetailDock() {
     const host = this.q('#detail')
-    this.dockMode = 'log'
-    host.className = 'info-dock glass cast-dock'
-    const rows = [...this.castLog]
-      .reverse()
-      .map((entry) => `<div class="cast-entry ${entry.kind}">
-        <div class="cast-meta"><span>TURN ${entry.turn}</span><b>${entry.kind === 'cast' ? '문장' : entry.kind === 'enemy' ? '적 행동' : '기록'}</b></div>
-        <div class="cast-text">${entry.text}</div>
-        ${entry.tally ? this.tallyLogHtml(entry.tally) : ''}
-      </div>`)
-      .join('')
-    host.innerHTML = `
-      <div class="cast-head"><span class="cast-kicker">DIARY CAST</span><h2>문장 캐스트 로그</h2></div>
-      <div class="cast-list">${rows || '<div class="cast-empty">아직 발동한 문장이 없다.<br>첫 문장을 완성해 이야기를 시작하자.</div>'}</div>`
-  }
-
-  // 로그 아래 한 줄 요약 — "깡 24 × 배율 3.20 = 77" + 무엇이 그 배율을 줬는지.
-  private tallyLogHtml(t: Tally): string {
-    const chips = [...t.flats.map((f) => ({ ...f, text: `${f.label} +${f.value}` })), ...t.mults.map((m) => ({ ...m, text: `${m.label} ×${m.value.toFixed(2)}` }))]
-      .map((c) => `<span class="cs-chip ${c.cls}">${c.text}</span>`)
-      .join('')
-    return `<div class="cast-score ${t.kind}">
-      <span class="cs-cell"><em>깡</em><b>${t.base}</b></span>
-      <span class="cs-op">×</span>
-      <span class="cs-cell"><em>배율</em><b>${t.mult.toFixed(2)}</b></span>
-      <span class="cs-op">=</span>
-      <span class="cs-cell total"><em>${t.kind === 'dmg' ? '피해' : '회복'}</em><b>${t.total}</b></span>
-    </div>
-    <div class="cast-chips">${chips}</div>`
+    host.className = 'info-dock detail-idle'
+    host.innerHTML = ''
   }
 
   // ── 상단 발광 체인(문장) ──
@@ -798,7 +753,6 @@ export class BattleView {
     host.classList.add('landed')
     // 배율이 크게 붙었으면 더 뜨겁게 빛난다.
     host.classList.toggle('hot', target >= 2)
-    GameAudio.play('wordSelect')
     this.timers.push(window.setTimeout(() => host.classList.remove('landed'), 620))
   }
 
@@ -869,10 +823,9 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
-      this.renderCastLog()
+      this.clearDetailDock()
       return
     }
-    this.dockMode = 'word'
     // 슬롯 키로 잡는다 — 겹동사(verb2)처럼 한 단어가 여러 칸에 들어갈 수 있어서
     // w.slot을 쓰면 지금 고르는 칸이 아니라 원래 칸을 가리킨다.
     const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
@@ -989,19 +942,21 @@ export class BattleView {
     return out
   }
 
-  // ── 우측 스탯표 ──
+  // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
-    // 스탯 아래에 지금 걸려 있는 규칙(전설 아이템 패시브)을 늘 보이게 둔다.
     const passives = passivesOf(this.player)
-      .map((p) => `<div class="stat-passive" title="${p.desc}">✦ ${p.name}</div>`)
+      .map((p) => `<div class="hud-stat hud-passive" role="img" aria-label="${p.name}. ${p.desc}" data-tooltip="${p.name} · ${p.desc}" title="${p.name}: ${p.desc}"><span aria-hidden="true">✦</span></div>`)
       .join('')
     this.q('#stats').innerHTML =
+      '<span class="hud-player-name" aria-label="주인공 이름 프롬">프롬</span>' +
       STAT_META.map(
-        (m) => `<div class="stat" title="${m.desc}">
+        (m) => {
+          const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
+          return `<div class="hud-stat" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${m.label} · ${m.desc}" title="${m.label}: ${value} — ${m.desc}">
         <span class="si">${icon(m.icon)}</span>
-        <span class="sl">${m.label}</span>
-        <span class="sv">${this.player.stats[m.key]}</span>
-      </div>`,
+        <b>${value}</b>
+      </div>`
+        },
       ).join('') + passives
   }
 
@@ -1042,10 +997,9 @@ export class BattleView {
   private renderItemDetail(item: OwnedItem | null) {
     const detail = this.q('#detail')
     if (!item) {
-      this.renderCastLog()
+      this.clearDetailDock()
       return
     }
-    this.dockMode = 'item'
     const rows = STAT_ORDER.filter((k) => item.stats[k])
       .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
       .join('')
@@ -1085,61 +1039,11 @@ export class BattleView {
     return `<div class="deck-hover-card mood-${mood} rarity-${rarity}" aria-hidden="true">${face}</div>`
   }
 
-  private openDeck() {
-    const host = this.q('#overlay')
-    const slots = this.t.template.slots
-    host.innerHTML = `
-      <div class="ov-backdrop"></div>
-      <div class="ov-panel glass deck-panel">
-        <div class="ov-head"><div class="ov-title">${icon('book')} 단어장</div><button class="ov-close" id="ov-x">${icon('close')}</button></div>
-        <div class="deck-cols">
-          ${slots
-            .map(
-              (s, i) => `<div class="deck-col">
-              <div class="deck-col-h"><b>${i + 1}</b> ${s.label}</div>
-              ${(this.player.deck[s.key] ?? [])
-                .map(
-                  (w) => `<div class="deck-word mood-${this.moodOf(w)}" data-slot="${s.key}" data-word="${w.id}">
-                    <span class="dw">${w.text}</span><span class="dn">${w.note}</span>
-                  </div>`,
-                )
-                .join('')}
-            </div>`,
-            )
-            .join('')}
-        </div>
-      </div>
-      <div id="deck-card-preview"></div>`
-    host.classList.add('open')
-    const close = () => this.closeOverlay()
-    host.querySelector('#ov-x')!.addEventListener('click', close)
-    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
-    const preview = host.querySelector<HTMLElement>('#deck-card-preview')!
-    const movePreview = (event: MouseEvent) => {
-      const rect = this.root.getBoundingClientRect()
-      const scale = rect.width / this.root.offsetWidth || 1
-      const cardWidth = 158
-      const cardHeight = 218
-      const x = Math.min(this.root.offsetWidth - cardWidth - 18, Math.max(18, (event.clientX - rect.left) / scale + 20))
-      const y = Math.min(this.root.offsetHeight - cardHeight - 18, Math.max(18, (event.clientY - rect.top) / scale - cardHeight - 20))
-      preview.style.transform = `translate3d(${x}px, ${y}px, 0)`
-    }
-    host.querySelectorAll<HTMLElement>('.deck-word').forEach((row) => {
-      const word = (this.player.deck[row.dataset.slot!] ?? []).find((item) => item.id === row.dataset.word)
-      if (!word) return
-      row.addEventListener('mouseenter', (event) => {
-        preview.innerHTML = this.deckPreviewHtml(word)
-        preview.classList.add('show')
-        movePreview(event)
-      })
-      row.addEventListener('mousemove', movePreview)
-      row.addEventListener('mouseleave', () => preview.classList.remove('show'))
-    })
-  }
-
-  // ── 도감 — 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
+  // ── 도감 — 현재 단어장과 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
   private openCodex() {
     const host = this.q('#overlay')
+    const slots = this.t.template.slots
+    const ownedWords = Object.values(this.player.deck).flat()
     const owned = new Set(Object.values(this.player.deck).flat().map((word) => word.id))
     const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()]
       .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
@@ -1153,7 +1057,19 @@ export class BattleView {
     const itemCatalog = Object.values(ALL_ITEMS)
     const foundItems = itemCatalog.filter((item) => ownedItems.has(item.id)).length
 
-    const cardContent = `<div class="codex-groups" data-codex-page="card">
+    const ownedContent = `<div class="codex-page codex-owned-page" data-codex-page="owned">
+      <p class="codex-intro">이번 런에서 모은 단어다. 단어에 마우스를 올리면 카드 정보를 볼 수 있다.</p>
+      <div class="deck-cols">
+        ${slots.map((slot, index) => `<section class="deck-col">
+          <div class="deck-col-h"><b>${index + 1}</b> ${slot.label}</div>
+          ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word mood-${this.moodOf(word)}" data-slot="${slot.key}" data-word="${word.id}">
+            <span class="dw">${word.text}</span><span class="dn">${word.note}</span>
+          </div>`).join('')}
+        </section>`).join('')}
+      </div>
+    </div>`
+
+    const cardContent = `<div class="codex-groups" data-codex-page="card" hidden>
       ${groups.map((slot) => `<section class="codex-group">
         <h3>${slotLabel[slot] ?? slot}</h3>
         <div class="codex-grid">
@@ -1200,22 +1116,25 @@ export class BattleView {
       <div class="ov-backdrop"></div>
       <section class="ov-panel glass codex-panel" aria-label="도감">
         <div class="ov-head">
-          <div class="ov-title">${icon('collection')} 그림일기 도감 <span class="codex-current-count">카드 ${found} / ${catalog.length}</span></div>
+          <div class="ov-title">${icon('collection')} 그림일기 도감 <span class="codex-current-count">내 단어 ${ownedWords.length}</span></div>
           <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
         </div>
         <div class="codex-layout">
           <nav class="codex-index" aria-label="도감 분류">
-            <button type="button" class="on" data-codex-tab="card" data-count="카드 ${found} / ${catalog.length}"><span>01</span><b>카드 도감</b><small>${found} / ${catalog.length}</small></button>
-            <button type="button" data-codex-tab="enemy" data-count="적 ${foundEnemies} / ${enemyCatalog.length}"><span>02</span><b>적 도감</b><small>${foundEnemies} / ${enemyCatalog.length}</small></button>
-            <button type="button" data-codex-tab="item" data-count="아이템 ${foundItems} / ${itemCatalog.length}"><span>03</span><b>아이템 도감</b><small>${foundItems} / ${itemCatalog.length}</small></button>
+            <button type="button" class="on" data-codex-tab="owned" data-count="내 단어 ${ownedWords.length}"><span>01</span><b>현재 내 단어</b><small>${ownedWords.length}장</small></button>
+            <button type="button" data-codex-tab="card" data-count="카드 ${found} / ${catalog.length}"><span>02</span><b>카드 도감</b><small>${found} / ${catalog.length}</small></button>
+            <button type="button" data-codex-tab="enemy" data-count="적 ${foundEnemies} / ${enemyCatalog.length}"><span>03</span><b>적 도감</b><small>${foundEnemies} / ${enemyCatalog.length}</small></button>
+            <button type="button" data-codex-tab="item" data-count="아이템 ${foundItems} / ${itemCatalog.length}"><span>04</span><b>아이템 도감</b><small>${foundItems} / ${itemCatalog.length}</small></button>
           </nav>
           <div class="codex-content">
+            ${ownedContent}
             ${cardContent}
             ${enemyContent}
             ${itemContent}
           </div>
         </div>
-      </section>`
+      </section>
+      <div id="deck-card-preview"></div>`
     host.classList.add('open')
     const close = () => this.closeOverlay()
     host.querySelector('#ov-x')!.addEventListener('click', close)
@@ -1229,53 +1148,29 @@ export class BattleView {
         count.textContent = button.dataset.count ?? ''
       })
     })
+    const preview = host.querySelector<HTMLElement>('#deck-card-preview')!
+    const movePreview = (event: MouseEvent) => {
+      const rect = this.root.getBoundingClientRect()
+      const scale = rect.width / this.root.offsetWidth || 1
+      const cardWidth = 158
+      const cardHeight = 218
+      const x = Math.min(this.root.offsetWidth - cardWidth - 18, Math.max(18, (event.clientX - rect.left) / scale + 20))
+      const y = Math.min(this.root.offsetHeight - cardHeight - 18, Math.max(18, (event.clientY - rect.top) / scale - cardHeight - 20))
+      preview.style.transform = `translate3d(${x}px, ${y}px, 0)`
+    }
+    host.querySelectorAll<HTMLElement>('.codex-owned-page .deck-word').forEach((row) => {
+      const word = (this.player.deck[row.dataset.slot!] ?? []).find((item) => item.id === row.dataset.word)
+      if (!word) return
+      row.addEventListener('mouseenter', (event) => {
+        preview.innerHTML = this.deckPreviewHtml(word)
+        preview.classList.add('show')
+        movePreview(event)
+      })
+      row.addEventListener('mousemove', movePreview)
+      row.addEventListener('mouseleave', () => preview.classList.remove('show'))
+    })
   }
 
-  // 채집통 — 현재 단어장 조합으로 완성할 수 있는 이름 있는 맥락을 모아 보여준다.
-  private openHarvest() {
-    const host = this.q('#overlay')
-    const canForm = (need: string[]) => {
-      const full = (1 << need.length) - 1
-      let states = new Set([0])
-      for (const slot of this.t.template.slots) {
-        const next = new Set<number>()
-        for (const state of states) {
-          for (const word of this.t.words[slot.key] ?? []) {
-            let mask = state
-            for (const tag of word.tags) {
-              const target = need.findIndex((wanted, index) => wanted === tag && (mask & (1 << index)) === 0)
-              if (target >= 0) mask |= 1 << target
-            }
-            next.add(mask)
-          }
-        }
-        states = next
-      }
-      return states.has(full)
-    }
-    const combos = this.t.combos.map((combo) => ({ combo, collected: canForm(combo.need) }))
-    const collected = combos.filter((entry) => entry.collected).length
-    host.innerHTML = `
-      <div class="ov-backdrop"></div>
-      <section class="ov-panel glass harvest-panel" aria-label="관용구 채집통">
-        <div class="ov-head">
-          <div class="ov-title">${icon('jar')} 관용구 채집통 <span class="codex-count">${collected} / ${combos.length}</span></div>
-          <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
-        </div>
-        <p class="harvest-intro">현재 단어장으로 완성할 수 있는 좋은 맥락이 금빛으로 기록됩니다.</p>
-        <div class="harvest-grid">
-          ${combos.map(({ combo, collected: ready }) => `<article class="harvest-entry${ready ? ' collected' : ' missing'}">
-            <div class="harvest-seal">${ready ? '✦' : '?'}</div>
-            <div><b>${ready ? combo.name : '아직 모르는 맥락'}</b><span>${ready ? (combo.flavor ?? '단어가 맞물려 힘이 폭발한다.') : '새 단어를 모아 맥락을 완성하자.'}</span></div>
-            <strong>${ready ? `×${combo.mult.toFixed(1)}` : '—'}</strong>
-          </article>`).join('')}
-        </div>
-      </section>`
-    host.classList.add('open')
-    const close = () => this.closeOverlay()
-    host.querySelector('#ov-x')!.addEventListener('click', close)
-    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
-  }
   private closeOverlay() {
     const host = this.q('#overlay')
     host.classList.remove('open')
@@ -1290,7 +1185,7 @@ export class BattleView {
   private pick(id: string) {
     const key = this.order()[this.slotIndex]
     const w = this.t.words[key].find((x) => x.id === id)!
-    GameAudio.play('wordSelect')
+    GameAudio.play('paper')
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
     const order = this.order()
@@ -1299,6 +1194,7 @@ export class BattleView {
     this.slotIndex = Math.min(next, order.length - 1)
     this.setPhase(this.complete() ? '단어 완성' : `${this.t.template.slots[this.slotIndex].label} 선택`)
     this.renderChain()
+    GameAudio.play('pencil')
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
     if (this.complete() && !this.busy && !this.over) {
@@ -1453,13 +1349,11 @@ export class BattleView {
       void total.offsetWidth
       total.classList.add('tick')
       this.applyHeatTier(el, Math.round(tally.total * eased))
-      if (i % 2 === 0) GameAudio.play('wordSelect')
     }
     total.textContent = String(tally.total)
     this.applyHeatTier(el, tally.total)
     total.classList.remove('tick')
     total.classList.add('slam')
-    GameAudio.play('sentenceComplete') // 팅!!!!
     await sleep(380)
   }
 
@@ -1705,7 +1599,6 @@ export class BattleView {
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++
-    this.q('#turn').textContent = String(this.state.turn)
     // 턴이 넘어가면 등급이 식는다 — 운이 보장하는 바닥까지만.
     const prevGrade = this.grade
     this.grade = decayGrade(this.grade, this.player.stats.luck)
@@ -1760,7 +1653,6 @@ export class BattleView {
     banner.classList.remove('show')
     void banner.offsetWidth
     banner.classList.add('show')
-    GameAudio.play('sentenceComplete')
     await sleep(420)
 
     const res = applyIntent(this.state, intent, mult, this.target)
@@ -1988,7 +1880,6 @@ export class BattleView {
       badge.classList.remove('ding')
       void (badge as HTMLElement).offsetWidth
       badge.classList.add('ding')
-      GameAudio.play('wordSelect')
       const pop = document.createElement('span')
       pop.className = 'grade-pop'
       pop.textContent = '+1'
@@ -2008,7 +1899,6 @@ export class BattleView {
     const dx = (s.left + s.width / 2 - (b.left + b.width / 2)) / scale
     const dy = (s.top + s.height * 0.44 - (b.top + b.height / 2)) / scale
     badge.classList.add('finale')
-    GameAudio.play('sentenceComplete')
     const anim = badge.animate(
       [
         { transform: 'translate(0,0) scale(1)' },
@@ -2151,7 +2041,7 @@ export class BattleView {
     void el.offsetWidth
     el.classList.add('hit')
   }
-  private log(html: string, tally?: Tally) {
+  private log(html: string, _tally?: Tally) {
     const host = this.q('#log')
     const line = document.createElement('div')
     line.className = 'log-line'
@@ -2160,9 +2050,5 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => line.remove(), 3100))
     while (host.children.length > 3) host.removeChild(host.firstChild!)
 
-    const kind = html.includes('습격') ? 'enemy' : html.includes('→') ? 'cast' : 'system'
-    this.castLog.push({ turn: this.state.turn, kind, text: html, tally })
-    if (this.castLog.length > 8) this.castLog.shift()
-    if (this.dockMode === 'log') this.renderCastLog()
   }
 }

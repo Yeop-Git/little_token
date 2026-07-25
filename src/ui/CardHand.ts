@@ -52,6 +52,7 @@ interface CardHandOptions {
   handRoot: HTMLElement
   deckButton: HTMLButtonElement
   onConfirm: (word: Word) => void
+  onHover?: (word: Word) => void
   onPreview: (word: Word) => void
   onPreviewEnd: () => void
 }
@@ -81,7 +82,10 @@ export class CardHand {
     const button = this.cardButton(event.target)
     if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return
     const card = this.cardFor(button)
-    if (card) this.opts.onPreview(card.word)
+    if (card) {
+      this.opts.onHover?.(card.word)
+      this.opts.onPreview(card.word)
+    }
   }
   private readonly onHandPointerOut = (event: PointerEvent) => {
     const button = this.cardButton(event.target)

@@ -10,7 +10,6 @@ import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { GameAudio } from '@/audio/GameAudio'
 import { RARITY_LABEL } from '@core/types'
 
 interface Opts {
@@ -177,7 +176,6 @@ export class ItemExclaimView {
 
     // 현재 슬롯의 텍스트 선택지 — 행운 감탄이 붙은 칸은 금빛으로 빛나고, 첫 등장에만 팅!.
     const slot = EXCLAIM_SLOTS[this.slotIndex]
-    let freshBless = false
     this.q('#egrid').innerHTML = slot.words
       .map((w) => {
         const picked = this.picks[slot.key] === w.id
@@ -186,7 +184,6 @@ export class ItemExclaimView {
         const fresh = bless && !this.revealed.has(key)
         if (fresh) {
           this.revealed.add(key)
-          freshBless = true
         }
         const blessHtml = bless
           ? `<span class="bless">팅! ${STAT_LABEL[bless.stat]} +${bless.n}</span>`
@@ -196,7 +193,6 @@ export class ItemExclaimView {
         </button>`
       })
       .join('')
-    if (freshBless) GameAudio.play('wordSelect')
     this.q('#egrid')
       .querySelectorAll<HTMLElement>('.word-cell')
       .forEach((btn) =>
