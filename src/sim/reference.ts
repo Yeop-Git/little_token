@@ -40,7 +40,7 @@ export interface EnemyInst {
   summonsRight: number
   /** 같은 전투 턴에 턴 시작 소환을 두 번 처리하지 않기 위한 표식. */
   lastSummonTurn: number
-  /** 여덟 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
+  /** 거미 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
   parts: EnemyPartInst[]
   webTurns: number
   lastWebTurn: number
@@ -79,6 +79,8 @@ export interface BattleState {
   playerMax: number
   guard: number
   counterMultiplier: number
+  /** 개발 치트: 적 행동은 진행하되 플레이어 피해와 방어 소모는 막는다. */
+  damageImmune?: boolean
   turn: number
   enemies: EnemyInst[]
   pending: PendingAttack | null
@@ -86,7 +88,13 @@ export interface BattleState {
 
 export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1): EnemyInst {
   const hpPerBar = Math.max(1, Math.round(def.hp * hpMult))
-  const bars = def.boss ? Math.max(1, Math.floor(healthBars)) : 1
+  // 부위 보스는 부위 하나가 곧 체력 한 줄이다. 호출부의 막 수와 어긋나더라도
+  // 부위 배열을 기준으로 잡아 총 체력·HUD·실제 피해 풀이 항상 일치하게 한다.
+  const bars = def.parts?.length
+    ? def.parts.length
+    : def.boss
+      ? Math.max(1, Math.floor(healthBars))
+      : 1
   const maxHp = hpPerBar * bars
   return {
     def,
@@ -126,22 +134,21 @@ export const activeEnemyPart = (enemy: Pick<EnemyInst, 'parts'>): EnemyPartInst 
 export const brokenSpiderLegs = (enemy: Pick<EnemyInst, 'parts'>): number =>
   enemy.parts.filter((part) => part.def.kind === 'leg' && part.broken).length
 
-/** 끊어진 다리 수를 기준점으로 삼아, 큰 파훼 시 webTurns를 이 값에 맞추면 장력이 0이 된다. */
-export function spiderWebTension(enemy: Pick<EnemyInst, 'webTurns' | 'parts'>): number {
-  return Math.min(4, Math.max(0, enemy.webTurns - brokenSpiderLegs(enemy)))
-}
-
-export function spiderWebAttackBonus(enemy: Pick<EnemyInst, 'def' | 'webTurns' | 'parts'>): number {
-  const pattern = enemy.def.webPattern
-  if (!pattern) return 0
-  return Math.min(pattern.maxAttackBonus, Math.floor(spiderWebTension(enemy) / 2) * pattern.attackPerTension)
+/** 끊어진 다리 수를 기준점으로 삼아, 다리 파괴 시 누적 봉인 수를 0으로 되돌린다. */
+export function spiderWebTension(enemy: Pick<EnemyInst, 'def' | 'webTurns' | 'parts'>): number {
+  return Math.min(enemy.def.webPattern?.maxSealedCards ?? 0, Math.max(0, enemy.webTurns - brokenSpiderLegs(enemy)))
 }
 
 export interface SpiderWebTurn {
   idx: number
   tension: number
-  attackBonus: number
   brokenLegs: number
+}
+
+/** 3슬롯에서는 주어 → 수식어 → 동사를 정확히 순환해 봉인 편중을 막는다. */
+export function spiderSealSlotForTurn(slotKeys: readonly string[], turn: number): string | null {
+  if (slotKeys.length === 0) return null
+  return slotKeys[Math.max(0, Math.floor(turn) - 1) % slotKeys.length]
 }
 
 /** View가 카드 한 장을 고르기 전에 거미줄의 전투 압력을 한 번만 확정한다. */
@@ -151,11 +158,10 @@ export function spiderWebAtTurnStart(state: BattleState): SpiderWebTurn | null {
   const enemy = state.enemies[idx]
   if (enemy.lastWebTurn === state.turn) return null
   enemy.lastWebTurn = state.turn
-  enemy.webTurns++
+  if (spiderWebTension(enemy) < enemy.def.webPattern!.maxSealedCards) enemy.webTurns++
   return {
     idx,
     tension: spiderWebTension(enemy),
-    attackBonus: spiderWebAttackBonus(enemy),
     brokenLegs: brokenSpiderLegs(enemy),
   }
 }
@@ -246,11 +252,10 @@ export interface HitFx {
   /** 부위 보스에서 이 타격이 시작된 다리 또는 본체. */
   partId?: string
   partName?: string
-  /** 공개 약점을 맞혀 거미줄 장력을 끊었는가. */
+  /** 공개 약점을 맞혀 카드 봉인 하나를 풀었는가. */
   webCut?: boolean
-  /** 부위 체력 한 칸 파괴 또는 감정 공명으로 거미줄을 전부 날렸는가. */
+  /** 다리를 파괴해 카드 봉인을 전부 풀었는가. */
   webBurst?: boolean
-  webBurstReason?: 'part' | 'emotion'
   tensionReduced?: number
 }
 
@@ -343,9 +348,11 @@ function damageEnemy(
     ? enemy.parts.filter((candidate) => !candidate.broken).length
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (part) {
-    // 강한 문장은 한 다리의 남은 체력에서 멈추지 않는다. 다음 다리와 본체까지
-    // 순차 관통시켜 기존 다중 체력막의 폭발적인 상한 판타지를 보존한다.
-    let remaining = dealt
+    // 지금 드러난 약점을 맞힌 문장만 다음 다리와 본체까지 순차 관통해 다중
+    // 체력막의 폭발적인 상한 판타지를 낸다. 약점을 빗나간 문장은 그 다리의
+    // 관절에서 멈춘다 — 안 그러면 강한 문장 하나가 다리 둘을 한꺼번에 끊어
+    // 기쁨·분노·슬픔·즐거움이 드러나기도 전에 사라진다.
+    let remaining = weak ? dealt : Math.min(dealt, part.hp)
     for (const candidate of enemy.parts.slice(enemy.parts.indexOf(part))) {
       if (remaining <= 0) break
       const applied = Math.min(candidate.hp, remaining)
@@ -362,13 +369,10 @@ function damageEnemy(
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (enemy.hp <= 0) enemy.dead = true
   const barsBroken = barsBefore - barsAfter
-  const emotionBurst = (['joy', 'anger', 'sorrow', 'pleasure'] as const).some(
-    (emotion) => emotions.filter((entry) => entry === emotion).length >= 2,
-  )
-  const webBurst = !!enemy.def.webPattern && dealt > 0 && (barsBroken > 0 || emotionBurst)
+  const webBurst = !!enemy.def.webPattern && dealt > 0 && barsBroken > 0
   const webCut = !!enemy.def.webPattern && weak && dealt > 0 && !webBurst
   if (webBurst) {
-    // 부위 한 칸 파괴와 감정 공명은 쌓인 거미줄을 전부 걷어 내는 큰 파훼다.
+    // 다리 하나가 떨어지면 쌓인 카드 봉인을 전부 걷어 낸다.
     enemy.webTurns = brokenSpiderLegs(enemy)
   } else if (webCut) {
     // 약점만 맞힌 경우에는 작은 파훼로 한 겹을 끊는다.
@@ -386,7 +390,6 @@ function damageEnemy(
     partName: part?.def.name,
     webCut,
     webBurst,
-    webBurstReason: webBurst ? (emotionBurst ? 'emotion' : 'part') : undefined,
     tensionReduced: Math.max(0, tensionBefore - spiderWebTension(enemy)),
   }
 }
@@ -427,9 +430,11 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
 
 function disperseTargetSummons(state: BattleState, target: number, targetCount: TargetCount): number {
   const enemy = state.enemies[target]
-  if (!enemy || enemy.dead || !enemy.def.summonPattern || targetCount === 1) return 0
+  if (!enemy || enemy.dead || !enemy.def.summonPattern) return 0
   const available = summonCount(enemy)
-  const requested = targetCount === 'all' ? available : Math.max(0, targetCount - 1)
+  // 범위 카드를 못 얻은 런도 호위에 대응할 수 있게 공격 한 번당 최소 한 마리는
+  // 흩어진다. 범위가 넓을수록 더 많이 지워져 낮은 계수와 제어력의 선택은 유지한다.
+  const requested = targetCount === 'all' ? available : Math.max(1, targetCount)
   let remaining = Math.min(available, requested)
   const dispersed = remaining
   // 최근에 들어온 오른쪽 호위부터 번갈아 걷어 내 좌우 실루엣이 한쪽으로 쏠리지 않게 한다.
@@ -499,8 +504,10 @@ export interface EnemyStrike {
   text: string
   dealt: number
   idx: number
-  /** 보스의 현재 체력 구간에 맞춘 공격 애니메이션·피해 단계. 일반 적은 1이다. */
+  /** 보스의 현재 체력 구간에 맞춘 피해 단계. 일반 적은 1이다. */
   attackStage: BossAttackStage
+  /** 실제 재생할 공격 클립 단계. 패턴 지정이 없으면 체력 기반 attackStage를 따른다. */
+  animationStage: BossAttackStage
   absorbed: number
   /** 강한 기술이 플레이어의 남은 방어를 수치와 무관하게 전부 지웠는가. */
   guardShattered: boolean
@@ -510,8 +517,6 @@ export interface EnemyStrike {
   groggyEntered: boolean
   groggyDamageMult: number
   telegraphText: string | null
-  webFinisher: boolean
-  webReleased: boolean
   /** 벌떼 돌격으로 이번 공격에 참가한 뒤 사라진 호위 수. */
   summonsReleased: number
   piercedGuard: boolean
@@ -526,32 +531,30 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const enemy = state.enemies[front]
   if (enemy.initiativePhase !== phase || state.turn < enemy.nextAttackTurn) return strikes
 
-  const attackStage = bossAttackStage(enemy)
-  const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
   const attackStep = nextEnemyAttackStep(enemy)
+  const attackStage = bossAttackStage(enemy)
+  const animationStage = attackStep?.animationStage ?? attackStage
+  const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
-  const webAttackBonus = spiderWebAttackBonus(enemy)
-  const webFinisher = !!enemy.def.webPattern && spiderWebTension(enemy) >= 4
   const summonsReleased = summonPattern && escorts >= summonPattern.releaseAt ? escorts : 0
   const uncappedRaw = Math.round(
-    (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + webAttackBonus + Math.floor(rng() * 3))
+    (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + Math.floor(rng() * 3))
       * enemy.atkMult
       * attackMultiplier
       * (attackStep?.damageScale ?? 1),
   )
-  // 피니셔는 큰 쇼를 만들되 즉사기가 아니다. 일반 조임도 최대 체력 비례로 눌러
-  // 15스테이지의 높은 공격 배율보다 기믹의 읽기와 파훼를 앞세운다.
-  const webShowCap = Math.max(1, Math.round(state.playerMax * (webFinisher ? .55 : .35)))
-  const finisherNonlethalCap = state.guard + Math.max(0, state.playerHp - 1)
+  // 장로거미는 카드 봉인 파훼를 읽을 시간을 주도록 한 번의 체력 피해를 제한한다.
+  const webShowCap = Math.max(1, Math.round(state.playerMax * .5))
   const raw = enemy.def.webPattern
-    ? Math.min(uncappedRaw, webShowCap, webFinisher ? finisherNonlethalCap : Infinity)
+    ? Math.min(uncappedRaw, webShowCap)
     : uncappedRaw
   const piercedGuard = !!enemy.def.pierceGuard
-  const guardShattered = !!attackStep?.shatterGuard && state.guard > 0
-  const absorbed = guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
-  const dealt = guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
+  const immune = !!state.damageImmune
+  const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard > 0
+  const absorbed = immune ? 0 : guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
+  const dealt = immune ? 0 : guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
   state.playerHp -= dealt
   const lifeStolen = Math.min(
     Math.max(0, enemy.maxHp - enemy.hp),
@@ -565,14 +568,16 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     && (!attackStep.groggyRequiresGuardShatter || guardShattered)
     && !enemy.dead
   if (groggyEntered) {
-    enemy.groggyUntilTurn = state.turn + 1
+    // 선공에서 막으면 같은 턴 본행동, 후공에서 막으면 다음 턴 본행동까지 정확히
+    // 한 번만 열린다. 평타 반복 RNG가 그로기 보상 횟수까지 바꾸지 않게 한다.
+    enemy.groggyUntilTurn = state.turn + (phase === 'second' ? 1 : 0)
     enemy.groggyDamageMult = attackStep.groggyDamageMult!
   }
   strikes.push({
-    text: `${enemy.def.name}의 ${webFinisher ? '사방 거미줄 조임' : summonsReleased > 0 ? '벌떼 돌격' : attackStep?.name ?? '습격'} → ${dealt} 피해`
+    text: `${enemy.def.name}의 ${summonsReleased > 0 ? '벌떼 돌격' : attackStep?.name ?? '습격'} → ${dealt} 피해`
       + (enemy.def.boss && attackStage > 1 ? ` (공격 ${attackStage}단계 ×${attackMultiplier.toFixed(2)})` : '')
       + (summonAttackBonus > 0 ? ` (호위 공격 +${summonAttackBonus})` : '')
-      + (webAttackBonus > 0 ? ` (거미줄 장력 +${webAttackBonus})` : '')
+      + (immune ? ' (무적)' : '')
       + (guardShattered ? ` (방어 ${absorbed} 전량 파괴)` : '')
       + (lifeStolen > 0 ? ` (흡혈 ${lifeStolen})` : '')
       + (groggyEntered ? ` (그로기 · 받는 피해 ×${enemy.groggyDamageMult.toFixed(1)})` : '')
@@ -580,14 +585,13 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     dealt,
     idx: front,
     attackStage,
+    animationStage,
     absorbed,
     guardShattered,
     lifeStolen,
     groggyEntered,
     groggyDamageMult: enemy.groggyDamageMult,
     telegraphText: attackStep?.telegraphText ?? null,
-    webFinisher,
-    webReleased: webFinisher,
     summonsReleased,
     piercedGuard,
     counterHit,
@@ -596,7 +600,6 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     enemy.summonsLeft = 0
     enemy.summonsRight = 0
   }
-  if (webFinisher) enemy.webTurns = brokenSpiderLegs(enemy)
   enemy.attacksMade++
   advanceEnemyAttackPattern(enemy, rng)
   state.guard -= absorbed

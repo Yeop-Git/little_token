@@ -62,6 +62,22 @@ export const ITEMS: Record<string, ItemDef> = {
     base: { hp: 0, atk: 2, guard: 0, heal: 1, luck: 1 },
     flavor: '심이 짧아도 쓰는 데는 지장 없다.',
   },
+  inkBottle: {
+    id: 'inkBottle',
+    name: '푸른 잉크병',
+    rarity: 'rare',
+    art: 'gift',
+    base: { hp: 0, atk: 2, guard: 0, heal: 2, luck: 2 },
+    flavor: '한 방울만 찍어도 다음 문장이 오래 반짝인다.',
+  },
+  softEraser: {
+    id: 'softEraser',
+    name: '말랑 지우개',
+    rarity: 'rare',
+    art: 'gift',
+    base: { hp: 4, atk: 0, guard: 2, heal: 1, luck: 1 },
+    flavor: '틀린 자국을 지우고도 종이가 상하지 않는다.',
+  },
 }
 
 /**

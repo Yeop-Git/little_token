@@ -242,16 +242,18 @@ export interface EnemyDef {
   weakEmotion?: Emotion
   /** 장로거미처럼 하나의 적 안에 순차적으로 파괴되는 독립 체력 부위를 가진 경우. */
   parts?: readonly EnemyPartDef[]
-  /** 매 문장 시작에 카드를 묶고, 누적 장력으로 공격을 강화하는 거미줄 패턴. */
+  /** 매 문장 시작에 카드를 묶고, 약점 공략으로 해제하는 거미줄 패턴. */
   webPattern?: {
     sealPerTurn: number
-    attackPerTension: number
-    maxAttackBonus: number
+    /** 전투 동안 동시에 유지되는 카드 봉인의 최대 개수. */
+    maxSealedCards: number
   }
   /** 공격할 때마다 순서대로 반복하는 예고형 기술. bonusAtk은 기본 공격력에 가산한다. */
   attackPattern?: readonly {
     name: string
     bonusAtk: number
+    /** 이 패턴이 재생할 공격 클립. 피해를 정하는 보스 체력 단계와는 독립적이다. */
+    animationStage?: 1 | 2 | 3
     /** 기본 공격 피해에 적용하는 기술별 위력 비율. 0이면 피해 없는 쇼 동작이다. */
     damageScale?: number
     /** 이 기술을 한 번 더 반복할 확률. 한 사이클에서 최대 한 번만 굴린다. */

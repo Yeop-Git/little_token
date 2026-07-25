@@ -5,8 +5,9 @@
  */
 
 import './style.css'
-import { BattleView } from '@views/BattleView'
+import type { BattleView as BattleViewType } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
+import { DeckDiscardView } from '@views/DeckDiscardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
 import { CombatGuideView } from '@views/CombatGuideView'
@@ -16,15 +17,14 @@ import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
-import { genRewards } from '@data/rewards'
-import { newRun, registerWord, applyItemReward } from '@core/run'
+import { genRewards, rewardGradeForDay } from '@data/rewards'
+import { newRun, registerWord, applyItemReward, type RewardPhase } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
 import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
-import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { CinematicIntro } from '@views/CinematicIntro'
 import { GameAudio } from '@/audio/GameAudio'
@@ -56,14 +56,23 @@ function fit() {
 window.addEventListener('resize', fit)
 fit()
 
-let run = newRun()
+// 저장된 런이 있으면 그 다음 전투를 예열한다. 항상 새 런부터 예열하면 이어하기에서
+// 1층 모델을 받은 직후 현재 층 모델을 또 받아 네트워크·파싱 비용이 두 번 든다.
+let run = loadRun() ?? newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
-void preloadBattleResources(run.player.deck, run.player.items)
-let current: { destroy?: () => void } | null = null
+void preloadUpcomingBattle().catch(() => undefined)
+type CurrentView = { destroy?: () => void } & Partial<Pick<BattleViewType,
+  'debugDefeat' | 'debugSetCombatModes' | 'debugSpawnCard'>>
+let current: CurrentView | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'ending' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
+// 저장 파일과 실제 밸런스에는 남기지 않는, 이번 실행 동안만 쓰는 전투 치트다.
+const debugCombatModes = {
+  invincible: false,
+  attackMultiplier: 1,
+}
 
 // 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
 // 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
@@ -122,7 +131,11 @@ function reinforceAllCards() {
 }
 
 function defeatPlayer() {
-  if (current instanceof BattleView) current.debugDefeat()
+  current?.debugDefeat?.()
+}
+
+function applyDebugCombatModes() {
+  current?.debugSetCombatModes?.(debugCombatModes)
 }
 
 // 디버그 스테이지 이동 — 날짜만 바꾼 뒤 일반 전투 진입 경로를 다시 타게 해
@@ -222,6 +235,8 @@ function mountDevCheat(active: SceneName) {
               <div class="dev-cheat-section-heading"><div><h3>RUN TOOLS</h3><p>런 상태 일괄 조작</p></div></div>
               <div class="dev-cheat-run-tools">
                 <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망</button>
+                <button type="button" class="is-toggle${debugCombatModes.invincible ? ' on' : ''}" data-run-tool="invincible" aria-pressed="${debugCombatModes.invincible}">무적 모드 · ${debugCombatModes.invincible ? 'ON' : 'OFF'}</button>
+                <button type="button" class="is-toggle${debugCombatModes.attackMultiplier > 1 ? ' on' : ''}" data-run-tool="attack-boost" aria-pressed="${debugCombatModes.attackMultiplier > 1}">공격력 ×100 · ${debugCombatModes.attackMultiplier > 1 ? 'ON' : 'OFF'}</button>
                 <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
                 <button type="button" data-run-tool="reinforce-all">보유 카드 강화</button>
               </div>
@@ -295,7 +310,7 @@ function mountDevCheat(active: SceneName) {
     const selected = shell.querySelector<HTMLSelectElement>('#dev-card-spawn-select')!.value
     const word = spawnWords.find((entry) => entry.id === selected)
     const result = shell.querySelector<HTMLElement>('[data-card-spawn-result]')!
-    if (!word || !(current instanceof BattleView)) {
+    if (!word || !current?.debugSpawnCard) {
       result.textContent = '전투 화면에서만 카드를 생성할 수 있습니다.'
       return
     }
@@ -303,8 +318,28 @@ function mountDevCheat(active: SceneName) {
   })
   shell.querySelectorAll<HTMLButtonElement>('[data-run-tool]').forEach((button) =>
     button.addEventListener('click', () => {
-      if (button.dataset.runTool === 'defeat') defeatPlayer()
-      else if (button.dataset.runTool === 'unlock-all') unlockAllCards()
+      if (button.dataset.runTool === 'defeat') {
+        defeatPlayer()
+        return
+      }
+      if (button.dataset.runTool === 'invincible') {
+        debugCombatModes.invincible = !debugCombatModes.invincible
+        button.classList.toggle('on', debugCombatModes.invincible)
+        button.setAttribute('aria-pressed', String(debugCombatModes.invincible))
+        button.textContent = `무적 모드 · ${debugCombatModes.invincible ? 'ON' : 'OFF'}`
+        applyDebugCombatModes()
+        return
+      }
+      if (button.dataset.runTool === 'attack-boost') {
+        debugCombatModes.attackMultiplier = debugCombatModes.attackMultiplier > 1 ? 1 : 100
+        const enabled = debugCombatModes.attackMultiplier > 1
+        button.classList.toggle('on', enabled)
+        button.setAttribute('aria-pressed', String(enabled))
+        button.textContent = `공격력 ×100 · ${enabled ? 'ON' : 'OFF'}`
+        applyDebugCombatModes()
+        return
+      }
+      if (button.dataset.runTool === 'unlock-all') unlockAllCards()
       else reinforceAllCards()
     }),
   )
@@ -385,6 +420,7 @@ function goTitle(withIntro = false) {
       run = saved ?? newRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
+      else if (run.reward?.day === run.day) goReward(run.reward.grade, run.reward.phase)
       else void goBattle()
     },
   })
@@ -428,10 +464,14 @@ function goCombatGuide() {
 
 async function goBattle(intro = false, onIntroComplete?: () => void) {
   const request = ++battleRequest
-  await preloadBattleResources(run.player.deck, run.player.items)
+  const st = stageFor(run.day)
+  const [{ BattleView }, { preloadBattleResources }] = await Promise.all([
+    import('@views/BattleView'),
+    import('@/ui/ResourcePreloader'),
+  ])
+  await preloadBattleResources(run.player.deck, run.player.items, st.encounter)
   if (request !== battleRequest) return
   reset()
-  const st = stageFor(run.day)
   GameAudio.playBattleBgm(run.day, st.isBoss ? st.encounter[0] : undefined)
   stage.setAttribute('data-theme', st.field.theme)
   current = new BattleView(stage, {
@@ -445,6 +485,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
+    debugCombat: debugCombatModes,
     onWin: handleBattleWin,
     onLose: () => {
       clearRun()
@@ -459,12 +500,19 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
   mountMeta(intro ? 'intro' : 'battle')
 }
 
+/** 타이틀 첫 화면을 막지 않고 다음 전투 런타임과 실제 편성 리소스를 뒤에서 준비한다. */
+async function preloadUpcomingBattle() {
+  const { preloadBattleResources } = await import('@/ui/ResourcePreloader')
+  const st = stageFor(run.day)
+  await preloadBattleResources(run.player.deck, run.player.items, st.encounter)
+}
+
 function handleBattleWin(grade: number) {
   if (run.day === 15 && !run.endingSeen) {
     goEnding(grade)
     return
   }
-  goReward(grade)
+  beginReward(grade)
 }
 
 function goEnding(grade = startGrade(run.player.stats.luck)) {
@@ -475,40 +523,79 @@ function goEnding(grade = startGrade(run.player.stats.luck)) {
     onComplete: () => {
       run.endingSeen = true
       run.endless = true
-      saveRun(run)
-      goReward(grade)
+      beginReward(grade)
     },
   })
   mountMeta('ending')
 }
 
-// 전투에서 들고 나온 보상등급이 희귀도 확률을 정한다. 씬 점퍼 직행이면 운 기준 시작 등급.
-function goReward(grade = startGrade(run.player.stats.luck)) {
+function beginReward(grade: number) {
+  run.reward = { day: run.day, grade, phase: 'subject' }
+  saveRun(run)
+  goReward(grade, 'subject')
+}
+
+function advanceReward(grade: number, phase: RewardPhase) {
+  if (phase === 'subject') {
+    run.reward = { day: run.day, grade, phase: 'item' }
+    saveRun(run)
+    goReward(grade, 'item')
+    return
+  }
+  run.reward = null
+  run.day++
+  saveRun(run)
+  goBattle()
+}
+
+function goDiscard(incoming: Word, candidates: Word[], grade: number, phase: 'subject' | 'verb') {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player, grade, run.day)
+  current = new DeckDiscardView(stage, {
+    incoming,
+    candidates,
+    onDiscard: (discarded) => {
+      const result = registerWord(run.player, incoming, discarded.id)
+      if (result.kind === 'needs-discard') return
+      advanceReward(grade, phase)
+    },
+  })
+}
+
+// 전투 등급에 현재 15층 사이클의 진행도를 더해 실제 희귀도 가중치를 정한다.
+function goReward(
+  grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
+  phase: RewardPhase = run.reward?.phase ?? 'subject',
+) {
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  const options = genRewards(run.player, grade, run.day, phase)
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
-    grade,
+    grade: rewardGradeForDay(grade, run.day),
+    phase,
     nextField: stageFor(run.day + 1).field,
     options,
     onPick: (opt) => {
       if (opt.kind === 'word' && opt.word) {
-        registerWord(run.player, opt.word) // 문장 = 스킬업
-        run.day++
-        saveRun(run)
-        goBattle()
+        const result = registerWord(run.player, opt.word)
+        if (result.kind === 'needs-discard') {
+          goDiscard(opt.word, result.candidates, grade, phase as 'subject' | 'verb')
+        } else {
+          advanceReward(grade, phase)
+        }
       } else if (opt.item) {
-        goItem(opt.item, grade) // 아이템 = 감탄사 커스텀(스펙업) — 등급이 행운 감탄 확률이 된다
+        goItem(opt.item, grade, 'verb')
       }
     },
   })
   mountMeta('reward')
 }
 
-function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
+function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck), nextPhase?: RewardPhase) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
@@ -517,9 +604,15 @@ function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
     grade,
     onDone: (result) => {
       applyItemReward(run.player, result)
-      run.day++
-      saveRun(run)
-      goBattle()
+      if (nextPhase) {
+        run.reward = { day: run.day, grade, phase: nextPhase }
+        saveRun(run)
+        goReward(grade, nextPhase)
+      } else {
+        run.day++
+        saveRun(run)
+        goBattle()
+      }
     },
   })
   mountMeta('item')

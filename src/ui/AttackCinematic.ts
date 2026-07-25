@@ -30,8 +30,11 @@ const END_LEAD_MS = 420
 export class AttackCinematic {
   private el: HTMLElement
   private videos: Record<AttackCut, HTMLVideoElement>
+  private warmups = new Map<AttackCut, Promise<void>>()
+  private idleWarmup = 0
   private timers: number[] = []
   private playing = false
+  private destroyed = false
 
   constructor(host: HTMLElement) {
     this.el = document.createElement('div')
@@ -55,9 +58,19 @@ export class AttackCinematic {
     }
     // 화면 밖에 둔 채로 먼저 받아 둔다. muted라 정책에 막히지 않는다.
     for (const v of Object.values(this.videos)) v.load()
+
+    // preload/load는 파일만 먼저 가져올 뿐 첫 프레임 디코딩과 GPU 업로드까지
+    // 보장하지 않는다. 전투 첫 화면을 그린 뒤 한가한 틈에 실제로 한 프레임씩
+    // 재생해 두면, 컷이 터지는 순간 미디어 파이프라인이 처음 열리며 끊기지 않는다.
+    this.idleWarmup = this.requestIdleWarmup(() => {
+      void this.warm('pump').then(() => this.warm('wipe'))
+    })
   }
 
   destroy() {
+    this.destroyed = true
+    this.cancelIdleWarmup(this.idleWarmup)
+    this.idleWarmup = 0
     for (const t of this.timers) clearTimeout(t)
     this.timers = []
     for (const v of Object.values(this.videos)) {
@@ -75,21 +88,33 @@ export class AttackCinematic {
    * 겹치면 패널이 두 번 밀려 들어오는 꼴이 된다.
    */
   async play(cut: AttackCut): Promise<void> {
-    if (!this.open(cut)) return
+    if (!(await this.open(cut))) return
     await this.wait(IN_MS + this.holdMsFor(cut))
     await this.close()
   }
 
   /**
-   * 패널만 밀어 넣고 바로 반환한다 — 물러날 시점은 부르는 쪽이 정한다.
+   * 패널만 밀어 넣고 반환한다 — 물러날 시점은 부르는 쪽이 정한다.
    * 강타 연출은 프롬이 검을 들어올린 채 멈춘 동안 이 패널을 겹쳐 틀고,
    * 내리치기 시작할 때 close()로 치운다. 컷과 칼질이 한 절정에 모여야 한다.
-   * @returns 이번에 열렸는지 — 이미 재생 중이면 false.
+   *
+   * 워밍업을 기다리므로 즉시 반환은 아니다. 대개는 이미 데워져 있어 한 프레임도
+   * 안 쉬고 열리지만, 아주 빠른 첫 턴이면 여기서 잠깐 기다린다.
+   * @returns 이번에 열렸는지 — 이미 재생 중이거나 이미 버려졌으면 false.
    */
-  open(cut: AttackCut): boolean {
+  async open(cut: AttackCut): Promise<boolean> {
     if (this.playing) return false
     this.playing = true
     const video = this.videos[cut]
+
+    // 아주 빠른 첫 턴이라 유휴 워밍업보다 먼저 도착했을 때도 검은 첫 프레임을
+    // 내보내지 않는다. 이 경우에만 준비가 끝날 때까지 패널을 화면 밖에 둔다.
+    await this.warm(cut)
+    if (this.destroyed) {
+      this.playing = false
+      return false
+    }
+
     this.el.dataset.cut = cut
     video.currentTime = 0
     this.el.classList.remove('is-out')
@@ -119,6 +144,91 @@ export class AttackCinematic {
   /** 패널이 밀려 들어오는 데 걸리는 시간 — 강타 연출이 정점 정지 길이를 맞출 때 본다. */
   get enterMs(): number {
     return IN_MS
+  }
+
+  private warm(cut: AttackCut): Promise<void> {
+    const current = this.warmups.get(cut)
+    if (current) return current
+
+    const warmup = this.warmVideo(this.videos[cut])
+    this.warmups.set(cut, warmup)
+    return warmup
+  }
+
+  /**
+   * 첫 영상 프레임을 디코더와 합성기에 한 번 통과시킨 뒤 0초로 되감는다.
+   * 네트워크/코덱 오류가 있어도 컷 패널 자체의 진행은 막지 않는다.
+   */
+  private async warmVideo(video: HTMLVideoElement): Promise<void> {
+    try {
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        await this.onceOrTimeout(video, 'loadeddata', 4000)
+      }
+      if (this.destroyed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
+
+      video.currentTime = 0
+      await video.play()
+      await this.firstVideoFrameOrTimeout(video, 700)
+      video.pause()
+      video.currentTime = 0
+    } catch {
+      video.pause()
+      // 재생 시점의 기존 fallback이 처리한다. 워밍업 실패는 전투를 막을 이유가 없다.
+    }
+  }
+
+  private onceOrTimeout(target: EventTarget, event: string, ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      let timer = 0
+      const finish = () => {
+        target.removeEventListener(event, finish)
+        clearTimeout(timer)
+        resolve()
+      }
+      target.addEventListener(event, finish, { once: true })
+      timer = window.setTimeout(finish, ms)
+    })
+  }
+
+  private firstVideoFrameOrTimeout(video: HTMLVideoElement, ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      let done = false
+      let timer = 0
+      const finish = () => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve()
+      }
+      timer = window.setTimeout(finish, ms)
+      const frameVideo = video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (callback: () => void) => number
+      }
+      if (typeof frameVideo.requestVideoFrameCallback === 'function') {
+        frameVideo.requestVideoFrameCallback(() => finish())
+      }
+      else video.addEventListener('timeupdate', finish, { once: true })
+    })
+  }
+
+  private requestIdleWarmup(run: () => void): number {
+    const idleWindow = window as unknown as {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
+      setTimeout: typeof window.setTimeout
+    }
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      return idleWindow.requestIdleCallback(run, { timeout: 1200 })
+    }
+    return idleWindow.setTimeout(run, 200)
+  }
+
+  private cancelIdleWarmup(id: number) {
+    if (!id) return
+    const idleWindow = window as unknown as {
+      cancelIdleCallback?: (handle: number) => void
+    }
+    if (typeof idleWindow.cancelIdleCallback === 'function') idleWindow.cancelIdleCallback(id)
+    else clearTimeout(id)
   }
 
   private wait(ms: number) {

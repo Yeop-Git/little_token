@@ -43,111 +43,6 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "hi": 1.8,
         "lo": 1
       }
-    },
-    {
-      "id": "nado",
-      "text": "나도",
-      "slot": "subj",
-      "tags": [
-        "self",
-        "echo"
-      ],
-      "emotion": "pleasure",
-      "person": "first",
-      "bonus": 0,
-      "targetMode": "enemy",
-      "rarity": "rare",
-      "art": "1003",
-      "note": "60% 확률로 배율 ×2.00",
-      "lore": "누가 먼저였는지는 중요하지 않다.",
-      "variance": {
-        "p": 0.6,
-        "hi": 2,
-        "lo": 1
-      }
-    },
-    {
-      "id": "oneul",
-      "text": "오늘의 나는",
-      "slot": "subj",
-      "tags": [
-        "self",
-        "now"
-      ],
-      "emotion": "joy",
-      "person": "first",
-      "bonus": 0,
-      "targetMode": "enemy",
-      "rarity": "rare",
-      "art": "1004",
-      "note": "30% 확률로 배율 ×3.00",
-      "lore": "오늘 몫은 오늘 적는다. 될 때는 크게 된다.",
-      "variance": {
-        "p": 0.3,
-        "hi": 3,
-        "lo": 1
-      }
-    },
-    {
-      "id": "gyeop",
-      "text": "이를 악문 나는",
-      "slot": "subj",
-      "tags": [
-        "self",
-        "grit"
-      ],
-      "emotion": "anger",
-      "person": "first",
-      "bonus": 0,
-      "targetMode": "enemy",
-      "rarity": "rare",
-      "art": "1005",
-      "note": "40% 확률로 배율 ×2.50",
-      "lore": "분한 마음을 꾹 삼키고 연필을 쥔다.",
-      "variance": {
-        "p": 0.4,
-        "hi": 2.5,
-        "lo": 1
-      }
-    },
-    {
-      "id": "naman",
-      "text": "불끈 선 나는",
-      "slot": "subj",
-      "tags": [
-        "self",
-        "force"
-      ],
-      "emotion": "anger",
-      "person": "first",
-      "bonus": 0.6,
-      "targetMode": "enemy",
-      "rarity": "rare",
-      "art": "1006",
-      "note": "배율 ×1.60",
-      "lore": "화난 발끝이 먼저 앞으로 나간다."
-    },
-    {
-      "id": "dachin",
-      "text": "다친 나는",
-      "slot": "subj",
-      "tags": [
-        "self",
-        "hurt"
-      ],
-      "emotion": "sorrow",
-      "person": "first",
-      "bonus": 0,
-      "targetMode": "enemy",
-      "rarity": "rare",
-      "art": "1007",
-      "note": "50% 확률로 배율 ×2.20",
-      "lore": "아픈 자리가 오히려 뜨겁다.",
-      "variance": {
-        "p": 0.5,
-        "hi": 2.2,
-        "lo": 1
-      }
     }
   ],
   "adv": [
@@ -198,55 +93,6 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "art": "2003",
       "note": "배율 ×1.00 · 대성공 40%",
       "lore": "조심스럽게."
-    },
-    {
-      "id": "naepda",
-      "text": "냅다",
-      "slot": "adv",
-      "tags": [
-        "rush"
-      ],
-      "emotion": "anger",
-      "stat": "atk",
-      "bonus": 0.4,
-      "crit": 0.25,
-      "rarity": "rare",
-      "art": "2004",
-      "note": "배율 ×1.40 · 대성공 25%",
-      "lore": "앞뒤 안 가리고."
-    },
-    {
-      "id": "kkuk",
-      "text": "꾹 참고",
-      "slot": "adv",
-      "tags": [
-        "grit",
-        "solid"
-      ],
-      "emotion": "sorrow",
-      "stat": "guard",
-      "bonus": 0.45,
-      "crit": 0.2,
-      "rarity": "rare",
-      "art": "2005",
-      "note": "배율 ×1.45 · 대성공 20%",
-      "lore": "울음을 삼킨 만큼 단단해진다."
-    },
-    {
-      "id": "nunmullo",
-      "text": "눈물로",
-      "slot": "adv",
-      "tags": [
-        "tear"
-      ],
-      "emotion": "sorrow",
-      "stat": "heal",
-      "bonus": 0.25,
-      "crit": 0.55,
-      "rarity": "rare",
-      "art": "2006",
-      "note": "배율 ×1.25 · 대성공 55%",
-      "lore": "젖은 눈으로 쓰면 가끔 크게 아문다."
     }
   ],
   "verb": [
@@ -314,45 +160,116 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "art": "3004",
       "note": "방어 ×1.5",
       "lore": "발끝이 먼저 종이 위를 미끄러진다."
-    },
-    {
-      "id": "jikyeot",
-      "text": "지켰다",
-      "slot": "verb",
-      "tags": [
-        "grd",
-        "hold"
-      ],
-      "emotion": "joy",
-      "stat": "guard",
-      "statMult": 1.5,
-      "kind": "guard",
-      "rarity": "rare",
-      "art": "3005",
-      "note": "방어 ×1.5",
-      "lore": "한 뼘도 안 내준다."
-    },
-    {
-      "id": "pumeot",
-      "text": "웅크렸다",
-      "slot": "verb",
-      "tags": [
-        "grd",
-        "warm"
-      ],
-      "emotion": "sorrow",
-      "stat": "guard",
-      "statMult": 1.5,
-      "kind": "guard",
-      "rarity": "rare",
-      "art": "3006",
-      "note": "방어 ×1.5",
-      "lore": "작아진 마음을 품고 숨을 고른다."
     }
   ]
 }
 
 export const REWARD_WORDS: Word[] = [
+  {
+    "id": "nado",
+    "text": "나도",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "echo"
+    ],
+    "emotion": "pleasure",
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "art": "1003",
+    "note": "60% 확률로 배율 ×2.00",
+    "lore": "누가 먼저였는지는 중요하지 않다.",
+    "variance": {
+      "p": 0.6,
+      "hi": 2,
+      "lo": 1
+    }
+  },
+  {
+    "id": "oneul",
+    "text": "오늘의 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "now"
+    ],
+    "emotion": "joy",
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "art": "1004",
+    "note": "30% 확률로 배율 ×3.00",
+    "lore": "오늘 몫은 오늘 적는다. 될 때는 크게 된다.",
+    "variance": {
+      "p": 0.3,
+      "hi": 3,
+      "lo": 1
+    }
+  },
+  {
+    "id": "gyeop",
+    "text": "이를 악문 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "grit"
+    ],
+    "emotion": "anger",
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "art": "1005",
+    "note": "40% 확률로 배율 ×2.50",
+    "lore": "분한 마음을 꾹 삼키고 연필을 쥔다.",
+    "variance": {
+      "p": 0.4,
+      "hi": 2.5,
+      "lo": 1
+    }
+  },
+  {
+    "id": "naman",
+    "text": "불끈 선 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "force"
+    ],
+    "emotion": "anger",
+    "person": "first",
+    "bonus": 0.6,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "art": "1006",
+    "note": "배율 ×1.60",
+    "lore": "화난 발끝이 먼저 앞으로 나간다."
+  },
+  {
+    "id": "dachin",
+    "text": "다친 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "hurt"
+    ],
+    "emotion": "sorrow",
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "art": "1007",
+    "note": "50% 확률로 배율 ×2.20",
+    "lore": "아픈 자리가 오히려 뜨겁다.",
+    "variance": {
+      "p": 0.5,
+      "hi": 2.2,
+      "lo": 1
+    }
+  },
   {
     "id": "uri",
     "text": "우리는",
@@ -581,6 +498,89 @@ export const REWARD_WORDS: Word[] = [
     "art": "1020",
     "note": "배율 ×1.25",
     "lore": "여백에 작은 낙서를 남긴다."
+  },
+  {
+    "id": "naepda",
+    "text": "냅다",
+    "slot": "adv",
+    "tags": [
+      "rush"
+    ],
+    "emotion": "anger",
+    "stat": "atk",
+    "bonus": 0.4,
+    "crit": 0.25,
+    "rarity": "rare",
+    "art": "2004",
+    "note": "배율 ×1.40 · 대성공 25%",
+    "lore": "앞뒤 안 가리고."
+  },
+  {
+    "id": "kkuk",
+    "text": "꾹 참고",
+    "slot": "adv",
+    "tags": [
+      "grit",
+      "solid"
+    ],
+    "emotion": "sorrow",
+    "stat": "guard",
+    "bonus": 0.45,
+    "crit": 0.2,
+    "rarity": "rare",
+    "art": "2005",
+    "note": "배율 ×1.45 · 대성공 20%",
+    "lore": "울음을 삼킨 만큼 단단해진다."
+  },
+  {
+    "id": "nunmullo",
+    "text": "눈물로",
+    "slot": "adv",
+    "tags": [
+      "tear"
+    ],
+    "emotion": "sorrow",
+    "stat": "heal",
+    "bonus": 0.25,
+    "crit": 0.55,
+    "rarity": "rare",
+    "art": "2006",
+    "note": "배율 ×1.25 · 대성공 55%",
+    "lore": "젖은 눈으로 쓰면 가끔 크게 아문다."
+  },
+  {
+    "id": "jikyeot",
+    "text": "지켰다",
+    "slot": "verb",
+    "tags": [
+      "grd",
+      "hold"
+    ],
+    "emotion": "joy",
+    "stat": "guard",
+    "statMult": 1.5,
+    "kind": "guard",
+    "rarity": "rare",
+    "art": "3005",
+    "note": "방어 ×1.5",
+    "lore": "한 뼘도 안 내준다."
+  },
+  {
+    "id": "pumeot",
+    "text": "웅크렸다",
+    "slot": "verb",
+    "tags": [
+      "grd",
+      "warm"
+    ],
+    "emotion": "sorrow",
+    "stat": "guard",
+    "statMult": 1.5,
+    "kind": "guard",
+    "rarity": "rare",
+    "art": "3006",
+    "note": "방어 ×1.5",
+    "lore": "작아진 마음을 품고 숨을 고른다."
   },
   {
     "id": "jaeppalli",

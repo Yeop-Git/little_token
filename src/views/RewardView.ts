@@ -15,6 +15,7 @@ import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
 import { critText, multText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
+import type { RewardPhase } from '@core/run'
 
 interface Opts {
   day: number
@@ -24,6 +25,7 @@ interface Opts {
   grade: number
   nextField: FieldDef
   options: RewardOption[]
+  phase: RewardPhase
   onPick: (opt: RewardOption) => void
 }
 
@@ -31,6 +33,12 @@ const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
+const PHASE_TITLE: Record<RewardPhase, string> = {
+  subject: '주어와 수식어를 고르자',
+  item: '이야기의 소품을 고르자',
+  verb: '마지막 동사를 고르자',
+}
+const PHASE_NO: Record<RewardPhase, number> = { subject: 1, item: 2, verb: 3 }
 
 function moodOf(w: Word): string {
   if (w.variance) return 'gamble'
@@ -154,8 +162,11 @@ export class RewardView {
             </div>
             <div class="reward-head">
               <div class="k">${opts.day}일차 클리어</div>
-              <div class="t hand">전리품을 고르자</div>
-              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade}</b></div>
+              <div class="t hand">${PHASE_TITLE[opts.phase]}</div>
+              <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
+                ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
+              </div>
+              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade.toFixed(1)}</b></div>
             </div>
             <div class="reward-field">
               내일은 <b>${f.date}</b> · <b>${f.title}</b><br>${f.desc}

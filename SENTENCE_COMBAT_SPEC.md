@@ -292,7 +292,7 @@ failP = Σ word.fail > 0 ? max(0.05, Σ word.fail − statBias × 0.01) : 0
 ## 7. 스탯
 
 ```ts
-{ hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 }   // startingPlayer()
+{ hp: 52, atk: 5, guard: 3, heal: 5, luck: 3 }   // startingPlayer()
 ```
 
 공격·방어·회복을 같은 값으로 열어 둔다 — 어느 축으로 가도 1일차에 문장이 성립해야 한다.

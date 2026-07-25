@@ -21,11 +21,11 @@ export const BOSS_BY_FLOOR: Record<number, string> = {
   15: 'elderSpider',
 }
 
-/** 보스의 체력 막 수. 뒤쪽 보스일수록 더 긴 결전을 요구한다. */
+/** 보스별 고정 체력 막 수. 엔드리스에서도 막은 늘리지 않고 hpMult로 막당 체력만 키운다. */
 export function bossHealthBarsForFloor(floor: number): number {
-  if (floor >= 15) return 9
-  if (floor >= 10) return 4
-  return 3
+  if (floor >= 15) return 5
+  if (floor >= 10) return 3
+  return 2
 }
 
 export function bossForDay(day: number): string | null {

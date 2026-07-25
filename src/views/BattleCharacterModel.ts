@@ -113,6 +113,23 @@ interface EffectShard {
   delay: number
 }
 
+interface SpiderPartDissolve {
+  id: string
+  root: THREE.Object3D
+  materials: THREE.MeshToonMaterial[]
+  elapsed: number
+  duration: number
+  fallDirection: number
+}
+
+const SPIDER_PART_NODES: Record<string, string> = {
+  'leg-joy': 'pasted__pasted__pasted__pasted__pasted__leg3',
+  'leg-anger': 'pasted__pasted__pasted__pasted__leg3',
+  'leg-sorrow': 'pasted__pasted__pasted__leg3',
+  'leg-pleasure': 'pasted__pasted__pasted__pasted__leg3.001',
+}
+const SPIDER_PART_ORDER = ['leg-joy', 'leg-anger', 'leg-sorrow', 'leg-pleasure'] as const
+
 const modelLoads = new Map<string, Promise<GLTF>>()
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
@@ -130,7 +147,7 @@ function loadModel(url: string): Promise<GLTF> {
 function runAnimationFrame(now: number) {
   const delta = previousFrame ? Math.min((now - previousFrame) / 1000, 0.1) : 0
   previousFrame = now
-  activeModels.forEach((model) => model.render(delta))
+  if (!document.hidden) activeModels.forEach((model) => model.render(delta, now))
   animationFrame = activeModels.size ? requestAnimationFrame(runAnimationFrame) : 0
   if (!animationFrame) previousFrame = 0
 }
@@ -295,6 +312,11 @@ class BattleCharacterModel {
   private active = true
   private firstFrameRendered = false
   private requestedAnimation: BattleAnimation = 'idle'
+  private pendingRenderDelta = 0
+  private lastRenderedAt = 0
+  private readonly brokenSpiderParts = new Set<string>()
+  private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
+  private spiderPartDissolves: SpiderPartDissolve[] = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
@@ -348,6 +370,7 @@ class BattleCharacterModel {
       const fittedBounds = this.fitModel(model)
       this.scene.add(model)
       this.model = model
+      this.brokenSpiderParts.forEach((partId) => this.startSpiderPartDissolve(partId, true))
       if (fittedBounds) this.setupEffects(fittedBounds)
       this.mixer = new THREE.AnimationMixer(model)
       this.actions = {
@@ -558,6 +581,7 @@ class BattleCharacterModel {
           vertexColors: source.vertexColors,
           toneMapped: false,
         })
+        toon.userData.partDissolveUniform = { value: 0 }
         this.applyBattleAtmosphere(toon, atmosphere, weather)
         return toon
       })
@@ -576,6 +600,7 @@ class BattleCharacterModel {
       shader.uniforms.uBattleSkyMix = { value: atmosphere.skyMix }
       shader.uniforms.uBattleGroundMix = { value: atmosphere.groundMix }
       shader.uniforms.uBattleExposure = { value: atmosphere.exposure }
+      shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
@@ -591,13 +616,19 @@ uniform vec3 uBattleGroundTint;
 uniform float uBattleSkyMix;
 uniform float uBattleGroundMix;
 uniform float uBattleExposure;
+uniform float uPartDissolve;
 varying float vBattleHeight;`)
         .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;
 float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBattleGroundMix;
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleSkyTint, battleSkyWeight);
-outgoingLight *= uBattleExposure;`)
+outgoingLight *= uBattleExposure;
+float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+if (partDissolveNoise < uPartDissolve) discard;
+          float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
+          float partDissolveEdge = partDissolveActive * (1.0 - smoothstep(0.0, 0.09, partDissolveNoise - uPartDissolve));
+outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolve);`)
     }
     material.customProgramCacheKey = () => `battle-atmosphere-${weather}`
   }
@@ -939,6 +970,86 @@ outgoingLight *= uBattleExposure;`)
     })
   }
 
+  dissolveSpiderParts(partId: string, count: number) {
+    const start = SPIDER_PART_ORDER.indexOf(partId as typeof SPIDER_PART_ORDER[number])
+    if (start < 0) return
+    SPIDER_PART_ORDER.slice(start, start + Math.max(1, count)).forEach((id) => {
+      if (this.brokenSpiderParts.has(id)) return
+      this.brokenSpiderParts.add(id)
+      this.startSpiderPartDissolve(id, false)
+    })
+  }
+
+  private startSpiderPartDissolve(partId: string, immediate: boolean) {
+    if (!this.model || this.spiderPartDissolves.some((entry) => entry.id === partId)) return
+    const root = this.model.getObjectByName(SPIDER_PART_NODES[partId])
+    if (!root) return
+    if (!this.spiderPartOriginals.has(partId)) {
+      this.spiderPartOriginals.set(partId, {
+        root,
+        position: root.position.clone(),
+        rotation: root.rotation.clone(),
+      })
+    }
+    const materials: THREE.MeshToonMaterial[] = []
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return
+      const list = Array.isArray(object.material) ? object.material : [object.material]
+      list.forEach((material) => {
+        if (material instanceof THREE.MeshToonMaterial && !materials.includes(material)) materials.push(material)
+      })
+    })
+    if (immediate) {
+      materials.forEach((material) => { material.userData.partDissolveUniform.value = 1 })
+      root.visible = false
+      return
+    }
+    this.spiderPartDissolves.push({
+      id: partId,
+      root,
+      materials,
+      elapsed: 0,
+      duration: .92,
+      fallDirection: SPIDER_PART_ORDER.indexOf(partId as typeof SPIDER_PART_ORDER[number]) % 2 ? 1 : -1,
+    })
+  }
+
+  private updateSpiderPartDissolves(delta: number) {
+    this.spiderPartDissolves = this.spiderPartDissolves.filter((entry) => {
+      entry.elapsed += delta
+      const progress = THREE.MathUtils.clamp(entry.elapsed / entry.duration, 0, 1)
+      const eased = progress * progress * (3 - 2 * progress)
+      entry.materials.forEach((material) => { material.userData.partDissolveUniform.value = eased })
+      const original = this.spiderPartOriginals.get(entry.id)
+      if (original) {
+        entry.root.position.copy(original.position)
+        entry.root.position.y -= eased * .18
+        entry.root.rotation.copy(original.rotation)
+        entry.root.rotation.z += entry.fallDirection * eased * .16
+      }
+      if (progress < 1) return true
+      entry.root.visible = false
+      return false
+    })
+  }
+
+  private restoreSpiderParts() {
+    this.spiderPartDissolves = []
+    this.brokenSpiderParts.clear()
+    this.spiderPartOriginals.forEach(({ root, position, rotation }) => {
+      root.visible = true
+      root.position.copy(position)
+      root.rotation.copy(rotation)
+      root.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return
+        const list = Array.isArray(object.material) ? object.material : [object.material]
+        list.forEach((material) => {
+          if (material instanceof THREE.MeshToonMaterial) material.userData.partDissolveUniform.value = 0
+        })
+      })
+    })
+  }
+
   private onAnimationFinished = (event: { action: THREE.AnimationAction }) => {
     if (event.action !== this.current) return
     const finished = (Object.entries(this.actions) as [BattleAnimation, THREE.AnimationAction | undefined][])
@@ -1038,6 +1149,7 @@ outgoingLight *= uBattleExposure;`)
     this.shell.dataset.modelAnimation = 'idle'
     delete this.shell.dataset.modelLastAction
     this.stopEffect()
+    this.restoreSpiderParts()
 
     const idle = this.actions.idle
     if (!idle) return
@@ -1072,13 +1184,23 @@ outgoingLight *= uBattleExposure;`)
     this.camera.updateProjectionMatrix()
   }
 
-  render(delta: number) {
+  render(delta: number, now: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
-    const motionDelta = this.frozen ? 0 : delta
+    this.pendingRenderDelta = Math.min(0.1, this.pendingRenderDelta + delta)
+    const lowQuality = document.documentElement.dataset.graphics === 'low'
+    const waitingEnemy = !!this.shell.closest('.actor.foe.back')
+    const targetFps = lowQuality ? 30 : waitingEnemy ? 30 : 60
+    if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return
+
+    const frameDelta = this.pendingRenderDelta
+    this.pendingRenderDelta = 0
+    this.lastRenderedAt = now
+    const motionDelta = this.frozen ? 0 : frameDelta
     this.mixer?.update(motionDelta)
-    this.updateCompanion(delta)
-    this.updateEffect(delta)
-    const zoomBlend = 1 - Math.exp(-delta * 8)
+    this.updateCompanion(frameDelta)
+    this.updateEffect(frameDelta)
+    this.updateSpiderPartDissolves(frameDelta)
+    const zoomBlend = 1 - Math.exp(-frameDelta * 8)
     const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
     if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {
       this.cameraZoom = nextZoom
@@ -1221,6 +1343,12 @@ export function freezeCharacterAnimation(actor: HTMLElement | null, frozen: bool
   if (!actor) return
   const shell = actor.querySelector<HTMLElement>('.model-shell')
   if (shell) mountedModels.get(shell)?.setFrozen(frozen)
+}
+
+export function dissolveCharacterParts(actor: HTMLElement | null, partId: string, count = 1) {
+  if (!actor) return
+  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  if (shell) mountedModels.get(shell)?.dissolveSpiderParts(partId, count)
 }
 
 export function destroyCharacterModels(root: HTMLElement) {

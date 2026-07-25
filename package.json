@@ -17,6 +17,7 @@
     "sweep": "npm run data:generate && tsx src/tools/sweep.ts",
     "check": "npm run data:generate && tsx src/tools/check-tables.ts",
     "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts",
+    "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts",
     "sprites:bake": "node scripts/bake-slash-sprites.mjs"
   },
   "devDependencies": {

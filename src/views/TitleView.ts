@@ -332,6 +332,19 @@ export class TitleView {
 
     this.flyLast = performance.now()
     const tick = (now: number) => {
+      // 절전 모드에서는 캔버스를 CSS로 숨긴다. 숨긴 표면을 계속 그리면 설정의
+      // 의도와 달리 GPU 비용은 그대로이므로 루프만 유지하고 드로우는 건너뛴다.
+      if (document.hidden || document.documentElement.dataset.graphics === 'low') {
+        this.flyLast = now
+        this.raf = requestAnimationFrame(tick)
+        return
+      }
+      // 전체 화면 캔버스에 방사형 그라디언트 20개를 그리는 효과라 60fps에서는
+      // 타이틀 대기 중에도 GPU 합성 비용이 크다. 느린 부유물은 30fps로 충분하다.
+      if (now - this.flyLast < 1000 / 30) {
+        this.raf = requestAnimationFrame(tick)
+        return
+      }
       const dt = Math.min(0.05, (now - this.flyLast) / 1000)
       this.flyLast = now
       // 자리 계산은 한 번, 그리기는 등록된 캔버스마다.

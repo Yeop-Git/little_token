@@ -6,16 +6,16 @@ import type { Emotion } from '@core/types'
  */
 const WORD_EMOTIONS: Record<string, Emotion> = {
   // 1번 주어: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
-  'early:na': 'joy', 'early:eoje': 'sorrow', 'early:nado': 'pleasure', 'early:oneul': 'joy',
-  'early:gyeop': 'anger', 'early:naman': 'anger', 'early:dachin': 'sorrow', 'reward:uri': 'pleasure',
+  'early:na': 'joy', 'early:eoje': 'sorrow', 'reward:nado': 'pleasure', 'reward:oneul': 'joy',
+  'reward:gyeop': 'anger', 'reward:naman': 'anger', 'reward:dachin': 'sorrow', 'reward:uri': 'pleasure',
   'reward:utneun': 'joy', 'reward:ttatteutan': 'joy', 'reward:andohan': 'joy',
   'reward:hwanan': 'anger', 'reward:matseo': 'anger', 'reward:kkeutkkaji': 'anger',
   'reward:ulmeogin': 'sorrow', 'reward:hollo': 'sorrow', 'reward:gogae': 'sorrow',
   'reward:deultteun': 'pleasure', 'reward:sinnan': 'pleasure', 'reward:jangnan': 'pleasure',
 
   // 2번 수식: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
-  'early:himkkeot': 'anger', 'early:dandanhi': 'joy', 'early:saljjak': 'pleasure', 'early:naepda': 'anger',
-  'early:kkuk': 'sorrow', 'early:nunmullo': 'sorrow',
+  'early:himkkeot': 'anger', 'early:dandanhi': 'joy', 'early:saljjak': 'pleasure', 'reward:naepda': 'anger',
+  'reward:kkuk': 'sorrow', 'reward:nunmullo': 'sorrow',
   'reward:jaeppalli': 'pleasure', 'reward:motdohage': 'sorrow', 'reward:michin': 'anger', 'reward:ipan': 'anger',
   'reward:hwanhage': 'joy', 'reward:pogeunhage': 'joy', 'reward:bangeopge': 'joy', 'reward:useumyeo': 'joy',
   'reward:geochilge': 'anger', 'reward:sseulsseulhi': 'sorrow', 'reward:aesseo': 'sorrow',
@@ -23,7 +23,7 @@ const WORD_EMOTIONS: Record<string, Emotion> = {
 
   // 3번 동사: 일반 카드 2장 + 특수 보상 카드 3장씩으로 감정마다 5장.
   'early:ttaeryeot': 'anger', 'early:makat': 'anger', 'early:gamssat': 'joy',
-  'early:huryeo': 'pleasure', 'early:jikyeot': 'joy', 'early:pumeot': 'sorrow',
+  'early:huryeo': 'pleasure', 'reward:jikyeot': 'joy', 'reward:pumeot': 'sorrow',
   'reward:naedeonjyeot': 'pleasure', 'reward:ureojyeot': 'sorrow',
 
   'special:focusStrike': 'anger', 'special:pierceStrike': 'sorrow', 'special:spreadTwo': 'joy',

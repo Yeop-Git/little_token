@@ -1029,6 +1029,69 @@ button {
 .action-order-item.timing-summary .action-order-portrait svg { width: 42px; height: 42px; }
 .action-order-item.timing-summary .action-order-copy b { color: var(--gold-hi); font-size: 19px; }
 
+/* 가방을 열지 않아도 보이는 Slay the Spire식 보유 아이템 열. */
+.relic-strip {
+  width: 308px;
+  margin: 4px 0 0 4px;
+  pointer-events: auto;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .48));
+}
+.relic-strip[hidden] { display: none; }
+.relic-strip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0 0 7px 5px;
+  color: var(--ink-dim);
+  text-shadow: 0 2px 7px rgba(0, 0, 0, .9);
+}
+.relic-strip-head span { font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.relic-strip-head b { color: var(--gold-hi); font-size: 17px; letter-spacing: .03em; }
+.relic-icons { display: flex; flex-wrap: wrap; gap: 7px; }
+.relic-icon {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 226, 168, .34);
+  border-radius: 15px 6px 13px 7px;
+  color: var(--gold-hi);
+  background: linear-gradient(145deg, rgba(50, 36, 48, .92), rgba(19, 14, 24, .9));
+  box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .06), 0 4px 10px rgba(0, 0, 0, .45);
+  cursor: help;
+  transition: transform .16s ease, filter .16s ease;
+}
+.relic-icon .item-illus,
+.relic-icon svg { width: 80%; height: 80%; object-fit: contain; }
+.relic-icon.rarity-rare { color: #a7d8ff; border-color: rgba(129, 193, 255, .65); }
+.relic-icon.rarity-legendary { color: #ffe28a; border-color: rgba(255, 206, 86, .82); box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .08), 0 0 14px rgba(255, 188, 64, .24); }
+.relic-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 9px);
+  z-index: 120;
+  width: max-content;
+  max-width: 250px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff3d4;
+  background: rgba(16, 11, 21, .96);
+  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .2), 0 8px 18px rgba(0, 0, 0, .5);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.relic-icon:hover,
+.relic-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.16); }
+.relic-icon:hover::after,
+.relic-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
+
 @media (prefers-reduced-motion: reduce) {
   .action-order-item { transition: none; }
   .action-order-item.priority-taken .action-order-portrait,
@@ -1270,24 +1333,24 @@ button {
   z-index: 38 !important;
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
-  width: 390px;
-  height: 430px;
+  width: clamp(330px, 38vh, 410px);
+  height: clamp(340px, 39vh, 420px);
   z-index: 2;
-  transform: scale(1.5);
+  transform: scale(1.2);
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
   display: none;
 }
 
-/* 상단 중앙을 통째로 쓰는 보스 전용 체력 HUD. 막 수는 텍스트 대신 분절로만 보여 준다. */
+/* 보스 HUD는 이름과 체력만 남기고 전투 규칙은 모델 위 상태 아이콘으로 보여 준다. */
 .boss-health-hud {
   position: absolute;
   top: 24px;
   left: 50%;
   z-index: 62;
   /* 좌측 주인공 스탯과 우측 시스템 메뉴 사이의 안전 여백을 남긴다. */
-  width: min(820px, 60vw);
-  padding: 10px 24px 14px;
+  width: min(760px, 56vw);
+  padding: 9px 24px 12px;
   color: #fff1d2;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 176, 113, .66);
@@ -1327,14 +1390,6 @@ button {
   font-weight: 900;
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
-.boss-health-hud .enemy-traits {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 50%;
-  justify-content: center;
-  width: 100%;
-  transform: translateX(-50%);
-}
 .spider-parts {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
@@ -1361,13 +1416,33 @@ button {
 .spider-part.broken { opacity: .2; filter: grayscale(1); }
 .spider-part-head { display: flex; justify-content: space-between; gap: 3px; color: #d8c2a2; font-size: 9px; line-height: 1; }
 .spider-part-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spider-part-head em { color: #ffd878; font-style: normal; font-weight: 900; }
+.spider-part-head em { display: inline-flex; align-items: center; gap: 2px; color: var(--emotion-color, #ffd878); font-style: normal; font-weight: 900; }
+.spider-part-head em .emotion-face { width: 11px; height: 11px; object-fit: contain; }
+.spider-part-head em > span { white-space: nowrap; }
 .spider-part-bar { display: block; height: 5px; margin-top: 4px; overflow: hidden; border-radius: 4px; background: rgba(0, 0, 0, .6); }
 .spider-part-bar i { display: block; height: 100%; background: linear-gradient(90deg, #a42331, #ff7359); transition: width .32s ease; }
 .spider-part.active .spider-part-bar i { box-shadow: 0 0 8px #ff765b; }
 .trait.spider-active { color: #ffe1a0; border: 1px solid rgba(255, 210, 111, .42); }
-.trait.web-tension { color: #ded4ee; border: 1px solid rgba(210, 198, 231, .34); }
 .trait.spider-tag-weak { color: #ffe392; border-color: rgba(255, 224, 130, .55); }
+.enemy-traits.spider-weakness-only { margin-top: 8px; }
+.enemy-traits.spider-weakness-only .trait {
+  min-height: 42px;
+  padding: 7px 18px;
+  gap: 9px;
+  border-width: 2px;
+  border-radius: 12px;
+  font-size: 22px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--emotion-color, #ffe392) 38%, transparent);
+}
+.enemy-traits.spider-weakness-only .emotion-face,
+.enemy-traits.spider-weakness-only .emotion-symbol {
+  width: 28px;
+  height: 28px;
+}
+.trait.spider-no-weakness {
+  color: #e8ded2;
+  border-color: rgba(232, 222, 210, .45);
+}
 .spider-part.breaking {
   z-index: 5;
   animation: spider-leg-drop .7s cubic-bezier(.2,.8,.3,1) forwards;
@@ -1415,67 +1490,38 @@ button {
     linear-gradient(-18deg, transparent 48.5%, rgba(232, 225, 238, .55) 49%, transparent 50.5%);
   animation: web-sweep .72s ease-out forwards;
 }
+.spider-web-shot-line {
+  position: absolute;
+  z-index: 1198;
+  height: 5px;
+  pointer-events: none;
+  transform: rotate(var(--web-angle)) scaleX(0);
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(227, 216, 237, .18), rgba(255, 255, 255, .96) 72%, rgba(234, 224, 244, .38));
+  filter: drop-shadow(0 0 7px rgba(240, 230, 255, .9));
+  animation: spider-web-shot-line .56s cubic-bezier(.18,.75,.22,1) forwards;
+}
+.spider-web-projectile {
+  position: absolute;
+  z-index: 1199;
+  width: 240px;
+  height: 320px;
+  pointer-events: none;
+  object-fit: contain;
+  filter: drop-shadow(0 0 15px rgba(250, 244, 255, .94));
+  will-change: transform, opacity;
+}
+@keyframes spider-web-shot-line {
+  0% { opacity: 0; transform: rotate(var(--web-angle)) scaleX(0); }
+  18% { opacity: 1; }
+  72% { opacity: 1; transform: rotate(var(--web-angle)) scaleX(1); }
+  100% { opacity: 0; transform: rotate(var(--web-angle)) scaleX(1); }
+}
 @keyframes web-sweep {
   from { opacity: 0; transform: translateY(-160px) scaleY(.4); }
   35% { opacity: 1; }
   to { opacity: 0; transform: translateY(40px) scaleY(1); }
-}
-.spider-web-pressure {
-  position: absolute;
-  inset: 0;
-  z-index: 52;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: calc(var(--web-tension, 0) * .14);
-  transition: opacity .45s ease;
-}
-.spider-web-pressure::before,
-.spider-web-pressure::after {
-  content: '';
-  position: absolute;
-  inset: calc(2% + var(--web-tension, 0) * 3.2%);
-  border: 2px solid rgba(231, 226, 238, .74);
-  border-radius: 46% 52% 44% 50%;
-  box-shadow:
-    inset 0 0 25px rgba(224, 217, 235, .18),
-    0 0 14px rgba(224, 217, 235, .2);
-  transition: inset .45s cubic-bezier(.2,.8,.3,1);
-}
-.spider-web-pressure::after {
-  inset: calc(5% + var(--web-tension, 0) * 4.1%);
-  border-width: 1px;
-  transform: rotate(-1.5deg);
-}
-.spider-web-pressure i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 140%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(231, 226, 238, .7) 16% 84%, transparent);
-  transform-origin: center;
-}
-.spider-web-pressure i:nth-child(1) { transform: translate(-50%,-50%) rotate(25deg); }
-.spider-web-pressure i:nth-child(2) { transform: translate(-50%,-50%) rotate(-24deg); }
-.spider-web-pressure i:nth-child(3) { transform: translate(-50%,-50%) rotate(67deg); }
-.spider-web-pressure i:nth-child(4) { transform: translate(-50%,-50%) rotate(-68deg); }
-.scene.battle.web-finisher-ready .spider-web-pressure {
-  opacity: .72;
-  animation: web-ring-ropes .62s ease-in-out infinite alternate;
-}
-.scene.battle.web-finisher-ready .trait.web-tension {
-  color: #ffb09e;
-  border-color: rgba(255, 112, 87, .74);
-  box-shadow: 0 0 12px rgba(255, 78, 62, .34);
-}
-.scene.battle.web-finisher-impact .spider-web-pressure {
-  animation: web-finisher-snap .72s cubic-bezier(.15,.8,.25,1) forwards;
-}
-.scene.battle.spider-web-cut .spider-web-pressure {
-  animation: web-cut-open .68s ease-out;
-}
-.scene.battle.spider-web-burst .spider-web-pressure {
-  animation: web-burst-clear .82s cubic-bezier(.12,.72,.2,1) forwards;
 }
 .web-burst-strand {
   position: absolute;
@@ -1491,25 +1537,6 @@ button {
   background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(220,211,231,.68), transparent);
   filter: drop-shadow(0 0 7px rgba(255,255,255,.8));
   animation: web-strand-fling .76s cubic-bezier(.15,.76,.25,1) var(--delay) forwards;
-}
-@keyframes web-ring-ropes {
-  from { filter: drop-shadow(0 0 2px rgba(255,255,255,.2)); transform: scale(.995); }
-  to { filter: drop-shadow(0 0 9px rgba(255,126,104,.55)); transform: scale(1.008); }
-}
-@keyframes web-finisher-snap {
-  0% { opacity: .8; transform: scale(1); filter: brightness(1); }
-  38% { opacity: 1; transform: scale(.78); filter: brightness(1.8); }
-  100% { opacity: 0; transform: scale(1.32); filter: brightness(2.2) blur(5px); }
-}
-@keyframes web-cut-open {
-  0% { filter: brightness(1); clip-path: inset(0); }
-  34% { filter: brightness(2.3); clip-path: polygon(0 0, 46% 0, 42% 100%, 0 100%, 0 0, 58% 0, 100% 0, 100% 100%, 62% 100%); }
-  100% { filter: brightness(1); clip-path: inset(0); }
-}
-@keyframes web-burst-clear {
-  0% { opacity: .88; transform: scale(1); filter: brightness(1); }
-  28% { opacity: 1; transform: scale(.86); filter: brightness(2.4); }
-  100% { opacity: 0; transform: scale(1.7) rotate(3deg); filter: brightness(2.8) blur(7px); }
 }
 @keyframes web-strand-fling {
   0% { opacity: 0; transform: rotate(var(--angle)) translateX(0) scaleX(.25); }
@@ -1543,13 +1570,19 @@ button {
   left: 158px;
   top: 8px;
   z-index: 5;
-  width: 260px;
-  padding: 13px 17px 15px;
+  box-sizing: border-box;
+  width: 330px;
+  min-height: 76px;
+  padding: 14px 28px 17px;
   color: #4a3225;
   font-size: 18px;
   font-weight: 900;
   line-height: 1.35;
   text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
   opacity: 0;
   transform: translate(-14px, 12px) rotate(-2deg) scale(.82);
   transform-origin: left bottom;
@@ -1632,10 +1665,9 @@ button {
   outline: none;
 }
 .actor.you {
-  /* 310→360 확장분의 절반만큼 좌측을 당겨 캐릭터 중심은 기존 위치에 고정한다.
-     프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
+  /* 프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
      화면 끝에 붙여 두면 잘려 나온 것처럼 보여서 왼쪽에 한 뼘 여백을 남긴다. */
-  left: 290px;
+  left: var(--player-left, 290px);
 }
 .actor .model-shell {
   position: relative;
@@ -1649,7 +1681,10 @@ button {
   touch-action: none;
   user-select: none;
 }
-.actor.you .model-shell { width: 360px; }
+.scene.battle:not([data-boss='true']) .actor.you .model-shell {
+  width: 280px;
+  height: 330px;
+}
 .actor .model-shell[data-model-dragging='true'] { cursor: grabbing; }
 .actor.foe .model-shell {
   width: 280px;
@@ -1657,7 +1692,7 @@ button {
 }
 /* 원본 투명 여백이 더 큰 바퀴벌레도 좀나방과 같은 약 273px 실루엣 높이로 정규화한다. */
 .actor.foe[data-character='roach'] .model-shell { width: 309px; }
-/* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
+/* 모든 적은 선명하게 유지하고, 현재 대상만 발광으로 구분한다. */
 .actor.foe.front .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px color-mix(in srgb, var(--glow) 48%, transparent));
 }
@@ -1680,8 +1715,8 @@ button {
 .model-shell[data-model-status='ready-3d'] .battle-model { opacity: 1; }
 .model-shell[data-model-status='ready-3d'] .battle-sprite { visibility: hidden; }
 .model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
-.actor .model-shell:hover,
-.actor:focus-visible .model-shell {
+.actor.you .model-shell:hover,
+.actor.you:focus-visible .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
 }
 /* 투영 그림자 대신 발선만 배경에 살짝 묻는 접지 흔적을 둔다. */
@@ -1707,7 +1742,7 @@ button {
   opacity: 1;
   z-index: -1;
 }
-/* 뒷줄 적은 모델과 같은 비율로 작아져야 발밑이 어긋나 보이지 않는다. */
+/* 일반 전투의 적은 모두 같은 크기라 그림자도 같은 비율을 유지한다. */
 .actor.foe .shadow {
   transform: scaleX(var(--model-scale, 1));
 }
@@ -1773,8 +1808,8 @@ button {
 }
 .queen-worker[hidden] { display: none; }
 .queen-worker img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
-.queen-worker.left[data-slot='1'] { left: 110px; bottom: 42px; }
-.queen-worker.left[data-slot='2'] { left: -34px; bottom: 4px; }
+.queen-worker.left[data-slot='1'] { left: 170px; bottom: 42px; }
+.queen-worker.left[data-slot='2'] { left: 40px; bottom: 4px; }
 .queen-worker.right[data-slot='1'] { right: 110px; bottom: 42px; }
 .queen-worker.right[data-slot='2'] { right: -34px; bottom: 4px; }
 .queen-worker.left { transform: rotate(-4deg); }
@@ -2221,16 +2256,10 @@ button {
   transform: translateX(-50%);
   transition: opacity 0.32s ease, filter 0.32s ease;
 }
-/* 2번째 적 — 있다는 것만 알 정도로 은은하게 */
-/* 대기 중인 적의 이름표·체력바 — 지금 상대가 아니라는 걸 옅기로 알린다.
-   맨 뒷줄은 한 번 더 물린다(.back.rank-last). 정보는 읽히되 앞줄과 다투지 않는 정도. */
+/* 재사용된 배우에 이전 상태가 남더라도 이름표·체력바는 선명하게 복구한다. */
 .actor.foe .nameplate.faint {
-  opacity: 0.3;
-  filter: saturate(0.55);
-}
-.actor.foe.rank-last .nameplate.faint {
-  opacity: 0.18;
-  filter: saturate(0.4);
+  opacity: 1;
+  filter: none;
 }
 .actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
 .nameplate .row {
@@ -2251,6 +2280,88 @@ button {
   font-weight: 700;
 }
 .enemy-traits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; min-height: 17px; }
+.enemy-intel {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 82px);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.enemy-intel[hidden] { display: none; }
+.enemy-intel-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 221, 165, .5);
+  border-radius: 11px 5px 10px 5px;
+  color: #ffe4ad;
+  background: linear-gradient(145deg, rgba(52, 32, 38, .96), rgba(19, 12, 22, .94));
+  box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .06), 0 4px 11px rgba(0, 0, 0, .56);
+  cursor: help;
+  outline: none;
+  transition: transform .14s ease, filter .14s ease;
+}
+.enemy-intel-icon svg { width: 23px; height: 23px; }
+.enemy-intel-icon > b { font: 900 17px/1 Georgia, serif; }
+.enemy-intel-icon .emotion-face { width: 26px; height: 26px; object-fit: contain; }
+.enemy-intel-icon .emotion-symbol { font-size: 20px; }
+.enemy-intel-icon.magic > b { position: absolute; right: -5px; bottom: -5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; color: #2b1d3e; background: #e5d0ff; font: 900 10px/1 sans-serif; }
+.enemy-intel-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 120;
+  width: max-content;
+  max-width: 250px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff3d4;
+  background: rgba(16, 11, 21, .97);
+  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .22), 0 8px 18px rgba(0, 0, 0, .56);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.enemy-intel-icon:hover,
+.enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
+.enemy-intel-icon:hover::after,
+.enemy-intel-icon:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.enemy-intel-icon.weak { color: #ffe69a; border-color: rgba(255, 220, 113, .7); }
+.enemy-intel-icon.weak.emotion-joy { color: #ffdf72; }
+.enemy-intel-icon.weak.emotion-anger { color: #ff9587; }
+.enemy-intel-icon.weak.emotion-sorrow { color: #8fc5ff; }
+.enemy-intel-icon.weak.emotion-pleasure { color: #f5a0eb; }
+.enemy-intel-icon.attack, .enemy-intel-icon.stage { color: #ffb37d; border-color: rgba(255, 137, 83, .7); }
+.enemy-intel-icon.guard { color: #8ee4f4; border-color: rgba(142, 228, 244, .65); }
+.enemy-intel-icon.magic { color: #d9aaff; border-color: rgba(217, 170, 255, .72); }
+.enemy-intel-icon.pierce { color: #ff9d81; border-color: rgba(255, 157, 129, .72); }
+.enemy-intel-icon.summon { color: #ffe47d; border-color: rgba(255, 213, 73, .72); }
+.enemy-intel-icon.web { color: #ded4ee; border-color: rgba(210, 198, 231, .58); }
+.enemy-intel-icon.groggy { color: #fff1a6; border-color: rgba(255, 226, 102, .72); }
+.enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
+.actor.foe { cursor: default; }
+.actor.foe .model-shell { cursor: default; }
+/* 일반 적의 특성 칩은 패널 높이에 포함하지 않는다. 그래야 특성 유무와 관계없이
+   프롬과 모든 적의 이름·HP 바가 정확히 같은 수평선에 놓인다. */
+.scene.battle:not([data-boss='true']) .actor.foe .enemy-traits {
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  right: 14px;
+}
 .trait { padding: 2px 5px; border-radius: 7px; font-size: 10px; font-weight: 900; line-height: 1.2; background: rgba(10, 8, 16, .58); }
 .trait.guard { color: #8ee4f4; border: 1px solid rgba(142, 228, 244, .42); }
 .trait.magic { color: #d9aaff; border: 1px solid rgba(217, 170, 255, .48); }
@@ -2312,6 +2423,14 @@ button {
 }
 .actor.foe.strikes-first .first-mark { display: inline-flex; }
 .actor.foe.back .first-mark { display: none; }
+.scene.battle[data-boss='true'] .actor.foe.boss .first-mark {
+  position: fixed;
+  top: 92px;
+  bottom: auto;
+  left: calc(50% + 470px);
+  z-index: 70;
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .guard-hint { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
 .nameplate.gone ~ .first-mark {
   bottom: calc(330px * var(--model-scale, 1) + 10px);
@@ -2925,9 +3044,9 @@ button {
   padding: 10px 34px;
   border-radius: 24px;
 }
-/* 보스 HUD가 상단 중앙을 쓰므로 문장 캐스트는 그 아래의 독립된 레일에 둔다. */
+/* 짧아진 보스 HUD 아래에 문장 캐스트 전용 레일을 고정한다. */
 .scene.battle[data-boss='true'] .chain-rail {
-  top: 158px;
+  top: 116px;
 }
 .chain-rail.has-sentence {
   background: linear-gradient(105deg, rgba(10, 7, 16, .82), rgba(26, 17, 25, .74) 52%, rgba(10, 7, 16, .82));
@@ -3174,14 +3293,13 @@ button {
 /* ───────── 중앙 하단: 가로 단어 선택 ───────── */
 .word-zone {
   position: absolute;
-  left: 356px;
-  right: 420px;
-  bottom: 12px;
+  left: 500px;
+  right: 110px;
+  bottom: 13px;
   z-index: 7;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
 }
 /* 단어 영역 아래 은은한 어둠 스크림(가독성) — 경계선이 안 보이게 아주 흐리게만 */
 .word-zone::before {
@@ -3196,33 +3314,33 @@ button {
   /* 위쪽으로 크게 번지는 장식 스크림이 전장 캐릭터의 포인터 판정을 막지 않게 한다. */
   pointer-events: none;
 }
-/* 단어 ↔ 가방 슬라이드 토글(같은 자리) */
-.pane-stack { position: relative; width: 100%; height: 318px; }
-.pane {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  transition: transform 0.38s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.3s ease;
-}
-.pane.bag { transform: translateY(70px); opacity: 0; pointer-events: none; }
-.word-zone.bag-mode .pane.words { transform: translateY(70px); opacity: 0; pointer-events: none; }
-.word-zone.bag-mode .pane.bag { transform: translateY(0); opacity: 1; pointer-events: auto; }
+/* 보스전은 전경의 프롬과 손패가 겹치지 않게 카드 축을 더 오른쪽으로 물린다. */
+.scene.battle[data-boss='true'] .word-zone { left: 620px; right: 72px; }
 
-/* 슬롯 진행 스텝 — 손패 아래 최하단. 박혀 있어도 읽히게 크고 두껍게. */
+/* 슬롯 진행 스텝 — 카드 레일에서 분리해 일반전 좌하단에 고정한다.
+   보스전에서는 같은 자리를 플레이어 체력이 쓰므로 그 오른쪽에 이어 붙인다. */
 .slot-step {
-  position: relative;
+  position: absolute;
+  left: 38px;
+  bottom: 28px;
   z-index: 950;
-  margin-top: 2px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 30px;
+  gap: 6px;
+  min-height: 42px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 235, 195, .16);
+  border-radius: 12px;
+  font-size: 24px;
   font-weight: 900;
+  background: linear-gradient(90deg, rgba(10, 7, 16, .76), rgba(10, 7, 16, .32));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28), inset 0 0 0 2px rgba(255, 255, 255, .025);
+  backdrop-filter: blur(7px);
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+.scene.battle[data-boss='true'] .slot-step {
+  left: 430px;
+  bottom: 38px;
 }
 .slot-step .step {
   color: var(--ink-faint);
@@ -3254,14 +3372,14 @@ button {
 .card-table {
   position: relative;
   width: 100%;
-  height: 263px;
+  height: 230px;
 }
 .card-hand {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 255px;
+  height: 230px;
   perspective: 1100px;
 }
 .word-card {
@@ -3554,18 +3672,58 @@ button {
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
 .word-card.blocked .card-note { color: #9a342b; }
 .word-card.sealed { opacity: .7; filter: grayscale(.25) saturate(.6); }
-.word-card.sealed .card-face::after {
-  z-index: 8;
-  left: -18%;
-  right: -18%;
-  top: -12%;
-  height: 124%;
-  background:
+.card-web-overlay {
+  --card-web-seal-image: none;
+  position: absolute;
+  inset: -8%;
+  z-index: 12;
+  display: none;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background-image:
+    var(--card-web-seal-image),
     linear-gradient(32deg, transparent 47.5%, rgba(241, 239, 247, .85) 48.5% 49.5%, transparent 50.5%),
     linear-gradient(-31deg, transparent 47.5%, rgba(221, 216, 233, .72) 48.5% 49.5%, transparent 50.5%),
     radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(235, 231, 241, .72) 19% 20%, transparent 21% 34%, rgba(235, 231, 241, .55) 35% 36%, transparent 37%);
+  background-size: 100% 100%, auto, auto, auto;
+  background-repeat: no-repeat;
 }
-.word-card.sealed .card-note { z-index: 9; color: #663648; }
+.word-card.sealed .card-web-overlay,
+.word-detail.sealed .card-web-overlay { display: grid; }
+.card-web-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 13, 31, .28);
+}
+.card-web-overlay b,
+.card-web-overlay small {
+  position: relative;
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #fff8ff;
+  background: rgba(52, 23, 63, .94);
+  border: 1px solid rgba(245, 232, 255, .82);
+  text-shadow: 0 2px 4px #160d1c;
+  box-shadow: 0 0 18px rgba(232, 218, 255, .48);
+}
+.card-web-overlay b { align-self: end; margin-bottom: 2px; font-size: 16px; }
+.card-web-overlay small { align-self: start; padding: 3px 9px; color: #ffd1d1; font-size: 12px; font-weight: 900; }
+.word-card.sealed .card-note { z-index: 13; color: #fff3f6; text-shadow: 0 2px 5px #210d18; }
+.word-detail.sealed .card-web-overlay {
+  inset: 0;
+  border-radius: inherit;
+}
+.word-card.web-catching { opacity: 1; filter: brightness(1.35) saturate(.45) drop-shadow(0 0 24px rgba(238, 226, 255, .94)); }
+.word-card.web-catching .card-web-overlay { animation: web-card-catch .82s cubic-bezier(.18,.82,.25,1) both; }
+@keyframes web-card-catch {
+  0% { opacity: 0; transform: translateY(-190px) scale(1.35) rotate(-8deg); }
+  44% { opacity: 1; transform: translateY(10px) scale(.92) rotate(3deg); }
+  68% { transform: translateY(-4px) scale(1.04) rotate(-1deg); }
+  100% { opacity: 1; transform: none; }
+}
 .word-card.drawing { pointer-events: none; }
 /* 사용 중에는 중앙 폭발이 끝날 때까지 다음 카드와 덱 입력을 잠근다. */
 .word-zone.is-committing .card-table,
@@ -3685,12 +3843,6 @@ button {
   transform: rotate(20deg);
   transform-origin: center center;
   transition: transform .18s ease, filter .18s ease, opacity .18s ease;
-}
-.battle-tools .draw-deck {
-  position: relative;
-  right: auto;
-  top: auto;
-  flex: none;
 }
 .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) {
   transform: translateY(-7px) rotate(21deg);
@@ -4319,25 +4471,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift { transform: translateY(-24px); }
 }
 
-/* 가방 아이템 가로 목록(단어 자리 토글) */
-.bag-row { display: flex; justify-content: center; align-items: flex-start; gap: 34px; flex-wrap: wrap; }
-.bag-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 112px;
-  padding: 10px 12px;
-  border: 3px double rgba(255,224,151,.54);
-  border-radius: 22px 6px 22px 6px;
-  background: rgba(38,25,34,.52);
-  transition: transform 0.16s cubic-bezier(0.2, 1.4, 0.4, 1), filter 0.16s;
-}
-.bag-art { width: 74px; height: 74px; color: var(--gold); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
-.bag-name { font-size: 17px; font-weight: 800; color: #fff2da; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
-.bag-item:hover { transform: translateY(-6px); filter: drop-shadow(0 0 16px var(--glow)); }
-.bag-empty { font-size: 18px; color: var(--ink-faint); }
-
 /* 좌하단 플레이어 스탯 독 — 상단은 전장 기준점에 고정하고 페이즈 행까지 아래로 확장한다. */
 .stat-dock {
   position: absolute;
@@ -4962,6 +5095,9 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .reward-head { text-align: center; margin-bottom: 8px; }
 .reward-head .k { font-size: 18px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .reward-head .t { font-size: 46px; font-weight: 900; margin-top: 4px; color: #fff6e2; text-shadow: 0 0 24px var(--glow); }
+.reward-progress { display: flex; justify-content: center; gap: 9px; margin-top: 10px; }
+.reward-progress i { width: 46px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.reward-progress i.on { background: var(--gold); box-shadow: 0 0 12px var(--glow); }
 .reward-field {
   text-align: center;
   margin: 14px auto 30px;
@@ -5127,6 +5263,26 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
 .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
 .reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+
+/* 덱 상한 교체 — 배열 앞쪽의 오래된 세 장만 같은 카드 문법으로 보여 준다. */
+.discard-card { width: 1080px; }
+.discard-incoming { margin: 16px auto 30px; text-align: center; color: var(--ink-dim); font-size: 18px; }
+.discard-incoming b { color: #fff2da; font-size: 21px; }
+.discard-pick {
+  position: relative; min-height: 390px; overflow: hidden; border-radius: 20px; color: #fff;
+  background: #17111f; box-shadow: 0 12px 30px rgba(0,0,0,.55), inset 0 0 0 2px var(--wglow, var(--gold));
+  transition: transform .16s, filter .16s, opacity .16s;
+}
+.discard-pick:hover, .discard-pick:focus-visible { transform: translateY(-9px); filter: brightness(1.12); }
+.discard-pick.is-chosen { transform: translateY(18px) rotate(-3deg); opacity: .35; }
+.discard-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.discard-veil { position: absolute; inset: 0; background: linear-gradient(rgba(5,3,10,.28), rgba(5,3,10,.2) 42%, rgba(5,3,10,.96)); }
+.discard-order, .discard-meta, .discard-pick strong, .discard-effect, .discard-action { position: relative; z-index: 1; display: block; }
+.discard-order { margin: 14px; color: var(--gold); font-size: 14px; font-weight: 900; letter-spacing: 2px; }
+.discard-meta { margin-top: 195px; color: #f4dfb6; font-size: 14px; font-weight: 800; }
+.discard-pick strong { margin: 7px 14px 0; font-size: 31px; text-shadow: 0 0 16px var(--wglow, var(--gold)), 0 3px 8px #000; }
+.discard-effect { min-height: 42px; margin: 8px 18px; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.discard-action { margin: 12px auto 16px; width: max-content; padding: 7px 15px; border-radius: 99px; background: rgba(155,61,56,.82); font-size: 14px; font-weight: 900; }
 
 /* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
 .reward-dock {
@@ -5453,6 +5609,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .dev-cheat-run-tools button:hover:not(:disabled) { background: rgba(255, 215, 106, .15); transform: translateY(-1px); }
 .dev-cheat-run-tools button:first-child { color: #ffc7bd; border-color: rgba(235, 101, 86, .38); }
+.dev-cheat-run-tools button.is-toggle { color: #d7ebff; border-color: rgba(117, 185, 255, .32); }
+.dev-cheat-run-tools button.is-toggle.on { color: #211923; border-color: #ffe4a3; background: linear-gradient(135deg, #ffe7a6, #eeac55); box-shadow: 0 0 18px rgba(255, 197, 102, .2); }
 .dev-cheat-run-tools button:disabled { opacity: .35; cursor: not-allowed; }
 .version-badge {
   position: absolute;

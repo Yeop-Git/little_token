@@ -242,7 +242,9 @@ class FoilShaderRenderer {
     this.prepareGeometry()
 
     this.observer = new MutationObserver(() => { this.scanQueued = true })
-    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    // 카드의 등급 클래스는 DOM에 붙기 전에 완성된다. 문서 전체의 class 변경까지
+    // 감시하면 전투 애니메이션 클래스가 바뀔 때마다 전체 포일 노드를 다시 훑게 된다.
+    this.observer.observe(document.documentElement, { childList: true, subtree: true })
     document.addEventListener('pointermove', this.onPointerMove, { passive: true })
     document.documentElement.classList.add('foil-shader-ready')
     requestAnimationFrame(this.frame)
@@ -257,7 +259,13 @@ class FoilShaderRenderer {
     requestAnimationFrame(this.frame)
     if (document.hidden) return
     const reduced = this.reducedMotion.matches
-    const interval = reduced ? 500 : 1000 / 60
+    // 가만히 있는 포일은 30fps로도 충분히 유려하다. 포인터가 올라가거나 카드가
+    // 사용되는 순간만 60fps로 올려, 여러 영웅/전설 카드의 GPU→2D 복사를 반으로 줄인다.
+    const interactive = [...this.surfaces.keys()].some((host) => {
+      const card = host.closest<HTMLElement>('.word-card, .reward-pick, .deck-hover-card')
+      return card?.classList.contains('commit-ghost') || card?.matches(':hover')
+    })
+    const interval = reduced ? 500 : 1000 / (interactive ? 60 : 30)
     if (now - this.lastFrame < interval) return
     this.lastFrame = now
     if (this.scanQueued) this.scan()

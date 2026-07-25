@@ -15,6 +15,15 @@ export interface PlayerStats {
   luck: number // 고등급 보상·도박 보정
 }
 
+/** 새 런과 전투 폴백이 공유하는 기준 스탯. 방어는 비축하되, 한 번의 충전량은 낮게 잡는다. */
+export const STARTING_COMBAT_STATS: Readonly<PlayerStats> = {
+  hp: 52,
+  atk: 5,
+  guard: 3,
+  heal: 5,
+  luck: 3,
+}
+
 export interface OwnedItem {
   id: string
   name: string
@@ -50,7 +59,7 @@ export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; d
 
 export function defaultPlayer(): PlayerState {
   return {
-    stats: { hp: 40, atk: 3, guard: 3, heal: 3, luck: 2 },
+    stats: { ...STARTING_COMBAT_STATS },
     items: [
       { id: 'candle', name: '몽당 양초', rarity: 'common', art: 'candle', line: '와! 정말 예뻐!', stats: { atk: 3, heal: 2, luck: 2 } },
       { id: 'ribbon', name: '낡은 리본', rarity: 'common', art: 'ribbon', line: '음? 살짝 튼튼해!', stats: { hp: 2, guard: 4, luck: 2 } },

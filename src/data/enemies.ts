@@ -15,14 +15,17 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   mantis: {
     id: 'mantis', name: '사마귀', boss: true,
-    hp: 38, atk: 7, every: 1, initiative: 'first',
+    // 평타 1~2회 → 준비 → 내려베기가 한 사이클(최대 4턴)이다. 사이클을 두 바퀴
+    // 이상 보여 주지 못하면 예고와 그로기가 한 번씩만 스치고 전투가 끝난다.
+    hp: 88, atk: 7, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
-      { name: '평범한 낫 베기', bonusAtk: 0, repeatOnceChance: 0.5 },
-      { name: '강공격 자세 잡기', bonusAtk: 0, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
+      { name: '평범한 낫 베기', bonusAtk: 0, animationStage: 1, repeatOnceChance: 0.5 },
+      { name: '강공격 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
       {
         name: '큰낫 내려베기',
         bonusAtk: 0,
+        animationStage: 3,
         damageScale: 1.2,
         shatterGuard: true,
         lifeStealRate: 0.5,
@@ -34,37 +37,37 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
-    hp: 52, atk: 4, every: 3, initiative: 'second',
+    hp: 68, atk: 7, every: 3, initiative: 'second',
     sprite: 'boss_queen_bee', magicShield: 2, weakEmotion: 'anger',
     summonPattern: {
       name: '일벌',
       sprite: 'enemy_worker_bee',
-      perTurn: 1,
+      // 한 턴에 둘씩 부른다. 공격 한 번은 최소 한 마리를 흩으므로, 매 턴 하나만
+      // 불러서는 호위가 영영 차지 않아 벌떼 돌격이 발동하지 않는다. 둘씩 불러야
+      // "좁게 때리면 모이고, 넓게 때리면 흩어진다"가 실제 선택이 된다.
+      perTurn: 2,
       max: 4,
       maxPerSide: 2,
-      attackBonusPerUnit: 0.5,
+      attackBonusPerUnit: 1.5,
       releaseAt: 4,
     },
-    note: '3턴마다 공격하며, 매 턴 시작에는 양옆으로 일벌을 한 마리씩 불러 최대 4마리의 호위를 만든다. 일벌마다 공격이 +0.5 되고, 넷이 모이면 다음 공격에 모두 돌격한 뒤 호위가 비워진다. 2·3명 공격은 각각 일벌 1·2마리를, 전체 공격은 전부 흩어 낸다.',
+    note: '3턴마다 공격하며, 매 턴 시작에 좌우를 번갈아 일벌 두 마리를 불러 최대 4마리의 호위를 만든다. 일벌마다 공격이 +1.5 되고, 넷이 모이면 다음 공격에 모두 돌격한 뒤 호위가 비워진다. 단일·2명·3명 공격은 각각 일벌 1·2·3마리를, 전체 공격은 전부 흩어 낸다.',
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
-    // 42 × 9부위는 기존 70 × 5막과 비슷한 총 결전 길이를 유지한다.
-    hp: 42, atk: 12, every: 2, initiative: 'first',
+    // 다리 하나가 곧 체력 한 막이다. 막당 체력이 낮으면 문장 하나가 다리 둘을
+    // 한꺼번에 끊어 기쁨·분노·슬픔·즐거움 약점이 드러나기도 전에 사라진다.
+    hp: 70, atk: 12, every: 2, initiative: 'first',
     sprite: 'boss_elder_spider', guard: 12, magicShield: 1,
     parts: [
-      { id: 'leg-force', name: '첫째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'force', label: '힘' } },
-      { id: 'leg-joy', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
-      { id: 'leg-warm', name: '셋째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'warm', label: '온기' } },
-      { id: 'leg-anger', name: '넷째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
-      { id: 'leg-grit', name: '다섯째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'grit', label: '버팀' } },
-      { id: 'leg-sorrow', name: '여섯째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'sorrow', label: '슬픔' } },
-      { id: 'leg-tear', name: '일곱째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'tear', label: '눈물' } },
-      { id: 'leg-pleasure', name: '여덟째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'pleasure', label: '즐거움' } },
+      { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
+      { id: 'leg-anger', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
+      { id: 'leg-sorrow', name: '셋째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'sorrow', label: '슬픔' } },
+      { id: 'leg-pleasure', name: '넷째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'pleasure', label: '즐거움' } },
       { id: 'body', name: '본체', kind: 'body' },
     ],
-    webPattern: { sealPerTurn: 1, attackPerTension: 1, maxAttackBonus: 4 },
-    note: '현재 다리의 공개 약점을 맞히면 피해 ×1.5와 함께 거미줄을 하나 끊는다. 다리 체력 한 칸을 전부 깎거나 같은 감정 2장으로 감정 공명을 터뜨리면 사방의 거미줄을 전부 날려 장력을 0으로 만든다. 매 문장마다 손패 한 장이 봉인되며, 장력 4에서는 사방의 거미줄이 한꺼번에 조여든 뒤 터진다.',
+    webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점을 맞히면 피해 ×1.5와 함께 봉인 하나를 풀고, 그 문장만 다음 다리와 본체까지 관통한다. 약점을 빗나간 문장은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',
