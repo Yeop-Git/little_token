@@ -1274,6 +1274,63 @@ button {
   border-radius: 12px;
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* ── 보호막 게이지 ──
+   체력 바 바로 아래 같은 축으로 깔아 "얼마나 더 버티나"를 한눈에 읽게 한다.
+   숫자 칩만 있을 때는 깎이는 게 안 보여서 한 대 더 쳐야 하는지 판단이 안 됐다. */
+.shieldbar {
+  position: relative;
+  height: 11px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1.5px rgba(255, 210, 122, 0.34);
+}
+.shieldbar[hidden] { display: none; }
+.shieldbar > .fill {
+  position: absolute;
+  inset: 0;
+  right: auto;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffe6ae, var(--shield) 58%, #d99f3e);
+  box-shadow: 0 0 10px rgba(255, 210, 122, 0.6);
+  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.shieldbar > .val {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #2a1c07;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+/* 매직실드 — 남은 '지울 타격 수'라 양이 아니라 칸으로 센다. */
+.magicbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.magicbar[hidden] { display: none; }
+.magicbar .mlabel { color: #d9aaff; font-size: 10px; font-weight: 900; }
+.magicbar i {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(217, 170, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(217, 170, 255, 0.4);
+}
+.magicbar i.on {
+  background: linear-gradient(180deg, #f0dcff, #d9aaff);
+  box-shadow: 0 0 8px rgba(217, 170, 255, 0.75);
+}
 .hpbar > .fill::after {
   content: '';
   position: absolute;
@@ -1801,6 +1858,11 @@ button {
   color: var(--ink-faint);
   padding: 2px 6px;
   transition: color 0.2s, text-shadow 0.2s, transform 0.2s;
+}
+/* 스텝은 진행 표시일 뿐 되돌아가는 버튼이 아니다 — 눌리는 것처럼 보이지 않게 한다. */
+.slot-step .step[disabled] {
+  cursor: default;
+  opacity: 1;
 }
 .slot-step .step b {
   color: inherit;
@@ -3763,8 +3825,43 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 
 .intro-dlg-box-inner {
+  position: relative;
   max-width: 720px;
   margin: 0 auto;
+}
+
+/* 진행 화살표 — 이 말풍선을 누르면 넘어간다는 표시.
+   클릭이 실제로 먹기 시작할 때(is-waiting)만 나타나므로, 떠 있으면 눌러도 되는 상태다. */
+.intro-dlg-next {
+  position: absolute;
+  right: -14px;
+  bottom: -12px;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.intro-dlg-next::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ffe58a;
+  clip-path: polygon(50% 100%, 0 26%, 100% 26%);
+  filter: drop-shadow(0 0 8px rgba(255, 208, 80, 0.9));
+}
+.intro-dlg-box.is-waiting .intro-dlg-next {
+  opacity: 1;
+  animation: dlg-next-bob 1.05s ease-in-out infinite;
+}
+@keyframes dlg-next-bob {
+  0%, 100% { transform: translateY(0); opacity: 0.72; }
+  50% { transform: translateY(5px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-dlg-box.is-waiting .intro-dlg-next { animation: none; opacity: 1; }
 }
 
 /* 토큰의 이름 — 샛노란 발광 */

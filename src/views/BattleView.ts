@@ -362,9 +362,6 @@ export class BattleView {
   private order() {
     return this.t.template.slots.map((s) => s.key)
   }
-  private filledCount() {
-    return this.order().filter((k) => this.sel[k]).length
-  }
 
   // 단어 효과별 무드(색) 분류.
   private moodOf(w: Word): Mood {
@@ -615,6 +612,7 @@ export class BattleView {
         <div class="nameplate glass">
           <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div></div>
+          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
         </div>
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
@@ -623,10 +621,22 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
-      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
+    el.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, s.playerHp)}/${s.playerMax}`
     el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width =
       `${Math.max(0, (s.playerHp / s.playerMax) * 100)}%`
+    // 보호막은 체력을 기준으로 읽는다 — 최대 체력만큼 쌓이면 꽉 찬다.
+    // 숫자만 있던 칩보다 "얼마나 버틸 수 있나"가 체력 바와 같은 축에서 바로 보인다.
+    this.paintShield(el.querySelector<HTMLElement>('.shieldbar')!, s.guard, s.playerMax)
+  }
+
+  /** 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
+  private paintShield(bar: HTMLElement, value: number, max: number) {
+    const on = value > 0
+    bar.hidden = !on
+    if (!on) return
+    bar.querySelector<HTMLElement>('.fill')!.style.width =
+      `${Math.min(100, (value / Math.max(1, max)) * 100)}%`
+    bar.querySelector<HTMLElement>('.val')!.textContent = `◈ ${value}`
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
@@ -643,6 +653,8 @@ export class BattleView {
           <div class="hp-row">
             <div class="hpbar foe"><div class="fill"></div></div>
           </div>
+          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
+          <div class="magicbar" hidden></div>
           <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -675,13 +687,22 @@ export class BattleView {
     plate.classList.remove('gone')
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    // 방어막은 남은 양을 게이지로 — 깎이는 게 보여야 "한 대 더 치면 뚫린다"가 읽힌다.
+    this.paintShield(plate.querySelector<HTMLElement>('.shieldbar')!, e.guard, e.def.guard ?? e.guard)
+    // 매직실드는 양이 아니라 "몇 대를 지우나"라서 칸으로 센다.
+    const magic = plate.querySelector<HTMLElement>('.magicbar')!
+    magic.hidden = e.magicShield <= 0
+    if (!magic.hidden) {
+      const max = Math.max(e.magicShield, e.def.magicShield ?? e.magicShield)
+      magic.innerHTML =
+        `<span class="mlabel">✧</span>` +
+        Array.from({ length: max }, (_, i) => `<i class="${i < e.magicShield ? 'on' : ''}"></i>`).join('')
+    }
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
-    traits.innerHTML = [
-      weak ? `<span class="trait weak ${weak}">${EMOTION_ICON[weak]} ${EMOTION_LABEL[weak]} 약점 ×1.25</span>` : '',
-      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
-      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
-    ].join('')
+    traits.innerHTML = weak
+      ? `<span class="trait weak ${weak}">${EMOTION_ICON[weak]} ${EMOTION_LABEL[weak]} 약점 ×1.25</span>`
+      : ''
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
@@ -900,17 +921,11 @@ export class BattleView {
         const done = g.indices.every((i) => this.sel[this.t.template.slots[i].key])
         const cls = active ? 'active' : done ? 'done' : ''
         const no = g.indices.map((i) => i + 1).join('·')
-        return `<button class="step ${cls}" data-i="${g.indices[0]}"><b>${no}</b> ${g.label}</button>`
+        // 한 번 고른 칸은 되돌리지 못한다 — 문장은 쓴 순서대로 흘러간다.
+        // 스텝은 "지금 어디까지 왔나"를 읽는 표시일 뿐이라 누를 수 없다.
+        return `<button class="step ${cls}" data-i="${g.indices[0]}" disabled><b>${no}</b> ${g.label}</button>`
       })
       .join('<span class="sep">·</span>')
-    this.q('#steps')
-      .querySelectorAll<HTMLElement>('.step')
-      .forEach((st) =>
-        st.addEventListener('click', () => {
-          const i = Number(st.dataset.i)
-          if (i <= this.filledCount()) this.setSlot(i)
-        }),
-      )
 
     const key = this.order()[this.slotIndex]
     // 테이블 목록을 먼저 본다 — 덱에 없는 유령 카드(무럭무럭·문장부호)가 여기에만 있다.
@@ -1272,11 +1287,6 @@ export class BattleView {
     const host = this.q('#overlay')
     host.classList.remove('open')
     host.innerHTML = ''
-  }
-
-  private setSlot(i: number) {
-    this.slotIndex = Math.max(0, Math.min(i, this.order().length - 1))
-    this.renderWords()
   }
 
   private pick(id: string) {

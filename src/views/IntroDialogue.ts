@@ -89,6 +89,7 @@ export class IntroDialogue {
           <div class="intro-dlg-name">${TOKEN_NAME}</div>
           <div class="intro-dlg-divider" aria-hidden="true"></div>
           <div class="intro-dlg-text"></div>
+          <span class="intro-dlg-next" aria-hidden="true"></span>
         </div>
       </div>
       <button type="button" class="intro-dlg-skip">SKIP ▸</button>`
@@ -216,12 +217,15 @@ export class IntroDialogue {
       const finish = (): void => {
         window.clearTimeout(unlockTimer)
         window.clearTimeout(autoTimer)
+        this.boxEl.classList.remove('is-waiting')
         this.advanceNow = null
         this.advanceForce = null
         resolve()
       }
       const unlockTimer = window.setTimeout(() => {
         locked = false
+        // 이제부터 클릭이 먹는다 — 말풍선에 "누르세요" 화살표를 띄운다.
+        this.boxEl.classList.add('is-waiting')
       }, ADVANCE_LOCK_MS)
       const autoTimer = window.setTimeout(finish, timeoutMs)
       this.advanceNow = () => {
