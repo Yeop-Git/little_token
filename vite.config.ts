@@ -20,5 +20,5 @@ export default defineConfig({
       '@views': resolve(__dirname, './src/views'),
     },
   },
-  server: { port: 3000, host: true },
+  server: { port: Number(process.env.PORT) || 3000, host: true },
 })

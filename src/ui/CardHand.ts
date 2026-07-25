@@ -1,5 +1,7 @@
 import { SKILL_ART } from '@/assets'
-import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionBadgeContent } from '@/ui/EmotionBadge'
+import { icon } from '@/ui/Icons'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -21,6 +23,19 @@ export const CARD_HAND_CONFIG = {
 export interface LineTransform {
   translateX: number
   zIndex: number
+}
+
+/** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
+export function cardTitleStyle(text: string, illustrated = false): string {
+  const maxSize = illustrated ? 27 : 24
+  const availableWidth = illustrated ? 140 : 126
+  const widthUnits = Array.from(text).reduce((sum, char) => {
+    if (/\s/.test(char)) return sum + 0.35
+    if (/[\u0000-\u00ff]/.test(char)) return sum + 0.62
+    return sum + 1
+  }, 0)
+  const fittedSize = Math.max(12, Math.min(maxSize, (availableWidth * 0.92) / Math.max(1, widthUnits)))
+  return `style="--card-title-size:${fittedSize.toFixed(1)}px"`
 }
 
 /** DOM과 무관한 일렬 손패 좌표 계산. 카드 묶음의 중심을 항상 화면 중앙에 맞춘다. */
@@ -379,7 +394,7 @@ export class CardHand {
       const note = button.querySelector<HTMLElement>('.card-note')
       if (note) note.textContent = blocked ?? card.word.note
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
-      if (emotionBadge) emotionBadge.textContent = `${EMOTION_ICON[emotionKey]} ${EMOTION_LABEL[emotionKey]}`
+      if (emotionBadge) emotionBadge.innerHTML = emotionBadgeContent(emotionKey)
       const footer = button.querySelector<HTMLElement>('.card-front > small')
       if (footer) footer.textContent = blocked ? '맥락 충돌' : 'WORD CARD'
     }
@@ -399,6 +414,7 @@ export class CardHand {
     const rarity = card.word.rarity ?? 'common'
     const emotion = emotionOrNeutral(card.word.emotion)
     const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
+    const actionBadge = this.verbActionBadge(card.word)
     // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
     const front = artUrl
       ? `<span class="card-face card-front art">
@@ -406,15 +422,15 @@ export class CardHand {
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
-          <strong class="card-title">${card.word.text}</strong>
+          ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>${actionBadge}
+          <strong class="card-title" ${cardTitleStyle(card.word.text, true)}>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
+          ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>${actionBadge}
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
-          <strong>${card.word.text}</strong>
+          <strong class="card-title" ${cardTitleStyle(card.word.text)}>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
           <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
         </span>`
@@ -426,6 +442,17 @@ export class CardHand {
         ${front}
       </span></span>
     </button>`
+  }
+
+  /** 동사는 카드 문구를 읽기 전에도 공격·방어·회복 역할을 알아볼 수 있게 한다. */
+  private verbActionBadge(word: Word): string {
+    if (word.slot !== 'verb' && word.slot !== 'verb2') return ''
+    const action = word.kind === 'heal' || word.effects?.heal
+      ? { cls: 'heal', label: '회복', glyph: 'cross' }
+      : word.kind === 'guard' || word.effects?.guard
+        ? { cls: 'guard', label: '방어', glyph: 'shield' }
+        : { cls: 'attack', label: '공격', glyph: 'sword' }
+    return `<span class="card-action action-${action.cls}" title="${action.label}" aria-hidden="true">${icon(action.glyph)}</span>`
   }
 
   // 카드 색감(--wglow): 공격=붉음 · 방어=파랑 · 회복=초록 · 도박=보라.

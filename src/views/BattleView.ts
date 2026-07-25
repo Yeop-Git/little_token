@@ -21,7 +21,8 @@ import {
 import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
+import { emotionBadgeContent } from '@/ui/EmotionBadge'
+import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
@@ -47,12 +48,13 @@ import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type Owned
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
+import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
+  freezeCharacterAnimation,
   isCharacterModelReady,
   mountCharacterModel,
   playCharacterAnimation,
@@ -68,11 +70,16 @@ interface Opts {
   onWin: (grade: number) => void
   onLose: () => void
   onHome?: () => void
+  onResetAll?: () => void
   player?: PlayerState
   tables?: Tables
   hpMult?: number
   atkMult?: number
   isBoss?: boolean
+  /** 현재 보스의 체력 막 수. 일반 전투에는 전달하지 않는다. */
+  bossHealthBars?: number
+  /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
+  modeLabel?: string
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
   intro?: boolean
   /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
@@ -123,8 +130,11 @@ export class BattleView {
   private onWin: (grade: number) => void
   private onLose: () => void
   private onHome?: () => void
+  private onResetAll?: () => void
   private onIntroComplete?: () => void
   private isBoss = false
+  private playerVisual: CharacterVisualDef
+  private modeLabel = ''
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
@@ -159,12 +169,19 @@ export class BattleView {
     this.onWin = opts.onWin
     this.onLose = opts.onLose
     this.onHome = opts.onHome
+    this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
     this.isBoss = !!opts.isBoss
+    this.playerVisual = this.isBoss
+      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI * 0.78 }
+      : CHARACTER_VISUALS.player
+    this.modeLabel = opts.modeLabel ?? ''
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
-    const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1))
+    const enemies = opts.encounter.map((id) =>
+      makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1, this.isBoss ? opts.bossHealthBars ?? 3 : 1),
+    )
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
@@ -267,7 +284,8 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+        ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
         <div class="weather-wash"></div>
 
@@ -294,10 +312,12 @@ export class BattleView {
         </div>
 
         <div class="stage-area" id="pbox">
+          ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? `<div class="boss-ribbon" role="status"><span>위험한 낙서</span><b>보스전 · ${this.state.enemies[0]?.def.name ?? '보스'}</b></div>` : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
+          <div class="resonance-flash" id="resonance" aria-live="polite"></div>
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
         </div>
@@ -397,7 +417,7 @@ export class BattleView {
       this.bindActor(you)
     }
     this.updatePlayer(you)
-    mountCharacterModel(you, CHARACTER_VISUALS.player)
+    mountCharacterModel(you, this.playerVisual)
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -454,7 +474,15 @@ export class BattleView {
   private visualForEnemy(enemy: EnemyInst): CharacterVisualDef {
     const direct = CHARACTER_VISUALS[enemy.def.id as CharacterVisualDef['id']]
     if (direct) return direct
-    return enemy.def.sprite === 'enemy_roach' ? CHARACTER_VISUALS.roach : CHARACTER_VISUALS.moth
+    const visualBySprite: Partial<Record<string, CharacterVisualDef['id']>> = {
+      enemy_moth: 'moth',
+      enemy_flea: 'flea',
+      enemy_termite: 'termite',
+      enemy_roach: 'roach',
+      enemy_pillbug: 'pillbug',
+      enemy_mosquito: 'mosquito',
+    }
+    return CHARACTER_VISUALS[visualBySprite[enemy.def.sprite] ?? 'moth']
   }
 
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
@@ -610,30 +638,37 @@ export class BattleView {
   }
 
   private playerHtml(): string {
-    const modelStatus = CHARACTER_VISUALS.player.model3d ? 'preparing-3d' : 'fallback-2d'
+    const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
-      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬 상세 보기">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
         <div class="nameplate glass">
           <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
-          <div class="hpbar you"><div class="fill"></div></div>
-          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
+          <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
       </div>`
   }
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    el.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, s.playerHp)}/${s.playerMax}`
-    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width =
-      `${Math.max(0, (s.playerHp / s.playerMax) * 100)}%`
-    // 보호막은 체력을 기준으로 읽는다 — 최대 체력만큼 쌓이면 꽉 찬다.
-    // 숫자만 있던 칩보다 "얼마나 버틸 수 있나"가 체력 바와 같은 축에서 바로 보인다.
-    this.paintShield(el.querySelector<HTMLElement>('.shieldbar')!, s.guard, s.playerMax)
+    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
+      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
+    // 실드(방어)는 리그 오브 레전드처럼 초록 체력을 덮지 않고, 그 뒤에 파란 막으로
+    // 이어 붙는다. 실드가 붙는 만큼 바의 전체 척도를 (최대체력 + 실드)로 늘려 초록은
+    // 그대로 초록으로 두고 추가분만 파랗게 표기한다.
+    const hp = Math.max(0, s.playerHp)
+    const guard = Math.max(0, s.guard)
+    const total = Math.max(1, s.playerMax + guard)
+    const hpPct = hp / total
+    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width = `${hpPct * 100}%`
+    const shield = el.querySelector<HTMLElement>('.hpbar.you > .shield')!
+    shield.style.left = `${hpPct * 100}%`
+    shield.style.width = `${(guard / total) * 100}%`
+    shield.classList.toggle('on', guard > 0)
   }
 
-  /** 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
+  /** 적 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
   private paintShield(bar: HTMLElement, value: number, max: number) {
     const on = value > 0
     bar.hidden = !on
@@ -655,10 +690,13 @@ export class BattleView {
             <span class="hpn"></span>
           </div>
           <div class="hp-row">
-            <div class="hpbar foe"><div class="fill"></div></div>
+            <div class="hpbar foe">
+              <div class="fill"></div>
+              <div class="boss-hp-segments" hidden></div>
+              <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
+            </div>
           </div>
           <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
-          <div class="magicbar" hidden></div>
           <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -673,8 +711,8 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
-    el.style.bottom = '26px'
+    el.style.right = this.isBoss && e.def.boss ? '17%' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
+    el.style.bottom = this.isBoss && e.def.boss ? '82px' : '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
@@ -689,24 +727,37 @@ export class BattleView {
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
     plate.classList.remove('gone')
-    plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
-    plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    const remainingBars = Math.ceil(Math.max(0, e.hp) / e.hpPerBar)
+    plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
+      ? `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`
+      : `${Math.max(0, e.hp)}/${e.maxHp}`
+    const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
+    hpbar.querySelector<HTMLElement>(':scope > .fill')!.style.width =
+      `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    hpbar.setAttribute('aria-label', e.healthBars > 1
+      ? `보스 체력 ${remainingBars}막 남음, 전체 ${e.healthBars}막`
+      : `체력 ${Math.max(0, e.hp)} / ${e.maxHp}`)
+    const segments = hpbar.querySelector<HTMLElement>('.boss-hp-segments')!
+    segments.hidden = e.healthBars <= 1
+    if (!segments.hidden) {
+      segments.style.gridTemplateColumns = `repeat(${e.healthBars}, 1fr)`
+      segments.innerHTML = Array.from({ length: e.healthBars }, (_, i) =>
+        `<i${i === e.healthBars - 1 ? ' class="last"' : ''}></i>`,
+      ).join('')
+    }
+    const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
+    spellshield.hidden = e.magicShield <= 0
+    spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
     // 방어막은 남은 양을 게이지로 — 깎이는 게 보여야 "한 대 더 치면 뚫린다"가 읽힌다.
     this.paintShield(plate.querySelector<HTMLElement>('.shieldbar')!, e.guard, e.def.guard ?? e.guard)
-    // 매직실드는 양이 아니라 "몇 대를 지우나"라서 칸으로 센다.
-    const magic = plate.querySelector<HTMLElement>('.magicbar')!
-    magic.hidden = e.magicShield <= 0
-    if (!magic.hidden) {
-      const max = Math.max(e.magicShield, e.def.magicShield ?? e.magicShield)
-      magic.innerHTML =
-        `<span class="mlabel">✧</span>` +
-        Array.from({ length: max }, (_, i) => `<i class="${i < e.magicShield ? 'on' : ''}"></i>`).join('')
-    }
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
-    traits.innerHTML = weak
-      ? `<span class="trait weak ${weak}">${EMOTION_ICON[weak]} ${EMOTION_LABEL[weak]} 약점 ×1.25</span>`
-      : ''
+    traits.innerHTML = [
+      weak ? `<span class="trait weak emotion-${weak}">${emotionBadgeContent(weak)}<strong>약점</strong></span>` : '',
+      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
+      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
+      e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
+    ].join('')
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
@@ -776,6 +827,9 @@ export class BattleView {
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
             ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
+            ...(enemy.def.weakEmotion
+              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
+              : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
@@ -839,6 +893,8 @@ export class BattleView {
       }
     }
     host.innerHTML = words + extra
+    host.classList.toggle('has-sentence', anyPicked)
+    host.classList.toggle('sentence-ready', this.complete())
     this.renderMultNow(anyPicked)
   }
 
@@ -849,14 +905,9 @@ export class BattleView {
     if (!anyPicked) {
       host.innerHTML = ''
       host.className = 'mult-now'
-      host.style.removeProperty('--mult-left')
       this.multReelToken++
       return
     }
-    // 선택 단어가 늘어날 때마다 체인의 실제 오른쪽 끝을 따라가 겹치지 않게 이동한다.
-    const chain = this.q('#chain')
-    const chainRight = this.root.offsetWidth / 2 + chain.offsetWidth / 2
-    host.style.setProperty('--mult-left', `${Math.min(1400, chainRight + 24)}px`)
     const intent = compile(this.sel, this.t, this.player.stats, this.mods())
     const mult = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     // 정산판과 같은 출처(컴파일러가 쌓아 둔 깡수치)를 쓴다 — 방어·회복 문장도 0이 되지 않는다.
@@ -872,24 +923,35 @@ export class BattleView {
     void this.spinMult(host.querySelector<HTMLElement>('.mn-mult')!, mult, host)
   }
 
-  // 숫자 릴 — 무작위 값이 몇 번 튀다가 실제 값에 멈추고 팅! 하며 발광한다.
+  // 숫자 릴 — 계단식 난수 대신 이전 값에서 목표 값까지 부드럽게 롤업한다.
   private async spinMult(el: HTMLElement, target: number, host: HTMLElement) {
     const token = ++this.multReelToken
     host.classList.add('spinning')
     host.classList.remove('landed', 'hot')
-    for (let i = 0; i < 5; i++) {
-      if (token !== this.multReelToken) return
-      const jitter = Math.max(0.2, target * (0.55 + Math.random() * 0.9))
-      el.textContent = jitter.toFixed(2)
-      await sleep(48)
-    }
+    const from = Number(el.textContent) || 1
+    await this.rollMultiplierValue(el, from, target, 360, () => token === this.multReelToken)
     if (token !== this.multReelToken) return
-    el.textContent = target.toFixed(2)
     host.classList.remove('spinning')
     host.classList.add('landed')
     // 배율이 크게 붙었으면 더 뜨겁게 빛난다.
     host.classList.toggle('hot', target >= 2)
     this.timers.push(window.setTimeout(() => host.classList.remove('landed'), 620))
+  }
+
+  /** 배율 숫자를 프레임 단위로 이어서 올려 칩 단위의 끊김을 줄인다. */
+  private rollMultiplierValue(el: HTMLElement, from: number, target: number, duration: number, isCurrent = () => true): Promise<void> {
+    return new Promise((resolve) => {
+      const started = performance.now()
+      const frame = (now: number) => {
+        if (!isCurrent()) return resolve()
+        const ratio = Math.min(1, (now - started) / duration)
+        const eased = 1 - Math.pow(1 - ratio, 3)
+        el.textContent = (from + (target - from) * eased).toFixed(2)
+        if (ratio < 1) requestAnimationFrame(frame)
+        else resolve()
+      }
+      requestAnimationFrame(frame)
+    })
   }
 
   // 체인에 붙는 한 줄 설명 — 카드 상세·보상과 같은 표기 규칙(wordValueLines)을 쓴다.
@@ -954,6 +1016,7 @@ export class BattleView {
     // w.slot을 쓰면 지금 고르는 칸이 아니라 원래 칸을 가리킨다.
     const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
     const mood = this.moodOf(w)
+    const emotion = emotionOrNeutral(w.emotion)
     const values = this.wordOwnValues(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
@@ -964,9 +1027,9 @@ export class BattleView {
 
     // 일러스트가 있으면 패널 전체에 풀로 깔고, 글은 아래쪽 스크림 위에 얹는다.
     const art = w.art ? SKILL_ART[w.art] : undefined
-    detail.className = `info-dock glass word-detail mood-${mood}`
+    detail.className = `info-dock glass word-detail mood-${mood} emotion-${emotion}`
     detail.innerHTML = `
-      ${art ? `<div class="wd-art"><img src="${art}" alt="" /></div>` : ''}
+      ${art ? `<div class="wd-art"><img src="${art}" alt="" /><span class="wd-art-tint" aria-hidden="true"></span></div>` : ''}
       <div class="wd-scrim" aria-hidden="true"></div>
       <div class="wd-body">
         <div class="wd-name">${w.text}</div>
@@ -1126,12 +1189,13 @@ export class BattleView {
   }
 
   private openSettings() {
-    openSettingsModal(this.root)
+    openSettingsModal(this.root, { onResetAll: () => this.onResetAll?.() })
   }
 
   // ── 단어장(전체 덱) 오버레이 ──
   private deckPreviewHtml(w: Word): string {
     const mood = this.moodOf(w)
+    const emotion = emotionOrNeutral(w.emotion)
     const art = w.art ? SKILL_ART[w.art] : undefined
     const rarity = w.rarity ?? 'common'
     const level = w.level ?? 1
@@ -1140,13 +1204,13 @@ export class BattleView {
       ? `<div class="card-face card-front art">
           <img class="card-illus" src="${art}" alt="" aria-hidden="true">
           <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
-          ${badge}<strong class="card-title">${w.text}</strong><span class="card-note">${w.note}</span>
+          ${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><strong class="card-title" ${cardTitleStyle(w.text, true)}>${w.text}</strong><span class="card-note">${w.note}</span>
         </div>`
       : `<div class="card-face card-front">
-          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
-          <strong>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
+          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
+          <strong class="card-title" ${cardTitleStyle(w.text)}>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
         </div>`
-    return `<div class="deck-hover-card mood-${mood} rarity-${rarity}" aria-hidden="true">${face}</div>`
+    return `<div class="deck-hover-card mood-${mood} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${face}</div>`
   }
 
   // ── 도감 — 현재 단어장과 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
@@ -1174,11 +1238,11 @@ export class BattleView {
     const foundItems = itemCatalog.filter((item) => ownedItems.has(item.id)).length
 
     const ownedContent = `<div class="codex-page codex-owned-page" data-codex-page="owned">
-      <p class="codex-intro">이번 런에서 모은 단어다. 단어에 마우스를 올리면 카드 정보를 볼 수 있다.</p>
+      <p class="codex-intro">이번 런에서 모은 단어다. 단어를 고르면 옆에 카드 상세가 펼쳐진다.</p>
       <div class="deck-cols">
         ${slots.map((slot, index) => `<section class="deck-col">
           <div class="deck-col-h"><b>${index + 1}</b> ${slot.label}</div>
-          ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word mood-${this.moodOf(word)}" data-slot="${slot.key}" data-word="${word.id}">
+          ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word codex-selectable mood-${this.moodOf(word)}" data-detail-kind="word" data-slot="${slot.key}" data-word="${word.id}">
             <span class="dw">${word.text}</span><span class="dn">${word.note}</span>
           </div>`).join('')}
         </section>`).join('')}
@@ -1191,7 +1255,7 @@ export class BattleView {
         <div class="codex-grid">
           ${catalog.filter((word) => word.slot === slot).map((word) => {
             const discovered = owned.has(word.id)
-            return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered' : ' missing'}">
+            return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="word" data-word="${word.id}"` : ''}>
               <span class="codex-mark">${discovered ? '✦' : '?'}</span>
               <div><b>${discovered ? word.text : '미발견 카드'}</b><span>${discovered ? word.note : '보상에서 만나면 기록된다.'}</span></div>
             </article>`
@@ -1206,7 +1270,7 @@ export class BattleView {
         ${enemyCatalog.map((enemy) => {
           const discovered = encountered.has(enemy.id)
           const sprite = SPRITES[enemy.sprite]
-          return `<article class="codex-portrait-entry${discovered ? ' discovered' : ' missing'}">
+          return `<article class="codex-portrait-entry${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="enemy" data-enemy="${enemy.id}"` : ''}>
             <div class="codex-portrait-art">${discovered && sprite ? `<img src="${sprite}" alt="">` : '<span>?</span>'}</div>
             <div><b>${discovered ? enemy.name : '미발견 벌레'}</b><span>${discovered ? enemy.note : '전장에서 만나면 기록된다.'}</span></div>
             <dl><div><dt>체력</dt><dd>${discovered ? enemy.hp : '—'}</dd></div><div><dt>공격</dt><dd>${discovered ? enemy.atk : '—'}</dd></div><div><dt>행동</dt><dd>${discovered ? `${enemy.every}턴` : '—'}</dd></div></dl>
@@ -1220,7 +1284,7 @@ export class BattleView {
       <div class="codex-item-grid">
         ${itemCatalog.map((item) => {
           const discovered = ownedItems.has(item.id)
-          return `<article class="codex-item-entry rarity-${item.rarity}${discovered ? ' discovered' : ' missing'}">
+          return `<article class="codex-item-entry rarity-${item.rarity}${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="item" data-item="${item.id}"` : ''}>
             <div class="codex-item-art">${discovered ? itemArt(item.art) : '<span>?</span>'}</div>
             <div><b>${discovered ? item.name : '미발견 아이템'}</b><em>${discovered ? RARITY_LABEL[item.rarity] : '기록 없음'}</em><span>${discovered ? item.flavor : '보상에서 만나면 기록된다.'}</span></div>
           </article>`
@@ -1248,43 +1312,118 @@ export class BattleView {
             ${enemyContent}
             ${itemContent}
           </div>
+          <aside class="codex-detail" id="codex-detail" aria-live="polite"></aside>
         </div>
-      </section>
-      <div id="deck-card-preview"></div>`
+      </section>`
     host.classList.add('open')
     const close = () => this.closeOverlay()
     host.querySelector('#ov-x')!.addEventListener('click', close)
     host.querySelector('.ov-backdrop')!.addEventListener('click', close)
     const count = host.querySelector<HTMLElement>('.codex-current-count')!
+    const panel = host.querySelector<HTMLElement>('.codex-panel')!
+    const detail = host.querySelector<HTMLElement>('#codex-detail')!
+    let selected: HTMLElement | null = null
+
+    // 상세를 닫으면 창을 원래 폭으로 되돌린다.
+    const closeDetail = () => {
+      panel.classList.remove('detail-open')
+      selected?.classList.remove('selected')
+      selected = null
+      detail.innerHTML = ''
+    }
+    // 항목을 고르면 창이 좌우로 늘어나며 옆에 상세 카드가 열린다(같은 항목을 다시 누르면 닫힘).
+    const openDetail = (el: HTMLElement, body: string) => {
+      if (selected === el) { closeDetail(); return }
+      selected?.classList.remove('selected')
+      selected = el
+      el.classList.add('selected')
+      detail.innerHTML = `<button class="cdx-detail-close" type="button" aria-label="상세 닫기">${icon('close')}</button>${body}`
+      panel.classList.add('detail-open')
+      detail.querySelector('.cdx-detail-close')!.addEventListener('click', closeDetail)
+      GameAudio.play('paper')
+    }
+
     host.querySelectorAll<HTMLButtonElement>('[data-codex-tab]').forEach((button) => {
       button.addEventListener('click', () => {
         const tab = button.dataset.codexTab!
         host.querySelectorAll('[data-codex-tab]').forEach((entry) => entry.classList.toggle('on', entry === button))
         host.querySelectorAll<HTMLElement>('[data-codex-page]').forEach((page) => { page.hidden = page.dataset.codexPage !== tab })
         count.textContent = button.dataset.count ?? ''
+        closeDetail() // 분류를 바꾸면 상세는 접는다.
       })
     })
-    const preview = host.querySelector<HTMLElement>('#deck-card-preview')!
-    const movePreview = (event: MouseEvent) => {
-      const rect = this.root.getBoundingClientRect()
-      const scale = rect.width / this.root.offsetWidth || 1
-      const cardWidth = 158
-      const cardHeight = 218
-      const x = Math.min(this.root.offsetWidth - cardWidth - 18, Math.max(18, (event.clientX - rect.left) / scale + 20))
-      const y = Math.min(this.root.offsetHeight - cardHeight - 18, Math.max(18, (event.clientY - rect.top) / scale - cardHeight - 20))
-      preview.style.transform = `translate3d(${x}px, ${y}px, 0)`
-    }
-    host.querySelectorAll<HTMLElement>('.codex-owned-page .deck-word').forEach((row) => {
-      const word = (this.player.deck[row.dataset.slot!] ?? []).find((item) => item.id === row.dataset.word)
-      if (!word) return
-      row.addEventListener('mouseenter', (event) => {
-        preview.innerHTML = this.deckPreviewHtml(word)
-        preview.classList.add('show')
-        movePreview(event)
+
+    host.querySelectorAll<HTMLElement>('.codex-selectable').forEach((el) => {
+      el.addEventListener('click', () => {
+        const kind = el.dataset.detailKind
+        if (kind === 'word') {
+          const id = el.dataset.word!
+          const word = (this.player.deck[el.dataset.slot ?? ''] ?? []).find((w) => w.id === id)
+            ?? catalog.find((w) => w.id === id)
+          if (word) openDetail(el, this.codexWordDetailHtml(word, el.dataset.slot ?? word.slot, slotLabel))
+        } else if (kind === 'enemy') {
+          const enemy = enemyCatalog.find((e) => e.id === el.dataset.enemy)
+          if (enemy) openDetail(el, this.codexEnemyDetailHtml(enemy))
+        } else if (kind === 'item') {
+          const item = itemCatalog.find((i) => i.id === el.dataset.item)
+          if (item) openDetail(el, this.codexItemDetailHtml(item))
+        }
       })
-      row.addEventListener('mousemove', movePreview)
-      row.addEventListener('mouseleave', () => preview.classList.remove('show'))
     })
+  }
+
+  // ── 도감 상세 카드 — 전투 중 호버 상세와 같은 표기(wd-name·character-dock·id-stats)를 재활용한다. ──
+  private codexWordDetailHtml(w: Word, slotKey: string, slotLabel: Record<string, string>): string {
+    const values = this.wordOwnValues(w)
+    const rarity = w.rarity ?? 'common'
+    const level = w.level ?? 1
+    const label = slotLabel[slotKey] ?? slotKey
+    return `<div class="cdx-detail-card cdx-word mood-${this.moodOf(w)} rarity-${rarity}">
+      <div class="cdx-detail-kicker">WORD CARD</div>
+      <div class="cdx-cardstage">${this.deckPreviewHtml(w)}</div>
+      <div class="cdx-detail-copy">
+        <div class="wd-name">${w.text}</div>
+        <div class="wd-grade">✦ ${label} · ${RARITY_LABEL[rarity]}${level > 1 ? ` · Lv.${level}` : ''}</div>
+        ${values.length ? `<div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>` : ''}
+        <p class="wd-flavor">${w.note}</p>
+      </div>
+    </div>`
+  }
+
+  private codexEnemyDetailHtml(enemy: (typeof ENEMIES)[keyof typeof ENEMIES]): string {
+    const sprite = SPRITES[enemy.sprite]
+    return `<article class="cdx-detail-card cdx-character" aria-label="${enemy.name} 상세 정보">
+      <div class="character-portrait">${sprite ? `<img src="${sprite}" alt="${enemy.name}">` : '<span>?</span>'}</div>
+      <div class="character-copy">
+        <div class="character-kicker">ENEMY DETAIL</div>
+        <h2>${enemy.name}</h2>
+        <div class="character-stats">
+          <div><span>체력</span><b>${enemy.hp}</b></div>
+          <div><span>공격</span><b>${enemy.atk}</b></div>
+          <div><span>행동 주기</span><b>${enemy.every}턴</b></div>
+        </div>
+        <div class="character-note">${enemy.note}</div>
+      </div>
+    </article>`
+  }
+
+  private codexItemDetailHtml(item: (typeof ALL_ITEMS)[keyof typeof ALL_ITEMS]): string {
+    const rows = STAT_ORDER.filter((k) => item.base[k])
+      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.base[k]}</span></div>`)
+      .join('')
+    const p = item.passive ? PASSIVES[item.passive] : null
+    const passive = p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''
+    return `<div class="cdx-detail-card cdx-item${p ? ' is-passive' : ''}">
+      <div class="cdx-detail-kicker">ITEM DETAIL</div>
+      <div class="id-art">${itemArt(item.art)}</div>
+      <div class="cdx-detail-copy">
+        <div class="wd-name">${item.name}</div>
+        <div class="wd-grade">✦ ${RARITY_LABEL[item.rarity]}</div>
+        ${passive}
+        ${rows ? `<div class="id-stats">${rows}</div>` : ''}
+        <p class="wd-flavor">${item.flavor}</p>
+      </div>
+    </div>`
   }
 
   private closeOverlay() {
@@ -1294,6 +1433,8 @@ export class BattleView {
   }
 
   private pick(id: string) {
+    // CardHand 외부의 개발 입력이나 지연된 confirm도 정산 잠금 뒤에는 선택을 바꾸지 못한다.
+    if (this.busy || this.over) return
     const key = this.order()[this.slotIndex]
     const debugKey = `${key}:${id}`
     const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
@@ -1311,7 +1452,7 @@ export class BattleView {
     GameAudio.play('pencil')
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
-    if (this.complete() && !this.busy && !this.over) {
+    if (this.complete()) {
       GameAudio.play('sentenceComplete')
       void this.autoComplete()
     }
@@ -1322,6 +1463,11 @@ export class BattleView {
   }
 
   private async autoComplete() {
+    // 마지막 카드 확정 직후 잠근다. 반짝임을 기다린 뒤 execute에서 잠그면 그 사이
+    // 광클이 두 번째 카드 적용 연출을 시작할 수 있다.
+    if (!this.complete() || this.busy || this.over) return
+    this.busy = true
+    this.q('.word-zone').classList.add('is-resolving')
     const rail = this.q('#chain')
     rail.classList.add('sparkle')
     await sleep(300)
@@ -1337,8 +1483,11 @@ export class BattleView {
     if (!dealsDamage && !heals) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind: 'dmg' }
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
+    const resonanceEmotion = this.resonantEmotion(intent.emotions)
     const cls = (p: { source: string; value: number }) =>
-      p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
+      p.source === 'emotion' && resonanceEmotion
+        ? `resonance emotion-${resonanceEmotion}`
+        : p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
     // 동사가 둘이면 한 문장이 피해와 회복을 동시에 만든다 — 집계판은 자기 풀만 더한다.
     // (안 그러면 방어 깡수치가 피해 총합에 섞여 화면 숫자와 실제 피해가 어긋난다.)
     const lane = dealsDamage ? 'damage' : 'heal'
@@ -1374,32 +1523,52 @@ export class BattleView {
         <div class="tally-x">×</div>
         <div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div>
       </div>
-      <div class="tally-feed"></div>
+      <div class="tally-feed tally-flat-feed"></div>
+      <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
+      <div class="tally-feed tally-mult-feed"></div>
       <div class="tally-total"></div>`
     this.q('#pbox').appendChild(el)
     requestAnimationFrame(() => el.classList.add('in'))
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
-    const feed = el.querySelector<HTMLElement>('.tally-feed')!
+    const flatFeed = el.querySelector<HTMLElement>('.tally-flat-feed')!
+    const multFeed = el.querySelector<HTMLElement>('.tally-mult-feed')!
     await sleep(200)
 
     let base = 0
     for (const f of tally.flats) {
       base += f.value
       baseBox.querySelector('b')!.textContent = String(base)
-      this.tallyChip(feed, `${f.label} +${f.value}`, f.cls)
+      this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
       this.bump(baseBox)
       await sleep(165)
     }
     let mult = 1
+    const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
+    const multStarted = performance.now()
+    if (hasRisingMultiplier) {
+      el.classList.add('mult-rising')
+      GameAudio.playMultiplierRise()
+    }
+    multBox.classList.add('rolling')
     for (const [i, m] of tally.mults.entries()) {
-      mult *= m.value
-      multBox.querySelector('b')!.textContent = mult.toFixed(2)
-      this.tallyChip(feed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
+      const nextMult = mult * m.value
+      this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
       // 배율이 겹칠수록 판이 뜨거워진다.
       el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
+      await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 330)
+      mult = nextMult
       this.bump(multBox)
-      await sleep(185)
+      await sleep(36)
+    }
+    multBox.classList.remove('rolling')
+    if (hasRisingMultiplier) {
+      const remainingSoundMs = Math.max(0, 930 - (performance.now() - multStarted))
+      if (remainingSoundMs) await sleep(remainingSoundMs)
+      el.classList.remove('mult-rising')
+      el.classList.add('mult-settled')
+      await sleep(420)
+      el.classList.remove('mult-settled')
     }
 
     // 깡 × 배율이 다 모이면 잠깐 멈춰 읽을 시간을 준다 — 호버 중이면 더 기다리고, 클릭하면 즉시.
@@ -1508,6 +1677,31 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => el.remove(), 340))
   }
 
+  private resonantEmotion(emotions: readonly Emotion[]): Emotion | null {
+    return (['joy', 'anger', 'sorrow', 'pleasure'] as const).find(
+      (emotion) => emotions.filter((entry) => entry === emotion).length >= 2,
+    ) ?? null
+  }
+
+  /** 공명은 맥락 보너스와 섞지 않고, 감정색 배율을 먼저 읽히게 한다. */
+  private async showEmotionResonance(intent: Intent) {
+    const emotion = this.resonantEmotion(intent.emotions)
+    if (!emotion) return
+    const el = this.q('#resonance')
+    const count = intent.emotions.filter((entry) => entry === emotion).length
+    el.className = `resonance-flash emotion-${emotion}`
+    el.innerHTML = `
+      <div class="resonance-head">${emotionBadgeContent(emotion)}<span>공명</span></div>
+      <div class="resonance-value"><small>배율</small><b>×${intent.emotionResonance.toFixed(2)}</b></div>
+      <div class="resonance-note">같은 감정 ${count}장</div>`
+    el.classList.remove('show')
+    void el.offsetWidth
+    el.classList.add('show')
+    GameAudio.playResonance(intent.emotions)
+    await sleep(860)
+    el.classList.remove('show')
+  }
+
   private tallyChip(feed: HTMLElement, text: string, cls: string) {
     const chip = document.createElement('span')
     chip.className = `tally-chip ${cls}`
@@ -1533,10 +1727,8 @@ export class BattleView {
 
   // ── 발동: 팅팅팅(기여 수치) → 맥락 → 총합 롤업 → 돌진·사각 블라스트로 꽂힘 ──
   private async execute() {
-    if (!this.complete() || this.busy || this.over) return
-    this.busy = true
-    // 정산이 도는 동안 손패는 "이미 쓴" 상태로 흐려지고 입력을 받지 않는다(연타 방지).
-    this.q('.word-zone').classList.add('is-resolving')
+    // autoComplete가 마지막 선택 승인과 같은 호출 스택에서 정산 잠금을 선점한다.
+    if (!this.complete() || !this.busy || this.over) return
 
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
@@ -1566,7 +1758,7 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(150)
 
-    if (intent.emotionResonance > 1) GameAudio.playResonance(intent.emotions)
+    if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
 
     // 맥락(관용구) 발동 배너
     if (intent.combos.length) {
@@ -1578,7 +1770,8 @@ export class BattleView {
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await sleep(760)
+      await sleep(900)
+      el.classList.remove('show')
     }
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
@@ -1595,6 +1788,8 @@ export class BattleView {
     const prep = applyPreparation(this.state, intent, mult)
     if (prep.guardGain > 0) {
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
+      // 캐릭터의 실드 형성과 같은 프레임에 체력바도 차오르기 시작한다.
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       await this.rollTotal(prep.guardGain, 'guard')
       await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
@@ -1679,7 +1874,7 @@ export class BattleView {
       if (result) {
         for (const hit of result.hits) {
           const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
-          if (hit.magicShieldBroken) this.popAt(hit.target, '매직실드!', 'guard')
+          if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining)
           else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
@@ -1781,7 +1976,7 @@ export class BattleView {
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
     res: {
-      hits: { target: number; dmg: number }[]
+      hits: { target: number; dmg: number; magicShieldBroken: boolean; magicShieldRemaining: number }[]
       selfDmg: number
       heal: number
       killed: number[]
@@ -1804,12 +1999,24 @@ export class BattleView {
     }
 
     for (const h of res.hits) {
+      if (h.magicShieldBroken) {
+        await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
+        continue
+      }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
       if (el) {
         SquareBurst.playOn(el, 'damage', { spread: 120 })
         this.hitOne(el)
       }
       this.popAt(h.target, `${h.dmg}`, 'dmg big')
+    }
+    const hitTargets = res.hits
+      .filter((hit) => hit.dmg > 0)
+      .map((hit) => this.q<HTMLElement>(`#actors .actor.foe[data-i="${hit.target}"]`))
+      .filter((actor): actor is HTMLElement => !!actor)
+    if (hitTargets.length > 0) {
+      const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
+      await this.attackHitStop(you, stopMs)
     }
     if (attacking) {
       await sleep(250)
@@ -1837,6 +2044,42 @@ export class BattleView {
     if (fast) el.classList.add('fast')
     this.spawnSparks(el, 8 + combo * 5)
     await sleep(fast ? 190 : 560)
+  }
+
+  /** 매직실드가 공격을 삼킨 순간의 결정 균열. 마지막 겹은 체력바 밖으로 파편이 터진다. */
+  private async playSpellShieldImpact(target: number, remaining: number): Promise<void> {
+    const actor = this.q<HTMLElement>(`#actors .actor.foe[data-i="${target}"]`)
+    const hpbar = actor?.querySelector<HTMLElement>('.hpbar.foe')
+    const overlay = hpbar?.querySelector<HTMLElement>('.spellshield-overlay')
+    if (!actor || !hpbar || !overlay) return
+
+    const removed = remaining <= 0
+    overlay.hidden = false
+    overlay.querySelector<HTMLElement>('b')!.textContent = remaining > 1 ? `×${remaining}` : ''
+    overlay.classList.remove('cracking', 'shattering')
+    void overlay.offsetWidth
+    overlay.classList.add(removed ? 'shattering' : 'cracking')
+    this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard')
+    if (removed) this.spawnCrystalShards(hpbar)
+    await sleep(removed ? 360 : 180)
+  }
+
+  private spawnCrystalShards(hpbar: HTMLElement) {
+    const host = this.q('#pbox')
+    const screenRect = hpbar.getBoundingClientRect()
+    const rect = this.toStage(screenRect)
+    for (let i = 0; i < 14; i++) {
+      const shard = document.createElement('i')
+      shard.className = 'spellshield-shard'
+      shard.style.left = `${rect.x + Math.random() * screenRect.width}px`
+      shard.style.top = `${rect.y + screenRect.height * 0.5}px`
+      shard.style.setProperty('--shard-x', `${(Math.random() - 0.5) * 150}px`)
+      shard.style.setProperty('--shard-y', `${-25 - Math.random() * 90}px`)
+      shard.style.setProperty('--shard-r', `${(Math.random() - 0.5) * 240}deg`)
+      shard.style.setProperty('--shard-delay', `${Math.random() * 70}ms`)
+      host.appendChild(shard)
+      this.timers.push(window.setTimeout(() => shard.remove(), 720))
+    }
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.
@@ -2112,10 +2355,14 @@ export class BattleView {
       playCharacterAnimation(foe ?? null, 'attack')
       foe?.classList.add('lunge')
       await sleep(170)
+      // 적의 타격이 닿는 순간 실제 흡수 뒤 남은 방어막을 체력바에 반영한다.
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       if (st.dealt <= 0) {
         this.log(st.text)
         if (st.counterHit) {
-          if (st.counterHit.magicShieldBroken) this.popAt(st.counterHit.target, '매직실드!', 'guard')
+          if (st.counterHit.magicShieldBroken) {
+            await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining)
+          }
           else if (st.counterHit.dmg > 0) {
             this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
             if (foe) this.hitOne(foe)
@@ -2204,6 +2451,20 @@ export class BattleView {
     el.classList.remove('hit')
     void el.offsetWidth
     el.classList.add('hit')
+  }
+
+  /** 첫 타격 프레임에서 주인공의 공격 클립과 돌진만 붙들며, 관통 연쇄에는 적용하지 않는다. */
+  private async attackHitStop(actor: HTMLElement, durationMs: number) {
+    const animations = actor.getAnimations()
+      .filter((animation) => animation.playState === 'running')
+
+    freezeCharacterAnimation(actor, true)
+    animations.forEach((animation) => animation.pause())
+    await sleep(durationMs)
+    freezeCharacterAnimation(actor, false)
+    animations.forEach((animation) => {
+      if (animation.playState === 'paused') animation.play()
+    })
   }
   private log(html: string, _tally?: Tally) {
     const host = this.q('#log')

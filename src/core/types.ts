@@ -237,6 +237,8 @@ export interface EnemyDef {
   guard?: number
   /** 한 타격을 통째로 지우는 매직실드 횟수. */
   magicShield?: number
+  /** 플레이어의 일반 방어막을 소모시키지 않고 체력에 직접 피해를 준다. */
+  pierceGuard?: boolean
   weakEmotion?: Emotion
 }
 

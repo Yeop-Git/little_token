@@ -3,7 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고, 상단=종류 / 하단=메인 효과 / 자세히보기=우측 정보창.
  */
 
-import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
+import { EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -14,6 +14,7 @@ import { STAT_LABEL, type StatKey } from '@data/items'
 import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
 import { critText, multText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
+import { emotionBadgeContent } from '@/ui/EmotionBadge'
 
 interface Opts {
   day: number
@@ -64,14 +65,18 @@ function mainEffect(opt: RewardOption): string {
 function emotionBadge(opt: RewardOption): string {
   if (opt.kind !== 'word' || !opt.word) return ''
   const emotion = emotionOrNeutral(opt.word.emotion)
-  return `<span class="rp-emotion emotion-${emotion}" title="감정: ${EMOTION_LABEL[emotion]}">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>`
+  return `<span class="rp-emotion emotion-${emotion}" title="감정: ${EMOTION_LABEL[emotion]}">${emotionBadgeContent(emotion)}</span>`
 }
 
-// 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(SVG뿐인 아이템/보상단어) 색 그라디언트 + 아이콘.
+// 풀 카드 배경 — 일러스트가 있으면 꽉 채운다. 아직 그림이 없는 단어도 공용 아이콘을
+// 크게 띄우지 않고 단어 자체를 옅은 필기 워터마크로 써서 완성된 카드처럼 보이게 한다.
 function bgHtml(opt: RewardOption): string {
   const art =
     opt.kind === 'word' ? (opt.word?.art ? SKILL_ART[opt.word.art] : undefined) : ITEM_ART[opt.item!.art]
   if (art) return `<div class="rp-bg"><img src="${art}" alt="" /></div>`
+  if (opt.kind === 'word' && opt.word) {
+    return `<div class="rp-bg noart word-noart" aria-hidden="true"><span class="rp-word-mark">${opt.word.text}</span></div>`
+  }
   const icon = opt.kind === 'item' && opt.item ? itemArt(opt.item.art) : itemArt('word')
   return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`
 }
@@ -173,10 +178,13 @@ export class RewardView {
 
   private pickHtml(p: RewardOption, i: number): string {
     const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
+    const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
     const badge = p.reinforce ? '▲ RANK UP' : p.kind === 'item' ? '● ITEM' : '✦ NEW'
-    const cls = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
+    const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
+    const nameLength = [...p.name.replace(/\s/g, '')].length
+    const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
     return `
-      <div class="reward-pick ${mood} rarity-${p.rarity} ${cls}" data-i="${i}">
+      <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}">
         ${bgHtml(p)}
         <span class="rp-tint" aria-hidden="true"></span>
         <span class="rp-veil" aria-hidden="true"></span>

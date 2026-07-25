@@ -86,6 +86,15 @@ export function loadRun(): RunState | null {
 
     // 감정 속성 도입 전 저장된 카드도 현재 데이터 형식으로 올린다.
     let migrated = false
+    // 엔드리스 상태 도입 전 16일 이상 진행한 런은 이미 첫 이야기를 마친 것으로 본다.
+    if (typeof parsed.endless !== 'boolean') {
+      parsed.endless = parsed.day > 15
+      migrated = true
+    }
+    if (typeof parsed.endingSeen !== 'boolean') {
+      parsed.endingSeen = parsed.day > 15
+      migrated = true
+    }
     for (const words of Object.values(parsed.player.deck)) {
       for (const word of words) {
         const subjectEmotion = LEGACY_SUBJECT_EMOTIONS[word.id]
@@ -111,7 +120,7 @@ export function saveRun(run: RunState): void {
   }
 }
 
-// 새로하기와 패배는 진행 중인 런만 지운다. 튜토리얼 완료 기록은 유지한다.
+// 새로하기와 패배는 진행 중인 런만 지운다. 전체 기록 삭제는 설정에서 별도로 한다.
 export function hasSeenTutorial(): boolean {
   try {
     return localStorage.getItem(TUTORIAL_KEY) === '1'
@@ -128,10 +137,24 @@ export function markTutorialSeen(): void {
   }
 }
 
+function clearTutorialHistory(): void {
+  try {
+    localStorage.removeItem(TUTORIAL_KEY)
+  } catch {
+    // 저장소를 못 쓰는 환경에서는 완료 기록도 남아 있지 않다.
+  }
+}
+
 export function clearRun(): void {
   try {
     localStorage.removeItem(SAVE_KEY)
   } catch {
     // 저장소를 못 쓰는 환경이면 애초에 남은 런도 없다.
   }
+}
+
+/** 환경 설정은 유지하고 런과 튜토리얼 완료 여부 등 플레이 기록을 모두 지운다. */
+export function clearAllRecords(): void {
+  clearRun()
+  clearTutorialHistory()
 }

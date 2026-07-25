@@ -69,6 +69,8 @@ body {
   --hp-foe: #f07a52;
   --hp-foe-hi: #ffb08a;
   --shield: #ffd27a;
+  --shield-hp: #3f9bff;
+  --shield-hp-hi: #a9d8ff;
   --danger: #ff8a6a;
   --heal: #9fe27a;
   --self: #ffb15a;
@@ -504,14 +506,16 @@ button {
 /* 시네마틱으로 들어온 타이틀은 배경만 먼저 드러내고 제목·메뉴는 붙잡아 둔다.
    (.ready 규칙보다 뒤에 와야 이긴다 — 같은 특이도라 순서로 결정된다) */
 .title-reveal.ui-held .title-logo-wrap,
-.title-reveal.ui-held .title-menu {
+.title-reveal.ui-held .title-menu,
+.title-reveal.ui-held .tmenu-link {
   animation: none;
   opacity: 0;
 }
 /* 놓아줄 때 — 배경이 한 번 일렁이고(SVG 필터) 그 위로 제목·메뉴가 천천히 떠오른다. */
 .title-reveal.ui-in .title-logo-wrap { animation: logo-enter 2.1s ease-out both; }
 .title-reveal.ui-in .title-logo { animation: logo-breathe 4.6s ease-in-out 2.3s infinite; }
-.title-reveal.ui-in .title-menu { animation: menu-in 1.2s ease-out 0.8s both; }
+.title-reveal.ui-in .title-menu,
+.title-reveal.ui-in .tmenu-link { animation: menu-in 1.2s ease-out 0.8s both; }
 
 /* 걷히기 — 흐려짐 없이 불투명도만 빠진다. 마지막에 화면이 뿌예지면 아래 타이틀까지
    덩달아 흐려 보여서 '같은 그림이 포개진다'는 느낌이 오히려 죽는다.
@@ -554,7 +558,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .title-reveal { filter: none; transform: none; transition: opacity 0.4s ease; }
   .title-reveal.ready .title-logo-wrap { animation: none; opacity: 1; }
-  .title-reveal.ready .title-menu { animation: none; opacity: 1; }
+  .title-reveal.ready .title-menu,
+  .title-reveal.ready .tmenu-link { animation: none; opacity: 1; }
   .title-reveal.ready .title-logo,
   .title-glow,
   .title-vignette { animation: none; }
@@ -957,9 +962,70 @@ button {
 }
 .boss-ribbon span { font-size: 12px; font-weight: 900; letter-spacing: .2em; opacity: .78; }
 .boss-ribbon b { font-size: 21px; letter-spacing: .04em; text-shadow: 0 2px 0 rgba(48, 7, 13, .7); }
+
+/* 보스 진입 전환. 추후 컷신이 준비되면 data-entrance 값과 이 한 레이어만
+   컷신 호스트로 교체하고, 아래의 전용 대치 구도는 그대로 이어받는다. */
+.boss-entry-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  background: #09070d;
+  pointer-events: none;
+  animation: boss-stage-fade 1.25s cubic-bezier(.22, .72, .25, 1) forwards;
+}
+@keyframes boss-stage-fade {
+  0%, 18% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+.endless-ribbon {
+  position: absolute;
+  z-index: 21;
+  top: 72px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 18px;
+  color: #fff1c5;
+  background: rgba(41, 21, 55, .84);
+  border: 1px solid rgba(229, 184, 255, .52);
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .36), 0 0 18px rgba(185, 107, 255, .16);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
+.endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
 .actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.16)); }
 .actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
+
+/* 레퍼런스처럼 카메라를 프롬의 등 뒤로 낮추고, 보스를 맞은편 높은 축에 둔다. */
+.scene.battle[data-boss='true'] .actor.you {
+  left: 24%;
+  bottom: -18px;
+  z-index: 54;
+}
+.scene.battle[data-boss='true'] .actor.you .model-shell {
+  transform: scale(1.2);
+  transform-origin: center bottom;
+  filter: drop-shadow(0 22px 28px rgba(0, 0, 0, .4));
+}
+.scene.battle[data-boss='true'] .actor.you .nameplate {
+  transform: translate(-54%, -8px);
+}
+.scene.battle[data-boss='true'] .actor.foe.boss {
+  z-index: 38 !important;
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
+  width: 390px;
+  height: 430px;
+  transform: scale(1.08);
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
+  width: 330px;
+  margin-bottom: 4px;
+}
 
 /* 배우 */
 .actor {
@@ -1251,17 +1317,35 @@ button {
 .trait { padding: 2px 5px; border-radius: 7px; font-size: 10px; font-weight: 900; line-height: 1.2; background: rgba(10, 8, 16, .58); }
 .trait.guard { color: #8ee4f4; border: 1px solid rgba(142, 228, 244, .42); }
 .trait.magic { color: #d9aaff; border: 1px solid rgba(217, 170, 255, .48); }
-.trait.weak.joy { color: #ffd76b; }.trait.weak.sorrow { color: #8cc8ff; }.trait.weak.anger { color: #ff967a; }.trait.weak.pleasure { color: #c9f28a; }
+.trait.pierce { color: #ff9d81; border: 1px solid rgba(255, 157, 129, .5); }
+.trait.weak { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px 1px 2px; color: var(--emotion-color); border: 1px solid color-mix(in srgb, var(--emotion-color) 58%, transparent); box-shadow: 0 0 8px color-mix(in srgb, var(--emotion-color) 20%, transparent); }
+.trait.weak .emotion-face { width: 16px; height: 16px; }
+.trait.weak strong { color: #fff7e8; font-size: 10px; }
 .shield-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: var(--shield);
+  color: var(--shield-hp-hi);
   font-weight: 800;
-  text-shadow: 0 0 10px var(--glow);
+  text-shadow: 0 0 10px rgba(63, 155, 255, 0.85);
 }
 .hp-row { display: flex; align-items: center; gap: 7px; }
 .hp-row .hpbar { flex: 1; min-width: 0; }
+.boss-hp-segments {
+  position: absolute;
+  inset: 0;
+  /* 매직실드 결정막 위에서도 체력 막 경계가 계속 읽혀야 한다. */
+  z-index: 6;
+  display: grid;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.boss-hp-segments[hidden] { display: none; }
+.boss-hp-segments i {
+  border-right: 3px solid rgba(24, 12, 18, .82);
+  box-shadow: 1px 0 0 rgba(255, 242, 218, .62);
+}
+.boss-hp-segments i.last { border-right: 0; box-shadow: none; }
 /* 선공 적 — 이름표 위에 따로 떠 있는 붉은 발광 글씨 + 캐릭터의 붉은 맥동 발광.
    판때기(테두리·배경)는 두지 않는다. 이름표(유리판) 바깥 레이어라 뒷줄에서 이름표가
    흐려지거나 사라져도 경고는 그대로 읽힌다. 후공은 아무 표시도 없다. */
@@ -1394,25 +1478,60 @@ button {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-/* 매직실드 — 남은 '지울 타격 수'라 양이 아니라 칸으로 센다. */
-.magicbar {
+/* 매직실드 — 천상의 보호막처럼 캐릭터를 감싸는 황금막과 체력바 위 결정층을
+   같은 상태에서 켠다. 체력과 별개로 한 타격을 통째로 지운다는 점이 즉시 읽힌다. */
+.spellshield-overlay {
+  position: absolute;
+  inset: 1px;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 3px;
-  margin-top: 4px;
+  justify-content: flex-end;
+  gap: 2px;
+  padding-right: 7px;
+  overflow: hidden;
+  border-radius: 11px;
+  color: #fff9cc;
+  background:
+    linear-gradient(122deg, transparent 0 13%, rgba(255,255,255,.72) 14% 17%, transparent 18% 42%, rgba(255,248,174,.58) 43% 48%, transparent 49%),
+    linear-gradient(58deg, rgba(255,193,37,.84), rgba(255,242,128,.94) 38%, rgba(229,151,17,.9) 72%, rgba(255,224,88,.88));
+  box-shadow: inset 0 0 0 1px rgba(255,255,225,.92), inset 0 -5px 8px rgba(147,83,0,.3), 0 0 13px rgba(255,205,50,.72);
+  text-shadow: 0 1px 3px #7d4800, 0 0 7px #fff;
+  animation: spellshield-bar-shimmer 1.4s ease-in-out infinite alternate;
+  pointer-events: none;
 }
-.magicbar[hidden] { display: none; }
-.magicbar .mlabel { color: #d9aaff; font-size: 10px; font-weight: 900; }
-.magicbar i {
-  flex: 1;
-  height: 7px;
-  border-radius: 4px;
-  background: rgba(217, 170, 255, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(217, 170, 255, 0.4);
+.spellshield-overlay[hidden] { display: none; }
+.spellshield-overlay span { font-size: 12px; }
+.spellshield-overlay b { min-width: 9px; font-size: 9px; line-height: 1; }
+@keyframes spellshield-bar-shimmer {
+  to { filter: brightness(1.18) saturate(1.08); background-position: 18px 0, 0 0; }
 }
-.magicbar i.on {
-  background: linear-gradient(180deg, #f0dcff, #d9aaff);
-  box-shadow: 0 0 8px rgba(217, 170, 255, 0.75);
+.spellshield-overlay.cracking { animation: spellshield-bar-crack .18s ease-out; }
+.spellshield-overlay.shattering { animation: spellshield-bar-shatter .36s ease-out forwards; }
+@keyframes spellshield-bar-crack {
+  35% { filter: brightness(2.2); transform: scaleY(1.3); }
+  100% { filter: brightness(1); transform: none; }
+}
+@keyframes spellshield-bar-shatter {
+  0% { opacity: 1; filter: brightness(2.5); transform: scale(1.03); clip-path: inset(0); }
+  55% { opacity: .86; clip-path: polygon(0 0, 18% 12%, 31% 0, 46% 28%, 63% 3%, 78% 20%, 100% 0, 92% 100%, 69% 77%, 51% 100%, 28% 70%, 0 100%); }
+  100% { opacity: 0; filter: brightness(1.7); transform: scale(1.18); clip-path: polygon(8% 8%, 12% 18%, 30% 5%, 36% 26%, 68% 8%, 74% 28%, 96% 7%, 87% 84%, 65% 70%, 52% 94%, 34% 64%, 7% 90%); }
+}
+
+.spellshield-shard {
+  position: absolute;
+  z-index: 98;
+  width: 11px;
+  height: 17px;
+  clip-path: polygon(50% 0, 100% 28%, 70% 100%, 10% 74%, 0 25%);
+  background: linear-gradient(135deg, #fffbd0, #ffd43b 48%, #d98508);
+  box-shadow: 0 0 8px #ffe866, 0 0 16px rgba(255,172,20,.8);
+  pointer-events: none;
+  animation: spellshield-shard-fly .62s cubic-bezier(.15,.7,.28,1) var(--shard-delay, 0ms) forwards;
+}
+@keyframes spellshield-shard-fly {
+  from { opacity: 1; transform: translate(0,0) rotate(0) scale(1); }
+  to { opacity: 0; transform: translate(var(--shard-x), var(--shard-y)) rotate(var(--shard-r)) scale(.35); }
 }
 .hpbar > .fill::after {
   content: '';
@@ -1428,9 +1547,57 @@ button {
   background: linear-gradient(180deg, var(--hp-you-hi), var(--hp-you));
   box-shadow: 0 0 12px rgba(143, 214, 106, 0.6);
 }
+/* 방어막 — 리그 오브 레전드처럼 현재 체력 위에 얹혀 다 까이기 전까지 붙어 있는
+   파란 한 겹. 폭이 0이면 감춰지고, 값이 생기면 부드럽게 늘어난다. */
+.hpbar.you > .shield {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  /* 왼쪽은 초록 체력과 맞닿으므로 각지게, 오른쪽만 캡슐 끝처럼 둥글게 */
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(180deg, var(--shield-hp-hi), var(--shield-hp));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 0 12px rgba(63, 155, 255, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1), width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.25s ease;
+}
+.hpbar.you > .shield.on { opacity: 0.94; }
+/* 실드가 붙으면 초록 체력의 오른쪽 끝을 각지게 해 파란 실드와 이음새 없이 맞닿게 한다 */
+.hpbar.you:has(.shield.on) > .fill {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* 초록 체력과 파란 방어막의 경계를 또렷하게 나누는 왼쪽 밝은 모서리 */
+.hpbar.you > .shield::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(233, 246, 255, 0.9);
+  box-shadow: 0 0 8px rgba(150, 210, 255, 0.9);
+}
+/* 유리 표면 하이라이트 — .fill 과 같은 결로 이어 붙는다 */
+.hpbar.you > .shield::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.5);
+}
 .hpbar.foe > .fill {
-  background: linear-gradient(180deg, var(--hp-foe-hi), var(--hp-foe));
-  box-shadow: 0 0 12px rgba(240, 122, 82, 0.55);
+  background: linear-gradient(180deg, #ff8f8f, #ec4646);
+  box-shadow: 0 0 12px rgba(236, 70, 70, 0.55);
 }
 
 /* 데미지/힐 팝업 */
@@ -1554,6 +1721,33 @@ button {
   gap: 6px;
   max-width: 620px;
 }
+.tally-mult-feed { min-height: 0; }
+.tally-phase {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 0;
+  overflow: hidden;
+  color: #ffd27a;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  opacity: 0;
+  transition: height .2s ease, opacity .2s ease;
+}
+.tally-phase i { width: 56px; height: 1px; background: linear-gradient(90deg, transparent, currentColor); box-shadow: 0 0 10px currentColor; }
+.tally-phase i:last-child { transform: scaleX(-1); }
+.tally.mult-rising .tally-phase,
+.tally.mult-settled .tally-phase { height: 24px; opacity: 1; }
+.tally.mult-rising .tally-box.mult {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, #ffd27a 52%, transparent), 0 0 28px color-mix(in srgb, #ffb35c 38%, transparent), 0 12px 30px rgba(0, 0, 0, .28);
+}
+.tally.mult-rising .tally-box.mult b { animation: mult-reel-glow .42s ease-in-out infinite alternate; }
+.tally-box.mult.rolling b { font-variant-numeric: tabular-nums; }
+.tally.mult-rising .tally-mult-feed { min-height: 28px; }
+.tally.mult-settled .tally-box.mult { animation: mult-settle .42s cubic-bezier(.2, 1.35, .35, 1); }
+@keyframes mult-reel-glow { to { filter: brightness(1.25); transform: translateY(-2px); } }
+@keyframes mult-settle { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
 /* 배율 내역 — 타원 배경 없이 글자+그림자만으로 깔끔하게 */
 .tally-chip {
   padding: 1px 4px;
@@ -1570,6 +1764,11 @@ button {
 .tally-chip.heal { color: #c6f39a; }
 .tally-chip.stat { color: #9fd8ff; }
 .tally-chip.buff { color: #ffd27a; }
+.tally-chip.resonance { font-size: 18px; }
+.tally-chip.resonance.emotion-joy { color: #fdd355; }
+.tally-chip.resonance.emotion-anger { color: #ef4b33; }
+.tally-chip.resonance.emotion-sorrow { color: #88cdf2; }
+.tally-chip.resonance.emotion-pleasure { color: #b4cb4f; }
 .tally-chip.combo {
   color: #ffe6a8;
   font-size: 18px;
@@ -1687,17 +1886,27 @@ button {
   top: 74px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 1240px;
+  max-width: 1120px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
   z-index: 85;
   pointer-events: none;
   min-height: 64px;
-  padding: 10px 44px;
-  border-radius: 40px;
+  padding: 10px 34px;
+  border-radius: 24px;
+}
+.chain-rail.has-sentence {
+  background: linear-gradient(105deg, rgba(10, 7, 16, .82), rgba(26, 17, 25, .74) 52%, rgba(10, 7, 16, .82));
+  border: 1px solid rgba(255, 228, 168, .18);
+  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 14px 34px rgba(0, 0, 0, .28);
+}
+.chain-rail.sentence-ready {
+  background: linear-gradient(105deg, rgba(12, 8, 18, .93), rgba(58, 39, 31, .83) 52%, rgba(12, 8, 18, .93));
+  border-color: rgba(255, 220, 142, .42);
+  box-shadow: inset 0 1px rgba(255,255,255,.16), 0 0 28px rgba(255, 179, 79, .18), 0 14px 34px rgba(0, 0, 0, .34);
 }
 /* 어느 배경 위에서도 읽히도록 은은한 어둠 스크림.
    레일 박스에 직접 깔면 border-radius 경계에서 그림자가 뚝 잘려(카드 설명 칩 아래가
@@ -1725,7 +1934,7 @@ button {
   animation: chain-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .chain-word .cw-text {
-  font-size: 40px;
+  font-size: 36px;
   font-weight: 900;
   color: var(--gold-hi);
   /* 발광 + 뚜렷한 드롭 섀도로 상단 문구 강조 */
@@ -1734,7 +1943,7 @@ button {
 /* 단어 바로 밑 설명 — 이 단어가 무엇을 얼마나 주는지 */
 .chain-word .cw-note {
   font-style: normal;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.3px;
   white-space: nowrap;
@@ -1754,7 +1963,7 @@ button {
 /* 피노키오의 미아핑 — 문장 끝에 항상 붙는 "…근데?" */
 .chain-word.ctx.doubt .cw-text { color: #e7c6ff; }
 /* 맨 끝 맥락 칸 — 완벽한 맥락은 금빛, 어긋남은 붉게 */
-.chain-word.ctx .cw-text { font-size: 28px; }
+.chain-word.ctx .cw-text { font-size: 25px; }
 .chain-word.ctx.perfect .cw-text { color: #fff0c0; }
 .chain-word.ctx.broken .cw-text {
   color: #ff9a9a;
@@ -1841,6 +2050,43 @@ button {
   30% { transform: translate(-50%, -50%) scale(1) rotate(0); }
   78% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -54%) scale(1.02); }
+}
+
+/* 감정 공명은 맥락 보너스와 독립된, 감정색 배율 한 줄로 읽힌다. */
+.resonance-flash {
+  --resonance-color: var(--emotion-color, #ffd27a);
+  position: absolute;
+  /* 문장 체인 아래의 전용 레일: 중앙 정산판·배우와 같은 자리를 쓰지 않는다. */
+  top: 166px;
+  left: 50%;
+  z-index: 87;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px 16px;
+  border: 1px solid color-mix(in srgb, var(--resonance-color) 72%, transparent);
+  border-radius: 999px;
+  color: #fff7e8;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--resonance-color) 18%, rgba(10, 7, 16, .92)), rgba(10, 7, 16, .9));
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--resonance-color) 13%, transparent), 0 0 26px color-mix(in srgb, var(--resonance-color) 26%, transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+.resonance-flash.show { animation: resonance-show .86s ease forwards; }
+.resonance-head { display: inline-flex; align-items: center; gap: 6px; color: var(--resonance-color); font-size: 14px; font-weight: 900; letter-spacing: 1px; }
+.resonance-head .emotion-face { width: 21px; height: 21px; }
+.resonance-head > span:last-child { padding-left: 6px; border-left: 1px solid color-mix(in srgb, var(--resonance-color) 65%, transparent); }
+.resonance-value { display: flex; align-items: baseline; gap: 10px; }
+.resonance-value small { color: color-mix(in srgb, var(--resonance-color) 82%, #fff); font-size: 12px; font-weight: 800; }
+.resonance-value b { color: var(--resonance-color); font-size: 28px; line-height: 1; text-shadow: 0 0 18px color-mix(in srgb, var(--resonance-color) 74%, transparent); }
+.resonance-note { padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--resonance-color) 38%, transparent); color: #e3d8c8; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.scene.battle[data-boss='true'] .resonance-flash { top: 192px; }
+@keyframes resonance-show {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(.94); }
+  18%, 72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(1.01); }
 }
 
 .flash {
@@ -2111,13 +2357,12 @@ button {
   z-index: 1;
   width: 126px;
   margin-top: 5px;
-  overflow: hidden;
+  overflow: visible;
   color: #3c291e;
-  font-size: 24px;
+  font-size: var(--card-title-size, 24px);
   font-weight: 900;
   line-height: 1.16;
   text-align: center;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-note {
@@ -2159,7 +2404,7 @@ button {
 }
 .card-back b { font-family: Georgia, serif; font-size: 12px; letter-spacing: 3px; }
 
-/* 풀 일러스트 맥락카드 — 일러스트 전체 + kind 색감 틴트 + 발광·깊은그림자 글자 */
+/* 풀 일러스트 맥락카드 — 일러스트 전체 + 감정 BaseColor + 발광·깊은그림자 글자 */
 .card-front.art {
   padding: 0;
   background: #12101a;
@@ -2175,18 +2420,13 @@ button {
   object-fit: cover;
   object-position: 50% 20%;
 }
-/* 색감 쉐이더 — kind 색(--wglow)을 은은하게 입힌다 */
+/* 감정 BaseColor를 일러스트의 명암 위에 입혀 같은 감정의 카드를 한눈에 묶는다. */
 .card-tint {
   position: absolute;
   inset: 0;
-  mix-blend-mode: soft-light;
-  opacity: 0.9;
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--wglow) 72%, transparent),
-    transparent 52%,
-    color-mix(in srgb, var(--wglow) 48%, transparent)
-  );
+  background: var(--card-base-color, #c9c2b5);
+  mix-blend-mode: color;
+  opacity: .42;
 }
 /* 하단 어둠 + 안쪽 발광 테두리 — 글자 가독성 & 카드 발광 */
 .card-veil {
@@ -2207,7 +2447,7 @@ button {
   margin: 0;
   overflow: visible;
   color: #fff;
-  font-size: 27px;
+  font-size: var(--card-title-size, 27px);
   font-weight: 900;
   text-align: center;
   white-space: nowrap;
@@ -2248,8 +2488,19 @@ button {
     inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--wglow)) 55%, transparent),
     0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
-.card-emotion { position: absolute; top: 9px; left: 9px; z-index: 4; padding: 2px 6px; border-radius: 999px; color: #fff8e7; background: rgba(8, 6, 14, .7); font-size: 10px; font-weight: 900; }
-.word-card.emotion-joy { --emotion-color: #ffd76b; }.word-card.emotion-sorrow { --emotion-color: #8cc8ff; }.word-card.emotion-anger { --emotion-color: #ff967a; }.word-card.emotion-pleasure { --emotion-color: #c9f28a; }.word-card.emotion-neutral { --emotion-color: #c9c2b5; }
+.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 2px 7px 2px 3px; border-radius: 999px; color: #fff8e7; background: rgba(8, 6, 14, .74); font-size: 10px; font-weight: 900; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 10px color-mix(in srgb, var(--emotion-color) 28%, transparent); }
+.card-action { position: absolute; top: 8px; left: 50%; z-index: 4; display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid currentColor; border-radius: 9px; background: rgba(8, 6, 14, .78); box-shadow: 0 0 10px color-mix(in srgb, currentColor 42%, transparent), inset 0 0 8px color-mix(in srgb, currentColor 16%, transparent); transform: translateX(-50%); }
+.card-action svg { width: 18px; height: 18px; }
+.card-action.action-attack { color: #ff7966; }
+.card-action.action-guard { color: #7cc1ff; }
+.card-action.action-heal { color: #8bea76; }
+.emotion-face { display: block; width: 18px; height: 18px; flex: none; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .58)); }
+.emotion-symbol { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
+.emotion-joy { --emotion-color: #fdd355; --card-base-color: #fdd355; }
+.emotion-anger { --emotion-color: #ef4b33; --card-base-color: #ef4b33; }
+.emotion-sorrow { --emotion-color: #88cdf2; --card-base-color: #88cdf2; }
+.emotion-pleasure { --emotion-color: #b4cb4f; --card-base-color: #b4cb4f; }
+.emotion-neutral { --emotion-color: #c9c2b5; --card-base-color: #9b9184; }
 .word-card[class*='emotion-'] .card-face { box-shadow: 0 14px 28px rgba(0,0,0,.58), inset 0 0 0 2px var(--emotion-color), inset 0 0 0 4px color-mix(in srgb, var(--wglow) 48%, #6a5040); }
 
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
@@ -2732,10 +2983,19 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   z-index: 0;
 }
 .word-detail .wd-art img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center 22%;
+}
+.word-detail .wd-art-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--card-base-color, #9b9184);
+  mix-blend-mode: color;
+  opacity: .42;
+  pointer-events: none;
 }
 .word-detail .wd-scrim {
   position: absolute;
@@ -3169,6 +3429,23 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .graphics-options button b { font-size: 17px; }
 .graphics-options button span { margin-top: 2px; font-size: 12px; }
 .graphics-options button.on { color: #2b1e10; background: var(--gold); box-shadow: 0 0 18px rgba(255,207,118,.32); }
+.settings-reset-btn {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  color: #fff3d3;
+  background: rgba(255,255,255,.06);
+  box-shadow: inset 0 0 0 1px rgba(255,207,118,.28);
+  font-size: 16px;
+  font-weight: 900;
+}
+.settings-reset-btn:hover:not(:disabled) { color: #2b1e10; background: var(--gold); }
+.settings-reset-btn:disabled { color: var(--ink-faint); cursor: default; opacity: .7; }
+.settings-reset-btn.is-danger {
+  color: #2b120c;
+  background: var(--danger);
+  box-shadow: 0 0 18px rgba(255,138,106,.3);
+}
 
 .deck-panel { width: 1200px; }
 .deck-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
@@ -3181,18 +3458,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .deck-word .dn { font-size: 13px; color: var(--ink-faint); }
 .deck-word { cursor: default; transition: background .14s ease, transform .14s ease; }
 .deck-word:hover { background: rgba(255,255,255,.07); transform: translateX(3px); }
-#deck-card-preview {
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 8;
-  width: 158px;
-  height: 218px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease;
-}
-#deck-card-preview.show { opacity: 1; }
 .deck-hover-card {
   position: relative;
   width: 158px;
@@ -3202,10 +3467,12 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .deck-hover-card .card-face { transform: none; }
 
 /* 그림일기 도감 — 좌측 인덱스로 카드·적·아이템 기록을 전환한다. */
-.codex-panel { width: 1160px; height: min(820px, calc(100% - 90px)); display: flex; flex-direction: column; }
+.codex-panel { width: 1160px; height: min(820px, calc(100% - 90px)); display: flex; flex-direction: column; transition: width .36s cubic-bezier(.2, 1, .3, 1); }
+.codex-panel.detail-open { width: min(1540px, calc(100% - 40px)); }
 .codex-count { margin-left: 10px; color: var(--gold); font-size: 15px; letter-spacing: .08em; }
 .codex-current-count { margin-left: 10px; color: var(--gold); font-size: 15px; letter-spacing: .08em; }
 .codex-layout { min-height: 0; flex: 1; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 22px; }
+.codex-panel.detail-open .codex-layout { grid-template-columns: 190px minmax(0, 1fr) 372px; }
 .codex-index { display: flex; flex-direction: column; gap: 8px; padding-right: 17px; border-right: 1px solid rgba(255,224,166,.17); }
 .codex-index button {
   position: relative;
@@ -3274,6 +3541,63 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .codex-item-entry em { margin-top: 4px; color: var(--rarity-color); font-size: 11px; font-style: normal; font-weight: 900; }
 .codex-item-entry div > span { margin-top: 8px; color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
 .codex-portrait-entry.missing, .codex-item-entry.missing { opacity: .34; filter: grayscale(.8); }
+
+/* 도감 상세 — 항목을 고르면 창이 좌우로 늘어나고 옆 칸에 상세 카드가 펼쳐진다. */
+.codex-selectable { cursor: pointer; }
+.codex-entry.codex-selectable:hover, .codex-portrait-entry.codex-selectable:hover, .codex-item-entry.codex-selectable:hover { transform: translateY(-2px); }
+.codex-selectable { transition: transform .14s ease, box-shadow .14s ease; }
+.codex-selectable.selected {
+  box-shadow: inset 0 0 0 2px var(--gold-hi, #ffe6ae), 0 8px 22px rgba(0, 0, 0, .3), 0 0 20px rgba(255, 207, 118, .28);
+}
+.deck-word.codex-selectable.selected { background: linear-gradient(90deg, rgba(255, 207, 118, .18), transparent); transform: translateX(3px); }
+
+.codex-detail {
+  display: none;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 210, 122, .35) transparent;
+}
+.codex-panel.detail-open .codex-detail {
+  display: block;
+  position: relative;
+  padding-left: 22px;
+  border-left: 1px solid rgba(255, 224, 166, .17);
+  animation: cdx-detail-in .34s cubic-bezier(.2, 1, .3, 1);
+}
+@keyframes cdx-detail-in { from { opacity: 0; transform: translateX(20px); } }
+.cdx-detail-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  color: var(--ink-dim);
+  border-radius: 9px;
+}
+.cdx-detail-close svg { width: 100%; height: 100%; }
+.cdx-detail-close:hover { color: var(--gold); background: rgba(255, 255, 255, .06); }
+.cdx-detail-card { --wglow: var(--gold); display: flex; flex-direction: column; }
+.cdx-detail-kicker { color: var(--gold); font-size: 12px; font-weight: 900; letter-spacing: 3px; }
+
+/* 단어 상세 — 전투 카드 상세와 같은 wd-* 표기 + 큰 카드 페이스 */
+.cdx-word .cdx-cardstage { display: grid; place-items: center; padding: 16px 0 18px; }
+.cdx-word .cdx-cardstage .deck-hover-card { width: 176px; height: 243px; }
+.cdx-detail-copy .wd-name { font-size: 34px; }
+.cdx-detail-copy .wd-values { margin-top: 12px; }
+.cdx-detail-copy .wd-flavor { margin-top: 14px; line-height: 1.6; }
+
+/* 적 상세 — 전투 캐릭터 상세(character-dock)와 같은 초상+스탯 표기 */
+.cdx-character { padding: 0; }
+.cdx-character .character-portrait { height: 240px; border-radius: 18px; margin-top: 6px; }
+.cdx-character .character-portrait img { height: 220px; }
+.cdx-character .character-copy { padding: 16px 2px 6px; }
+
+/* 아이템 상세 — 전투 가방 상세(id-*)와 같은 규칙+스탯 표기 */
+.cdx-item.is-passive { --wglow: #ffd76a; }
+.cdx-item .id-art { margin: 14px auto 4px; align-self: center; order: -1; }
+.cdx-item .cdx-detail-copy { display: flex; flex-direction: column; }
 
 /* 관용구 채집통 */
 .harvest-panel { width: 920px; max-height: 760px; display: flex; flex-direction: column; }
@@ -3376,6 +3700,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   font-size: 13px;
 }
 .character-stats b { color: #fff2da; }
+.character-stats .enemy-weakness { display: inline-flex; align-items: center; gap: 4px; color: var(--emotion-color); }
+.character-stats .enemy-weakness .emotion-face { width: 18px; height: 18px; }
 .character-note {
   margin-top: 13px;
   padding-left: 11px;
@@ -3391,7 +3717,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 
 .reward-scene,
 .item-scene,
-.defeat-scene {
+.defeat-scene,
+.ending-scene {
   display: grid;
   place-items: center;
   background-size: cover;
@@ -3399,7 +3726,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .reward-scene::before,
 .item-scene::before,
-.defeat-scene::before {
+.defeat-scene::before,
+.ending-scene::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -3411,7 +3739,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 24px;
 }
 .defeat-scene::before {
   background: rgba(17, 13, 18, 0.72);
@@ -3458,9 +3786,54 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .defeat-new { color: #fff9e8; background: #a85145; box-shadow: 0 7px 0 #713a35, 0 11px 18px rgba(74, 35, 30, .28); }
 .defeat-title { color: #5f4538; background: rgba(255, 250, 229, .74); box-shadow: inset 0 0 0 2px rgba(105, 70, 51, .3); }
 
+/* 첫 15층 완주 엔딩 — 후속 원화가 들어와도 같은 컷 프레임을 유지한다. */
+.ending-scene { overflow: hidden; background-position: center; }
+.ending-scene::before {
+  background: radial-gradient(circle at 50% 44%, rgba(72, 55, 75, .18), rgba(6, 5, 11, .86) 76%);
+  backdrop-filter: blur(4px) saturate(.72);
+}
+.ending-vignette { position: absolute; inset: 0; box-shadow: inset 0 0 220px 70px rgba(0, 0, 0, .88); pointer-events: none; }
+.ending-cut {
+  position: relative;
+  z-index: 1;
+  width: 1360px;
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 550px 1fr;
+  align-items: center;
+  gap: 56px;
+}
+.ending-cut.is-entering { animation: ending-cut-in .72s cubic-bezier(.22, .86, .24, 1) both; }
+@keyframes ending-cut-in {
+  from { opacity: 0; transform: translateX(34px) scale(.985); filter: blur(7px); }
+  to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+}
+.ending-art { height: 650px; display: grid; place-items: end center; filter: drop-shadow(0 28px 34px rgba(0, 0, 0, .58)); }
+.ending-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.tone-spider .ending-art img { filter: grayscale(.78) brightness(.62); transform: rotate(-5deg) translateY(36px); }
+.tone-token .ending-art img { max-width: 430px; filter: drop-shadow(0 0 38px rgba(255, 220, 117, .5)); }
+.tone-from .ending-art img { filter: drop-shadow(0 0 34px rgba(135, 203, 255, .24)); }
+.ending-page {
+  position: relative;
+  padding: 62px 68px 58px;
+  color: #49372e;
+  background: repeating-linear-gradient(0deg, transparent 0 39px, rgba(103, 76, 55, .11) 39px 40px), #f3dfb9;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, .64), inset 0 0 0 3px rgba(111, 76, 51, .16);
+  transform: rotate(.7deg);
+}
+.ending-page::after { content: ''; position: absolute; inset: 15px; border: 1px dashed rgba(103, 69, 47, .3); pointer-events: none; }
+.ending-kicker { color: #a45248; font-size: 17px; font-weight: 900; letter-spacing: .22em; }
+.ending-page h1 { margin: 22px 0 24px; font-size: 52px; line-height: 1.15; color: #41302b; }
+.ending-page p { min-height: 126px; margin: 0 0 38px; font-size: 21px; font-weight: 700; line-height: 1.85; color: #70594b; }
+.ending-next { position: relative; z-index: 1; min-width: 240px; padding: 16px 26px; border-radius: 12px; color: #fff8e7; background: #9e4d43; box-shadow: 0 7px 0 #66362f, 0 12px 20px rgba(66, 35, 30, .25); font-size: 18px; font-weight: 900; }
+.ending-next:hover, .ending-next:focus-visible { transform: translateY(-3px); filter: brightness(1.08); }
+.ending-progress { position: absolute; z-index: 2; bottom: 52px; display: flex; gap: 12px; }
+.ending-progress i { width: 38px; height: 5px; border-radius: 9px; background: rgba(255, 243, 210, .25); }
+.ending-progress i.on { background: #ffe5a0; box-shadow: 0 0 16px rgba(255, 215, 119, .65); }
+
 .reward-card {
   position: relative;
-  width: 1000px;
+  width: 1080px;
   flex: none;
   padding: 40px 48px 46px;
   border-radius: 28px;
@@ -3488,8 +3861,14 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   color: var(--ink-dim);
 }
 .reward-field b { color: #fff2da; }
-.reward-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 22px;
+}
 .reward-pick {
+  min-width: 0;
   padding: 0;
   border-radius: 20px;
   background: var(--glass-strong);
@@ -3525,13 +3904,34 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   display: grid; place-items: center;
   background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--wglow, var(--gold)) 40%, #241d30), #130e1b 78%);
 }
+.rp-bg.word-noart {
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 13%, color-mix(in srgb, var(--wglow, var(--gold)) 28%, transparent) 13% 13.6%, transparent 13.6%),
+    repeating-linear-gradient(0deg, transparent 0 38px, rgba(255, 246, 226, .09) 38px 40px),
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--wglow, var(--gold)) 34%, #2a2431), #130e1b 82%);
+}
+.rp-word-mark {
+  width: 76%;
+  color: rgba(255, 248, 230, .24);
+  font-family: var(--font);
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1.18;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 24px color-mix(in srgb, var(--wglow, var(--gold)) 42%, transparent);
+  transform: translateY(-12px) rotate(-3deg);
+}
 .rp-bg.noart .rp-icon {
   width: 104px; height: 104px; color: #fff;
   filter: drop-shadow(0 0 18px var(--wglow, var(--gold))) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.7));
 }
 .rp-tint {
-  position: absolute; inset: 0; z-index: 1; mix-blend-mode: soft-light; opacity: 0.85;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--wglow) 72%, transparent), transparent 55%);
+  position: absolute; inset: 0; z-index: 1;
+  background: var(--card-base-color, var(--wglow));
+  mix-blend-mode: color;
+  opacity: .42;
 }
 .rp-veil {
   position: absolute; inset: 0; z-index: 1;
@@ -3541,12 +3941,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
     inset 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 40%, transparent);
 }
 .rp-foil { border-radius: 20px; }
-.rp-top { position: relative; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; }
+.rp-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 72px;
+  padding: 12px 14px;
+}
 .rp-type {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff;
   text-shadow: 0 0 12px var(--wglow, var(--gold)), 0 0 22px color-mix(in srgb, var(--wglow, var(--gold)) 68%, transparent), 0 2px 4px rgba(0, 0, 0, 0.96);
 }
 .rp-badge {
+  white-space: nowrap;
   font-size: 11px; font-weight: 900; letter-spacing: 1px; padding: 3px 9px; border-radius: 999px;
   color: #fff; background: rgba(8, 6, 14, 0.5);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 62%, transparent);
@@ -3556,10 +3968,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .rp-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 0 14px 14px; text-align: center; }
 .rp-name {
   font-size: 32px; font-weight: 900; color: #fff; line-height: 1.1;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-shadow: 0 0 12px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 78%, transparent), 0 2px 3px rgba(0, 0, 0, 0.98), 0 3px 12px rgba(0, 0, 0, 0.92);
 }
+.reward-pick.has-medium-name .rp-name { font-size: 28px; }
+.reward-pick.has-long-name .rp-name { font-size: 24px; line-height: 1.16; }
 .rp-effect {
-  margin-top: 3px; font-size: 15px; font-weight: 800; color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
 .rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
@@ -3689,10 +4115,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .dev-cheat {
   position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 650px;
-  height: 560px;
+  top: 24px;
+  left: 24px;
+  width: 920px;
+  height: 820px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3730,17 +4156,54 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px;
+  padding: 16px;
 }
-.dev-cheat-section + .dev-cheat-section { margin-top: 18px; }
-.dev-cheat-section h3 { margin: 0 0 8px 2px; color: rgba(243, 227, 194, .5); font-size: 11px; letter-spacing: .12em; }
-.dev-cheat-scenes {
+.dev-cheat-section h3 { margin: 0; color: #ffe9a8; font-size: 12px; letter-spacing: .12em; }
+.dev-cheat-section h4 { margin: 14px 0 7px; color: rgba(243, 227, 194, .52); font-size: 10px; letter-spacing: .08em; }
+.dev-cheat-section-heading {
+  min-height: 34px;
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dev-cheat-section-heading p { margin: 4px 0 0; color: rgba(243, 227, 194, .42); font-size: 10px; font-weight: 700; }
+.dev-cheat-section-heading strong {
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 8px;
+  color: #2b1e10;
+  background: var(--gold);
+  font-size: 11px;
+}
+.dev-cheat-navigation,
+.dev-cheat-card-section {
+  padding: 14px;
+  border: 1px solid rgba(255, 215, 106, .14);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+.dev-cheat-nav-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.dev-cheat-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(0, .84fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: 12px;
+}
+.dev-cheat-word-column { display: flex; flex-direction: column; gap: 12px; }
+.dev-cheat-scenes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 .dev-cheat-scenes button {
-  flex: 1;
-  padding: 9px 10px;
+  min-width: 0;
+  padding: 9px 6px;
   border-radius: 10px;
   color: rgba(243, 227, 194, .72);
   background: rgba(255,255,255,.06);
@@ -3748,14 +4211,69 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   font-weight: 800;
 }
 .dev-cheat-scenes button:hover, .dev-cheat-scenes button.on { color: #23190e; background: var(--gold); }
+.dev-cheat-stage-jump {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  gap: 6px;
+}
+.dev-cheat-stage-jump label {
+  min-width: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255, 215, 106, .2);
+  border-radius: 9px;
+  background: #211923;
+  overflow: hidden;
+}
+.dev-cheat-stage-jump label span { padding-left: 10px; color: rgba(243, 227, 194, .4); font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.dev-cheat-stage-jump input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  color: #fff1c8;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  outline: none;
+}
+.dev-cheat-stage-jump label:focus-within { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 215, 106, .13); }
+.dev-cheat-stage-jump > button {
+  border-radius: 9px;
+  color: #241a10;
+  background: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+}
+.dev-cheat-stage-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 6px; }
+.dev-cheat-stage-presets button {
+  min-width: 0;
+  padding: 5px 3px;
+  border: 1px solid rgba(255, 215, 106, .14);
+  border-radius: 7px;
+  color: rgba(243, 227, 194, .58);
+  background: rgba(255,255,255,.045);
+  font-size: 9px;
+  font-weight: 900;
+}
+.dev-cheat-stage-presets button:hover,
+.dev-cheat-stage-presets button.on { color: #ffe9a8; border-color: rgba(255, 215, 106, .42); background: rgba(255, 215, 106, .12); }
+.dev-cheat-bosses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
+.dev-cheat-bosses button { min-height: 34px; padding: 5px 7px; display: grid; gap: 1px; justify-items: start; border: 1px solid rgba(255, 139, 91, .32); border-radius: 8px; color: #ffe7bf; text-align: left; background: linear-gradient(135deg, rgba(126, 39, 39, .4), rgba(255, 159, 82, .12)); }
+.dev-cheat-bosses button:hover { border-color: rgba(255, 220, 134, .82); background: linear-gradient(135deg, rgba(175, 52, 43, .65), rgba(255, 173, 75, .26)); }
+.dev-cheat-bosses small { color: rgba(255, 225, 178, .65); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.dev-cheat-bosses b { font-size: 11px; }
 .dev-cheat-items {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
+.dev-cheat-items-normal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dev-cheat-item {
-  min-height: 58px;
-  padding: 8px 10px;
+  min-height: 48px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3766,7 +4284,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   background: rgba(255,255,255,.055);
 }
 .dev-cheat-item:hover { background: rgba(255,255,255,.12); border-color: rgba(255, 215, 106, .3); }
-.dev-cheat-item b { color: #f3e3c2; font-size: 13px; font-weight: 900; }
+.dev-cheat-item b { color: #f3e3c2; font-size: 12px; font-weight: 900; }
 .dev-cheat-item span { margin-top: 2px; color: rgba(243, 227, 194, .48); font-size: 10px; font-weight: 700; }
 .dev-cheat-item.passive { border-color: rgba(255, 215, 106, .28); background: rgba(255, 215, 106, .08); }
 .dev-cheat-item.passive b { color: #ffe9a8; }
@@ -3774,8 +4292,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-word-grant,
 .dev-cheat-card-spawn {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 6px;
 }
 .dev-cheat-word-grant select,
 .dev-cheat-word-grant button,
@@ -3808,10 +4326,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-card-spawn button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
 .dev-cheat-card-spawn button:disabled { opacity: .35; cursor: not-allowed; }
 .dev-cheat-result { min-height: 16px; margin: 6px 2px 0; color: rgba(243, 227, 194, .55); font-size: 10px; font-weight: 700; }
-.dev-cheat-run-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.dev-cheat-run-tools { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 9px; }
 .dev-cheat-run-tools button {
-  min-height: 42px;
-  padding: 8px;
+  min-height: 36px;
+  padding: 7px 10px;
   border: 1px solid rgba(255, 215, 106, .18);
   border-radius: 10px;
   color: #f3e3c2;
@@ -4358,9 +4876,15 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .rp-tags {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 184px;
   gap: 6px;
 }
 .rp-rarity {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1px;
@@ -4372,20 +4896,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-shadow: 0 0 9px color-mix(in srgb, var(--rarity-color, #d8c6a4) 70%, transparent);
 }
 .rp-emotion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .4px;
-  padding: 3px 8px;
+  padding: 2px 8px 2px 3px;
   border-radius: 999px;
   color: var(--emotion-color, #ece5d4);
   background: rgba(8, 6, 14, .62);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color, #d8c6a4) 72%, transparent), 0 0 9px color-mix(in srgb, var(--emotion-color, #d8c6a4) 30%, transparent);
   text-shadow: 0 1px 3px rgba(0, 0, 0, .92);
 }
-.rp-emotion.emotion-joy { --emotion-color: #ffd76b; }
-.rp-emotion.emotion-sorrow { --emotion-color: #8cc8ff; }
-.rp-emotion.emotion-anger { --emotion-color: #ff967a; }
-.rp-emotion.emotion-pleasure { --emotion-color: #c9f28a; }
+.rp-emotion .emotion-face { width: 20px; height: 20px; }
+.rp-emotion.emotion-joy { --emotion-color: #fdd355; }
+.rp-emotion.emotion-sorrow { --emotion-color: #88cdf2; }
+.rp-emotion.emotion-anger { --emotion-color: #ef4b33; }
+.rp-emotion.emotion-pleasure { --emotion-color: #b4cb4f; }
 .rp-emotion.emotion-neutral { --emotion-color: #c9c2b5; }
 
 /* ── 행운 감탄 — 보상등급에 비례해 팅! 하고 추가 스탯이 붙은 선택지 ── */
@@ -4424,8 +4952,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* ── 체인 아래 "지금 배율" — 카드를 고르는 즉시 삐리릭 돌다가 팅! 하고 확정 ── */
 .mult-now {
   position: absolute;
-  left: var(--mult-left, 62%);
-  top: 80px;
+  right: 52px;
+  top: 164px;
   z-index: 86;
   transform: none;
   display: flex;
@@ -4462,12 +4990,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 /* 삐리리릭 — 숫자가 튀는 동안은 살짝 흔들리고 흐릿하다 */
 .mult-now.spinning .mn-mult {
-  filter: blur(0.6px);
-  animation: mn-spin 0.1s linear infinite alternate;
-}
-@keyframes mn-spin {
-  from { transform: translateY(-1px) scale(0.98); }
-  to { transform: translateY(1px) scale(1.02); }
+  filter: brightness(1.12);
+  text-shadow: 0 0 24px rgba(255, 190, 90, .8), 0 4px 11px rgba(0, 0, 0, .36);
 }
 /* 팅! — 확정되는 순간 튀어오르며 발광 */
 .mult-now.landed .mn-mult { animation: mn-land 0.5s cubic-bezier(0.2, 1.6, 0.35, 1); }

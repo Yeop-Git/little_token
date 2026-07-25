@@ -11,6 +11,7 @@ import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
 import { CombatGuideView } from '@views/CombatGuideView'
 import { DefeatView } from '@views/DefeatView'
+import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
@@ -18,7 +19,7 @@ import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
 import { startGrade } from '@core/grade'
-import { clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
+import { clearAllRecords, clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
 import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -60,7 +61,7 @@ let run = newRun()
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
 void preloadBattleResources(run.player.deck, run.player.items)
 let current: { destroy?: () => void } | null = null
-type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'defeat'
+type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'ending' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
 
@@ -124,13 +125,35 @@ function defeatPlayer() {
   if (current instanceof BattleView) current.debugDefeat()
 }
 
+// 디버그 스테이지 이동 — 날짜만 바꾼 뒤 일반 전투 진입 경로를 다시 타게 해
+// 적 편성, 필드, 배율과 저장 상태가 서로 어긋나지 않게 한다.
+const DEBUG_BOSSES = [
+  { day: 5, name: '소금쟁이' },
+  { day: 10, name: '여왕벌' },
+  { day: 15, name: '장로거미' },
+] as const
+
+function jumpToStage(day: number) {
+  if (!Number.isFinite(day)) return
+  run.day = Math.max(1, Math.floor(day))
+  if (run.day > 15) {
+    run.endless = true
+    run.endingSeen = true
+  }
+  saveRun(run)
+  void goBattle()
+}
+
 // 좌상단 모서리를 다섯 번 누르면 열리는 개발용 치트 패널.
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
   const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
   const rewardWords = Object.values(REWARD_WORDS).flat()
   const spawnWords = spawnCardCatalog()
-  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
+  const normalItems = Object.values(ALL_ITEMS).filter((item) => !item.passive)
+  const ruleItems = Object.values(ALL_ITEMS).filter((item) => item.passive)
+  const stagePresets = [1, 5, 10, 15]
+  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄', ending: '엔딩' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
       <b>${def.name}</b><span>${def.passive ? '문장 규칙' : '스탯 아이템'}${owned.has(def.id) ? ' · 보유 중' : ''}</span>
@@ -141,43 +164,70 @@ function mountDevCheat(active: SceneName) {
     <section class="dev-cheat" aria-label="개발 치트" aria-hidden="true">
       <header><span>DEV CHEAT</span><b>${active.toUpperCase()}</b><button type="button" data-close aria-label="닫기">×</button></header>
       <div class="dev-cheat-body">
-        <section class="dev-cheat-section">
-          <h3>SCENE JUMP</h3>
-          <div class="dev-cheat-scenes">
-            ${(['title', 'intro', 'battle', 'reward', 'item'] as Exclude<SceneName, 'defeat'>[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
+        <section class="dev-cheat-section dev-cheat-navigation">
+          <div class="dev-cheat-section-heading">
+            <div><h3>NAVIGATION</h3><p>화면 또는 원하는 스테이지로 즉시 이동</p></div>
+            <strong>현재 ${run.day} 스테이지</strong>
+          </div>
+          <div class="dev-cheat-nav-grid">
+            <div>
+              <h4>화면 이동</h4>
+              <div class="dev-cheat-scenes">
+                ${(['title', 'intro', 'battle', 'reward', 'item', 'ending'] as Exclude<SceneName, 'defeat'>[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
+              </div>
+            </div>
+            <div>
+              <h4>스테이지 이동</h4>
+              <form class="dev-cheat-stage-jump" data-stage-jump>
+                <label><span>STAGE</span><input type="number" name="stage" min="1" step="1" value="${run.day}" aria-label="이동할 스테이지" required></label>
+                <button type="submit">전투로 이동</button>
+              </form>
+              <div class="dev-cheat-stage-presets" aria-label="추천 스테이지">
+                ${stagePresets.map((day) => `<button type="button" data-stage-preset="${day}"${day === run.day ? ' class="on"' : ''}>${day}${day % 5 === 0 ? ' · BOSS' : ''}</button>`).join('')}
+              </div>
+              <div class="dev-cheat-bosses" aria-label="보스 바로가기">
+                ${DEBUG_BOSSES.map((boss) => `<button type="button" data-boss-day="${boss.day}"><small>${boss.day} STAGE</small><b>${boss.name}</b></button>`).join('')}
+              </div>
+            </div>
           </div>
         </section>
-        <section class="dev-cheat-section">
-          <h3>ITEM GRANT</h3>
-          <div class="dev-cheat-items">${Object.values(ALL_ITEMS).map(itemButton).join('')}</div>
-        </section>
-        <section class="dev-cheat-section">
-          <h3>WORD CARD UNLOCK</h3>
-          <div class="dev-cheat-word-grant">
-            <select id="dev-word-select" aria-label="해금할 단어 카드">
-              ${rewardWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}${ownedWords.has(word.id) ? ' · 보유 중(강화)' : ''}</option>`).join('')}
-            </select>
-            <button type="button" data-word-grant>바로 해금</button>
+        <div class="dev-cheat-content-grid">
+          <section class="dev-cheat-section dev-cheat-card-section">
+            <div class="dev-cheat-section-heading"><div><h3>ITEM GRANT</h3><p>클릭 즉시 획득</p></div></div>
+            <h4>스탯 아이템</h4>
+            <div class="dev-cheat-items dev-cheat-items-normal">${normalItems.map(itemButton).join('')}</div>
+            <h4>문장 규칙 아이템</h4>
+            <div class="dev-cheat-items">${ruleItems.map(itemButton).join('')}</div>
+          </section>
+          <div class="dev-cheat-word-column">
+            <section class="dev-cheat-section dev-cheat-card-section">
+              <div class="dev-cheat-section-heading"><div><h3>WORD CARD</h3><p>단어장 등록 또는 현재 손패 생성</p></div></div>
+              <h4>단어장에 등록</h4>
+              <div class="dev-cheat-word-grant">
+                <select id="dev-word-select" aria-label="해금할 단어 카드">
+                  ${rewardWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}${ownedWords.has(word.id) ? ' · 보유 중(강화)' : ''}</option>`).join('')}
+                </select>
+                <button type="button" data-word-grant>등록</button>
+              </div>
+              <h4>현재 손패에 생성</h4>
+              <div class="dev-cheat-card-spawn">
+                <select id="dev-card-spawn-select" aria-label="손패에 생성할 단어 카드">
+                  ${spawnWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}</option>`).join('')}
+                </select>
+                <button type="button" data-card-spawn${active === 'battle' ? '' : ' disabled'}>생성</button>
+              </div>
+              <p class="dev-cheat-result" data-card-spawn-result aria-live="polite">전투 중 현재 슬롯과 같은 종류만 생성할 수 있습니다.</p>
+            </section>
+            <section class="dev-cheat-section dev-cheat-card-section">
+              <div class="dev-cheat-section-heading"><div><h3>RUN TOOLS</h3><p>런 상태 일괄 조작</p></div></div>
+              <div class="dev-cheat-run-tools">
+                <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망</button>
+                <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
+                <button type="button" data-run-tool="reinforce-all">보유 카드 강화</button>
+              </div>
+            </section>
           </div>
-        </section>
-        <section class="dev-cheat-section">
-          <h3>WORD CARD SPAWN</h3>
-          <div class="dev-cheat-card-spawn">
-            <select id="dev-card-spawn-select" aria-label="손패에 생성할 단어 카드">
-              ${spawnWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}</option>`).join('')}
-            </select>
-            <button type="button" data-card-spawn${active === 'battle' ? '' : ' disabled'}>손패에 생성</button>
-          </div>
-          <p class="dev-cheat-result" data-card-spawn-result aria-live="polite">전투 중 현재 슬롯과 같은 종류의 카드를 즉시 생성합니다.</p>
-        </section>
-        <section class="dev-cheat-section">
-          <h3>RUN TOOLS</h3>
-          <div class="dev-cheat-run-tools">
-            <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망시키기</button>
-            <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
-            <button type="button" data-run-tool="reinforce-all">모든 카드 강화하기</button>
-          </div>
-        </section>
+        </div>
       </div>
     </section>`
 
@@ -195,7 +245,8 @@ function mountDevCheat(active: SceneName) {
     else if (scene === 'intro') goBattle(true)
     else if (scene === 'battle') goBattle()
     else if (scene === 'reward') goReward()
-    else goItem(ITEMS.candle)
+    else if (scene === 'item') goItem(ITEMS.candle)
+    else goEnding(startGrade(run.player.stats.luck))
   }
   let cornerClicks = 0
   const corner = document.createElement('button')
@@ -212,6 +263,18 @@ function mountDevCheat(active: SceneName) {
   shell.querySelector<HTMLElement>('[data-close]')!.addEventListener('click', close)
   shell.querySelectorAll<HTMLElement>('[data-scene]').forEach((button) =>
     button.addEventListener('click', () => goScene(button.dataset.scene as SceneName)),
+  )
+  const stageForm = shell.querySelector<HTMLFormElement>('[data-stage-jump]')!
+  const stageInput = stageForm.elements.namedItem('stage') as HTMLInputElement
+  stageForm.addEventListener('submit', (event) => {
+    event.preventDefault()
+    jumpToStage(stageInput.valueAsNumber)
+  })
+  shell.querySelectorAll<HTMLButtonElement>('[data-stage-preset]').forEach((button) =>
+    button.addEventListener('click', () => jumpToStage(Number(button.dataset.stagePreset))),
+  )
+  shell.querySelectorAll<HTMLButtonElement>('[data-boss-day]').forEach((button) =>
+    button.addEventListener('click', () => jumpToStage(Number(button.dataset.bossDay))),
   )
   shell.querySelectorAll<HTMLElement>('[data-item]').forEach((button) =>
     button.addEventListener('click', () => grantItem(ALL_ITEMS[button.dataset.item!])),
@@ -284,6 +347,13 @@ function startNewRunBattle() {
   void goBattle(intro, intro ? markTutorialSeen : undefined)
 }
 
+function resetAllRecordsAndStart() {
+  clearAllRecords()
+  run = newRun()
+  saveRun(run)
+  void goBattle(true, markTutorialSeen)
+}
+
 /**
  * 첫 부팅에서만 오프닝 시네마틱을 얹는다. 타이틀을 먼저 다 그려 둔 위에 덮고,
  * 영상이 끝나기 전에 걷히게 해서 마지막 장면이 타이틀 배경으로 포개지게 한다.
@@ -296,7 +366,7 @@ function goTitle(withIntro = false) {
   const title = new TitleView(stage, {
     hasSave: !!loadRun(),
     holdUi: withIntro,
-    onSettings: () => openSettingsModal(stage),
+    onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
       if (fresh) clearRun()
@@ -354,19 +424,45 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     hpMult: st.hpMult,
     atkMult: st.atkMult,
     isBoss: st.isBoss,
+    bossHealthBars: st.bossHealthBars,
+    modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
-    onWin: (grade) => goReward(grade),
+    onWin: handleBattleWin,
     onLose: () => {
       clearRun()
       goDefeat()
     },
     onHome: () => goTitle(), // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
+    onResetAll: resetAllRecordsAndStart,
 
     intro,
     onIntroComplete,
   })
   mountMeta(intro ? 'intro' : 'battle')
+}
+
+function handleBattleWin(grade: number) {
+  if (run.day === 15 && !run.endingSeen) {
+    goEnding(grade)
+    return
+  }
+  goReward(grade)
+}
+
+function goEnding(grade = startGrade(run.player.stats.luck)) {
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'night')
+  current = new EndingView(stage, {
+    onComplete: () => {
+      run.endingSeen = true
+      run.endless = true
+      saveRun(run)
+      goReward(grade)
+    },
+  })
+  mountMeta('ending')
 }
 
 // 전투에서 들고 나온 보상등급이 희귀도 확률을 정한다. 씬 점퍼 직행이면 운 기준 시작 등급.
@@ -438,6 +534,7 @@ if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
 void FontManager.load()
 if (start === 'reward') goReward()
 else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'ending') goEnding()
 else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
