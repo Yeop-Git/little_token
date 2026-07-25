@@ -26,6 +26,7 @@ import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type In
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
+import { tacticalGuideForEnemy } from '@data/tacticalCards'
 import {
   activeEnemyPart,
   allDead,
@@ -171,7 +172,7 @@ interface Tally {
   base: number
   mult: number
   total: number
-  kind: 'dmg' | 'heal'
+  kind: 'dmg' | 'guard' | 'heal'
 }
 
 export class BattleView {
@@ -218,6 +219,10 @@ export class BattleView {
   private actionOrderSignature = ''
   private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
+  private readonly enemyPrewarmQueue: EnemyInst[] = []
+  private readonly prewarmingEnemyKeys = new Set<string>()
+  private enemyPrewarmActive = false
+  private destroyed = false
   /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
   private readonly debugSpawnedWords = new Map<string, Word>()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
@@ -313,6 +318,7 @@ export class BattleView {
   }
 
   destroy() {
+    this.destroyed = true
     this.timers.forEach((t) => clearTimeout(t))
     clearTimeout(this.dockTimer)
     document.removeEventListener('pointerdown', this.onPointerDown, true)
@@ -478,6 +484,7 @@ export class BattleView {
           <div class="resonance-flash" id="resonance" aria-live="polite"></div>
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
+          <div class="model-prewarm-stage" aria-hidden="true"></div>
         </div>
 
         ${this.isBoss ? this.bossPlayerHudHtml() : ''}
@@ -600,6 +607,7 @@ export class BattleView {
       }
       this.updateFoe(el, e, rank)
     })
+    this.queueWaitingEnemyModels(alive.slice(MAX_VISIBLE_ENEMIES))
     this.renderEnemyOverflow(host, hiddenWaiting)
     this.renderStats()
     this.renderActionOrder()
@@ -633,6 +641,78 @@ export class BattleView {
     const pool = this.enemyPool.get(key) ?? []
     pool.push(el)
     this.enemyPool.set(key, pool)
+  }
+
+  /**
+   * 레일 뒤의 새 적은 등장 전에 유휴 시간에 한 번 렌더해 캔버스 생성·모델 복제·GPU 텍스처
+   * 업로드를 끝낸다. 전투 규칙과 DOM 레일에는 손대지 않고, 준비가 끝난 배우만 기존 풀에 넣는다.
+   */
+  private queueWaitingEnemyModels(waiting: number[]) {
+    if (this.destroyed || this.isBoss) return
+    for (const index of waiting) {
+      const enemy = this.state.enemies[index]
+      if (!enemy || enemy.dead) continue
+      const key = enemy.def.id
+      const visual = this.visualForEnemy(enemy)
+      if (!visual.model3d || this.prewarmingEnemyKeys.has(key)) continue
+      const pool = this.enemyPool.get(key) ?? []
+      if (pool.some((actor) => isCharacterModelReady(actor, visual))) continue
+      this.prewarmingEnemyKeys.add(key)
+      this.enemyPrewarmQueue.push(enemy)
+    }
+    this.drainEnemyPrewarmQueue()
+  }
+
+  private drainEnemyPrewarmQueue() {
+    if (this.destroyed || this.enemyPrewarmActive) return
+    const enemy = this.enemyPrewarmQueue.shift()
+    if (!enemy) return
+    this.enemyPrewarmActive = true
+    const timer = window.setTimeout(() => {
+      void this.prewarmEnemyModel(enemy).finally(() => {
+        this.enemyPrewarmActive = false
+        this.drainEnemyPrewarmQueue()
+      })
+    }, 80)
+    this.timers.push(timer)
+  }
+
+  private prewarmEnemyModel(enemy: EnemyInst): Promise<void> {
+    const key = enemy.def.id
+    const visual = this.visualForEnemy(enemy)
+    const host = this.root.querySelector<HTMLElement>('.model-prewarm-stage')
+    if (this.destroyed || !host || !visual.model3d) {
+      this.prewarmingEnemyKeys.delete(key)
+      return Promise.resolve()
+    }
+
+    // 음수 인덱스는 실제 전장 레일과 절대 겹치지 않는다. 준비가 끝나면 releaseFoe가 풀로 옮긴다.
+    const actor = this.acquireFoe(-1000 - this.enemyPrewarmQueue.length, enemy)
+    actor.classList.add('model-prewarm')
+    host.append(actor)
+    return new Promise((resolve) => {
+      let attempts = 0
+      const settle = () => {
+        if (this.destroyed || !actor.isConnected) {
+          this.prewarmingEnemyKeys.delete(key)
+          resolve()
+          return
+        }
+        if (isCharacterModelReady(actor, visual)) {
+          this.releaseFoe(actor)
+          this.prewarmingEnemyKeys.delete(key)
+          resolve()
+          return
+        }
+        attempts++
+        // 리소스는 전투 진입 전에 파싱됐으므로 보통 2~3 프레임 안에 끝난다. 느린 GPU에서도
+        // 준비 캔버스는 화면 밖에서 계속 살아 있어 실제 웨이브가 이 작업을 대신하지 않는다.
+        const retry = window.setTimeout(settle, attempts < 12 ? 16 : 48)
+        this.timers.push(retry)
+      }
+      const firstCheck = window.setTimeout(settle, 32)
+      this.timers.push(firstCheck)
+    })
   }
 
   /**
@@ -1068,6 +1148,8 @@ export class BattleView {
     if (summonPattern) add(`summon${summons >= summonPattern.releaseAt ? ' ready' : ''}`, icon('jar'), `${summonPattern.name} ${summons}/${summonPattern.max} · 공격력 +${summons * summonPattern.attackBonusPerUnit}`)
     if (e.def.webPattern) add(`web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`, '<b>✣</b>', `거미줄 봉인 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards} · 현재 다리 약점을 맞히면 봉인 해제`)
     if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', `그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}`)
+    const tacticalGuide = tacticalGuideForEnemy(e.def.id)
+    if (tacticalGuide) add('tactic', '<b>✦</b>', `${tacticalGuide.title} · ${tacticalGuide.tooltip}`)
 
     host.hidden = icons.length === 0
     host.innerHTML = icons.join('')
@@ -1955,9 +2037,11 @@ export class BattleView {
   // ── 점수 분해 — 깡 점수(더하기)와 배율(곱하기)을 출처별로 쪼갠다 ──
   // execute와 같은 규칙으로 계산하므로 여기 총합은 실제로 꽂히는 수치와 일치한다.
   private buildTally(intent: Intent, resolved: ResolvedMult, dealsDamage: boolean): Tally {
-    // 피해도 회복도 없는 문장(순수 방어 등)은 집계판을 띄우지 않는다.
-    const heals = !dealsDamage && intent.heal > 0
-    if (!dealsDamage && !heals) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind: 'dmg' }
+    // 피해·실드·회복 어느 문장이든 같은 배율 정산을 보여 준다.
+    // 순수 효과형 카드도 실제 적용값과 일치하도록 아래에서 깡수치를 보충한다.
+    const kind: Tally['kind'] = dealsDamage ? 'dmg' : intent.guard > 0 ? 'guard' : 'heal'
+    const supportBase = kind === 'guard' ? intent.guard : kind === 'heal' ? intent.heal : 0
+    if (!dealsDamage && supportBase <= 0) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind }
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
     const resonanceEmotion = this.resonantEmotion(intent.emotions)
@@ -1967,14 +2051,26 @@ export class BattleView {
         : p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
     // 동사가 둘이면 한 문장이 피해와 회복을 동시에 만든다 — 집계판은 자기 풀만 더한다.
     // (안 그러면 방어 깡수치가 피해 총합에 섞여 화면 숫자와 실제 피해가 어긋난다.)
-    const lane = dealsDamage ? 'damage' : 'heal'
+    const lane = kind === 'dmg' ? 'damage' : kind
     const flats: TallyPart[] = intent.breakdown.flats
       .filter((p) => (p.lane ?? 'damage') === lane)
       .map((p) => ({
         label: p.hint ? `${p.label} (${p.hint})` : p.label,
         value: p.value,
-        cls: dealsDamage ? 'dmg' : 'heal',
+        cls: kind,
       }))
+    // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
+    // 집계판의 깡수치 합이 실제 방어·회복 적용값과 항상 같도록 남은 값만 보탠다.
+    if (supportBase > 0) {
+      const explained = flats.reduce((sum, part) => sum + part.value, 0)
+      if (supportBase > explained) {
+        flats.push({
+          label: kind === 'guard' ? '실드 효과' : '회복 효과',
+          value: supportBase - explained,
+          cls: kind,
+        })
+      }
+    }
     const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
 
     const p = resolved.parts
@@ -1987,16 +2083,17 @@ export class BattleView {
 
     const base = flats.reduce((n, f) => n + f.value, 0)
     const mult = mults.reduce((m, x) => m * x.value, 1)
-    return { flats, mults, base, mult, total: Math.round(base * mult), kind: dealsDamage ? 'dmg' : 'heal' }
+    return { flats, mults, base, mult, total: Math.round(base * mult), kind }
   }
 
   // 깡 점수가 하나씩 쌓이고 → 배율이 하나씩 꽂히고 → 총합이 쾅. 발라트로식 콤보 쾌감.
   private async playTally(tally: Tally): Promise<void> {
     const el = document.createElement('div')
     el.className = `tally ${tally.kind}`
+    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : '깡 점수'
     el.innerHTML = `
       <div class="tally-slots">
-        <div class="tally-box base"><span class="tl">깡 점수</span><b>0</b></div>
+        <div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div>
         <div class="tally-x">×</div>
         <div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div>
       </div>
@@ -2005,26 +2102,30 @@ export class BattleView {
       <div class="tally-feed tally-mult-feed"></div>
       <div class="tally-total"></div>`
     this.q('#pbox').appendChild(el)
-    requestAnimationFrame(() => el.classList.add('in'))
+    this.fitTallyToStage(el)
+    requestAnimationFrame(() => {
+      this.fitTallyToStage(el)
+      el.classList.add('in')
+    })
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
     const flatFeed = el.querySelector<HTMLElement>('.tally-flat-feed')!
     const multFeed = el.querySelector<HTMLElement>('.tally-mult-feed')!
-    await sleep(200)
+    await sleep(120)
 
     let base = 0
     for (const f of tally.flats) {
       base += f.value
       baseBox.querySelector('b')!.textContent = String(base)
       this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
+      this.fitTallyToStage(el)
       this.bump(baseBox)
       // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
       this.setFever(el, base)
-      await sleep(165)
+      await sleep(100)
     }
     let mult = 1
     const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
-    const multStarted = performance.now()
     if (hasRisingMultiplier) {
       el.classList.add('mult-rising')
       GameAudio.playMultiplierRise()
@@ -2033,23 +2134,22 @@ export class BattleView {
     for (const [i, m] of tally.mults.entries()) {
       const nextMult = mult * m.value
       this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
+      this.fitTallyToStage(el)
       // 배율이 겹칠수록 판이 뜨거워진다.
       el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
-      await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 330)
+      await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 220)
       mult = nextMult
       this.bump(multBox)
       // 배율이 한 칸 꽂힐 때마다 지금까지의 예상 총합으로 열기를 다시 잰다 —
       // 곱이 겹칠수록 판이 커지고 흔들리고 불이 붙는다.
       this.setFever(el, base * mult)
-      await sleep(36)
+      await sleep(20)
     }
     multBox.classList.remove('rolling')
     if (hasRisingMultiplier) {
-      const remainingSoundMs = Math.max(0, 930 - (performance.now() - multStarted))
-      if (remainingSoundMs) await sleep(remainingSoundMs)
       el.classList.remove('mult-rising')
       el.classList.add('mult-settled')
-      await sleep(420)
+      await sleep(240)
       el.classList.remove('mult-settled')
     }
 
@@ -2064,7 +2164,7 @@ export class BattleView {
     this.parkedTally = el
   }
 
-  // 집계판 체류 — 기본 1.3초. 패널에 마우스를 올려두면 놓을 때까지(최대 8초) 기다리고,
+  // 집계판 체류 — 기본 0.35초. 패널에 마우스를 올려두면 놓을 때까지(최대 2초) 기다리고,
   // 아무 곳이나 클릭하면 바로 진행한다.
   private tallyDwell(el: HTMLElement): Promise<void> {
     el.classList.add('dwell')
@@ -2083,9 +2183,9 @@ export class BattleView {
       const tick = () => {
         if (done) return
         const elapsed = Date.now() - started
-        const holding = el.matches(':hover') && elapsed < 8000
-        if (elapsed >= 1300 && !holding) return finish()
-        this.timers.push(window.setTimeout(tick, 140))
+        const holding = el.matches(':hover') && elapsed < 2000
+        if (elapsed >= 350 && !holding) return finish()
+        this.timers.push(window.setTimeout(tick, 80))
       }
       tick()
     })
@@ -2096,6 +2196,24 @@ export class BattleView {
     el.classList.toggle('hot1', v >= 50)
     el.classList.toggle('hot2', v >= 90)
     el.classList.toggle('hot3', v >= 140)
+    this.fitTallyToStage(el)
+  }
+
+  /**
+   * 배율 내역이 여러 줄이거나 큰 숫자가 들어와도 집계판이 전장 안전 영역을 넘지 않게 한다.
+   * 레이아웃 크기는 그대로 두고 최종 표시 비율만 줄이므로, 숫자·칩이 잘리지 않는다.
+   */
+  private fitTallyToStage(el: HTMLElement) {
+    const stage = this.q('#pbox')
+    const safeWidth = Math.max(340, Math.min(680, stage.clientWidth - 420))
+    const safeHeight = Math.max(250, Math.round(stage.clientHeight * 0.62))
+    const width = el.offsetWidth
+    const height = el.offsetHeight
+    if (width <= 0 || height <= 0) return
+    const feverScale = [1, 1.05, 1.1, 1.16][Number(el.dataset.fever ?? 0)] ?? 1.16
+    const fit = Math.min(1, safeWidth / (width * feverScale), safeHeight / (height * feverScale))
+    el.style.setProperty('--tally-fit', Math.max(0.34, fit).toFixed(3))
+    el.classList.toggle('compact', fit < 0.86)
   }
 
   // 뽀로롱 롤업 — 스텝마다 깡/배율 상자에서 불꽃이 총합으로 날아가 꽂히고 숫자가 오른다.
@@ -2104,11 +2222,11 @@ export class BattleView {
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
     total.textContent = '0'
-    const steps = Math.min(11, Math.max(5, Math.round(tally.total / 14)))
+    const steps = Math.min(6, Math.max(4, Math.round(tally.total / 28)))
     for (let i = 1; i <= steps; i++) {
       const eased = 1 - Math.pow(1 - i / steps, 2)
       void this.flingSpark(i % 2 ? baseBox : multBox, total, el)
-      await sleep(i === steps ? 150 : 95)
+      await sleep(i === steps ? 100 : 55)
       total.textContent = String(Math.round(tally.total * eased))
       total.classList.remove('tick')
       void total.offsetWidth
@@ -2119,7 +2237,7 @@ export class BattleView {
     this.applyHeatTier(el, tally.total)
     total.classList.remove('tick')
     total.classList.add('slam')
-    await sleep(380)
+    await sleep(180)
   }
 
   // 상자 중심 → 총합 중심으로 날아가는 불꽃 하나. 무대가 scale()로 줄어 있으므로
@@ -2180,7 +2298,7 @@ export class BattleView {
     void el.offsetWidth
     el.classList.add('show')
     GameAudio.playResonance(intent.emotions)
-    await sleep(860)
+    await sleep(520)
     el.classList.remove('show')
   }
 
@@ -2235,10 +2353,10 @@ export class BattleView {
       const el = chainEls[i]
       if (el) el.classList.add('wave')
       if (c && el) this.popEl(el, c.text, `tick ${c.cls}`)
-      await sleep(95)
+      await sleep(70)
     }
     this.q('#flash').classList.add('go')
-    await sleep(150)
+    await sleep(110)
 
     if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
 
@@ -2252,7 +2370,7 @@ export class BattleView {
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await sleep(900)
+      await sleep(520)
       el.classList.remove('show')
     }
 
@@ -2298,14 +2416,14 @@ export class BattleView {
     // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
     this.setPhase('본인 캐릭터 행동')
 
-    // 액션 컷 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
-    // 문턱은 판 크기 비율이라(encounterHp) 층이 올라도 희소성이 그대로 유지된다.
+    // 액션 컷은 큰 일격의 배경 연출이다. 완료까지 기다리면 배율이 큰 문장마다
+    // 전투가 멈춘 것처럼 느껴지므로, 타격과 겹쳐 재생한다.
     if (dealsDamage) {
       const alive = aliveIdx(this.state)
       const wipesAll =
         alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
       const cut = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
-      if (cut) await this.attackCine?.play(cut)
+      if (cut) void this.attackCine?.play(cut)
     }
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
@@ -2685,6 +2803,7 @@ export class BattleView {
     const next = this.feverOf(value)
     if (next <= Number(el.dataset.fever ?? 0)) return
     el.dataset.fever = String(next)
+    this.fitTallyToStage(el)
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.

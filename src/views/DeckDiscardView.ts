@@ -18,11 +18,13 @@ function cardHtml(word: Word, index: number): string {
     <button class="discard-pick rarity-${rarity}" type="button" data-i="${index}">
       ${art ? `<img class="discard-art" src="${art}" alt="" />` : ''}
       <span class="discard-veil" aria-hidden="true"></span>
-      <span class="discard-order">오래된 카드 ${index + 1}</span>
-      <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
-      <strong>${word.text}</strong>
-      <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || word.note}</span>
-      <span class="discard-action">이 카드를 버리기</span>
+      <span class="discard-order">보유 카드 ${index + 1}</span>
+      <span class="discard-copy">
+        <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
+        <strong>${word.text}</strong>
+        <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || word.note}</span>
+        <span class="discard-action">이 카드를 버리기</span>
+      </span>
     </button>`
 }
 
@@ -44,7 +46,7 @@ export class DeckDiscardView {
             <div class="t hand">한 장을 지우고 새 문장을 쓰자</div>
           </div>
           <div class="discard-incoming">
-            새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 가장 오래된 세 장 중 하나를 버려야 한다.
+            새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 현재 보유 카드 중 한 장을 골라 버린다.
           </div>
           <div class="reward-grid discard-grid">
             ${opts.candidates.map(cardHtml).join('')}

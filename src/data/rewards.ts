@@ -11,6 +11,7 @@ import { GRADE_MAX, rollRarity, startGrade } from '@core/grade'
 import { floorInCycle, STORY_FLOORS } from './stages'
 import { ALL_REWARD_WORDS } from './earlyWords'
 import { ITEMS, LEGENDARY_ITEMS, type ItemDef } from './items'
+import { tacticalCardIdsForRewardDay } from './tacticalCards'
 
 export const LEGENDARY_GIFT_FLOOR = 10
 
@@ -116,7 +117,7 @@ function freshLegendaries(player: PlayerState): ItemDef[] {
   return fresh.length ? fresh : Object.values(LEGENDARY_ITEMS)
 }
 
-function generateWordRewards(player: PlayerState, grade: number, phase: 'subject' | 'verb'): RewardOption[] {
+function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb'): RewardOption[] {
   const slots = phase === 'subject' ? ['subj', 'adv'] : ['verb']
   const all = wordOptions(player, slots)
   const used = new Set<string>()
@@ -128,6 +129,13 @@ function generateWordRewards(player: PlayerState, grade: number, phase: 'subject
       const option = pickOne(all.filter((entry) => entry.word?.slot === slot), grade, used)
       if (option) picks.push(option)
     }
+  }
+  // A boss-eve verb reward always includes one card that interacts with the next boss's rule.
+  // Already-owned cards remain useful here because the reward becomes a reinforcement.
+  if (phase === 'verb') {
+    const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
+    const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, used)
+    if (option) picks.push(option)
   }
   while (picks.length < 3) {
     const option = pickOne(all, grade, used)
@@ -164,5 +172,5 @@ export function genRewards(
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
   if (phase === 'item') return generateItemRewards(player, effectiveGrade, day)
-  return generateWordRewards(player, effectiveGrade, phase)
+  return generateWordRewards(player, effectiveGrade, day, phase)
 }
