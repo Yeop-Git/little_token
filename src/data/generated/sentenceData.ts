@@ -311,6 +311,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "statMult": 1.5,
       "kind": "guard",
       "rarity": "rare",
+      "art": "3004",
       "note": "방어 ×1.5",
       "lore": "발끝이 먼저 종이 위를 미끄러진다."
     },
@@ -344,7 +345,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "statMult": 1.5,
       "kind": "guard",
       "rarity": "rare",
-      "art": "3008",
+      "art": "3006",
       "note": "방어 ×1.5",
       "lore": "작아진 마음을 품고 숨을 고른다."
     }
@@ -387,6 +388,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.35,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1009",
     "note": "배율 ×1.35",
     "lore": "웃음이 빈 칸까지 환하게 번진다."
   },
@@ -404,6 +406,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.25,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1010",
     "note": "배율 ×1.25",
     "lore": "서로의 공책을 꼭 잡아 준다."
   },
@@ -420,6 +423,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.3,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1011",
     "note": "배율 ×1.30",
     "lore": "끝난 줄을 보며 가볍게 숨을 쉰다."
   },
@@ -436,6 +440,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1012",
     "note": "배율 ×1.50",
     "lore": "구겨진 페이지를 펴며 씩씩거린다."
   },
@@ -453,6 +458,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.4,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1013",
     "note": "배율 ×1.40",
     "lore": "같은 줄에서 벌레를 마주 본다."
   },
@@ -469,6 +475,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.45,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1014",
     "note": "배율 ×1.45",
     "lore": "마지막 한 줄까지 지우지 않는다."
   },
@@ -485,6 +492,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.25,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1015",
     "note": "배율 ×1.25",
     "lore": "젖은 글씨를 보며 잠깐 멈춘다."
   },
@@ -501,6 +509,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.35,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1016",
     "note": "배율 ×1.35",
     "lore": "빈자리에도 내 이야기는 남는다."
   },
@@ -517,6 +526,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.2,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1017",
     "note": "배율 ×1.20",
     "lore": "어제의 줄을 다시 읽어 본다."
   },
@@ -533,6 +543,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.35,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1018",
     "note": "배율 ×1.35",
     "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
   },
@@ -550,6 +561,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.45,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1019",
     "note": "배율 ×1.45",
     "lore": "함께 쓰는 줄이 통통 튄다."
   },
@@ -566,6 +578,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.25,
     "targetMode": "enemy",
     "rarity": "rare",
+    "art": "1020",
     "note": "배율 ×1.25",
     "lore": "여백에 작은 낙서를 남긴다."
   },
@@ -614,6 +627,7 @@ export const REWARD_WORDS: Word[] = [
     "statMult": 1.5,
     "kind": "heal",
     "rarity": "rare",
+    "art": "3008",
     "note": "회복 ×1.5",
     "lore": "삐뚤어진 줄도 신나게 다시 고친다."
   },
@@ -630,6 +644,7 @@ export const REWARD_WORDS: Word[] = [
     "statMult": 1.5,
     "kind": "attack",
     "rarity": "rare",
+    "art": "3007",
     "note": "공격 ×1.5",
     "lore": "젖은 잉크를 멀리 흘려보낸다."
   },
@@ -681,6 +696,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.3,
     "crit": 0.25,
     "rarity": "rare",
+    "art": "2011",
     "note": "배율 ×1.30 · 대성공 25%",
     "lore": "빛나는 줄을 따라 손이 가벼워진다."
   },
@@ -696,6 +712,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.25,
     "crit": 0.3,
     "rarity": "rare",
+    "art": "2012",
     "note": "배율 ×1.25 · 대성공 30%",
     "lore": "종이를 덮듯 마음을 감싼다."
   },
@@ -711,6 +728,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.2,
     "crit": 0.3,
     "rarity": "rare",
+    "art": "2013",
     "note": "배율 ×1.20 · 대성공 30%",
     "lore": "새 페이지를 만나듯 반긴다."
   },
@@ -726,6 +744,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.2,
     "crit": 0.3,
     "rarity": "rare",
+    "art": "2014",
     "note": "배율 ×1.20 · 대성공 30%",
     "lore": "입꼬리를 올리고 다음 줄을 쓴다."
   },
@@ -741,6 +760,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.45,
     "crit": 0.2,
     "rarity": "rare",
+    "art": "2015",
     "note": "배율 ×1.45 · 대성공 20%",
     "lore": "연필심이 종이를 세게 긁는다."
   },
@@ -756,6 +776,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.3,
     "crit": 0.25,
     "rarity": "rare",
+    "art": "2016",
     "note": "배율 ×1.30 · 대성공 25%",
     "lore": "빈 여백이 유난히 넓어 보인다."
   },
@@ -771,6 +792,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.35,
     "crit": 0.2,
     "rarity": "rare",
+    "art": "2017",
     "note": "배율 ×1.35 · 대성공 20%",
     "lore": "흔들리는 손을 애써 붙잡는다."
   },
@@ -786,6 +808,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.4,
     "crit": 0.25,
     "rarity": "rare",
+    "art": "2018",
     "note": "배율 ×1.40 · 대성공 25%",
     "lore": "낙서가 통통 튀며 앞으로 달린다."
   },
@@ -801,6 +824,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.3,
     "crit": 0.3,
     "rarity": "rare",
+    "art": "2019",
     "note": "배율 ×1.30 · 대성공 30%",
     "lore": "어깨가 들썩여 글씨도 춤춘다."
   },
@@ -816,6 +840,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.25,
     "crit": 0.3,
     "rarity": "rare",
+    "art": "2020",
     "note": "배율 ×1.25 · 대성공 30%",
     "lore": "가벼운 박자에 상처도 풀린다."
   }

@@ -28,6 +28,18 @@ import skill1005 from './sprites/skills/skill_1005.webp'
 import skill1006 from './sprites/skills/skill_1006.webp'
 import skill1007 from './sprites/skills/skill_1007.webp'
 import skill1008 from './sprites/skills/skill_1008.webp'
+import skill1009 from './sprites/skills/skill_1009.webp'
+import skill1010 from './sprites/skills/skill_1010.webp'
+import skill1011 from './sprites/skills/skill_1011.webp'
+import skill1012 from './sprites/skills/skill_1012.webp'
+import skill1013 from './sprites/skills/skill_1013.webp'
+import skill1014 from './sprites/skills/skill_1014.webp'
+import skill1015 from './sprites/skills/skill_1015.webp'
+import skill1016 from './sprites/skills/skill_1016.webp'
+import skill1017 from './sprites/skills/skill_1017.webp'
+import skill1018 from './sprites/skills/skill_1018.webp'
+import skill1019 from './sprites/skills/skill_1019.webp'
+import skill1020 from './sprites/skills/skill_1020.webp'
 import skill2001 from './sprites/skills/skill_2001.webp'
 import skill2002 from './sprites/skills/skill_2002.webp'
 import skill2003 from './sprites/skills/skill_2003.webp'
@@ -38,11 +50,36 @@ import skill2007 from './sprites/skills/skill_2007.webp'
 import skill2008 from './sprites/skills/skill_2008.webp'
 import skill2009 from './sprites/skills/skill_2009.webp'
 import skill2010 from './sprites/skills/skill_2010.webp'
+import skill2011 from './sprites/skills/skill_2011.webp'
+import skill2012 from './sprites/skills/skill_2012.webp'
+import skill2013 from './sprites/skills/skill_2013.webp'
+import skill2014 from './sprites/skills/skill_2014.webp'
+import skill2015 from './sprites/skills/skill_2015.webp'
+import skill2016 from './sprites/skills/skill_2016.webp'
+import skill2017 from './sprites/skills/skill_2017.webp'
+import skill2018 from './sprites/skills/skill_2018.webp'
+import skill2019 from './sprites/skills/skill_2019.webp'
+import skill2020 from './sprites/skills/skill_2020.webp'
 import skill3001 from './sprites/skills/skill_3001.webp'
 import skill3002 from './sprites/skills/skill_3002.webp'
 import skill3003 from './sprites/skills/skill_3003.webp'
+import skill3004 from './sprites/skills/skill_3004.webp'
 import skill3005 from './sprites/skills/skill_3005.webp'
+import skill3006 from './sprites/skills/skill_3006.webp'
+import skill3007 from './sprites/skills/skill_3007.webp'
 import skill3008 from './sprites/skills/skill_3008.webp'
+import skill3009 from './sprites/skills/skill_3009.webp'
+import skill3010 from './sprites/skills/skill_3010.webp'
+import skill3011 from './sprites/skills/skill_3011.webp'
+import skill3012 from './sprites/skills/skill_3012.webp'
+import skill3013 from './sprites/skills/skill_3013.webp'
+import skill3014 from './sprites/skills/skill_3014.webp'
+import skill3015 from './sprites/skills/skill_3015.webp'
+import skill3016 from './sprites/skills/skill_3016.webp'
+import skill3017 from './sprites/skills/skill_3017.webp'
+import skill3018 from './sprites/skills/skill_3018.webp'
+import skill3019 from './sprites/skills/skill_3019.webp'
+import skill3020 from './sprites/skills/skill_3020.webp'
 import skill7001 from './sprites/skills/skill_7001.webp'
 import skill7002 from './sprites/skills/skill_7002.webp'
 import skill7003 from './sprites/skills/skill_7003.webp'
@@ -128,6 +165,19 @@ export const SKILL_ART: Record<string, string> = {
   '1006': skill1006,
   '1007': skill1007,
   '1008': skill1008,
+  // 감정 주어 리뉴얼분 — 1009~1020이 CSV 순서 그대로 붙는다.
+  '1009': skill1009,
+  '1010': skill1010,
+  '1011': skill1011,
+  '1012': skill1012,
+  '1013': skill1013,
+  '1014': skill1014,
+  '1015': skill1015,
+  '1016': skill1016,
+  '1017': skill1017,
+  '1018': skill1018,
+  '1019': skill1019,
+  '1020': skill1020,
   '2001': skill2001,
   '2002': skill2002,
   '2003': skill2003,
@@ -138,13 +188,41 @@ export const SKILL_ART: Record<string, string> = {
   '2008': skill2008,
   '2009': skill2009,
   '2010': skill2010,
+  // 감정 수식 리뉴얼분 — 열 장이 CSV 순서대로 그대로 붙는다.
+  '2011': skill2011,
+  '2012': skill2012,
+  '2013': skill2013,
+  '2014': skill2014,
+  '2015': skill2015,
+  '2016': skill2016,
+  '2017': skill2017,
+  '2018': skill2018,
+  '2019': skill2019,
+  '2020': skill2020,
   '3001': skill3001,
   '3002': skill3002,
   '3003': skill3003,
+  '3004': skill3004,
   '3005': skill3005,
-  // 3008은 '웅크렸다'용으로 그린 그림 — 카드 리뉴얼로 그 단어가 pumeot으로 옮겨가
-  // 번호는 그대로 두고 옮겨 붙였다.
+  // 3006('품었다'용 그림)이 웅크렸다로 왔다 — id가 pumeot이고 태그도 warm이라
+  // "작아진 마음을 품고"라는 문구와 같은 그림이다. 원래 쓰던 3008은 새로 그려져
+  // 고쳐냈다로 넘어갔다.
+  '3006': skill3006,
+  '3007': skill3007,
   '3008': skill3008,
+  // 3009~3020은 전투 규칙 카드(SPECIAL_REWARD_WORDS) 열두 장이 순서대로 쓴다.
+  '3009': skill3009,
+  '3010': skill3010,
+  '3011': skill3011,
+  '3012': skill3012,
+  '3013': skill3013,
+  '3014': skill3014,
+  '3015': skill3015,
+  '3016': skill3016,
+  '3017': skill3017,
+  '3018': skill3018,
+  '3019': skill3019,
+  '3020': skill3020,
   // 문장부호(올림프의 당근) — 7001 느낌표 · 7002 온점 · 7003 물음표
   '7001': skill7001,
   '7002': skill7002,
@@ -154,15 +232,14 @@ export const SKILL_ART: Record<string, string> = {
 }
 
 /**
- * 임시폐기 일러스트 — 감정 카드 리뉴얼로 대상 단어가 사라져 갈 곳을 잃은 그림들.
- * 파일은 `sprites/skills/n00X.webp`로 남겨 두고 여기 등록하지 않는다(빌드에서 빠진다).
- * 나중에 뜻이 맞는 카드가 생기면 번호를 새로 받아 되살리면 된다.
+ * 대기 중인 일러스트 — 파일은 있는데 아직 붙을 단어가 없는 그림들.
+ * 여기 등록하지 않으면 빌드에서 빠지므로 두어도 용량에 영향이 없다.
+ * 뜻이 맞는 카드가 생기면 그때 번호를 그대로 등록하면 된다.
  *
- *   n001 ← 3004  후려쳤다 — 크게 휘두르는 공격
- *   n002 ← 3006  품었다   — 가슴에 안는 회복
- *   n003 ← 3007  내던졌다 — 돌을 던져 벽을 부수는 공격
- *   n004 ← 3009  박살냈다 — 산산조각 내는 공격
- *   n005 ← 3010  휩쓸어버렸다 — 페이지 끝에서 끝까지 쓰는 전체 공격
+ *   1021 · 1022   주어 — 요정에게 손 뻗기 / 멀리 가리키기
+ *
+ * 반대로 그림이 없어 비어 있는 단어(art 미지정)는 `npm run check`가 매번 알려준다.
+ * 동사 번호는 3001~3006 초기 · 3007~3008 보상 · 3009~3020 전투 규칙 카드로 꽉 차 있다.
  */
 
 /**

@@ -32,7 +32,13 @@ import { installFoilShaders } from '@/ui/FoilShader'
 const STAGE_W = 1920
 const STAGE_H = 1080
 /** 시네마틱이 걷힌 뒤 제목·메뉴를 올리기까지 두는 시간. */
-const TITLE_UI_HOLD_MS = 1500
+const TITLE_UI_HOLD_MS = 850
+/**
+ * 걷힘이 끝난 뒤 얼려 둔 배경을 도로 푸는 시각.
+ * 걷힘이 끝나는 프레임과 제목이 올라오는 순간(TITLE_UI_HOLD_MS) 둘 다에서 떨어져야
+ * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
+ */
+const AMBIENT_THAW_MS = 260
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
@@ -306,13 +312,22 @@ function goTitle(withIntro = false) {
   // 영상이 배경으로 다 포개진 뒤 잠깐 둔다 — 방금 본 장면이 타이틀이 됐다는 걸
   // 알아볼 시간을 주고 나서 제목과 메뉴를 올린다.
   let holdTimer = 0
+  let thawTimer = 0
   const intro = new CinematicIntro(stage, {
+    // 걷히는 동안엔 타이틀 배경도 같이 세운다 — 두 화면이 동시에 그려지는 유일한
+    // 구간이라, 여기서 도는 건 전부 두 배로 비싸다(TitleView.freezeAmbient 참고).
+    onFadeStart: () => title.freezeAmbient(),
     onDone: () => {
+      // 얼린 걸 푸는 것도 한 덩어리 작업이다(애니메이션 여섯 개 재개 + 캔버스 루프 재시작).
+      // 걷힘이 끝나는 프레임 바로 옆에 두면 그 순간이 걸리므로 조용한 틈으로 보낸다.
+      // (rAF 한 프레임은 너무 가까웠다. 타이머라 탭이 뒤에 있어도 확실히 돈다.)
+      thawTimer = window.setTimeout(() => title.thawAmbient(), AMBIENT_THAW_MS)
       holdTimer = window.setTimeout(() => title.revealUi(), TITLE_UI_HOLD_MS)
     },
   })
   cinematicCleanup = () => {
     clearTimeout(holdTimer)
+    clearTimeout(thawTimer)
     intro.destroy()
   }
 }

@@ -23,6 +23,9 @@ interface Opts {
  */
 const WARP_ON_MS = 1200
 
+/** 떠오름 트랜지션(가장 긴 게 transform 1.5s)이 다 끝났다고 볼 시각. 넉넉히 잡는다. */
+const SETTLE_FALLBACK_MS = 1700
+
 interface Fly {
   x: number
   y: number
@@ -42,6 +45,10 @@ export class TitleView {
   private startTimer = 0
   private confirmTimer = 0
   private warpTimer = 0
+  private settleTimer = 0
+  /** 얼렸다 풀 때 같은 루프를 이어 돌리려고 들고 있는다(freezeAmbient/thawAmbient). */
+  private flyTick: ((now: number) => void) | null = null
+  private flyLast = 0
 
   constructor(
     private root: HTMLElement,
@@ -56,6 +63,7 @@ export class TitleView {
     clearTimeout(this.startTimer)
     clearTimeout(this.confirmTimer)
     clearTimeout(this.warpTimer)
+    clearTimeout(this.settleTimer)
     window.removeEventListener('resize', this.onResize)
   }
 
@@ -100,16 +108,16 @@ export class TitleView {
                 : `<button class="tmenu-btn" type="button" data-act="continue">시작하기</button>`
             }
             <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
-            <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
+            <button class="tmenu-btn" type="button" data-act="guide">도움말</button>
+            <button class="tmenu-btn is-exit" type="button" data-act="exit">나가기</button>
           </nav>
-          <button class="tmenu-link" type="button" data-act="guide">전투 시스템 설명</button>
           <div class="title-toast" id="title-toast" aria-live="polite"></div>
           <div class="title-loadmask" aria-hidden="true"></div>
         </div>
         <div class="title-darken" aria-hidden="true"></div>
       </main>`
 
-    this.root.querySelectorAll<HTMLButtonElement>('.tmenu-btn, .tmenu-link').forEach((btn) => {
+    this.root.querySelectorAll<HTMLButtonElement>('.tmenu-btn').forEach((btn) => {
       btn.addEventListener('click', () => this.onAct(btn.dataset.act ?? ''))
     })
 
@@ -128,12 +136,16 @@ export class TitleView {
     if (this.opts.holdUi) reveal?.classList.add('ui-held')
     // 떠오름이 끝나면 흐림을 뗀다(위 .settled 참고). 여기서 안 떼면 시네마틱이 걷히는
     // 동안 영상 위에 타이틀 화면 전체를 굽는 필터 패스가 하나 더 얹힌다.
+    // transitionend가 빠른 길이고, 타이머는 그게 안 올 때를 받친다(탭이 뒤에 있었거나
+    // 감속 모션이라 트랜지션이 아예 안 붙는 경우). 늦게 떼는 건 괜찮지만 안 떼면 곤란하다.
+    const settle = () => reveal?.classList.add('settled')
     reveal?.addEventListener('transitionend', (e) => {
-      if (e.target === reveal && e.propertyName === 'filter') reveal.classList.add('settled')
+      if (e.target === reveal && e.propertyName === 'filter') settle()
     })
     Promise.all(preload).then(() => {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
+        this.settleTimer = window.setTimeout(settle, SETTLE_FALLBACK_MS)
         // 붙잡아 둔 상태에서는 아직 누를 게 없다 — 포커스도 놓아줄 때 준다.
         if (this.opts.holdUi) return
         this.focusMenu()
@@ -154,8 +166,33 @@ export class TitleView {
     reveal.classList.add('ready')
     reveal.classList.remove('ui-held')
     reveal.classList.add('ui-in')
+    // 이 경로로 처음 ready가 붙었을 수도 있다(이미지가 늦거나 탭이 뒤에 있어 rAF가 묶였을 때).
+    // 그러면 mount에서 건 안전망이 아직 안 돌았으니 여기서 다시 건다.
+    clearTimeout(this.settleTimer)
+    this.settleTimer = window.setTimeout(() => reveal.classList.add('settled'), SETTLE_FALLBACK_MS)
     this.startWarp()
     this.focusMenu()
+  }
+
+  /**
+   * 시네마틱이 걷히는 동안 배경을 얼린다 — 반딧불이 캔버스를 세우고, 발광·비네트의
+   * 무한 애니메이션도 CSS에서 멈춘다(.cine-crossfade).
+   * 걷힘은 영상과 타이틀이 함께 그려지는 유일한 구간이라, 여기서 도는 건 전부
+   * 두 배로 비싸다. 다 세워 두면 정지 그림 두 장의 크로스페이드가 된다.
+   */
+  freezeAmbient() {
+    this.root.closest('#stage')?.classList.add('cine-crossfade')
+    cancelAnimationFrame(this.raf)
+    this.raf = 0
+  }
+
+  /** 걷힘이 끝나면 도로 풀어 준다. */
+  thawAmbient() {
+    this.root.closest('#stage')?.classList.remove('cine-crossfade')
+    if (!this.raf && this.flyTick) {
+      this.flyLast = performance.now()
+      this.raf = requestAnimationFrame(this.flyTick)
+    }
   }
 
   private beginAnim(sel: string) {
@@ -255,10 +292,10 @@ export class TitleView {
       hue: 40 + Math.random() * 16, // 따뜻한 노랑~호박색
     }))
 
-    let last = performance.now()
+    this.flyLast = performance.now()
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
+      const dt = Math.min(0.05, (now - this.flyLast) / 1000)
+      this.flyLast = now
       ctx.clearRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'lighter'
       for (const f of flies) {
@@ -288,6 +325,7 @@ export class TitleView {
       ctx.globalCompositeOperation = 'source-over'
       this.raf = requestAnimationFrame(tick)
     }
+    this.flyTick = tick
     this.raf = requestAnimationFrame(tick)
   }
 }

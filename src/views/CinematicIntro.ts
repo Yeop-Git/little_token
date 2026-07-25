@@ -13,6 +13,11 @@ import { VIDEO } from '@/assets'
 interface Opts {
   /** 영상이 완전히 걷힌 뒤 — 이 시점엔 타이틀만 남는다. */
   onDone: () => void
+  /**
+   * 걷히기 시작할 때. 아래 화면도 같이 얼려 달라는 신호다(자세한 건 beginFade 주석).
+   * 걷힘이 끝나면 onDone에서 도로 풀어 주면 된다.
+   */
+  onFadeStart?: () => void
 }
 
 /**
@@ -20,26 +25,37 @@ interface Opts {
  * 원본을 다시 굽지 않고 여기 한 줄로 조절한다 — 아래 페이드 시점이 알아서 따라온다.
  */
 const SPEED = 0.73
-/** 걷히는 데 걸리는 시간. style.css의 .cine-veil 트랜지션과 같은 값이어야 한다. */
-const FADE_MS = 1800
+/**
+ * 걷기 시작해서 완전히 넘어가기까지. style.css의 .cine-veil 트랜지션 합과 같아야 한다.
+ * 앞 0.62초는 영상을 불투명한 채로 타이틀 화각까지 밀어 넣는 시간이고,
+ * 실제로 걷히는 건 뒤의 0.28초뿐이다 — 다 맞아떨어진 자리에서 짧게 끊어 낸다.
+ */
+const FADE_MS = 620 + 280
 /**
  * 걷힘이 끝난 걸 알아채는 건 transitionend가 맡고, 이 타이머는 그게 안 올 때만 쓴다
  * (탭이 뒤로 가 있거나 트랜지션 자체가 안 붙는 경우). 실제 길이보다 넉넉해야
  * 타이머가 먼저 터져서 걷히다 만 화면을 잘라내는 일이 없다.
  */
-const FADE_FALLBACK_MS = FADE_MS + 400
+const FADE_FALLBACK_MS = FADE_MS + 500
+/**
+ * 다 세운 뒤 실제로 걷기 시작하기까지 두는 시간(rAF이 안 돌 때만 쓰는 상한).
+ * 보통은 두 프레임 뒤에 시작하고 이 타이머는 안 쓰인다.
+ */
+const LEAVE_DEFER_MS = 120
 /**
  * 넘겨준 뒤 영상 자원을 놓기까지 두는 시간.
  * 디코더를 푸는 건 메인 스레드를 꽤 잡아먹어서, 화면이 막 넘어간 프레임에 얹으면
- * 그 순간이 툭 끊긴다. 타이틀 UI가 올라오기 전 조용한 틈으로 미룬다.
+ * 그 순간이 툭 끊긴다. 한가한 틈을 기다리되(requestIdleCallback), 그 틈이 안 오면
+ * 이 시각에는 그냥 놓는다 — 계속 물고 있는 것보다는 낫다.
  */
-const RELEASE_DELAY_MS = 600
+const RELEASE_DELAY_MS = 3000
 /**
- * 컷 몇 초(실제 시간) 전에 걷기 시작하는가. 작을수록 영상 끝자락에 붙는다.
- * 페이드가 컷보다 길어도 된다 — 마지막 프레임에 멈춘 채로 마저 흐려지고,
- * 그 프레임이 곧 타이틀 배경이라 멈춘 티가 안 난다.
+ * 컷 몇 초(실제 시간) 전에 걷기 시작하는가.
+ * 예전엔 0.8초를 앞당겨 재생 중인 영상 위로 걷어냈는데, 그러면 걷히는 내내 영상
+ * 디코딩과 합성이 같이 돌아 화면이 끊겼다. 이제는 끝에 바짝 붙여 놓고 걷기 직전에
+ * 영상을 세운다 — 마지막 프레임이 곧 타이틀 배경이라 멈춘 티가 안 난다.
  */
-const FADE_LEAD_SEC = 0.8
+const FADE_LEAD_SEC = 0.15
 /**
  * 늘어지는 구간만 살짝 빨리 넘긴다(초는 영상 원본 시간 기준).
  * 요정이 같은 자리에 떠 있기만 하는 대목이라 화면이 거의 안 바뀐다 —
@@ -57,7 +73,9 @@ export class CinematicIntro {
   private giveUpTimer = 0
   private safetyTimer = 0
   private releaseTimer = 0
+  private leaveTimer = 0
   private fading = false
+  private leaving = false
   private finished = false
   private released = false
 
@@ -105,6 +123,7 @@ export class CinematicIntro {
     clearTimeout(this.giveUpTimer)
     clearTimeout(this.safetyTimer)
     clearTimeout(this.releaseTimer)
+    clearTimeout(this.leaveTimer)
     this.video.removeEventListener('timeupdate', this.tick)
     this.el.removeEventListener('transitionend', this.onTransitionEnd)
     this.el.removeEventListener('click', this.skip)
@@ -168,13 +187,54 @@ export class CinematicIntro {
 
   private skip = () => this.beginFade()
 
+  /**
+   * 걷기 시작 — 그 전에 움직이는 걸 전부 세운다.
+   *
+   * 걷힘은 영상과 타이틀이 동시에 화면에 있는 유일한 구간이다. 여기서 재던 걸
+   * 실제로 세어 보니 전면 애니메이션 열한 개가 겹쳐 돌고 영상까지 재생 중이었다.
+   * 특히 양쪽 발광(.cine-glow / .title-glow)이 mix-blend-mode: screen을 쓰면서
+   * 무한 애니메이션을 도는 탓에, 브라우저가 매 프레임 화면 전체를 다시 합성해야 해서
+   * 불투명도를 컴포지터에 넘기지 못했다 — 지지직거리던 게 이거다.
+   *
+   * 그래서 걷기 직전에 영상을 세우고 양쪽 장식 애니메이션을 멈춘다. 안이 한 픽셀도
+   * 안 바뀌면 브라우저는 한 번 구운 결과를 그대로 재사용하고, 그 위에서 불투명도만
+   * 흘린다. 정지 그림 두 장의 크로스페이드라 구조적으로 끊길 수가 없다.
+   */
   private beginFade = () => {
     if (this.fading) return
     this.fading = true
     clearTimeout(this.giveUpTimer)
     clearTimeout(this.safetyTimer)
-    this.el.classList.add('leaving')
+
+    // ① 먼저 전부 세운다. 여기서 레이어와 표면이 한꺼번에 갈아엎힌다 —
+    //    영상 레이어가 강등되고, 전면 필터 표면이 사라지고, 양쪽 장식이 멈추면서
+    //    덮개와 타이틀 양쪽에 스타일 재계산이 걸린다. 다 합치면 한 프레임짜리 덩어리다.
+    this.video.pause()
+    // blur(0)이 남아 있으면 화면 전체가 필터 패스를 한 번 더 탄다. 떠오름은 진작
+    // 끝났을 시점이라 결과는 그대로고 비용만 빠진다.
+    // 트랜지션을 먼저 끊어야 한다 — .cine-stage는 filter를 2.9초에 걸쳐 흘리게 돼 있어서,
+    // 그냥 none을 넣으면 흐림을 끄는 데 2.9초짜리 트랜지션이 새로 붙어 걷히는 내내
+    // 필터 표면이 살아남는다. 끄려다 오히려 켜 두는 셈이 된다.
+    this.stage.style.transition = 'none'
+    this.stage.style.filter = 'none'
+    this.el.classList.add('frozen')
+    this.opts.onFadeStart?.()
+
+    // ② 그 덩어리가 화면에 한 번 나간 뒤에 페이드를 건다.
+    //    같은 프레임에 몰면 갈아엎는 비용이 페이드의 첫 프레임에 그대로 얹혀서
+    //    출발할 때 한 번 툭 걸린다("스르륵" 하다 걸리는 게 이거다).
+    //    두 프레임을 두는 건 첫 프레임에 재래스터가 끝나고 두 번째에 실제로 표시되기 때문.
+    requestAnimationFrame(() => requestAnimationFrame(this.startLeaving))
+    // rAF이 안 도는 상황(탭이 뒤에 있는 경우)에서도 반드시 걷히도록 타이머로 받친다.
+    this.leaveTimer = window.setTimeout(this.startLeaving, LEAVE_DEFER_MS)
     this.fadeTimer = window.setTimeout(this.finish, FADE_FALLBACK_MS)
+  }
+
+  private startLeaving = () => {
+    if (this.leaving || this.finished) return
+    this.leaving = true
+    clearTimeout(this.leaveTimer)
+    this.el.classList.add('leaving')
   }
 
   private onTransitionEnd = (e: TransitionEvent) => {
@@ -198,11 +258,20 @@ export class CinematicIntro {
     if (this.finished) return
     this.finished = true
     clearTimeout(this.fadeTimer)
-    // 걷힌 뒤라면 화면은 이미 넘어갔다. 여기서 영상 자원까지 같이 풀면 넘겨주는 그 한 프레임이
-    // 통째로 밀린다 — 넘기는 건 지금, 무거운 정리는 타이틀 UI가 올라오기 전 조용한 틈으로.
+    clearTimeout(this.leaveTimer)
+    // 걷힌 뒤라면 화면은 이미 넘어갔다. 여기서 5.6MB짜리 디코더까지 같이 풀면 넘겨주는
+    // 그 한 프레임이 통째로 밀린다 — 넘기는 건 지금, 무거운 정리는 브라우저가 한가하다고
+    // 알려줄 때. 고정 시간으로 미루면 하필 타이틀 UI가 올라오는 중에 터질 수 있다.
     // 영상을 아예 못 튼 경우엔 덮개가 아직 그대로라 미룰 수가 없다(미루면 검은 화면이 남는다).
-    if (this.fading) this.releaseTimer = window.setTimeout(() => this.destroy(), RELEASE_DELAY_MS)
+    if (this.fading) this.scheduleRelease()
     else this.destroy()
     this.opts.onDone()
+  }
+
+  private scheduleRelease() {
+    const idle = (window as Window & { requestIdleCallback?: typeof requestIdleCallback })
+      .requestIdleCallback
+    if (idle) idle(() => this.destroy(), { timeout: RELEASE_DELAY_MS })
+    else this.releaseTimer = window.setTimeout(() => this.destroy(), RELEASE_DELAY_MS)
   }
 }

@@ -25,6 +25,7 @@ import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
 import { RARITY_LABEL, type Tables, type Word } from '@core/types'
 import { EARLY_WORDS, GROW_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { TABLES } from '@data/tables'
 
 // 이 태그가 하나라도 충돌 쌍에 등장하면, 앞 선택에 따라 차단될 여지가 있다.
@@ -67,7 +68,15 @@ function checkArt(): string[] {
   const src = readFileSync(new URL('../assets/index.ts', import.meta.url), 'utf8')
   const block = src.slice(src.indexOf('export const SKILL_ART'), src.indexOf('export const FONT_URL'))
   const keys = new Set([...block.matchAll(/'(\d+)':/g)].map((m) => m[1]))
-  const words = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...PUNCT_WORDS, ...GROW_WORDS]
+  // 전투 규칙 카드(SPECIAL_REWARD_WORDS)도 보상으로 실제 나오는 카드다. 예전엔 여기서
+  // 빠져 있어서 동사 열두 장이 일러스트 없이 도는 걸 이 검사가 못 잡았다.
+  const words = [
+    ...Object.values(EARLY_WORDS).flat(),
+    ...REWARD_WORDS,
+    ...SPECIAL_REWARD_WORDS,
+    ...PUNCT_WORDS,
+    ...GROW_WORDS,
+  ]
 
   const broken = words.filter((w) => w.art && !keys.has(w.art))
   const noArt = words.filter((w) => !w.art)
