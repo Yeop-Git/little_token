@@ -2,7 +2,10 @@ import type { RunState } from './run'
 import type { Emotion } from './types'
 
 const SAVE_KEY = 'little-token.run.v1'
-const TUTORIAL_KEY = 'little-token.tutorial-seen.v1'
+// v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
+// 세이브가 있으면 튜토리얼을 영구히 놓칠 수 있었다. 완료 시점에 기록하는 v2로
+// 한 번 갱신해 해당 사용자도 복구된 오프닝을 볼 수 있게 한다.
+const TUTORIAL_KEY = 'little-token.tutorial-seen.v2'
 
 // v0.3.25 이전 런에는 이 주어들이 무감정으로 저장됐다. 현재 데이터의 감정 분포로
 // 한 번만 올려, 이어하기 런도 새 공명 경로를 바로 사용할 수 있게 한다.

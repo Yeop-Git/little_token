@@ -11,6 +11,45 @@ const MODEL_FIT_HEIGHT = 2.78
 const TRANSITION_SECONDS = 0.18
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'heal', 'shield'])
 
+type BattleWeather = 'sunny' | 'rain' | 'night'
+
+interface BattleAtmosphere {
+  skyTint: THREE.Color
+  groundTint: THREE.Color
+  skyMix: number
+  groundMix: number
+  exposure: number
+}
+
+/**
+ * 전장의 배경색을 캐릭터 텍스처에 아주 얕게 섞는다. 광원 반응형 재질로
+ * 바꾸지 않아 언릿 카툰 인상은 유지하고, 발밑은 배경의 청록 그림자에 더
+ * 잠기며 머리 쪽은 하늘색을 조금 받게 한다.
+ */
+const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
+  sunny: {
+    skyTint: new THREE.Color(0xfff0c2),
+    groundTint: new THREE.Color(0x53665f),
+    skyMix: 0.07,
+    groundMix: 0.28,
+    exposure: 0.94,
+  },
+  rain: {
+    skyTint: new THREE.Color(0xaec8d0),
+    groundTint: new THREE.Color(0x405665),
+    skyMix: 0.12,
+    groundMix: 0.36,
+    exposure: 0.88,
+  },
+  night: {
+    skyTint: new THREE.Color(0x8998c4),
+    groundTint: new THREE.Color(0x252c4d),
+    skyMix: 0.17,
+    groundMix: 0.46,
+    exposure: 0.8,
+  },
+}
+
 interface PlusParticle {
   group: THREE.Group
   phase: number
@@ -56,9 +95,13 @@ function removeFromAnimationFrame(model: BattleCharacterModel) {
 /**
  * 일부 DCC/엔진에서 내보낸 클립은 첫 키가 0초보다 늦어서 반복할 때 잠깐
  * 첫 자세에 멈춘 것처럼 보인다. 시간을 0초 기준으로 옮기고, idle의 마지막
- * 자세를 첫 자세와 맞춰 루프 경계에서도 포즈가 튀지 않게 한다.
+ * 구간을 첫 자세로 점진 보간해 루프 경계에서도 포즈가 튀지 않게 한다.
  */
-function normalizedClip(source: THREE.AnimationClip, seamlessLoop: boolean): THREE.AnimationClip {
+function normalizedClip(
+  source: THREE.AnimationClip,
+  seamlessLoop: boolean,
+  loopBlendSeconds = 0,
+): THREE.AnimationClip {
   const clip = source.clone()
   const firstTime = clip.tracks.reduce((earliest, track) => {
     const time = track.times[0]
@@ -73,13 +116,45 @@ function normalizedClip(source: THREE.AnimationClip, seamlessLoop: boolean): THR
     })
   }
 
+  clip.resetDuration()
+
   if (seamlessLoop) {
     clip.tracks.forEach((track) => {
       const valueSize = track.getValueSize()
       const lastOffset = track.values.length - valueSize
       if (lastOffset <= 0) return
-      for (let component = 0; component < valueSize; component += 1) {
-        track.values[lastOffset + component] = track.values[component]
+
+      const endTime = track.times[track.times.length - 1] ?? clip.duration
+      const blendDuration = Math.min(Math.max(0, loopBlendSeconds), endTime)
+      if (blendDuration <= 0) {
+        for (let component = 0; component < valueSize; component += 1) {
+          track.values[lastOffset + component] = track.values[component]
+        }
+        return
+      }
+
+      const blendStart = endTime - blendDuration
+      const firstValue = Array.from(track.values.slice(0, valueSize))
+      for (let keyIndex = 0; keyIndex < track.times.length; keyIndex += 1) {
+        const time = track.times[keyIndex]
+        if (time < blendStart) continue
+        const progress = THREE.MathUtils.clamp((time - blendStart) / blendDuration, 0, 1)
+        const eased = progress * progress * (3 - 2 * progress)
+        const offset = keyIndex * valueSize
+        if (track instanceof THREE.QuaternionKeyframeTrack && valueSize === 4) {
+          new THREE.Quaternion()
+            .fromArray(track.values, offset)
+            .slerp(new THREE.Quaternion().fromArray(firstValue), eased)
+            .toArray(track.values, offset)
+          continue
+        }
+        for (let component = 0; component < valueSize; component += 1) {
+          track.values[offset + component] = THREE.MathUtils.lerp(
+            track.values[offset + component],
+            firstValue[component],
+            eased,
+          )
+        }
       }
     })
   }
@@ -187,17 +262,23 @@ class BattleCharacterModel {
     const clip = gltf.animations.find((candidate) => candidate.name === configuredName)
       ?? gltf.animations.find((candidate) => candidate.name.toLowerCase().includes(animation))
     return clip && this.mixer
-      ? this.mixer.clipAction(normalizedClip(clip, animation === 'idle'))
+      ? this.mixer.clipAction(normalizedClip(
+        clip,
+        animation === 'idle',
+        (this.visual.animations?.idleLoopBlendMs ?? 0) / 1000,
+      ))
       : undefined
   }
 
   private useUnlitMaterials(model: THREE.Object3D) {
+    const weather = this.shell.closest<HTMLElement>('.battle')?.dataset.weather as BattleWeather | undefined
+    const atmosphere = BATTLE_ATMOSPHERES[weather ?? 'sunny'] ?? BATTLE_ATMOSPHERES.sunny
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const originals = Array.isArray(object.material) ? object.material : [object.material]
       const replacements = originals.map((material) => {
         const source = material as THREE.MeshStandardMaterial
-        return new THREE.MeshBasicMaterial({
+        const unlit = new THREE.MeshBasicMaterial({
           name: `${material.name}-battle-unlit`,
           color: source.color?.clone() ?? new THREE.Color(0xffffff),
           map: source.map ?? null,
@@ -209,9 +290,48 @@ class BattleCharacterModel {
           vertexColors: source.vertexColors,
           toneMapped: false,
         })
+        this.applyBattleAtmosphere(unlit, atmosphere, weather ?? 'sunny')
+        return unlit
       })
       object.material = Array.isArray(object.material) ? replacements : replacements[0]
     })
+  }
+
+  private applyBattleAtmosphere(
+    material: THREE.MeshBasicMaterial,
+    atmosphere: BattleAtmosphere,
+    weather: BattleWeather,
+  ) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uBattleSkyTint = { value: atmosphere.skyTint }
+      shader.uniforms.uBattleGroundTint = { value: atmosphere.groundTint }
+      shader.uniforms.uBattleSkyMix = { value: atmosphere.skyMix }
+      shader.uniforms.uBattleGroundMix = { value: atmosphere.groundMix }
+      shader.uniforms.uBattleExposure = { value: atmosphere.exposure }
+
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+varying float vBattleHeight;`)
+        .replace('#include <project_vertex>', `#include <project_vertex>
+vec4 battleWorldPosition = modelMatrix * vec4(transformed, 1.0);
+vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);`)
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+uniform vec3 uBattleSkyTint;
+uniform vec3 uBattleGroundTint;
+uniform float uBattleSkyMix;
+uniform float uBattleGroundMix;
+uniform float uBattleExposure;
+varying float vBattleHeight;`)
+        .replace('vec3 outgoingLight = reflectedLight.indirectDiffuse;', `vec3 outgoingLight = reflectedLight.indirectDiffuse;
+float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBattleGroundMix;
+float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
+outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);
+outgoingLight = mix(outgoingLight, outgoingLight * uBattleSkyTint, battleSkyWeight);
+outgoingLight *= uBattleExposure;`)
+    }
+    material.customProgramCacheKey = () => `battle-atmosphere-${weather}`
   }
 
   private fitModel(model: THREE.Object3D): THREE.Box3 | null {

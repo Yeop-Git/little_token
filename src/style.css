@@ -861,23 +861,36 @@ button {
 .model-shell[data-model-status='ready-3d'] .battle-model { opacity: 1; }
 .model-shell[data-model-status='ready-3d'] .battle-sprite { visibility: hidden; }
 .model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
-.actor:hover .model-shell,
+.actor .model-shell:hover,
 .actor:focus-visible .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 24px color-mix(in srgb, var(--gold) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
 }
-/* 타원 그림자 레이어(반투명 도형) */
+/* 캐릭터와 배경 지면을 잇는 넓은 접지 그림자. 중심의 청록 반사는 숲 바닥색을 받는다. */
 .actor .shadow {
   position: absolute;
-  bottom: -6px;
-  width: 190px;
-  height: 42px;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0) 72%);
+  bottom: -4px;
+  width: 210px;
+  height: 48px;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(17, 30, 29, .64) 0 18%, rgba(6, 12, 15, .42) 38%, transparent 74%),
+    radial-gradient(ellipse at center, rgba(74, 91, 69, .2), transparent 68%);
   border-radius: 50%;
+  filter: blur(1.5px);
   z-index: -1;
 }
+.battle[data-weather='rain'] .actor .shadow {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(12, 24, 31, .7) 0 18%, rgba(5, 11, 18, .48) 40%, transparent 74%),
+    radial-gradient(ellipse at center, rgba(72, 102, 116, .22), transparent 68%);
+}
+.battle[data-weather='night'] .actor .shadow {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(7, 10, 25, .78) 0 20%, rgba(5, 7, 18, .54) 42%, transparent 76%),
+    radial-gradient(ellipse at center, rgba(77, 88, 135, .22), transparent 70%);
+}
 .actor.foe .shadow {
-  width: 160px;
-  height: 36px;
+  width: 180px;
+  height: 40px;
 }
 .actor.hit {
   animation: shake 0.34s ease;
@@ -1044,6 +1057,8 @@ button {
   padding: 9px 14px 11px;
   border-radius: 16px;
   z-index: 5;
+  /* 이름/체력 HUD는 표시 전용이다. 선택 판정은 캐릭터 본체(model-shell)만 받는다. */
+  pointer-events: none;
 }
 .actor.foe .nameplate {
   transform: translateX(-50%);
@@ -1674,6 +1689,8 @@ button {
   bottom: -60px;
   z-index: -1;
   background: radial-gradient(ellipse 76% 62% at 50% 78%, rgba(8, 6, 12, 0.44) 0%, rgba(8, 6, 12, 0.2) 46%, transparent 80%);
+  /* 위쪽으로 크게 번지는 장식 스크림이 전장 캐릭터의 포인터 판정을 막지 않게 한다. */
+  pointer-events: none;
 }
 /* 단어 ↔ 가방 슬라이드 토글(같은 자리) */
 .pane-stack { position: relative; width: 100%; height: 318px; }

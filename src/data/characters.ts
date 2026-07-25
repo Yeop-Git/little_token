@@ -12,6 +12,8 @@ export interface CharacterAnimationDef {
   durationsMs?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
   playbackRates?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  /** idle 끝 자세를 첫 자세로 점진 보간할 루프 연결 구간. */
+  idleLoopBlendMs?: number
   /** 승리 동작 중 스테이지 전환 전에 보여 줄 하이라이트 길이. */
   victoryHighlightMs?: number
 }
@@ -32,6 +34,10 @@ export interface CharacterVisualDef {
 
 // 전장의 3D 모델과 상세 화면의 2D 스프라이트를 한 곳에서 1:1로 연결한다.
 // 모델 에셋이 준비되기 전에는 model3d를 null로 두고 portrait2d를 전장에도 쓴다.
+// 모든 적은 완전 측면(-90°)에서 화면 쪽으로 60° 돌아간 같은 방향을 공유한다.
+const ENEMY_MODEL_YAW = -Math.PI / 6
+const ENEMY_IDLE_LOOP_BLEND_MS = 500
+
 export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisualDef> = {
   player: {
     id: 'player',
@@ -65,10 +71,22 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
   moth: {
     id: 'moth',
     name: '좀나방',
-    model3d: null,
-    animations: null,
-    // 향후 3D 모델 연결 시 전장 왼쪽의 플레이어를 바라보는 방향.
-    modelYaw: -Math.PI / 2,
+    model3d: MODELS.enemy_moth,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      // 긴 원본 클립을 기존 타격·사망 연출 타이밍에 맞추되 포즈 전환은
+      // 공용 모델 렌더러의 크로스페이드로 부드럽게 연결한다.
+      durationsMs: {
+        attack: 440,
+        defeat: 560,
+      },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    // 플레이어와 서로 다른 모델 셸 높이를 보정해 실제 발끝을 같은 전장선에 둔다.
+    modelGroundOffset: -0.18,
     portrait2d: SPRITES.enemy_moth,
     title: '책장을 갉는 날개',
     description: '가벼운 날갯짓으로 문장의 가장자리부터 빠르게 먹어 치운다.',
@@ -76,9 +94,19 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
   roach: {
     id: 'roach',
     name: '바퀴벌레',
-    model3d: null,
-    animations: null,
-    modelYaw: -Math.PI / 2,
+    model3d: MODELS.enemy_roach,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: {
+        attack: 440,
+        defeat: 560,
+      },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    modelGroundOffset: -0.18,
     portrait2d: SPRITES.enemy_roach,
     title: '문장 사이의 단단한 얼룩',
     description: '두꺼운 껍질로 버티며 일기장 깊숙한 곳까지 파고든다.',

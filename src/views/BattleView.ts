@@ -74,6 +74,8 @@ interface Opts {
   atkMult?: number
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
   intro?: boolean
+  /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
+  onIntroComplete?: () => void
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
@@ -120,6 +122,7 @@ export class BattleView {
   private onWin: (grade: number) => void
   private onLose: () => void
   private onHome?: () => void
+  private onIntroComplete?: () => void
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
@@ -154,6 +157,7 @@ export class BattleView {
     this.onWin = opts.onWin
     this.onLose = opts.onLose
     this.onHome = opts.onHome
+    this.onIntroComplete = opts.onIntroComplete
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -248,6 +252,7 @@ export class BattleView {
     this.introDialogue = new IntroDialogue(scene, {
       onComplete: () => {
         this.introDialogue = null
+        this.onIntroComplete?.()
         scene.classList.add('is-enemies-arriving')
         requestAnimationFrame(() => scene.classList.remove('is-intro-hold'))
         this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
@@ -1807,6 +1812,7 @@ export class BattleView {
     const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${idx}"]`)
     if (!el) return
     el.classList.remove('lunge')
+    playCharacterAnimation(el, 'defeat')
     el.classList.add('dying')
     if (fast) el.classList.add('fast')
     this.spawnSparks(el, 8 + combo * 5)
@@ -2081,6 +2087,11 @@ export class BattleView {
   private async enemyPhase(phase: 'first' | 'second') {
     for (const st of enemyTurn(this.state, Math.random, phase)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
+      // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
+      // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
+      playCharacterAnimation(foe ?? null, 'attack')
+      foe?.classList.add('lunge')
+      await sleep(170)
       if (st.dealt <= 0) {
         this.log(st.text)
         if (st.counterHit) {
@@ -2091,11 +2102,10 @@ export class BattleView {
           }
           if (this.state.enemies[st.counterHit.target]?.dead) await this.playDeath(st.counterHit.target)
         }
+        await sleep(240)
+        foe?.classList.remove('lunge')
         continue
       }
-      playCharacterAnimation(foe ?? null, 'attack')
-      foe?.classList.add('lunge')
-      await sleep(170)
       const you = this.q<HTMLElement>('.actor.you')
       SquareBurst.playOn(you, 'damage', { spread: 100 })
       this.hitOne(you)

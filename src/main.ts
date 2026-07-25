@@ -269,8 +269,7 @@ function reset() {
 
 function startNewRunBattle() {
   const intro = !hasSeenTutorial()
-  if (intro) markTutorialSeen()
-  void goBattle(intro)
+  void goBattle(intro, intro ? markTutorialSeen : undefined)
 }
 
 function goTitle() {
@@ -286,8 +285,6 @@ function goTitle() {
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
-      // Existing runs predate the persistent tutorial flag, so do not replay their intro.
-      if (saved) markTutorialSeen()
       startNewRunBattle()
     },
   })
@@ -302,7 +299,7 @@ function goCombatGuide() {
   mountMeta('title')
 }
 
-async function goBattle(intro = false) {
+async function goBattle(intro = false, onIntroComplete?: () => void) {
   const request = ++battleRequest
   await preloadBattleResources(run.player.deck, run.player.items)
   if (request !== battleRequest) return
@@ -323,6 +320,7 @@ async function goBattle(intro = false) {
     },
     onHome: goTitle,
     intro,
+    onIntroComplete,
   })
   mountMeta(intro ? 'intro' : 'battle')
 }
