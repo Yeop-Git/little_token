@@ -3,8 +3,20 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 
-type BattleAnimation = 'idle' | 'attack'
+export type BattleAnimation = 'idle' | 'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
+type OneShotAnimation = Exclude<BattleAnimation, 'idle'>
 const MODEL_VIEW_HEIGHT = 3.6
+// 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
+const MODEL_FIT_HEIGHT = 2.78
+const TRANSITION_SECONDS = 0.18
+const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'heal', 'shield'])
+
+interface PlusParticle {
+  group: THREE.Group
+  phase: number
+  x: number
+  y: number
+}
 
 const modelLoads = new Map<string, Promise<GLTF>>()
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
@@ -82,13 +94,33 @@ function normalizedClip(source: THREE.AnimationClip, seamlessLoop: boolean): THR
  */
 class BattleCharacterModel {
   private readonly scene = new THREE.Scene()
-  private readonly camera = new THREE.OrthographicCamera(-1, 1, MODEL_VIEW_HEIGHT, 0, 0.1, 20)
+  private readonly camera = new THREE.OrthographicCamera(
+    -1,
+    1,
+    MODEL_VIEW_HEIGHT / 2,
+    -MODEL_VIEW_HEIGHT / 2,
+    0.1,
+    20,
+  )
   private readonly renderer: THREE.WebGLRenderer
   private readonly resizeObserver: ResizeObserver
   private mixer: THREE.AnimationMixer | null = null
   private actions: Partial<Record<BattleAnimation, THREE.AnimationAction>> = {}
   private current: THREE.AnimationAction | null = null
   private model: THREE.Object3D | null = null
+  private readonly effects = new THREE.Group()
+  private healAura: THREE.Group | null = null
+  private healMaterials: THREE.MeshBasicMaterial[] = []
+  private plusParticles: PlusParticle[] = []
+  private shieldMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null = null
+  private shieldBaseY = 1
+  private effectKind: 'heal' | 'shield' | null = null
+  private effectElapsed = 0
+  private dragPointerId: number | null = null
+  private dragStartX = 0
+  private dragStartYaw = 0
+  private dragDistance = 0
+  private suppressClick = false
   private disposed = false
   private active = true
   private firstFrameRendered = false
@@ -100,9 +132,17 @@ class BattleCharacterModel {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.domElement.className = 'battle-model'
     this.renderer.domElement.setAttribute('aria-hidden', 'true')
-    this.camera.position.set(0, 1.7, 6)
-    this.camera.lookAt(0, 1.7, 0)
+    // 캐릭터 중심을 바라보는 약한 하향 시점으로, 지면과 평행한 발밑 오라도 함께 읽히게 한다.
+    this.camera.position.set(0, 3, 7)
+    this.camera.lookAt(0, 1.45, 0)
+    this.scene.add(this.effects)
     this.shell.append(this.renderer.domElement)
+    this.shell.dataset.modelInteractive = 'true'
+    this.shell.addEventListener('pointerdown', this.onPointerDown)
+    this.shell.addEventListener('pointermove', this.onPointerMove)
+    this.shell.addEventListener('pointerup', this.onPointerUp)
+    this.shell.addEventListener('pointercancel', this.onPointerUp)
+    this.shell.addEventListener('click', this.onClickCapture, true)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(shell)
@@ -120,13 +160,19 @@ class BattleCharacterModel {
       const model = cloneSkeleton(gltf.scene)
       model.rotation.y = this.visual.modelYaw ?? 0
       this.useUnlitMaterials(model)
-      this.fitModel(model)
+      const fittedBounds = this.fitModel(model)
       this.scene.add(model)
       this.model = model
+      if (fittedBounds) this.setupEffects(fittedBounds)
       this.mixer = new THREE.AnimationMixer(model)
       this.actions = {
         idle: this.actionFor(gltf, 'idle'),
         attack: this.actionFor(gltf, 'attack'),
+        heal: this.actionFor(gltf, 'heal'),
+        shield: this.actionFor(gltf, 'shield'),
+        victory1: this.actionFor(gltf, 'victory1'),
+        victory2: this.actionFor(gltf, 'victory2'),
+        defeat: this.actionFor(gltf, 'defeat'),
       }
       this.mixer.addEventListener('finished', this.onAnimationFinished)
       this.play(this.requestedAnimation)
@@ -168,36 +214,235 @@ class BattleCharacterModel {
     })
   }
 
-  private fitModel(model: THREE.Object3D) {
+  private fitModel(model: THREE.Object3D): THREE.Box3 | null {
     model.updateMatrixWorld(true)
     const bounds = new THREE.Box3().setFromObject(model)
     const size = bounds.getSize(new THREE.Vector3())
-    if (!Number.isFinite(size.y) || size.y <= 0) return
-    const scale = 3.05 / size.y
+    if (!Number.isFinite(size.y) || size.y <= 0) return null
+    const scale = MODEL_FIT_HEIGHT / size.y
     model.scale.multiplyScalar(scale)
     model.updateMatrixWorld(true)
     const fitted = new THREE.Box3().setFromObject(model)
     const center = fitted.getCenter(new THREE.Vector3())
     model.position.x -= center.x
-    model.position.y += (this.visual.modelGroundOffset ?? 0) - fitted.min.y
+    model.position.y += (this.visual.modelGroundOffset ?? 0.1) - fitted.min.y
+    model.updateMatrixWorld(true)
+    return new THREE.Box3().setFromObject(model)
+  }
+
+  private setupEffects(bounds: THREE.Box3) {
+    const size = bounds.getSize(new THREE.Vector3())
+    const center = bounds.getCenter(new THREE.Vector3())
+    const groundY = bounds.min.y + 0.025
+    const radius = Math.max(size.x * 0.72, size.y * 0.34)
+
+    const aura = new THREE.Group()
+    aura.visible = false
+    // 모델 발끝은 공통 발선에 두되, 원근으로 앞쪽 호가 캔버스 아래에서 잘리지 않게 오라만 살짝 든다.
+    aura.position.set(center.x, groundY + 0.2, 0)
+    aura.renderOrder = 6
+    const auraDefs = [
+      { inner: radius * 0.52, outer: radius * 0.92, opacity: 0.44 },
+      { inner: radius * 0.82, outer: radius * 1.06, opacity: 0.72 },
+    ]
+    auraDefs.forEach(({ inner, outer, opacity }) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x79f29a,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      })
+      const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 64), material)
+      ring.rotation.x = -Math.PI / 2
+      aura.add(ring)
+      this.healMaterials.push(material)
+    })
+    this.effects.add(aura)
+    this.healAura = aura
+
+    for (let index = 0; index < 7; index += 1) {
+      const plus = new THREE.Group()
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xbaffc9,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        toneMapped: false,
+      })
+      plus.add(
+        new THREE.Mesh(new THREE.PlaneGeometry(0.065, 0.25), material),
+        new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.065), material),
+      )
+      plus.visible = false
+      plus.renderOrder = 8
+      this.effects.add(plus)
+      this.plusParticles.push({
+        group: plus,
+        phase: index / 7,
+        x: center.x + ((index * 47) % 100) / 100 * radius * 1.4 - radius * 0.7,
+        y: groundY + 0.2 + ((index * 31) % 100) / 100 * size.y * 0.42,
+      })
+    }
+
+    const shieldMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(0x8bdcff) },
+        uOpacity: { value: 0 },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        void main() {
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal);
+          vViewDirection = normalize(-mvPosition.xyz);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        void main() {
+          float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDirection))), 2.35);
+          float glow = 0.18 + fresnel * 1.35;
+          gl_FragColor = vec4(uColor * glow, min(1.0, glow) * uOpacity);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    })
+    const shield = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 32), shieldMaterial)
+    shield.position.copy(center)
+    this.shieldBaseY = Math.max(1, size.y / (radius * 2) * 1.06)
+    shield.scale.y = this.shieldBaseY
+    shield.visible = false
+    shield.renderOrder = 7
+    this.effects.add(shield)
+    this.shieldMesh = shield
+  }
+
+  private startEffect(kind: 'heal' | 'shield') {
+    this.effectKind = kind
+    this.effectElapsed = 0
+    if (this.healAura) this.healAura.visible = kind === 'heal'
+    this.plusParticles.forEach(({ group }) => { group.visible = kind === 'heal' })
+    if (this.shieldMesh) this.shieldMesh.visible = kind === 'shield'
+  }
+
+  private stopEffect() {
+    this.effectKind = null
+    if (this.healAura) this.healAura.visible = false
+    this.plusParticles.forEach(({ group }) => { group.visible = false })
+    if (this.shieldMesh) this.shieldMesh.visible = false
+  }
+
+  private updateEffect(delta: number) {
+    if (!this.effectKind) return
+    this.effectElapsed += delta
+    if (this.effectKind === 'heal') {
+      const progress = Math.min(1, this.effectElapsed / 0.9)
+      const pulse = 1 + Math.sin(progress * Math.PI * 3) * 0.08
+      if (this.healAura) {
+        this.healAura.scale.setScalar((0.65 + progress * 0.48) * pulse)
+        this.healAura.rotation.y = progress * Math.PI * 0.8
+      }
+      this.healMaterials.forEach((material, index) => {
+        material.opacity = Math.sin(progress * Math.PI) * (index ? 0.72 : 0.44)
+      })
+      this.plusParticles.forEach((particle) => {
+        const local = (progress + particle.phase) % 1
+        particle.group.position.set(particle.x, particle.y + local * 1.15, 0.55)
+        particle.group.scale.setScalar(0.65 + Math.sin(local * Math.PI) * 0.55)
+        const opacity = Math.sin(local * Math.PI) * (1 - progress * 0.35)
+        particle.group.children.forEach((child) => {
+          ;(child as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>).material.opacity = opacity
+        })
+      })
+      if (progress >= 1) this.stopEffect()
+      return
+    }
+
+    const progress = Math.min(1, this.effectElapsed / 1.1)
+    if (this.shieldMesh) {
+      const expansion = 0.58 + Math.min(1, progress * 2.2) * 0.48
+      this.shieldMesh.scale.set(expansion, this.shieldBaseY * expansion, expansion)
+      this.shieldMesh.material.uniforms.uOpacity.value = Math.sin(progress * Math.PI) * 0.82
+    }
+    if (progress >= 1) this.stopEffect()
   }
 
   private onAnimationFinished = (event: { action: THREE.AnimationAction }) => {
-    if (event.action === this.actions.attack) this.play('idle')
+    if (event.action !== this.current) return
+    const finished = (Object.entries(this.actions) as [BattleAnimation, THREE.AnimationAction | undefined][])
+      .find(([, action]) => action === event.action)?.[0]
+    if (finished && RETURN_TO_IDLE.has(finished)) this.play('idle')
   }
 
-  play(animation: BattleAnimation) {
+  private onPointerDown = (event: PointerEvent) => {
+    if (!this.model || event.button !== 0) return
+    this.dragPointerId = event.pointerId
+    this.dragStartX = event.clientX
+    this.dragStartYaw = this.model.rotation.y
+    this.dragDistance = 0
+    this.shell.dataset.modelDragging = 'true'
+    this.shell.setPointerCapture(event.pointerId)
+  }
+
+  private onPointerMove = (event: PointerEvent) => {
+    if (!this.model || event.pointerId !== this.dragPointerId) return
+    const deltaX = event.clientX - this.dragStartX
+    this.dragDistance = Math.max(this.dragDistance, Math.abs(deltaX))
+    // 수직 입력은 사용하지 않고 화면의 좌우 이동량만 Y축 회전에 반영한다.
+    this.model.rotation.y = this.dragStartYaw + deltaX * 0.012
+  }
+
+  private onPointerUp = (event: PointerEvent) => {
+    if (event.pointerId !== this.dragPointerId) return
+    if (this.shell.hasPointerCapture(event.pointerId)) this.shell.releasePointerCapture(event.pointerId)
+    this.dragPointerId = null
+    delete this.shell.dataset.modelDragging
+    if (this.dragDistance > 4) {
+      this.suppressClick = true
+      window.setTimeout(() => { this.suppressClick = false }, 0)
+    }
+  }
+
+  private onClickCapture = (event: MouseEvent) => {
+    if (!this.suppressClick) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+
+  play(animation: BattleAnimation): number {
     this.requestedAnimation = animation
     this.shell.dataset.modelAnimation = animation
-    if (animation === 'attack') this.shell.dataset.modelLastAction = animation
+    if (animation !== 'idle') this.shell.dataset.modelLastAction = animation
     const next = this.actions[animation]
-    if (!next || next === this.current) return
+    if (!next) return 0
+    if (next === this.current && animation === 'idle') return 0
+
+    if (animation === 'heal' || animation === 'shield') this.startEffect(animation)
+    else if (animation !== 'idle') this.stopEffect()
 
     next.reset().enabled = true
-    if (animation === 'attack') {
-      const desiredSeconds = (this.visual.animations?.attackDurationMs ?? 440) / 1000
+    if (animation !== 'idle') {
+      const desiredMs = this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
+      const playbackRate = this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1
+      const desiredSeconds = desiredMs ? desiredMs / 1000 : next.getClip().duration / playbackRate
       next.setLoop(THREE.LoopOnce, 1)
-      next.clampWhenFinished = false
+      next.clampWhenFinished = true
       next.setEffectiveTimeScale(next.getClip().duration / desiredSeconds)
     } else {
       next.setLoop(THREE.LoopRepeat, Infinity)
@@ -205,8 +450,12 @@ class BattleCharacterModel {
       next.setEffectiveTimeScale(1)
     }
     next.play()
-    if (this.current) this.current.crossFadeTo(next, 0.08, false)
+    if (this.current && this.current !== next) this.current.crossFadeTo(next, TRANSITION_SECONDS, false)
     this.current = next
+    return animation === 'idle'
+      ? 0
+      : (this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
+        ?? next.getClip().duration * 1000 / (this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1))
   }
 
   private resize() {
@@ -221,14 +470,15 @@ class BattleCharacterModel {
     const viewWidth = viewHeight * (width / height)
     this.camera.left = -viewWidth / 2
     this.camera.right = viewWidth / 2
-    this.camera.top = viewHeight
-    this.camera.bottom = 0
+    this.camera.bottom = -viewHeight / 2
+    this.camera.top = viewHeight / 2
     this.camera.updateProjectionMatrix()
   }
 
   render(delta: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
     this.mixer?.update(delta)
+    this.updateEffect(delta)
     this.renderer.render(this.scene, this.camera)
     if (this.model && !this.firstFrameRendered) {
       // 실제 WebGL 컨텍스트에서 텍스처 업로드와 첫 드로우까지 성공한 뒤에만
@@ -258,10 +508,21 @@ class BattleCharacterModel {
     this.disposed = true
     removeFromAnimationFrame(this)
     this.resizeObserver.disconnect()
+    this.shell.removeEventListener('pointerdown', this.onPointerDown)
+    this.shell.removeEventListener('pointermove', this.onPointerMove)
+    this.shell.removeEventListener('pointerup', this.onPointerUp)
+    this.shell.removeEventListener('pointercancel', this.onPointerUp)
+    this.shell.removeEventListener('click', this.onClickCapture, true)
     this.mixer?.removeEventListener('finished', this.onAnimationFinished)
     this.mixer?.stopAllAction()
     this.model?.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
+      const materials = Array.isArray(object.material) ? object.material : [object.material]
+      materials.forEach((material) => material.dispose())
+    })
+    this.effects.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return
+      object.geometry.dispose()
       const materials = Array.isArray(object.material) ? object.material : [object.material]
       materials.forEach((material) => material.dispose())
     })
@@ -310,11 +571,11 @@ export function suspendCharacterModel(actor: HTMLElement) {
   if (shell) mountedModels.get(shell)?.setActive(false)
 }
 
-export function playCharacterAnimation(actor: HTMLElement | null, animation: BattleAnimation) {
-  if (!actor) return
+export function playCharacterAnimation(actor: HTMLElement | null, animation: BattleAnimation): number {
+  if (!actor) return 0
   const shell = actor.querySelector<HTMLElement>('.model-shell')
-  if (!shell) return
-  mountedModels.get(shell)?.play(animation)
+  if (!shell) return 0
+  return mountedModels.get(shell)?.play(animation) ?? 0
 }
 
 export function destroyCharacterModels(root: HTMLElement) {

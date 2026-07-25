@@ -84,6 +84,17 @@ const RAIL_FRONT_RIGHT = 860
 const RAIL_GAP = 260
 const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
+const TRANSIENT_ACTOR_CLASSES = [
+  'front',
+  'target',
+  'back',
+  'strikes-first',
+  'hit',
+  'lunge',
+  'dying',
+  'fast',
+  'dead',
+] as const
 const BUG_COUNT_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
   <ellipse cx="24" cy="26" rx="10" ry="14" fill="currentColor" fill-opacity=".16"/><path d="M19 14c0-5 10-5 10 0M14 21 8 17M34 21l6-4M14 29l-7 2M34 29l7 2M17 37l-5 5M31 37l5 5M24 16v24"/>
 </svg>`
@@ -417,7 +428,8 @@ export class BattleView {
   private releaseFoe(el: HTMLElement) {
     const key = el.dataset.poolKey
     el.getAnimations().forEach((animation) => animation.cancel())
-    el.classList.remove('front', 'target', 'back', 'strikes-first', 'hit', 'lunge')
+    // 사망 애니메이션은 forwards라 dying/fast가 남으면 재사용한 적도 opacity 0이 된다.
+    el.classList.remove(...TRANSIENT_ACTOR_CLASSES)
     suspendCharacterModel(el)
     el.remove()
     if (!key) return
@@ -458,6 +470,9 @@ export class BattleView {
       this.bindActor(actor)
       return actor
     })()
+    // 풀에 들어오기 전 경로와 무관하게 재취득 시 한 번 더 방어적으로 초기화한다.
+    el.getAnimations().forEach((animation) => animation.cancel())
+    el.classList.remove(...TRANSIENT_ACTOR_CLASSES)
     el.dataset.i = String(i)
     el.dataset.character = visual.id
     el.dataset.poolKey = key
@@ -466,6 +481,8 @@ export class BattleView {
     const image = el.querySelector<HTMLImageElement>('.battle-sprite')!
     image.src = visual.portrait2d
     image.alt = enemy.def.name
+    const modelShell = el.querySelector<HTMLElement>('.model-shell')!
+    if (!visual.model3d) modelShell.dataset.modelStatus = 'fallback-2d'
     mountCharacterModel(el, visual)
     return el
   }
@@ -670,13 +687,16 @@ export class BattleView {
     }
     const leave = () => this.fadeDock(() => this.clearDetailDock())
     // 체력바뿐 아니라 캐릭터 본체도 각각 명시적인 상세보기 호버 영역으로 사용한다.
-    actor.querySelectorAll<HTMLElement>('.nameplate, .model-shell').forEach((target) => {
+    // 포인터 히트박스는 실제 캐릭터가 그려지는 모델 셸로 통일한다.
+    actor.querySelectorAll<HTMLElement>('.model-shell').forEach((target) => {
       target.addEventListener('mouseenter', show)
       target.addEventListener('mouseleave', leave)
     })
     actor.addEventListener('focus', show)
     actor.addEventListener('blur', leave)
-    actor.addEventListener('click', show)
+    actor.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('.model-shell')) show()
+    })
     actor.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
@@ -1550,6 +1570,7 @@ export class BattleView {
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
     if (prep.guardGain > 0) {
+      playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
       await this.rollTotal(prep.guardGain, 'guard')
       await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
@@ -1684,7 +1705,8 @@ export class BattleView {
     this.setPhase('패배')
     this.log('일기장이 너무 상했다…')
     this.renderActors()
-    await sleep(520)
+    const defeatDuration = playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'defeat')
+    await sleep(defeatDuration || 520)
     this.onLose()
   }
 
@@ -1770,7 +1792,10 @@ export class BattleView {
     }
     // 회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다. 방어는 준비 단계에서 처리한다.
     if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
-    if (res.heal) await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+    if (res.heal) {
+      playCharacterAnimation(you, 'heal')
+      await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+    }
     // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
     for (const k of res.killed) await this.playDeath(k, 1, sweep)
   }
@@ -1944,6 +1969,10 @@ export class BattleView {
   private async finishWin(pause: number): Promise<void> {
     this.over = true
     this.setPhase('전투 승리')
+    const victoryStartedAt = performance.now()
+    const victory = Math.random() < 0.5 ? 'victory1' : 'victory2'
+    playCharacterAnimation(this.q<HTMLElement>('.actor.you'), victory)
+    const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
     const saved = this.cardHand.savedDraws
     if (saved > 0) {
       this.log(`카드 뽑기 ${saved}회를 아꼈다 — 보상등급 +${saved}`)
@@ -1951,6 +1980,8 @@ export class BattleView {
     }
     await sleep(pause)
     await this.gradeFinale()
+    const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
+    if (victoryRemaining > 0) await sleep(victoryRemaining)
     this.onWin(this.grade)
   }
 
@@ -2018,7 +2049,8 @@ export class BattleView {
   private async flyToPlayer(text: string, cls: string, theme: 'self' | 'heal' | 'guard') {
     const pboxEl = this.q('#pbox')
     const you = this.q<HTMLElement>('.actor.you')
-    const to = this.toStage(you.getBoundingClientRect())
+    const modelShell = you.querySelector<HTMLElement>('.model-shell') ?? you
+    const to = this.toStageCenter(modelShell.getBoundingClientRect())
     const fx = pboxEl.offsetWidth / 2
     const fy = pboxEl.offsetHeight * 0.5
     const p = document.createElement('div')
@@ -2032,8 +2064,8 @@ export class BattleView {
       [
         { transform: 'translate(0,0) scale(0.6)', opacity: 0 },
         { transform: 'translate(0,0) scale(1.15)', opacity: 1, offset: 0.22 },
-        { transform: `translate(${to.x - fx}px, ${to.y + 40 - fy}px) scale(1)`, opacity: 1, offset: 0.85 },
-        { transform: `translate(${to.x - fx}px, ${to.y + 40 - fy}px) scale(0.7)`, opacity: 0 },
+        { transform: `translate(${to.x - fx}px, ${to.y - fy}px) scale(1)`, opacity: 1, offset: 0.85 },
+        { transform: `translate(${to.x - fx}px, ${to.y - fy}px) scale(0.7)`, opacity: 0 },
       ],
       { duration: 520, easing: 'cubic-bezier(0.4,0,0.3,1)' },
     )
@@ -2106,6 +2138,15 @@ export class BattleView {
     const box = pboxEl.getBoundingClientRect()
     const scale = box.width / pboxEl.offsetWidth
     return { x: (rect.left + rect.width / 2 - box.left) / scale, y: (rect.top - box.top) / scale }
+  }
+  private toStageCenter(rect: DOMRect): { x: number; y: number } {
+    const pboxEl = this.q('#pbox')
+    const box = pboxEl.getBoundingClientRect()
+    const scale = box.width / pboxEl.offsetWidth
+    return {
+      x: (rect.left + rect.width / 2 - box.left) / scale,
+      y: (rect.top + rect.height / 2 - box.top) / scale,
+    }
   }
   private popEl(el: HTMLElement, txt: string, cls: string) {
     const { x, y } = this.toStage(el.getBoundingClientRect())

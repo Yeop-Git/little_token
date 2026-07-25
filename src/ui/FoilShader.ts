@@ -106,9 +106,9 @@ const FRAGMENT_SHADER = `
     float fineSeed = hash21(fineCell + 37.1);
     vec2 finePoint = fract(fineGrid) - (0.18 + fineSeed2 * 0.64);
     float fineRadius = length(finePoint);
-    float fineRays = smoothstep(0.042, 0.0, min(abs(finePoint.x), abs(finePoint.y)))
-      * smoothstep(0.34, 0.02, fineRadius);
-    float fineCore = smoothstep(0.105, 0.0, fineRadius);
+    float fineRays = smoothstep(0.084, 0.0, min(abs(finePoint.x), abs(finePoint.y)))
+      * smoothstep(0.52, 0.04, fineRadius);
+    float fineCore = smoothstep(0.21, 0.0, fineRadius);
     float fineWave = max(0.0, sin(u_time * (1.05 + fineSeed * 0.72) + fineSeed * 47.0));
     float finePulse = mix(pow(fineWave, 10.0), pow(fineWave, 2.2), u_hover * 0.72);
     float fineStar = (fineCore + fineRays * 0.78) * step(0.70, fineSeed) * finePulse;
@@ -119,9 +119,9 @@ const FRAGMENT_SHADER = `
     float heroSeed = hash21(heroCell + 91.4);
     vec2 heroPoint = fract(heroGrid) - (0.20 + heroSeed2 * 0.60);
     float heroRadius = length(heroPoint);
-    float heroRays = smoothstep(0.032, 0.0, min(abs(heroPoint.x), abs(heroPoint.y)))
-      * smoothstep(0.43, 0.03, heroRadius);
-    float heroCore = smoothstep(0.092, 0.0, heroRadius);
+    float heroRays = smoothstep(0.064, 0.0, min(abs(heroPoint.x), abs(heroPoint.y)))
+      * smoothstep(0.58, 0.06, heroRadius);
+    float heroCore = smoothstep(0.184, 0.0, heroRadius);
     float heroWave = max(0.0, sin(u_time * (0.72 + heroSeed * 0.44) + heroSeed * 53.0));
     float heroPulse = mix(pow(heroWave, 16.0), pow(heroWave, 2.8), u_hover * 0.76);
     float heroStar = (heroCore * 1.25 + heroRays) * step(0.56, heroSeed) * heroPulse;
@@ -144,21 +144,13 @@ const FRAGMENT_SHADER = `
     float turn = u_pointer.x * 0.13 + sin(u_time * 0.19) * 0.035;
     mat2 rotation = mat2(cos(turn), -sin(turn), sin(turn), cos(turn));
     vec2 prismP = rotation * p;
-    // 큰 보로노이 셸 위에 방사형 파단선을 겹쳐, 작은 타일 무늬가 아니라
-    // 한 장의 포일이 불규칙한 프리즘 조각으로 깨진 인상을 만든다.
+    // 단일 보로노이 레이어만 사용한다. 색·반사·호버 점등은 모두 이 각진
+    // 셸 ID를 공유해 별도의 소용돌이 파단 무늬가 겹쳐 보이지 않게 한다.
     vec3 cells = voronoi(prismP * vec2(3.15, 4.25) + vec2(0.31, -0.18));
     float shellGap = cells.y - cells.x;
     float shellEdge = 1.0 - smoothstep(0.012, 0.078, shellGap);
-
-    vec2 fractureOrigin = vec2(0.06, 0.08);
-    vec2 fractureDelta = prismP - fractureOrigin;
-    float fractureAngle = atan(fractureDelta.y, fractureDelta.x) / TAU + 0.5;
-    float sectorCoord = fractureAngle * 11.0 + length(fractureDelta) * 1.55;
-    float sectorLocal = abs(fract(sectorCoord) - 0.5);
-    float fractureEdge = 1.0 - smoothstep(0.455, 0.495, sectorLocal);
-    float edge = max(shellEdge, fractureEdge * 0.72);
-
-    float shellId = fract(cells.z + floor(sectorCoord) * 0.137);
+    float edge = shellEdge;
+    float shellId = cells.z;
     float facetAngle = shellId * TAU + u_time * 0.11;
     vec2 facetNormal = vec2(cos(facetAngle), sin(facetAngle));
     vec2 light = normalize(vec2(0.72 + u_pointer.x * 0.46, -0.52 - u_pointer.y * 0.28));
@@ -283,14 +275,22 @@ class FoilShaderRenderer {
       const rect = host.getBoundingClientRect()
       if (!card || rect.width < 2 || rect.height < 2) continue
 
-      const hovering = card.matches(':hover')
+      // 사용 고스트는 포인터를 떠나 중앙으로 이동하므로 실제 :hover가 풀린다.
+      // 이동·폭발 중에는 강제 호버로 취급해 등급별 반짝임을 끝까지 이어 간다.
+      const forcedHover = card.classList.contains('commit-ghost')
+      const hovering = forcedHover || card.matches(':hover')
       if (hovering && !surface.hovering) surface.hoverPulse = 1
       surface.hovering = hovering
-      surface.hoverPulse *= reduced ? 0.25 : 0.91
+      // 전설 셀 점등은 영웅 파동보다 2배 길게 보여 각 조각의 색 변화를 읽게 한다.
+      // 기존 지수 감쇠율의 제곱근을 쓰면 같은 변화량에 필요한 프레임 수가 2배가 된다.
+      const hoverDecay = surface.kind === 'legendary'
+        ? (reduced ? 0.5 : Math.sqrt(0.91))
+        : (reduced ? 0.25 : 0.91)
+      surface.hoverPulse *= hoverDecay
       const autoX = Math.sin(time * 0.43 + rect.left * 0.002) * 0.34
       const autoY = Math.cos(time * 0.37 + rect.top * 0.002) * 0.28
-      const targetX = hovering ? Math.max(-1, Math.min(1, ((this.pointerClientX - rect.left) / rect.width - 0.5) * 2)) : autoX
-      const targetY = hovering ? Math.max(-1, Math.min(1, ((this.pointerClientY - rect.top) / rect.height - 0.5) * 2)) : autoY
+      const targetX = forcedHover ? 0 : hovering ? Math.max(-1, Math.min(1, ((this.pointerClientX - rect.left) / rect.width - 0.5) * 2)) : autoX
+      const targetY = forcedHover ? 0 : hovering ? Math.max(-1, Math.min(1, ((this.pointerClientY - rect.top) / rect.height - 0.5) * 2)) : autoY
       surface.pointerX += (targetX - surface.pointerX) * (reduced ? 1 : 0.09)
       surface.pointerY += (targetY - surface.pointerY) * (reduced ? 1 : 0.09)
       this.draw(surface, time, rect.width / rect.height, Math.max(hovering ? 0.16 : 0, surface.hoverPulse))

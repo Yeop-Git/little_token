@@ -3,8 +3,17 @@ import { MODELS, SPRITES } from '@/assets'
 export interface CharacterAnimationDef {
   idle: string
   attack: string
-  /** 원본 클립 길이와 무관하게 전투 타격 연출에 맞출 재생 시간. */
-  attackDurationMs: number
+  heal?: string
+  shield?: string
+  victory1?: string
+  victory2?: string
+  defeat?: string
+  /** 원본 클립 길이와 무관하게 화면 연출에 맞출 단발 동작별 재생 시간. */
+  durationsMs?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
+  playbackRates?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  /** 승리 동작 중 스테이지 전환 전에 보여 줄 하이라이트 길이. */
+  victoryHighlightMs?: number
 }
 
 export interface CharacterVisualDef {
@@ -31,10 +40,24 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     animations: {
       idle: 'Armature|idle|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
-      attackDurationMs: 440,
+      heal: 'Armature|heal|BaseLayer',
+      // 새 GLB의 실제 클립명이 sheld로 저장되어 있어 의미상의 shield와 명시적으로 연결한다.
+      shield: 'Armature|sheld|BaseLayer',
+      victory1: 'Armature|victory1|BaseLayer',
+      victory2: 'Armature|victory2|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: {
+        attack: 440,
+        heal: 900,
+        shield: 1100,
+        defeat: 1500,
+      },
+      playbackRates: { victory1: 1.25, victory2: 1.25 },
+      victoryHighlightMs: 2000,
     },
+    // 화면 정면에서 90° 돌아 오른쪽의 적을 완전히 바라보는 측면 자세.
     modelYaw: Math.PI / 2,
-    modelGroundOffset: 1.45,
+    modelGroundOffset: -0.34,
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',
     description: '비에 젖은 일기장을 품고, 올바른 문장으로 이야기를 지켜낸다.',
@@ -44,6 +67,8 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '좀나방',
     model3d: null,
     animations: null,
+    // 향후 3D 모델 연결 시 전장 왼쪽의 플레이어를 바라보는 방향.
+    modelYaw: -Math.PI / 2,
     portrait2d: SPRITES.enemy_moth,
     title: '책장을 갉는 날개',
     description: '가벼운 날갯짓으로 문장의 가장자리부터 빠르게 먹어 치운다.',
@@ -53,6 +78,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '바퀴벌레',
     model3d: null,
     animations: null,
+    modelYaw: -Math.PI / 2,
     portrait2d: SPRITES.enemy_roach,
     title: '문장 사이의 단단한 얼룩',
     description: '두꺼운 껍질로 버티며 일기장 깊숙한 곳까지 파고든다.',

@@ -1,8 +1,9 @@
 import { SKILL_ART } from '@/assets'
 import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 
-// 클릭으로 카드를 먹일 때 고스트가 부풀어 사라지는 시간.
-const COMMIT_ANIM_MS = 340
+// 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
+const COMMIT_FLIGHT_MS = 480
+const COMMIT_POP_MS = 180
 
 export const CARD_HAND_CONFIG = {
   maxHand: 6,
@@ -448,40 +449,77 @@ export class CardHand {
   }
 
   // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.
-  // 게임 진행(onConfirm)은 즉시 일어나고, 카드가 부풀어 빨려드는 연출은 뒤에서 따로 논다.
-  // 이렇게 분리해야 연출이 입력을 삼키지 않는다(예전엔 190ms 동안 클릭이 먹혔다).
-  private commit(card: CardInstance, button?: HTMLButtonElement) {
-    if (this.destroyed) return
+  // 중앙에서 카드가 터지는 프레임에 onConfirm을 호출해 화면 연출과 실제 적용을 일치시킨다.
+  private async commit(card: CardInstance, button?: HTMLButtonElement) {
+    if (this.destroyed || this.processing) return
     // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
     if (button && !button.isConnected) return
     if (this.drawingId === card.instanceId) return
     if (this.conflictOf(card.word)) return
 
     this.selectedId = card.instanceId
-    this.pulseSlotStep()
-    // 연출은 진행 전에 미리 찍어 둔다 — onConfirm이 손패를 다시 그리면 버튼이 사라지기 때문.
-    if (button && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      this.playCommitFx(button)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!button || reduced) {
+      this.pulseSlotStep()
+      this.opts.onConfirm(card.word)
+      return
     }
-    this.opts.onConfirm(card.word)
+
+    this.processing = true
+    this.wordZone?.classList.add('is-committing')
+    try {
+      await this.playCommitFx(button)
+      if (this.destroyed) return
+      this.pulseSlotStep()
+      this.opts.onConfirm(card.word)
+    } finally {
+      this.processing = false
+      this.wordZone?.classList.remove('is-committing')
+    }
   }
 
-  // 순수 연출 — 원본 위치에서 고스트를 복제해 화면 쪽으로 부풀리며 빛으로 흩어 보낸다.
-  private playCommitFx(button: HTMLButtonElement) {
+  // 원본 위치의 복제 카드가 화면 중앙으로 이동한 뒤 광환과 파편으로 터진다.
+  private async playCommitFx(button: HTMLButtonElement) {
     const ghost = this.spawnCommitGhost(button)
-    // 좌표는 숫자로 계산한다(키프레임 안의 calc()는 브라우저가 거부할 수 있다).
-    const x = parseFloat(ghost.style.getPropertyValue('--commit-x')) || 0
-    const y = parseFloat(ghost.style.getPropertyValue('--commit-y')) || 0
-    const at = (dy: number, s: number) => `translate3d(${x.toFixed(1)}px, ${(y + dy).toFixed(1)}px, 0) scale(${s})`
-    ghost.animate(
+    const fromX = Number(ghost.dataset.fromX) || 0
+    const fromY = Number(ghost.dataset.fromY) || 0
+    const toX = Number(ghost.dataset.toX) || 0
+    const toY = Number(ghost.dataset.toY) || 0
+    const at = (x: number, y: number, scale: number, rotate = 0) =>
+      `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) rotate(${rotate}deg) scale(${scale})`
+    const flight = ghost.animate(
       [
-        { transform: at(0, 1), opacity: 1, filter: 'brightness(1)' },
-        { transform: at(-34, 1.34), opacity: 1, filter: 'brightness(1.75) saturate(1.25)', offset: 0.45 },
-        { transform: at(-96, 2.05), opacity: 0, filter: 'brightness(2.6) saturate(1.4)' },
+        { transform: at(fromX, fromY, 1), opacity: 1, filter: 'brightness(1)' },
+        {
+          transform: at(fromX + (toX - fromX) * 0.58, fromY + (toY - fromY) * 0.58 - 54, 1.08, -2),
+          opacity: 1,
+          filter: 'brightness(1.28) saturate(1.15)',
+          offset: 0.62,
+        },
+        { transform: at(toX, toY, 1.18), opacity: 1, filter: 'brightness(1.85) saturate(1.3)' },
       ],
-      { duration: COMMIT_ANIM_MS, easing: 'cubic-bezier(.2,.72,.24,1)' },
+      { duration: COMMIT_FLIGHT_MS, easing: 'cubic-bezier(.18,.76,.2,1)', fill: 'forwards' },
     )
-    window.setTimeout(() => ghost.remove(), COMMIT_ANIM_MS + 80)
+    await Promise.race([
+      Promise.allSettled([flight.finished]),
+      new Promise((resolve) => window.setTimeout(resolve, COMMIT_FLIGHT_MS + 120)),
+    ])
+    if (this.destroyed) {
+      ghost.remove()
+      return
+    }
+
+    this.spawnCommitBurst(button)
+    const pop = ghost.animate(
+      [
+        { transform: at(toX, toY, 1.18), opacity: 1, filter: 'brightness(1.85) saturate(1.3)' },
+        { transform: at(toX, toY, 1.42), opacity: 0.88, filter: 'brightness(3) saturate(1.1)', offset: 0.28 },
+        { transform: at(toX, toY, 0.72), opacity: 0, filter: 'brightness(4) blur(8px)' },
+      ],
+      { duration: COMMIT_POP_MS, easing: 'cubic-bezier(.22,.72,.18,1)', fill: 'forwards' },
+    )
+    void Promise.allSettled([pop.finished]).then(() => ghost.remove())
+    window.setTimeout(() => ghost.remove(), COMMIT_POP_MS + 120)
   }
 
   private pulseSlotStep() {
@@ -495,18 +533,50 @@ export class CardHand {
 
   private spawnCommitGhost(button: HTMLElement): HTMLElement {
     const stageRect = this.stage.getBoundingClientRect()
-    const rect = button.getBoundingClientRect()
+    const rect = button.querySelector<HTMLElement>('.card-lift')?.getBoundingClientRect() ?? button.getBoundingClientRect()
     const scaleX = stageRect.width / this.stage.offsetWidth || 1
     const scaleY = stageRect.height / this.stage.offsetHeight || 1
+    const visibleCenterX = (Math.max(0, stageRect.left) + Math.min(window.innerWidth, stageRect.right)) / 2
+    const visibleCenterY = (Math.max(0, stageRect.top) + Math.min(window.innerHeight, stageRect.bottom)) / 2
     const ghost = button.cloneNode(true) as HTMLElement
+    // 원본 WebGL 캔버스의 비트맵은 cloneNode로 복제되지 않는다. 빈 캔버스를 버리면
+    // 포일 렌더러가 고스트용 캔버스를 새로 붙여 이동 중에도 등급 연출을 그린다.
+    ghost.querySelectorAll('.foil-shader-canvas').forEach((canvas) => canvas.remove())
     ghost.classList.remove('selected', 'committing')
     ghost.classList.add('commit-ghost')
     ghost.removeAttribute('data-instance-id')
     ghost.setAttribute('aria-hidden', 'true')
-    ghost.style.setProperty('--commit-x', `${((rect.left - stageRect.left) / scaleX).toFixed(1)}px`)
-    ghost.style.setProperty('--commit-y', `${((rect.top - stageRect.top) / scaleY).toFixed(1)}px`)
+    ghost.dataset.fromX = ((rect.left - stageRect.left) / scaleX).toFixed(1)
+    ghost.dataset.fromY = ((rect.top - stageRect.top) / scaleY).toFixed(1)
+    ghost.dataset.toX = ((visibleCenterX - stageRect.left - rect.width / 2) / scaleX).toFixed(1)
+    ghost.dataset.toY = ((visibleCenterY - stageRect.top - rect.height / 2) / scaleY).toFixed(1)
     this.stage.append(ghost)
     return ghost
+  }
+
+  private spawnCommitBurst(button: HTMLElement) {
+    const stageRect = this.stage.getBoundingClientRect()
+    const scaleX = stageRect.width / this.stage.offsetWidth || 1
+    const scaleY = stageRect.height / this.stage.offsetHeight || 1
+    const visibleCenterX = (Math.max(0, stageRect.left) + Math.min(window.innerWidth, stageRect.right)) / 2
+    const visibleCenterY = (Math.max(0, stageRect.top) + Math.min(window.innerHeight, stageRect.bottom)) / 2
+    const burst = document.createElement('span')
+    burst.className = 'card-commit-burst'
+    burst.setAttribute('aria-hidden', 'true')
+    burst.style.left = `${((visibleCenterX - stageRect.left) / scaleX).toFixed(1)}px`
+    burst.style.top = `${((visibleCenterY - stageRect.top) / scaleY).toFixed(1)}px`
+    burst.style.setProperty('--burst-color', getComputedStyle(button).getPropertyValue('--wglow').trim() || '#ffe3a1')
+    for (let i = 0; i < 18; i++) {
+      const piece = document.createElement('i')
+      const angle = (360 / 18) * i + (i % 2) * 7
+      const distance = 92 + (i % 5) * 18
+      piece.style.setProperty('--burst-angle', `${angle}deg`)
+      piece.style.setProperty('--burst-distance', `${distance}px`)
+      piece.style.setProperty('--burst-delay', `${(i % 3) * 12}ms`)
+      burst.append(piece)
+    }
+    this.stage.append(burst)
+    window.setTimeout(() => burst.remove(), 720)
   }
 
   // 덱 버튼 — 이번 스테이지에 남은 추가 드로우 횟수를 보여준다(덱 장수가 아니다).

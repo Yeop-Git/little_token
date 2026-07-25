@@ -815,7 +815,8 @@ button {
   outline: none;
 }
 .actor.you {
-  left: 250px;
+  /* 310→360 확장분의 절반만큼 좌측을 당겨 캐릭터 중심은 기존 위치에 고정한다. */
+  left: 225px;
 }
 .actor .model-shell {
   position: relative;
@@ -825,11 +826,18 @@ button {
   transform-origin: center bottom;
   filter: blur(var(--model-blur, 0)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
   transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), filter 0.4s ease;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
+.actor.you .model-shell { width: 360px; }
+.actor .model-shell[data-model-dragging='true'] { cursor: grabbing; }
 .actor.foe .model-shell {
   width: 280px;
   height: 330px;
 }
+/* 원본 투명 여백이 더 큰 바퀴벌레도 좀나방과 같은 약 273px 실루엣 높이로 정규화한다. */
+.actor.foe[data-character='roach'] .model-shell { width: 309px; }
 /* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
 .actor.foe.front .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 18px color-mix(in srgb, var(--glow) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
@@ -2008,21 +2016,96 @@ button {
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
 .word-card.blocked .card-note { color: #9a342b; }
 .word-card.drawing { pointer-events: none; }
-/* 클릭 발동 순간 원래 카드 위치에서 떠오르는 복제 카드. */
+/* 사용 중에는 중앙 폭발이 끝날 때까지 다음 카드와 덱 입력을 잠근다. */
+.word-zone.is-committing .card-table,
+.word-zone.is-committing .draw-deck {
+  pointer-events: none;
+}
+.word-zone.is-committing .card-hand > .word-card {
+  opacity: .52;
+  filter: saturate(.65) brightness(.72);
+}
+/* 클릭한 카드와 같은 모습으로 화면 중앙까지 이동하는 복제 카드. */
 .word-card.commit-ghost {
   left: 0;
   top: 0;
   z-index: 1400;
-  opacity: .98;
+  opacity: 1;
   pointer-events: none;
-  transform: translate3d(var(--commit-x), var(--commit-y), 0) scale(1.06);
   transition: none;
   filter: drop-shadow(0 0 26px var(--wglow)) drop-shadow(0 28px 24px rgba(0, 0, 0, 0.6));
-  will-change: transform;
+  will-change: transform, opacity, filter;
 }
 .word-card.commit-ghost .card-lift {
-  transform: translateY(-12px);
+  transform: none;
   filter: none;
+}
+/* 중앙 도착 프레임의 광환·충격파·방사 파편. */
+.card-commit-burst {
+  --burst-color: #ffe3a1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 1410;
+  pointer-events: none;
+}
+.card-commit-burst::before,
+.card-commit-burst::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(.18);
+  pointer-events: none;
+}
+.card-commit-burst::before {
+  width: 210px;
+  height: 210px;
+  background: radial-gradient(circle, #fff 0 7%, var(--burst-color) 18%, color-mix(in srgb, var(--burst-color) 38%, transparent) 42%, transparent 68%);
+  filter: blur(2px);
+  animation: card-commit-flash .34s ease-out both;
+}
+.card-commit-burst::after {
+  width: 128px;
+  height: 128px;
+  border: 7px solid color-mix(in srgb, var(--burst-color) 78%, white);
+  box-shadow: 0 0 22px var(--burst-color), inset 0 0 18px var(--burst-color);
+  animation: card-commit-ring .54s cubic-bezier(.12,.68,.2,1) both;
+}
+.card-commit-burst > i {
+  position: absolute;
+  left: -5px;
+  top: -18px;
+  width: 10px;
+  height: 36px;
+  border-radius: 3px 3px 8px 8px;
+  background: linear-gradient(#fff, var(--burst-color) 42%, transparent);
+  box-shadow: 0 0 12px var(--burst-color);
+  transform-origin: 5px 18px;
+  animation: card-commit-shard .58s cubic-bezier(.12,.72,.2,1) var(--burst-delay) both;
+}
+@keyframes card-commit-flash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.12); }
+  24% { opacity: 1; transform: translate(-50%, -50%) scale(.72); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.45); }
+}
+@keyframes card-commit-ring {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(.2); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.5); }
+}
+@keyframes card-commit-shard {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--burst-angle)) translateY(-22px) scaleY(.35);
+  }
+  62% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--burst-angle)) translateY(calc(var(--burst-distance) * -1)) scaleY(.08);
+  }
 }
 /* 정산 중 손패 — 문장을 다 쓴 손패는 아래로 빠지며 사라진다.
    정산이 끝나면 1번 주어부터 새로 뽑히므로, 흐려졌다 돌아오지 않고 완전히 비운다. */
@@ -2221,17 +2304,21 @@ button {
 }
 .word-card.rarity-rare:hover .card-foil,
 .word-card.rarity-rare:focus-visible .card-foil,
+.word-card.rarity-rare.commit-ghost .card-foil,
 .reward-pick.rarity-rare:hover .rp-foil {
   animation: rare-foil-sweep .9s ease-out both;
 }
 .word-card[class*='rarity-']:hover .card-foil,
 .word-card[class*='rarity-']:focus-visible .card-foil,
+.word-card[class*='rarity-'].commit-ghost .card-foil,
 .reward-pick[class*='rarity-']:hover .rp-foil { filter: brightness(1.25) saturate(1.16); }
 .word-card.rarity-epic:hover .card-foil::after,
 .word-card.rarity-epic:focus-visible .card-foil::after,
+.word-card.rarity-epic.commit-ghost .card-foil::after,
 .reward-pick.rarity-epic:hover .rp-foil::after { animation-duration: 1.15s; opacity: .52; }
 .word-card.rarity-legendary:hover .card-foil::after,
 .word-card.rarity-legendary:focus-visible .card-foil::after,
+.word-card.rarity-legendary.commit-ghost .card-foil::after,
 .reward-pick.rarity-legendary:hover .rp-foil::after { animation-duration: 1.05s; opacity: .72; }
 @keyframes rare-foil-sweep {
   from { background-position: 100% 0; }
