@@ -3,9 +3,9 @@
  *  · 상단: 완성 중인 문장(체인) 그림자 강조
  *  · 중앙 하단: 단어를 가로 배치하고 클릭으로 발동. 전부 채우면 자동 완성(반짝 후 발동)
  *  · 되돌리기: 하단 중앙 회색 연한 글자, 한 단계씩 되돌림
- *  · 좌측: 스탯표 · 우하단: 단어장과 가방 보조 버튼
- *  · 우측: 정보 패널 — "해당 단어"만의 효과/수치(누적 아님) 또는 가방 아이템 정보
- *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
+ *  · 좌측: 스탯표 · 행동 순서 · 보유 아이템 아이콘
+ *  · 우측: 정보 패널 — "해당 단어"만의 효과/수치(누적 아님)
+ *  · 우상단: 설정 · 도감 · 홈
  */
 
 import {
@@ -52,7 +52,7 @@ import { SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
-import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
+import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -101,6 +101,11 @@ interface Opts {
   intro?: boolean
   /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
   onIntroComplete?: () => void
+  /** 저장하지 않는 개발용 전투 보정. */
+  debugCombat?: {
+    invincible: boolean
+    attackMultiplier: number
+  }
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
@@ -198,7 +203,6 @@ export class BattleView {
   private target = 0
   private busy = false
   private over = false
-  private bagMode = false
   private timers: number[] = []
   private cardHand!: CardHand
   private introDialogue: IntroDialogue | null = null
@@ -212,6 +216,7 @@ export class BattleView {
   private phaseLabel = '주어 선택'
   private playerPreempting = false
   private actionOrderSignature = ''
+  private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
   /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
   private readonly debugSpawnedWords = new Map<string, Word>()
@@ -246,7 +251,16 @@ export class BattleView {
     )
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
-    this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
+    this.state = {
+      playerHp: maxHp,
+      playerMax: maxHp,
+      guard: 0,
+      counterMultiplier: 0,
+      turn: 1,
+      enemies,
+      pending: null,
+    }
+    this.debugSetCombatModes(opts.debugCombat)
     // 이 판의 크기 — 적 전체의 최대 체력 합. 연출 문턱을 깡수치가 아니라 이 값의 비율로
     // 잡으면 층이 올라 적이 단단해질수록 문턱도 저절로 따라 올라간다.
     this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
@@ -323,6 +337,12 @@ export class BattleView {
     void this.lose()
   }
 
+  /** Developer-only battle modifiers; they never change the saved player state. */
+  debugSetCombatModes(modes?: { invincible: boolean; attackMultiplier: number }) {
+    this.state.damageImmune = !!modes?.invincible
+    this.debugAttackMultiplier = Math.max(1, Math.floor(modes?.attackMultiplier ?? 1))
+  }
+
   /** Developer-only shortcut; the spawned card exists only in the current slot hand. */
   async debugSpawnCard(word: Word): Promise<string> {
     if (this.busy || this.over) return '지금은 카드를 생성할 수 없습니다.'
@@ -371,7 +391,7 @@ export class BattleView {
       if (!restore) return
       if (this.pointerDown) return this.scheduleDockRestore(120)
       // 리렌더로 엘리먼트만 갈렸을 뿐 커서는 아직 무언가 위에 있다면 그대로 둔다.
-      if (this.root.querySelector('.word-card:hover, .actor:hover, .bag-item:hover')) return
+      if (this.root.querySelector('.word-card:hover, .actor:hover')) return
       this.dockRestore = null
       restore()
     }, delay)
@@ -438,11 +458,13 @@ export class BattleView {
               <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
               <ol id="action-order-list"></ol>
             </aside>
+            <aside class="relic-strip" id="relic-strip" aria-label="보유 아이템"></aside>
           </div>
           <div class="hud-status">
             <div class="hud-status-bar">
               <div class="hud-actions glass" aria-label="시스템 메뉴">
                 <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
+                <button id="codex-btn" type="button" title="도감" aria-label="그림일기 도감">${icon('collection')}</button>
                 <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
               </div>
             </div>
@@ -465,23 +487,11 @@ export class BattleView {
         ${this.isBoss ? this.bossPlayerHudHtml() : ''}
 
         <div class="word-zone">
-          <div class="pane-stack">
-            <div class="pane words">
-              <div class="card-table" aria-label="단어 카드 선택 영역">
-                <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
-                <button class="draw-deck" id="draw-deck" type="button"></button>
-              </div>
-              <div class="slot-step" id="steps"></div>
-            </div>
-            <div class="pane bag">
-              <div class="bag-row" id="bagrow"></div>
-            </div>
+          <div class="card-table" aria-label="단어 카드 선택 영역">
+            <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
+            <button class="draw-deck" id="draw-deck" type="button"></button>
           </div>
-        </div>
-
-        <div class="battle-tools" aria-label="전투 보조 메뉴">
-          <button class="battle-tool backpack" id="bag" type="button" title="가방">${icon('backpack')}<span>가방</span></button>
-          <button class="battle-tool codex-btn" id="codex-btn" type="button">${icon('collection')}<span>도감</span></button>
+          <div class="slot-step" id="steps"></div>
         </div>
 
         <aside class="info-dock detail-idle" id="detail" aria-live="polite"></aside>
@@ -495,7 +505,6 @@ export class BattleView {
     // 가장 짜릿해야 할 순간에 검은 사각형이 먼저 뜬다.
     this.attackCine = new AttackCinematic(this.q<HTMLElement>('.scene.battle'))
 
-    this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
     this.q('#home-btn').addEventListener('click', () => this.onHome?.())
@@ -523,7 +532,7 @@ export class BattleView {
     this.renderWords()
     this.beginSpiderTurn()
     this.renderStats()
-    this.renderBag()
+    this.renderRelics()
     this.clearDetailDock()
     if (this.isBoss) {
       const bossId = this.state.enemies[0]?.def.id
@@ -1242,7 +1251,7 @@ export class BattleView {
       .join('')
     let extra = ''
     if (anyPicked) {
-      const intent = compile(this.sel, this.t, this.player.stats, this.mods())
+      const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
         extra += `<span class="chain-word ctx perfect"><b class="cw-text">「${c.name}」</b><em class="cw-note combo">완벽한 맥락 ×${c.mult}</em></span>`
       }
@@ -1271,7 +1280,7 @@ export class BattleView {
       this.multReelToken++
       return
     }
-    const intent = compile(this.sel, this.t, this.player.stats, this.mods())
+    const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
     const mult = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     // 정산판과 같은 출처(컴파일러가 쌓아 둔 깡수치)를 쓴다 — 방어·회복 문장도 0이 되지 않는다.
     const flat = intent.breakdown.flats.reduce((n, f) => n + f.value, 0)
@@ -1319,7 +1328,7 @@ export class BattleView {
 
   // 체인에 붙는 한 줄 설명 — 카드 상세·보상과 같은 표기 규칙(wordValueLines)을 쓴다.
   private chainNote(w: Word): { text: string; cls: string } | null {
-    const lines = wordValueLines(w, this.player.stats)
+    const lines = wordValueLines(w, this.combatStats())
     if (!lines.length) return null
     // 도박 카드는 색을 보라로 고정한다(카드 무드와 같은 색).
     const cls = w.variance ? 'gamble' : lines[0].cls
@@ -1361,7 +1370,7 @@ export class BattleView {
     // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
     const words = this.t.words[key] ?? this.player.deck[key] ?? []
     this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
-    if (!this.bagMode) this.renderDetail(null)
+    this.renderDetail(null)
   }
 
   /** 장로거미는 문장마다 보이는 카드 한 장만 묶는다. CardHand가 남은 선택지를 보장한다. */
@@ -1403,7 +1412,7 @@ export class BattleView {
     const values = this.wordOwnValues(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
-    const intent = compile(trial, this.t, this.player.stats, this.mods())
+    const intent = compile(trial, this.t, this.combatStats(), this.mods())
     const warn = intent.penalties.length
       ? `<div class="wd-warn">⚠ ${intent.penalties[0]} · 위력 ×${intent.coherence.toFixed(2)}</div>`
       : ''
@@ -1425,7 +1434,14 @@ export class BattleView {
   }
 
   private multCtx(intent: Intent) {
-    return { luck: this.player.stats.luck, statBias: statBiasOf(intent, this.player.stats) }
+    const stats = this.combatStats()
+    return { luck: stats.luck, statBias: statBiasOf(intent, stats) }
+  }
+
+  /** The boost changes only outgoing attack-stat cards, never saved stats or heal/guard values. */
+  private combatStats() {
+    if (this.debugAttackMultiplier === 1) return this.player.stats
+    return { ...this.player.stats, atk: this.player.stats.atk * this.debugAttackMultiplier }
   }
 
   /** 보유 패시브 → 컴파일러 수정자. 바베큐는 이번 전투 처치 수를 먹는다. */
@@ -1452,7 +1468,7 @@ export class BattleView {
   // 공/방/회 모두 하나의 배율을 공유한다(execute와 동일 규칙, 룰렛만 미확정).
   // 스탯은 이미 동사의 깡수치로 들어가 있으니 여기서 또 더하지 않는다.
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
-    const intent = compile(sel, this.t, this.player.stats, this.mods())
+    const intent = compile(sel, this.t, this.combatStats(), this.mods())
     const m = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     const guard = Math.round(intent.guard * m)
     const heal = Math.round(intent.heal * m)
@@ -1497,12 +1513,11 @@ export class BattleView {
 
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
   private wordOwnValues(w: Word): { text: string; cls: string }[] {
-    return wordValueLines(w, this.player.stats)
+    return wordValueLines(w, this.combatStats())
   }
 
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
-    // 아이템 규칙은 가방 상세에서 읽는다 — 스탯표 아래에 탭처럼 늘어놓지 않는다.
     this.q('#stats').innerHTML =
       '<span class="hud-player-name" aria-label="주인공 이름 프롬">프롬</span>' +
       STAT_META.map(
@@ -1516,59 +1531,28 @@ export class BattleView {
       ).join('')
   }
 
-  // ── 가방(아이템) — 하단 인라인 토글 ──
-  private renderBag() {
-    const row = this.q('#bagrow')
+  // ── 보유 아이템 — 가방을 열지 않고 전장 좌측에 유물 아이콘으로 상시 표시한다. ──
+  private renderRelics() {
+    const strip = this.q('#relic-strip')
     if (!this.player.items.length) {
-      row.innerHTML = `<div class="bag-empty">가방이 비었다.</div>`
+      strip.hidden = true
+      strip.innerHTML = ''
       return
     }
-    row.innerHTML = this.player.items
-      .map(
-        (it, i) => `<button class="bag-item" data-i="${i}">
-        <div class="bag-art">${itemArt(it.art)}</div>
-        <div class="bag-name">${it.name}</div>
-      </button>`,
-      )
-      .join('')
-    row.querySelectorAll<HTMLElement>('.bag-item').forEach((btn) => {
-      const it = this.player.items[Number(btn.dataset.i)]
-      btn.addEventListener('mouseenter', () => {
-        this.keepDock()
-        this.renderItemDetail(it)
-      })
-      btn.addEventListener('mouseleave', () => this.fadeDock(() => this.renderItemDetail(null)))
-    })
-  }
-
-  private toggleBag() {
-    this.bagMode = !this.bagMode
-    this.q('.word-zone').classList.toggle('bag-mode', this.bagMode)
-    this.q('#bag').classList.toggle('active', this.bagMode)
-    this.renderItemDetail(null)
-    if (!this.bagMode) this.renderDetail(null)
-  }
-
-  // 우측 정보 패널에 아이템 정보(스탯표 + 일러스트).
-  private renderItemDetail(item: OwnedItem | null) {
-    const detail = this.q('#detail')
-    if (!item) {
-      this.clearDetailDock()
-      return
+    strip.hidden = false
+    const tooltipFor = (item: (typeof this.player.items)[number]) => {
+      const passive = item.passive ? PASSIVES[item.passive] : null
+      const stats = STAT_ORDER
+        .filter((key) => item.stats[key])
+        .map((key) => `${STAT_LABEL[key]} +${item.stats[key]}`)
+        .join(' · ')
+      return `${item.name} — ${passive ? `${passive.name}: ${passive.desc}` : stats || item.line}`
     }
-    const rows = STAT_ORDER.filter((k) => item.stats[k])
-      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.stats[k]}</span></div>`)
-      .join('')
-    // 전설 아이템은 스탯이 아니라 규칙을 준다 — 그 규칙을 그대로 적어 준다.
-    const p = item.passive ? PASSIVES[item.passive] : null
-    const passive = p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''
-    detail.className = `info-dock glass item-detail${p ? ' is-passive' : ''}`
-    detail.innerHTML = `
-      <div class="wd-name">${item.name}</div>
-      <div class="wd-grade">✦ ${RARITY_LABEL[ownedItemRarity(item)]} · 「${item.line}」</div>
-      ${passive}
-      <div class="id-stats">${rows}</div>
-      <div class="id-art">${itemArt(item.art)}</div>`
+    strip.innerHTML = `
+      <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
+      <div class="relic-icons">
+        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
+      </div>`
   }
 
   private openSettings() {
@@ -2120,7 +2104,7 @@ export class BattleView {
 
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
-    const intent = compile(this.sel, this.t, this.player.stats, this.mods())
+    const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
