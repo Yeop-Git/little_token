@@ -1552,6 +1552,21 @@ button {
   width: 176px;
   height: 22px;
 }
+/* 프롬 등장 — 왼쪽 밖에서 달려 들어와 자기 자리에 선다.
+   모델 쪽은 어택 클립(달려나가는 동작)이 함께 돌아가므로 여기서는 이동만 맡는다.
+   배경마다 서는 높이가 달라서, 이게 없으면 판이 바뀔 때마다 다른 자리에 순간이동한다. */
+.actor.you.is-entering {
+  animation: player-enter 0.56s cubic-bezier(0.16, 0.9, 0.28, 1) both;
+}
+@keyframes player-enter {
+  from { transform: translateX(-300px); opacity: 0; }
+  60% { opacity: 1; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .actor.you.is-entering { animation: none; }
+}
+
 .actor.hit {
   animation: shake 0.34s ease;
 }
