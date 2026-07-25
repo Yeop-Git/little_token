@@ -59,6 +59,7 @@ interface Opts {
   encounter: string[]
   /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
   onWin: (grade: number) => void
+  onLose: () => void
   onHome?: () => void
   player?: PlayerState
   tables?: Tables
@@ -70,10 +71,12 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-// 적 레일 — 전장에는 앞의 세 마리만 같은 크기·같은 바닥선에 세운다.
+// 적 레일 — 스테이지의 최대 8마리를 모두 바닥선에 세우되, 많아지면 뒤쪽만 압축한다.
+// 3마리 이후를 DOM에서 빼면 실제 적이 투명해진 것처럼 보여 전황을 읽을 수 없어진다.
 const RAIL_FRONT_RIGHT = 860
 const RAIL_GAP = 260
-const MAX_VISIBLE_ENEMIES = 3
+const RAIL_BACK_RIGHT = 40
+const MAX_ACTION_ORDER_ENEMIES = 3
 const BUG_COUNT_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
   <ellipse cx="24" cy="26" rx="10" ry="14" fill="currentColor" fill-opacity=".16"/><path d="M19 14c0-5 10-5 10 0M14 21 8 17M34 21l6-4M14 29l-7 2M34 29l7 2M17 37l-5 5M31 37l5 5M24 16v24"/>
 </svg>`
@@ -97,6 +100,7 @@ export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
   private onWin: (grade: number) => void
+  private onLose: () => void
   private onHome?: () => void
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
@@ -130,6 +134,7 @@ export class BattleView {
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
     this.onWin = opts.onWin
+    this.onLose = opts.onLose
     this.onHome = opts.onHome
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
@@ -154,6 +159,13 @@ export class BattleView {
     this.cardHand.destroy()
     this.introDialogue?.destroy()
     this.enemyPool.clear()
+  }
+
+  /** Developer-only shortcut; avoid interrupting an already resolving battle turn. */
+  debugDefeat() {
+    if (this.busy || this.over) return
+    this.state.playerHp = 0
+    void this.lose()
   }
 
   private onPointerDown = () => {
@@ -344,9 +356,10 @@ export class BattleView {
     const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
     // 전투 대상은 항상 최전방.
     this.target = frontIdx(s)
-    const visible = alive.slice(0, MAX_VISIBLE_ENEMIES)
+    // 전투 수는 8마리까지 늘어난다. 전원은 레일에 남기고, updateFoe에서 수를
+    // 기준으로 간격과 크기만 압축한다.
+    const visible = alive
     const visibleSet = new Set(visible)
-    const hiddenCount = Math.max(0, alive.length - visible.length)
 
     let you = host.querySelector<HTMLElement>('.actor.you')
     if (!you) {
@@ -366,19 +379,8 @@ export class BattleView {
         el = this.acquireFoe(i, e)
         host.append(el)
       }
-      this.updateFoe(el, e, rank)
+      this.updateFoe(el, e, rank, visible.length)
     })
-    let overflow = host.querySelector<HTMLElement>('.enemy-overflow-count')
-    if (hiddenCount > 0) {
-      if (!overflow) {
-        host.insertAdjacentHTML('beforeend', `<div class="enemy-overflow-count" aria-live="polite">${BUG_COUNT_ICON}<b></b><span>대기 중</span></div>`)
-        overflow = host.querySelector<HTMLElement>('.enemy-overflow-count')!
-      }
-      overflow.querySelector('b')!.textContent = `×${hiddenCount}`
-      overflow.setAttribute('aria-label', `화면 밖에 적 ${hiddenCount}마리 대기 중`)
-    } else {
-      overflow?.remove()
-    }
     this.renderActionOrder()
   }
 
@@ -472,7 +474,7 @@ export class BattleView {
     }
 
     const waitingEnemies = aliveIdx(this.state).filter((i) => i !== front)
-    waitingEnemies.slice(0, MAX_VISIBLE_ENEMIES - 1).forEach((i) => {
+    waitingEnemies.slice(0, MAX_ACTION_ORDER_ENEMIES - 1).forEach((i) => {
       const waiting = this.state.enemies[i]
       entries.push({
         key: `enemy-${i}`,
@@ -484,7 +486,7 @@ export class BattleView {
         active: false,
       })
     })
-    const hiddenWaiting = Math.max(0, waitingEnemies.length - (MAX_VISIBLE_ENEMIES - 1))
+    const hiddenWaiting = Math.max(0, waitingEnemies.length - (MAX_ACTION_ORDER_ENEMIES - 1))
     if (hiddenWaiting > 0) {
       entries.push({
         key: 'enemy-overflow',
@@ -571,14 +573,20 @@ export class BattleView {
       </div>`
   }
 
-  private updateFoe(el: HTMLElement, e: EnemyInst, rank: number) {
+  private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
-    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
+    const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
+    const gap = visibleCount <= 1
+      ? RAIL_GAP
+      : Math.min(RAIL_GAP, (RAIL_FRONT_RIGHT - RAIL_BACK_RIGHT) / (visibleCount - 1))
+    el.style.right = `${RAIL_FRONT_RIGHT - rank * gap}px`
     el.style.bottom = '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
-    el.style.opacity = front ? '1' : '0.68'
-    el.style.setProperty('--model-scale', '1')
-    el.style.setProperty('--model-blur', front ? '0px' : '2px')
+    // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
+    // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
+    el.style.opacity = `${1 - depth * 0.2}`
+    el.style.setProperty('--model-scale', `${1 - depth * 0.24}`)
+    el.style.setProperty('--model-blur', `${depth * 1.5}px`)
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
@@ -586,7 +594,8 @@ export class BattleView {
     // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
-    plate.classList.remove('gone')
+    // 4번째부터는 이름표를 접어 모델과 서로 겹치지 않게 한다.
+    plate.classList.toggle('gone', rank >= 3)
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
@@ -1583,10 +1592,7 @@ export class BattleView {
       this.setPhase('선공 상대 행동')
       await this.enemyPhase('first')
       if (this.state.playerHp <= 0) {
-        this.releaseTally()
-        this.over = true
-        this.setPhase('패배')
-        this.log('일기장이 너무 상했다… (패배)')
+        await this.lose()
         return
       }
     }
@@ -1614,6 +1620,11 @@ export class BattleView {
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
     let kills = res.killed.length
+    if (this.state.playerHp <= 0) {
+      await this.lose()
+      return
+    }
+
     if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
@@ -1670,9 +1681,8 @@ export class BattleView {
     }
 
     if (this.state.playerHp <= 0) {
-      this.over = true
-      this.setPhase('패배')
-      this.log('일기장이 너무 상했다… (패배)')
+      await this.lose()
+      return
     } else if (allDead(this.state)) {
       await this.finishWin(300)
       return
@@ -1693,6 +1703,18 @@ export class BattleView {
     this.cardHand.resetTurn()
     this.renderChain()
     this.renderWords()
+  }
+
+  /** 패배 — 진행 중 연출을 정리하고 그림일기 결과 화면으로 넘긴다. */
+  private async lose(): Promise<void> {
+    if (this.over) return
+    this.releaseTally()
+    this.over = true
+    this.setPhase('패배')
+    this.log('일기장이 너무 상했다…')
+    this.renderActors()
+    await sleep(520)
+    this.onLose()
   }
 
   /**

@@ -9,6 +9,7 @@ import { BattleView } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
+import { DefeatView } from '@views/DefeatView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
@@ -16,10 +17,10 @@ import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
 import { startGrade } from '@core/grade'
-import { clearRun, loadRun, saveRun } from '@core/save'
+import { clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
-import { REWARD_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
@@ -44,7 +45,7 @@ let run = newRun()
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
 void preloadBattleResources(run.player.deck)
 let current: { destroy?: () => void } | null = null
-type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item'
+type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
 
@@ -74,12 +75,40 @@ function grantWord(word: Word) {
   else goBattle()
 }
 
+function cardCatalog(): Word[] {
+  return [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()].filter(
+    (word, index, all) => all.findIndex((entry) => entry.id === word.id) === index,
+  )
+}
+
+function unlockAllCards() {
+  const owned = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
+  for (const word of cardCatalog()) {
+    if (!owned.has(word.id)) registerWord(run.player, word)
+  }
+  saveRun(run)
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
+function reinforceAllCards() {
+  const owned = Object.values(run.player.deck).flat()
+  for (const word of owned) registerWord(run.player, word)
+  saveRun(run)
+  if (lastScene === 'reward') goReward()
+  else goBattle()
+}
+
+function defeatPlayer() {
+  if (current instanceof BattleView) current.debugDefeat()
+}
+
 // 좌상단 모서리를 다섯 번 누르면 열리는 개발용 치트 패널.
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
   const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
   const rewardWords = Object.values(REWARD_WORDS).flat()
-  const sceneLabel: Record<SceneName, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
+  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
       <b>${def.name}</b><span>${def.passive ? '문장 규칙' : '스탯 아이템'}${owned.has(def.id) ? ' · 보유 중' : ''}</span>
@@ -93,7 +122,7 @@ function mountDevCheat(active: SceneName) {
         <section class="dev-cheat-section">
           <h3>SCENE JUMP</h3>
           <div class="dev-cheat-scenes">
-            ${(['title', 'intro', 'battle', 'reward', 'item'] as SceneName[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
+            ${(['title', 'intro', 'battle', 'reward', 'item'] as Exclude<SceneName, 'defeat'>[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
           </div>
         </section>
         <section class="dev-cheat-section">
@@ -107,6 +136,14 @@ function mountDevCheat(active: SceneName) {
               ${rewardWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}${ownedWords.has(word.id) ? ' · 보유 중(강화)' : ''}</option>`).join('')}
             </select>
             <button type="button" data-word-grant>바로 해금</button>
+          </div>
+        </section>
+        <section class="dev-cheat-section">
+          <h3>RUN TOOLS</h3>
+          <div class="dev-cheat-run-tools">
+            <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망시키기</button>
+            <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
+            <button type="button" data-run-tool="reinforce-all">모든 카드 강화하기</button>
           </div>
         </section>
       </div>
@@ -152,6 +189,13 @@ function mountDevCheat(active: SceneName) {
     const word = rewardWords.find((entry) => entry.id === selected)
     if (word) grantWord(word)
   })
+  shell.querySelectorAll<HTMLButtonElement>('[data-run-tool]').forEach((button) =>
+    button.addEventListener('click', () => {
+      if (button.dataset.runTool === 'defeat') defeatPlayer()
+      else if (button.dataset.runTool === 'unlock-all') unlockAllCards()
+      else reinforceAllCards()
+    }),
+  )
   stage.appendChild(shell)
   viewport.appendChild(corner)
 
@@ -191,6 +235,12 @@ function reset() {
   stage.innerHTML = ''
 }
 
+function startNewRunBattle() {
+  const intro = !hasSeenTutorial()
+  if (intro) markTutorialSeen()
+  void goBattle(intro)
+}
+
 function goTitle() {
   battleRequest++
   reset()
@@ -203,8 +253,9 @@ function goTitle() {
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
-      // 새 런 첫 진입에만 토큰의 오프닝 다이얼로그가 흐른다.
-      goBattle(!saved)
+      // Existing runs predate the persistent tutorial flag, so do not replay their intro.
+      if (saved) markTutorialSeen()
+      startNewRunBattle()
     },
   })
   mountMeta('title')
@@ -225,6 +276,10 @@ async function goBattle(intro = false) {
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
     onWin: (grade) => goReward(grade),
+    onLose: () => {
+      clearRun()
+      goDefeat()
+    },
     onHome: goTitle,
     intro,
   })
@@ -274,6 +329,22 @@ function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
   mountMeta('item')
 }
 
+function goDefeat() {
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  current = new DefeatView(stage, {
+    day: run.day,
+    onNewRun: () => {
+      run = newRun()
+      saveRun(run)
+      startNewRunBattle()
+    },
+    onTitle: goTitle,
+  })
+  mountMeta('defeat')
+}
+
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
 const params = new URLSearchParams(location.search)
 const start = (params.get('scene') as SceneName) || 'title'
@@ -284,6 +355,7 @@ if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
 void FontManager.load()
 if (start === 'reward') goReward()
 else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
 else goTitle()
