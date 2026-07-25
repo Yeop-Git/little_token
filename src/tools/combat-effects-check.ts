@@ -32,6 +32,18 @@ assert(wordValueLines(legacyWord)[0].text.includes('무감정'), 'legacy save em
 assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [], multCap: 9 }).emotionResonance === 1, 'legacy emotion does not resonate')
 assert(EARLY_WORDS.subj.every((subject) => subject.emotion !== 'neutral'), 'starting subjects carry emotions')
 
+const resonanceCards = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
+assert(resonanceCards.length === 60, `resonance card total (${resonanceCards.length})`)
+for (const slot of ['subj', 'adv', 'verb']) {
+  const slotCards = resonanceCards.filter((card) => card.slot === slot)
+  assert(slotCards.length === 20, `${slot} card total (${slotCards.length})`)
+  for (const emotion of ['joy', 'anger', 'sorrow', 'pleasure'] as const) {
+    const count = slotCards.filter((card) => card.emotion === emotion).length
+    assert(count === 5, `${slot} ${emotion} balance (${count})`)
+  }
+  assert(slotCards.every((card) => card.emotion !== 'neutral'), `${slot} has no forced neutral card`)
+}
+
 for (const kind of ['attack', 'guard', 'heal'] as const) {
   const counts = new Map(['joy', 'anger', 'sorrow', 'pleasure'].map((emotion) => [emotion, 0]))
   for (const word of [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]) {

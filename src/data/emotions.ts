@@ -1,17 +1,37 @@
 import type { Emotion } from '@core/types'
 
-/** 효과와 별개인 카드 정체성. 목록 밖의 단어는 무감정이며 공명을 만들지 않는다. */
+/**
+ * 효과와 별개인 카드 정체성. 일반 3슬롯 풀은 타입마다 네 감정을 5장씩 맞춰
+ * 어느 감정으로도 3장 공명을 안정적으로 만들 수 있다. 성장/문장부호만 무감정이다.
+ */
 const WORD_EMOTIONS: Record<string, Emotion> = {
-  // 주어도 문장의 첫 조각이다. 시작 덱에서 네 감정을 고르게 골라 공명 경로를 연다.
+  // 1번 주어: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
   'early:na': 'joy', 'early:eoje': 'sorrow', 'early:nado': 'pleasure', 'early:oneul': 'joy',
-  'early:gyeop': 'sorrow', 'early:naman': 'anger', 'early:dachin': 'anger', 'reward:uri': 'pleasure',
-  'early:himkkeot': 'anger', 'early:dandanhi': 'joy', 'early:saljjak': 'pleasure', 'early:naepda': 'sorrow',
-  'early:kkuk': 'sorrow', 'early:nunmullo': 'joy',
+  'early:gyeop': 'anger', 'early:naman': 'anger', 'early:dachin': 'sorrow', 'reward:uri': 'pleasure',
+  'reward:utneun': 'joy', 'reward:ttatteutan': 'joy', 'reward:andohan': 'joy',
+  'reward:hwanan': 'anger', 'reward:matseo': 'anger', 'reward:kkeutkkaji': 'anger',
+  'reward:ulmeogin': 'sorrow', 'reward:hollo': 'sorrow', 'reward:gogae': 'sorrow',
+  'reward:deultteun': 'pleasure', 'reward:sinnan': 'pleasure', 'reward:jangnan': 'pleasure',
+
+  // 2번 수식: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
+  'early:himkkeot': 'anger', 'early:dandanhi': 'joy', 'early:saljjak': 'pleasure', 'early:naepda': 'anger',
+  'early:kkuk': 'sorrow', 'early:nunmullo': 'sorrow',
+  'reward:jaeppalli': 'pleasure', 'reward:motdohage': 'sorrow', 'reward:michin': 'anger', 'reward:ipan': 'anger',
+  'reward:hwanhage': 'joy', 'reward:pogeunhage': 'joy', 'reward:bangeopge': 'joy', 'reward:useumyeo': 'joy',
+  'reward:geochilge': 'anger', 'reward:sseulsseulhi': 'sorrow', 'reward:aesseo': 'sorrow',
+  'reward:sinnage': 'pleasure', 'reward:deulsseogimyeo': 'pleasure', 'reward:gyeongkwaehage': 'pleasure',
+
+  // 3번 동사: 일반 카드 2장 + 특수 보상 카드 3장씩으로 감정마다 5장.
   'early:ttaeryeot': 'anger', 'early:makat': 'anger', 'early:gamssat': 'joy',
-  'early:huryeo': 'pleasure', 'early:jikyeot': 'joy', 'early:pumeot': 'pleasure',
-  'reward:jaeppalli': 'pleasure', 'reward:motdohage': 'sorrow', 'reward:naedeonjyeot': 'sorrow',
-  'reward:ureojyeot': 'sorrow', 'reward:michin': 'anger', 'reward:ipan': 'anger',
-  'reward:baksal': 'anger', 'reward:hwissda': 'joy',
+  'early:huryeo': 'pleasure', 'early:jikyeot': 'joy', 'early:pumeot': 'sorrow',
+  'reward:naedeonjyeot': 'pleasure', 'reward:ureojyeot': 'sorrow',
+
+  'special:focusStrike': 'anger', 'special:pierceStrike': 'sorrow', 'special:spreadTwo': 'joy',
+  'special:splitTwo': 'pleasure', 'special:scatterThree': 'joy', 'special:pourThree': 'sorrow',
+  'special:doubleTap': 'anger', 'special:flurry': 'pleasure', 'special:counterOne': 'joy',
+  'special:counterTwo': 'pleasure', 'special:tearMend': 'sorrow', 'special:riseAgain': 'anger',
+
+  // 5슬롯 확장 데이터는 일반 런의 공명 비율과 독립적으로 보존한다.
   'expansion:na': 'joy', 'expansion:neo': 'anger', 'expansion:geu': 'sorrow', 'expansion:uri': 'pleasure',
   'expansion:holo': 'sorrow', 'expansion:joy': 'pleasure', 'expansion:mad': 'anger', 'expansion:slow': 'joy',
   'expansion:war': 'anger', 'expansion:fir': 'pleasure', 'expansion:sil': 'joy', 'expansion:mem': 'sorrow', 'expansion:bit': 'pleasure',
