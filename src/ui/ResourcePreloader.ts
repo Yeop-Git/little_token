@@ -32,6 +32,7 @@ function loadImage(src: string): Promise<void> {
 export function preloadBattleResources(
   deck: Record<string, Word[]>,
   items: { art: string }[] = [],
+  encounter: string[] = [],
 ): Promise<void> {
   const cardArt = Object.values(deck)
     .flat()
@@ -43,11 +44,25 @@ export function preloadBattleResources(
     const src = ITEM_ART[it.art]
     return src ? [src] : []
   })
+  const encounterVisuals = encounter.flatMap((id) => {
+    const visual = CHARACTER_VISUALS[id as keyof typeof CHARACTER_VISUALS]
+    return visual ? [visual] : []
+  })
+  const visuals = [
+    CHARACTER_VISUALS.player,
+    ...encounterVisuals,
+    ...(encounter.some((id) => id === 'queenBee' || id === 'elderSpider')
+      ? [CHARACTER_VISUALS.token]
+      : []),
+  ]
+  const characterArt = visuals.map((visual) => visual.portrait2d)
+  // 여왕벌의 일벌은 독립 배우 매니페스트가 없는 전투 전용 스프라이트다.
+  const summonArt = encounter.includes('queenBee') ? [SPRITES.enemy_worker_bee] : []
   const urls = [
-    ...new Set([...Object.values(BACKGROUNDS), ...Object.values(SPRITES), ...cardArt, ...bagArt]),
+    ...new Set([...Object.values(BACKGROUNDS), ...characterArt, ...summonArt, ...cardArt, ...bagArt]),
   ]
   return Promise.all([
     ...urls.map(loadImage),
-    preloadCharacterModelResources(Object.values(CHARACTER_VISUALS)),
+    preloadCharacterModelResources(visuals),
   ]).then(() => undefined)
 }

@@ -1,4 +1,4 @@
-import { SKILL_ART } from '@/assets'
+import { SKILL_ART, SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
@@ -56,6 +56,11 @@ export function calculateLineTransform(index: number, count: number, availableWi
 }
 
 interface CardInstance {
+  instanceId: string
+  word: Word
+}
+
+export interface SealedCard {
   instanceId: string
   word: Word
 }
@@ -201,7 +206,7 @@ export class CardHand {
   }
 
   /** 장로거미 전용 — 봉인을 누적하되 현재 손패에는 선택 가능한 카드를 반드시 남긴다. */
-  sealRandom(maxSealed: number, rng: () => number = Math.random): Word | null {
+  sealRandom(maxSealed: number, rng: () => number = Math.random): SealedCard | null {
     const state = this.currentState()
     if (!state || this.processing || this.sealedWordIds.size >= maxSealed) return null
     const usable = state.hand.filter((card) => !this.conflictOf(card.word) && !this.sealedWordIds.has(card.word.id))
@@ -211,7 +216,17 @@ export class CardHand {
     this.sealedWordIds.add(picked.word.id)
     if (this.selectedId === picked.instanceId) this.selectedId = null
     this.render()
-    return picked.word
+    return { instanceId: picked.instanceId, word: picked.word }
+  }
+
+  /** 거미줄 발사체가 도착하는 프레임에 봉인 카드의 부착 연출을 재생한다. */
+  playSealImpact(instanceId: string, delay = 0) {
+    window.setTimeout(() => {
+      const button = this.opts.handRoot.querySelector<HTMLButtonElement>(`[data-instance-id="${instanceId}"]`)
+      if (!button) return
+      button.classList.add('web-catching')
+      window.setTimeout(() => button.isConnected && button.classList.remove('web-catching'), 900)
+    }, delay)
   }
 
   /** 가장 오래된 봉인부터 지정한 수만큼 푼다. */
@@ -460,7 +475,7 @@ export class CardHand {
   private releaseRenderedCards() {
     this.opts.handRoot.querySelectorAll<HTMLButtonElement>(':scope > .word-card').forEach((button) => {
       button.getAnimations().forEach((animation) => animation.cancel())
-      button.classList.remove('pressing', 'selected', 'drawing', 'sealed', 'blocked')
+      button.classList.remove('pressing', 'selected', 'drawing', 'sealed', 'blocked', 'web-catching')
       button.remove()
       const key = button.dataset.poolKey
       if (!key) return
@@ -526,6 +541,8 @@ export class CardHand {
     const emotion = emotionOrNeutral(card.word.emotion)
     const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
     const actionBadge = this.verbActionBadge(card.word)
+    // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.
+    const webOverlay = `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>`
     // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
     const front = artUrl
       ? `<span class="card-face card-front art">
@@ -536,6 +553,7 @@ export class CardHand {
           ${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${actionBadge}
           <strong class="card-title" ${cardTitleStyle(card.word.text, true)}>${card.word.text}</strong>
           <span class="card-note">${unavailable ?? card.word.note}</span>
+          ${webOverlay}
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
@@ -544,6 +562,7 @@ export class CardHand {
           <strong class="card-title" ${cardTitleStyle(card.word.text)}>${card.word.text}</strong>
           <span class="card-note">${unavailable ?? card.word.note}</span>
           <small>${sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD'}</small>
+          ${webOverlay}
         </span>`
     return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${unavailable ? 'disabled' : ''}

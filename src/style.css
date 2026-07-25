@@ -1349,7 +1349,7 @@ button {
   left: 50%;
   z-index: 62;
   /* 좌측 주인공 스탯과 우측 시스템 메뉴 사이의 안전 여백을 남긴다. */
-  width: min(820px, 60vw);
+  width: min(760px, 56vw);
   padding: 10px 24px 14px;
   color: #fff1d2;
   transform: translateX(-50%);
@@ -1391,13 +1391,45 @@ button {
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
 .boss-health-hud .enemy-traits {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 50%;
+  position: static;
   justify-content: center;
   width: 100%;
-  transform: translateX(-50%);
+  margin-top: 7px;
+  transform: none;
 }
+.boss-pattern-guide {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 213, 153, .24);
+  border-radius: 8px;
+  background: rgba(12, 7, 14, .58);
+  color: #f3dfc6;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+.boss-pattern-guide > b {
+  grid-row: 1 / span 3;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding-right: 10px;
+  color: #ffb678;
+  font-size: 11px;
+  letter-spacing: .12em;
+  border-right: 1px solid rgba(255, 190, 126, .24);
+}
+.boss-pattern-guide span,
+.boss-pattern-guide em { display: block; min-width: 0; }
+.boss-pattern-guide strong { color: #ffd58d; }
+.boss-pattern-guide em { color: #9ee9d3; font-style: normal; font-weight: 900; }
+.boss-pattern-guide:empty { display: none; }
+.boss-health-hud .spider-parts { margin-top: 8px; }
+.boss-health-hud .spider-parts + .boss-pattern-guide { margin-top: 6px; }
 .spider-parts {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
@@ -1430,9 +1462,7 @@ button {
 .spider-part.active .spider-part-bar i { box-shadow: 0 0 8px #ff765b; }
 .trait.spider-active { color: #ffe1a0; border: 1px solid rgba(255, 210, 111, .42); }
 .trait.spider-tag-weak { color: #ffe392; border-color: rgba(255, 224, 130, .55); }
-.enemy-traits.spider-weakness-only {
-  top: calc(100% + 12px);
-}
+.enemy-traits.spider-weakness-only { margin-top: 8px; }
 .enemy-traits.spider-weakness-only .trait {
   min-height: 42px;
   padding: 7px 18px;
@@ -1497,6 +1527,34 @@ button {
     linear-gradient(25deg, transparent 48.5%, rgba(232, 225, 238, .7) 49%, transparent 50.5%),
     linear-gradient(-18deg, transparent 48.5%, rgba(232, 225, 238, .55) 49%, transparent 50.5%);
   animation: web-sweep .72s ease-out forwards;
+}
+.spider-web-shot-line {
+  position: absolute;
+  z-index: 1198;
+  height: 5px;
+  pointer-events: none;
+  transform: rotate(var(--web-angle)) scaleX(0);
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(227, 216, 237, .18), rgba(255, 255, 255, .96) 72%, rgba(234, 224, 244, .38));
+  filter: drop-shadow(0 0 7px rgba(240, 230, 255, .9));
+  animation: spider-web-shot-line .56s cubic-bezier(.18,.75,.22,1) forwards;
+}
+.spider-web-projectile {
+  position: absolute;
+  z-index: 1199;
+  width: 240px;
+  height: 320px;
+  pointer-events: none;
+  object-fit: contain;
+  filter: drop-shadow(0 0 15px rgba(250, 244, 255, .94));
+  will-change: transform, opacity;
+}
+@keyframes spider-web-shot-line {
+  0% { opacity: 0; transform: rotate(var(--web-angle)) scaleX(0); }
+  18% { opacity: 1; }
+  72% { opacity: 1; transform: rotate(var(--web-angle)) scaleX(1); }
+  100% { opacity: 0; transform: rotate(var(--web-angle)) scaleX(1); }
 }
 @keyframes web-sweep {
   from { opacity: 0; transform: translateY(-160px) scaleY(.4); }
@@ -1670,7 +1728,7 @@ button {
 }
 /* 원본 투명 여백이 더 큰 바퀴벌레도 좀나방과 같은 약 273px 실루엣 높이로 정규화한다. */
 .actor.foe[data-character='roach'] .model-shell { width: 309px; }
-/* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
+/* 모든 적은 선명하게 유지하고, 현재 대상만 발광으로 구분한다. */
 .actor.foe.front .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px color-mix(in srgb, var(--glow) 48%, transparent));
 }
@@ -1784,8 +1842,8 @@ button {
 }
 .queen-worker[hidden] { display: none; }
 .queen-worker img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
-.queen-worker.left[data-slot='1'] { left: 110px; bottom: 42px; }
-.queen-worker.left[data-slot='2'] { left: -34px; bottom: 4px; }
+.queen-worker.left[data-slot='1'] { left: 170px; bottom: 42px; }
+.queen-worker.left[data-slot='2'] { left: 40px; bottom: 4px; }
 .queen-worker.right[data-slot='1'] { right: 110px; bottom: 42px; }
 .queen-worker.right[data-slot='2'] { right: -34px; bottom: 4px; }
 .queen-worker.left { transform: rotate(-4deg); }
@@ -1975,16 +2033,14 @@ button {
   transform: translateX(-50%);
   transition: opacity 0.32s ease, filter 0.32s ease;
 }
-/* 2번째 적 — 있다는 것만 알 정도로 은은하게 */
-/* 대기 중인 적의 이름표·체력바 — 지금 상대가 아니라는 걸 옅기로 알린다.
-   맨 뒷줄은 한 번 더 물린다(.back.rank-last). 정보는 읽히되 앞줄과 다투지 않는 정도. */
+/* 재사용된 배우에 이전 상태가 남더라도 이름표·체력바는 선명하게 복구한다. */
 .actor.foe .nameplate.faint {
-  opacity: 0.3;
-  filter: saturate(0.55);
+  opacity: 1;
+  filter: none;
 }
 .actor.foe.rank-last .nameplate.faint {
-  opacity: 0.18;
-  filter: saturate(0.4);
+  opacity: 1;
+  filter: none;
 }
 .actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
 .nameplate .row {
@@ -2066,6 +2122,14 @@ button {
 }
 .actor.foe.strikes-first .first-mark { display: inline-flex; }
 .actor.foe.back .first-mark { display: none; }
+.scene.battle[data-boss='true'] .actor.foe.boss .first-mark {
+  position: fixed;
+  top: 92px;
+  bottom: auto;
+  left: calc(50% + 470px);
+  z-index: 70;
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .guard-hint { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
 .nameplate.gone ~ .first-mark {
   bottom: calc(330px * var(--model-scale, 1) + 10px);
@@ -3286,18 +3350,53 @@ button {
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
 .word-card.blocked .card-note { color: #9a342b; }
 .word-card.sealed { opacity: .7; filter: grayscale(.25) saturate(.6); }
-.word-card.sealed .card-face::after {
-  z-index: 8;
-  left: -18%;
-  right: -18%;
-  top: -12%;
-  height: 124%;
-  background:
+.card-web-overlay {
+  --card-web-seal-image: none;
+  position: absolute;
+  inset: -8%;
+  z-index: 12;
+  display: none;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background-image:
+    var(--card-web-seal-image),
     linear-gradient(32deg, transparent 47.5%, rgba(241, 239, 247, .85) 48.5% 49.5%, transparent 50.5%),
     linear-gradient(-31deg, transparent 47.5%, rgba(221, 216, 233, .72) 48.5% 49.5%, transparent 50.5%),
     radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(235, 231, 241, .72) 19% 20%, transparent 21% 34%, rgba(235, 231, 241, .55) 35% 36%, transparent 37%);
+  background-size: 100% 100%, auto, auto, auto;
+  background-repeat: no-repeat;
 }
-.word-card.sealed .card-note { z-index: 9; color: #663648; }
+.word-card.sealed .card-web-overlay { display: grid; }
+.card-web-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 13, 31, .28);
+}
+.card-web-overlay b,
+.card-web-overlay small {
+  position: relative;
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #fff8ff;
+  background: rgba(52, 23, 63, .94);
+  border: 1px solid rgba(245, 232, 255, .82);
+  text-shadow: 0 2px 4px #160d1c;
+  box-shadow: 0 0 18px rgba(232, 218, 255, .48);
+}
+.card-web-overlay b { align-self: end; margin-bottom: 2px; font-size: 16px; }
+.card-web-overlay small { align-self: start; padding: 3px 9px; color: #ffd1d1; font-size: 12px; font-weight: 900; }
+.word-card.sealed .card-note { z-index: 13; color: #fff3f6; text-shadow: 0 2px 5px #210d18; }
+.word-card.web-catching { opacity: 1; filter: brightness(1.35) saturate(.45) drop-shadow(0 0 24px rgba(238, 226, 255, .94)); }
+.word-card.web-catching .card-web-overlay { animation: web-card-catch .82s cubic-bezier(.18,.82,.25,1) both; }
+@keyframes web-card-catch {
+  0% { opacity: 0; transform: translateY(-190px) scale(1.35) rotate(-8deg); }
+  44% { opacity: 1; transform: translateY(10px) scale(.92) rotate(3deg); }
+  68% { transform: translateY(-4px) scale(1.04) rotate(-1deg); }
+  100% { opacity: 1; transform: none; }
+}
 .word-card.drawing { pointer-events: none; }
 /* 사용 중에는 중앙 폭발이 끝날 때까지 다음 카드와 덱 입력을 잠근다. */
 .word-zone.is-committing .card-table,
@@ -4669,6 +4768,9 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .reward-head { text-align: center; margin-bottom: 8px; }
 .reward-head .k { font-size: 18px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .reward-head .t { font-size: 46px; font-weight: 900; margin-top: 4px; color: #fff6e2; text-shadow: 0 0 24px var(--glow); }
+.reward-progress { display: flex; justify-content: center; gap: 9px; margin-top: 10px; }
+.reward-progress i { width: 46px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.reward-progress i.on { background: var(--gold); box-shadow: 0 0 12px var(--glow); }
 .reward-field {
   text-align: center;
   margin: 14px auto 30px;
@@ -4834,6 +4936,26 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
 .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
 .reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+
+/* 덱 상한 교체 — 배열 앞쪽의 오래된 세 장만 같은 카드 문법으로 보여 준다. */
+.discard-card { width: 1080px; }
+.discard-incoming { margin: 16px auto 30px; text-align: center; color: var(--ink-dim); font-size: 18px; }
+.discard-incoming b { color: #fff2da; font-size: 21px; }
+.discard-pick {
+  position: relative; min-height: 390px; overflow: hidden; border-radius: 20px; color: #fff;
+  background: #17111f; box-shadow: 0 12px 30px rgba(0,0,0,.55), inset 0 0 0 2px var(--wglow, var(--gold));
+  transition: transform .16s, filter .16s, opacity .16s;
+}
+.discard-pick:hover, .discard-pick:focus-visible { transform: translateY(-9px); filter: brightness(1.12); }
+.discard-pick.is-chosen { transform: translateY(18px) rotate(-3deg); opacity: .35; }
+.discard-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.discard-veil { position: absolute; inset: 0; background: linear-gradient(rgba(5,3,10,.28), rgba(5,3,10,.2) 42%, rgba(5,3,10,.96)); }
+.discard-order, .discard-meta, .discard-pick strong, .discard-effect, .discard-action { position: relative; z-index: 1; display: block; }
+.discard-order { margin: 14px; color: var(--gold); font-size: 14px; font-weight: 900; letter-spacing: 2px; }
+.discard-meta { margin-top: 195px; color: #f4dfb6; font-size: 14px; font-weight: 800; }
+.discard-pick strong { margin: 7px 14px 0; font-size: 31px; text-shadow: 0 0 16px var(--wglow, var(--gold)), 0 3px 8px #000; }
+.discard-effect { min-height: 42px; margin: 8px 18px; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.discard-action { margin: 12px auto 16px; width: max-content; padding: 7px 15px; border-radius: 99px; background: rgba(155,61,56,.82); font-size: 14px; font-weight: 900; }
 
 /* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
 .reward-dock {

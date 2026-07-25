@@ -1,4 +1,4 @@
-import { reinforceWord, type RunState } from './run'
+import { DECK_LIMITS, reinforceWord, type RunState } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import type { Emotion, Word } from './types'
 
@@ -56,6 +56,11 @@ function migrateCardDefinitions(run: RunState): boolean {
       if (id !== saved.id || saved.text !== base.text || saved.emotion !== base.emotion) migrated = true
     }
     run.player.deck[slot] = [...merged.values()]
+    const limit = DECK_LIMITS[slot]
+    if (limit != null && run.player.deck[slot].length > limit) {
+      run.player.deck[slot] = run.player.deck[slot].slice(0, limit)
+      migrated = true
+    }
   }
   return migrated
 }
@@ -93,6 +98,10 @@ export function loadRun(): RunState | null {
     }
     if (typeof parsed.endingSeen !== 'boolean') {
       parsed.endingSeen = parsed.day > 15
+      migrated = true
+    }
+    if (parsed.reward === undefined) {
+      parsed.reward = null
       migrated = true
     }
     for (const words of Object.values(parsed.player.deck)) {

@@ -145,6 +145,12 @@ export interface SpiderWebTurn {
   brokenLegs: number
 }
 
+/** 3슬롯에서는 주어 → 수식어 → 동사를 정확히 순환해 봉인 편중을 막는다. */
+export function spiderSealSlotForTurn(slotKeys: readonly string[], turn: number): string | null {
+  if (slotKeys.length === 0) return null
+  return slotKeys[Math.max(0, Math.floor(turn) - 1) % slotKeys.length]
+}
+
 /** View가 카드 한 장을 고르기 전에 거미줄의 전투 압력을 한 번만 확정한다. */
 export function spiderWebAtTurnStart(state: BattleState): SpiderWebTurn | null {
   const idx = state.enemies.findIndex((enemy) => !enemy.dead && !!enemy.def.webPattern)
@@ -422,9 +428,11 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
 
 function disperseTargetSummons(state: BattleState, target: number, targetCount: TargetCount): number {
   const enemy = state.enemies[target]
-  if (!enemy || enemy.dead || !enemy.def.summonPattern || targetCount === 1) return 0
+  if (!enemy || enemy.dead || !enemy.def.summonPattern) return 0
   const available = summonCount(enemy)
-  const requested = targetCount === 'all' ? available : Math.max(0, targetCount - 1)
+  // 범위 카드를 못 얻은 런도 호위에 대응할 수 있게 공격 한 번당 최소 한 마리는
+  // 흩어진다. 범위가 넓을수록 더 많이 지워져 낮은 계수와 제어력의 선택은 유지한다.
+  const requested = targetCount === 'all' ? available : Math.max(1, targetCount)
   let remaining = Math.min(available, requested)
   const dispersed = remaining
   // 최근에 들어온 오른쪽 호위부터 번갈아 걷어 내 좌우 실루엣이 한쪽으로 쏠리지 않게 한다.
@@ -558,7 +566,9 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     && (!attackStep.groggyRequiresGuardShatter || guardShattered)
     && !enemy.dead
   if (groggyEntered) {
-    enemy.groggyUntilTurn = state.turn + 1
+    // 선공에서 막으면 같은 턴 본행동, 후공에서 막으면 다음 턴 본행동까지 정확히
+    // 한 번만 열린다. 평타 반복 RNG가 그로기 보상 횟수까지 바꾸지 않게 한다.
+    enemy.groggyUntilTurn = state.turn + (phase === 'second' ? 1 : 0)
     enemy.groggyDamageMult = attackStep.groggyDamageMult!
   }
   strikes.push({

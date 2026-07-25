@@ -1,11 +1,12 @@
 import { compile } from '@core/compiler'
-import { reinforceWord } from '@core/run'
+import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer } from '@core/run'
 import type { EnemyDef, Intent, Word } from '@core/types'
 import { wordValueLines } from '@core/wordText'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
+import { genRewards, rewardGradeForDay } from '@data/rewards'
 import {
   activeEnemyPart,
   applyIntent,
@@ -14,6 +15,7 @@ import {
   enemyTurn,
   makeEnemy,
   spiderWebAtTurnStart,
+  spiderSealSlotForTurn,
   spiderWebTension,
   summonAtTurnStart,
   summonCount,
@@ -41,12 +43,14 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const boss = makeEnemy(foe('layered', { boss: true, hp: 20 }), 1, 1, 3); const s = state([boss]); const r = applyIntent(s, attack({ base: 45 }), 1, 0); assert(boss.maxHp === 60 && boss.hp === 15 && !boss.dead && r.hits[0].barsBroken === 2, 'boss damage crosses multiple health bars without a per-hit cap') }
 { const boss = makeEnemy(foe('phased', { boss: true, hp: 30, atk: 10 }), 1, 1, 3); const s = state([boss]); let r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 1 && r.dealt === 10, 'boss starts with attack1 and base damage'); boss.hp = 60; boss.nextAttackTurn = 1; r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 2 && r.dealt === 13, 'boss uses attack2 and x1.25 damage at two-thirds hp'); boss.hp = 30; boss.nextAttackTurn = 1; r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 3 && r.dealt === 15, 'boss uses attack3 and x1.5 damage at one-third hp') }
 assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '1,2,3', 'mantis data maps normal, telegraph, and strong patterns to attack1, attack2, and attack3')
+assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'verb'], turn)).join(',') === 'subj,adv,verb,subj,adv,verb', 'spider web seal rotates evenly across subject, modifier, and verb slots')
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '평타', bonusAtk: 0, animationStage: 1, repeatOnceChance: .5 }, { name: '강공격 자세', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '준비' }, { name: '큰낫 내려베기', bonusAtk: 0, animationStage: 3, damageScale: 1.2, shatterGuard: true, lifeStealRate: .5, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-pattern', { atk: 7, attackPattern: pattern })); const s = state([mantis]); const rolls = [0, .9, 0, 0]; const rng = () => rolls.shift() ?? 0; let r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 7 && r.animationStage === 1 && r.text.includes('평타') && mantis.attackPatternIndex === 1, 'mantis normal attack uses attack1 and can advance after one hit'); mantis.nextAttackTurn = 1; r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 0 && r.animationStage === 2 && r.telegraphText === '준비', 'mantis telegraph uses attack2 without damage'); mantis.hp = 20; mantis.nextAttackTurn = 1; r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 8 && r.animationStage === 3 && r.lifeStolen === 4 && mantis.hp === 24 && !r.groggyEntered, 'mantis strong attack uses attack3; failed defense takes 1.2x damage and lifesteal without groggy'); assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 10, 'failed defense does not grant a vulnerability window') }
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '평타', bonusAtk: 0, repeatOnceChance: .5 }, { name: '강공격 자세', bonusAtk: 0, damageScale: 0, telegraphText: '준비' }]; const mantis = makeEnemy(foe('mantis-repeat', { atk: 7, attackPattern: pattern })); const s = state([mantis]); const rolls = [0, .1, 0]; const rng = () => rolls.shift() ?? 0; enemyTurn(s, rng, 'second'); assert(mantis.attackPatternIndex === 0 && mantis.attackStepRepeated, 'mantis can randomly schedule a second normal attack'); mantis.nextAttackTurn = 1; enemyTurn(s, rng, 'second'); assert(mantis.attackPatternIndex === 1 && !mantis.attackStepRepeated, 'mantis normal attack repeats at most once before telegraphing') }
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, lifeStealRate: .5, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-shatter', { atk: 7, attackPattern: pattern })); const s = state([mantis]); s.guard = 30; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.guardShattered && r.absorbed === 30 && r.dealt === 0 && r.lifeStolen === 0 && r.groggyEntered && s.guard === 0, 'successful defense erases guard, prevents 1.2x overflow and lifesteal, and opens groggy'); s.turn = 2; assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 15, 'successful defense grants the groggy damage window') }
+{ const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-first-groggy', { atk: 7, initiative: 'first', attackPattern: pattern })); const s = state([mantis]); s.guard = 1; const r = enemyTurn(s, () => 0, 'first')[0]; assert(r.groggyEntered && mantis.groggyUntilTurn === 1, 'first-phase shatter opens groggy only for the same turn main action'); assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 15, 'first-phase groggy boosts the immediate main action'); s.turn = 2; assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 10, 'first-phase groggy does not grant a second boosted turn') }
 { const regular = makeEnemy(foe('unphased', { hp: 30, atk: 10 })); regular.hp = 1; const r = enemyTurn(state([regular]), () => 0, 'second')[0]; assert(r.attackStage === 1 && r.dealt === 10, 'regular enemy damage does not scale with low hp') }
 { const queen = makeEnemy(foe('queen-summon', { atk: 10, summonPattern: { name: '일벌', sprite: 'enemy_worker_bee', perTurn: 1, max: 4, maxPerSide: 2, attackBonusPerUnit: .5, releaseAt: 4 } })); const s = state([queen]); summonAtTurnStart(s); summonAtTurnStart(s); assert(queen.summonsLeft === 1 && queen.summonsRight === 0, 'queen summons only once at the same turn start'); s.turn = 2; summonAtTurnStart(s); s.turn = 3; summonAtTurnStart(s); s.turn = 4; summonAtTurnStart(s); assert(queen.summonsLeft === 2 && queen.summonsRight === 2, 'queen alternates summons up to two workers per side'); queen.nextAttackTurn = 1; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 12 && r.summonsReleased === 4 && summonCount(queen) === 0, 'four workers add only two damage then all leave on swarm charge') }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); for (let turn = 1; turn <= 4; turn++) { s.turn = turn; summonAtTurnStart(s) } let r = applyIntent(s, attack({ targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'two-target attack disperses one worker without reducing boss damage'); r = applyIntent(s, attack({ targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 3 && summonCount(queen) === 0, 'all-target attack disperses every remaining worker') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); for (let turn = 1; turn <= 4; turn++) { s.turn = turn; summonAtTurnStart(s) } let r = applyIntent(s, attack({ targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'single-target attack always leaves a worker-bee answer'); r = applyIntent(s, attack({ targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'two-target attack disperses two workers without reducing boss damage'); r = applyIntent(s, attack({ targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'all-target attack disperses every remaining worker') }
 { const stage = stageFor(10); const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax && queen.nextAttackTurn === 4, 'day-10 queen cannot one-shot base hp on her worst opening roll and gives three turns before attacking again') }
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
@@ -134,6 +138,28 @@ assert(stageFor(20).bossHealthBars === 2 && stageFor(25).bossHealthBars === 3 &&
 }
 assert(stageFor(16).encounter.join(',') === stageFor(1).encounter.join(','), 'endless roster repeats every fifteen floors')
 assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageFor(1).atkMult, 'endless repeat keeps scaling')
+
+{
+  const player = startingPlayer()
+  assert(player.deck.subj.length === 2 && player.deck.adv.length === 3 && player.deck.verb.length === 4, 'starting deck uses 2-3-4 cards')
+  assert(DECK_LIMITS.subj === 6 && DECK_LIMITS.adv === 6 && DECK_LIMITS.verb === 8, 'deck limits use 6-6-8 cards')
+  const first = genRewards(player, 5, 1, 'subject')
+  const second = genRewards(player, 5, 1, 'item')
+  const third = genRewards(player, 5, 1, 'verb')
+  assert(first.length === 3 && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward offers three subject/modifier cards with both slots represented')
+  assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
+  assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
+  assert(genRewards(player, 5, 10, 'item').some((option) => option.rarity === 'legendary'), 'floor ten guarantees a legendary item each cycle')
+  assert(genRewards(player, 5, 25, 'item').some((option) => option.rarity === 'legendary'), 'endless floor ten repeats the legendary item guarantee')
+  assert(rewardGradeForDay(5, 15) > rewardGradeForDay(5, 1) && rewardGradeForDay(5, 16) === rewardGradeForDay(5, 1), 'reward grade rises through fifteen floors and resets next cycle')
+
+  for (let i = 0; i < 4; i++) registerWord(player, { id: `limit-${i}`, text: `limit-${i}`, slot: 'subj', tags: [], emotion: 'joy', note: '' })
+  const incoming: Word = { id: 'limit-new', text: 'limit-new', slot: 'subj', tags: [], emotion: 'joy', note: '' }
+  const full = registerWord(player, incoming)
+  assert(full.kind === 'needs-discard' && full.candidates.map((card) => card.id).join(',') === player.deck.subj.slice(0, 3).map((card) => card.id).join(','), 'full grammar deck exposes the three oldest cards')
+  if (full.kind === 'needs-discard') registerWord(player, incoming, full.candidates[1].id)
+  assert(player.deck.subj.length === 6 && player.deck.subj[player.deck.subj.length - 1]?.id === incoming.id, 'discarding an old card keeps the grammar deck at its cap')
+}
 
 const word = (id: string, emotion: Word['emotion']): Word => ({ id, text: id, slot: id === 'v' ? 'verb' : id, tags: [], emotion, note: '', kind: id === 'v' ? 'attack' : undefined, power: id === 'v' ? 10 : undefined })
 const result = compile({ subj: word('subj', 'joy'), adv: word('adv', 'joy'), verb: word('v', 'joy') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })

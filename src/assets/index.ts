@@ -40,6 +40,7 @@ import enemyWorkerBee from './sprites/enemy_worker_bee.webp'
 import bossMantis from './sprites/boss_mantis.webp'
 import bossQueenBee from './sprites/boss_queen_bee.webp'
 import bossElderSpider from './sprites/boss_elder_spider.webp'
+import cardWebSeal from './sprites/effects/card_web_seal.webp'
 import emotionJoy from './sprites/emotions/emotion_joy.webp'
 import emotionAnger from './sprites/emotions/emotion_anger.webp'
 import emotionSorrow from './sprites/emotions/emotion_sorrow.webp'
@@ -205,6 +206,7 @@ export const SPRITES: Record<string, string> = {
   boss_mantis: bossMantis,
   boss_queen_bee: bossQueenBee,
   boss_elder_spider: bossElderSpider,
+  effect_card_web_seal: cardWebSeal,
 }
 
 // 전장용 GLB. 상세 카드에는 계속 대응되는 SPRITES 초상을 사용한다.

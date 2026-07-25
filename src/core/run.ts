@@ -14,7 +14,19 @@ export interface RunState {
   endless: boolean
   /** 첫 장로거미 승리 뒤 엔딩 컷씬을 끝까지 본 런인지 저장한다. */
   endingSeen: boolean
+  /** 전투를 다시 치러 보상을 중복 획득하지 않도록 3단계 보상 진행을 저장한다. */
+  reward: PendingReward | null
 }
+
+export type RewardPhase = 'subject' | 'item' | 'verb'
+
+export interface PendingReward {
+  day: number
+  grade: number
+  phase: RewardPhase
+}
+
+export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
 
 function cloneDeck(d: Record<string, Word[]>): Record<string, Word[]> {
   const out: Record<string, Word[]> = {}
@@ -32,7 +44,7 @@ export function startingPlayer(): PlayerState {
 }
 
 export function newRun(): RunState {
-  return { player: startingPlayer(), day: 1, endless: false, endingSeen: false }
+  return { player: startingPlayer(), day: 1, endless: false, endingSeen: false, reward: null }
 }
 
 // 아이템 보상 = 스탯 수치 상승(스펙업).
@@ -68,14 +80,34 @@ export function reinforceWord(w: Word): void {
 }
 
 // 문장 보상 = 단어장 등록. 이미 있으면 새로 넣지 않고 그 단어를 강화한다(반복강화).
-export function registerWord(player: PlayerState, word: Word): void {
+export type RegisterWordResult =
+  | { kind: 'added' | 'reinforced' }
+  | { kind: 'needs-discard'; candidates: Word[] }
+
+/** 상한을 넘길 때 보여 줄 후보. 배열 앞쪽이 오래된 카드이므로 첫 세 장만 제시한다. */
+export function oldestDiscardCandidates(player: PlayerState, slotKey: string): Word[] {
+  return (player.deck[slotKey] ?? []).slice(0, 3)
+}
+
+export function registerWord(player: PlayerState, word: Word, discardId?: string): RegisterWordResult {
   const slot = player.deck[word.slot] ?? (player.deck[word.slot] = [])
   const idx = slot.findIndex((w) => w.id === word.id)
   if (idx >= 0) {
     const upgraded = cloneWord(slot[idx])
     reinforceWord(upgraded)
     slot[idx] = upgraded
+    return { kind: 'reinforced' }
   } else {
+    const limit = DECK_LIMITS[word.slot]
+    if (limit != null && slot.length >= limit) {
+      const candidates = oldestDiscardCandidates(player, word.slot)
+      const discardIndex = discardId ? slot.findIndex((w) => w.id === discardId) : -1
+      if (discardIndex < 0 || !candidates.some((w) => w.id === discardId)) {
+        return { kind: 'needs-discard', candidates }
+      }
+      slot.splice(discardIndex, 1)
+    }
     slot.push({ ...cloneWord(word), level: 1 })
+    return { kind: 'added' }
   }
 }

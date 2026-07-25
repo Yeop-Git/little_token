@@ -42,6 +42,7 @@ import {
   makeEnemy,
   nextEnemyAttackStep,
   spiderWebAtTurnStart,
+  spiderSealSlotForTurn,
   summonAtTurnStart,
   summonCount,
   type TurnSummon,
@@ -69,6 +70,7 @@ import {
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
+  dissolveCharacterParts,
   freezeCharacterAnimation,
   isCharacterModelReady,
   mountCharacterModel,
@@ -130,6 +132,7 @@ const TOKEN_BOSS_LINES = [
   '조심해! 뭔가 오고 있어!',
 ] as const
 const TOKEN_BOSS_HINTS = {
+  mantisStart: '평타 뒤에 큰낫을 들어! 그때 방어를 준비하자!!',
   mantisTelegraph: '위험해, 프롬! 다음엔 강력한 공격이 날아올 것 같아...!!',
   mantisGroggy: '막아냈어, 프롬! 사마귀가 휘청거려. 지금이 기회야!!',
   queenBeeStart: '일벌이 모이면 무서운 일이 일어날 것만 같아...!!',
@@ -227,6 +230,9 @@ export class BattleView {
   private tokenSpeechHideTimer = 0
   private bossPatternSolved = false
   private bossPatternHint: string | null = null
+  /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
+  private pendingSpiderSeal: { enemyIdx: number; maxSealed: number; slotKey: string } | null = null
+  private lastSpiderSealSlotKey: string | null = null
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -528,16 +534,16 @@ export class BattleView {
     document.addEventListener('pointercancel', this.onPointerUp, true)
     this.renderActors()
     this.renderActionOrder()
+    this.beginSpiderTurn()
     this.renderChain()
     this.renderWords()
-    this.beginSpiderTurn()
     this.renderStats()
     this.renderRelics()
     this.clearDetailDock()
     if (this.isBoss) {
       const bossId = this.state.enemies[0]?.def.id
       const initialPatternHint = bossId === 'mantis'
-        ? TOKEN_BOSS_HINTS.mantisTelegraph
+        ? TOKEN_BOSS_HINTS.mantisStart
         : bossId === 'queenBee'
           ? TOKEN_BOSS_HINTS.queenBeeStart
           : bossId === 'elderSpider'
@@ -855,6 +861,7 @@ export class BattleView {
           </div>
         </div>
         <div class="spider-parts" hidden aria-label="장로거미의 네 다리와 본체"></div>
+        <div class="boss-pattern-guide" aria-live="polite"></div>
         <div class="enemy-traits"></div>
       </section>`
   }
@@ -1013,12 +1020,11 @@ export class BattleView {
     el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${st.railRight - rank * st.railGap + jit.x}px`
     el.style.bottom = this.isBoss && e.def.boss ? '24px' : `${st.bottom + rank * st.railRise + jit.y}px`
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
-    // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
-    // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
-    // 뒤로 갈수록 옅어진다 — 맨 뒷줄은 확실히 물러나 보여야 앞줄이 지금 상대라는 게 읽힌다.
-    el.style.opacity = `${1 - depth * 0.58}`
+    // 모든 적의 외형과 체력 정보는 같은 선명도로 유지한다. 레일의 깊이와 현재
+    // 공격 대상은 위치·크기·겹침 및 front/target 표시만으로 구분한다.
+    el.style.opacity = '1'
     el.style.setProperty('--model-scale', `${1 - depth * st.railShrink}`)
-    el.style.setProperty('--model-blur', `${depth * 1.5}px`)
+    el.style.setProperty('--model-blur', '0px')
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
@@ -1028,9 +1034,9 @@ export class BattleView {
     // 맨 뒷줄은 한 번 더 물러난다(CSS의 .rank-last).
     el.classList.toggle('rank-last', visibleCount > 1 && rank === visibleCount - 1)
 
-    // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
+    // 대기 적도 이름과 체력을 즉시 읽을 수 있도록 이름표 투명도를 낮추지 않는다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
-    plate.classList.toggle('faint', rank > 0)
+    plate.classList.remove('faint')
     plate.classList.remove('gone')
     this.updateFoePlate(plate, e, false)
     if (e.def.boss) {
@@ -1106,14 +1112,53 @@ export class BattleView {
       e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
       e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
     ].join('')
-    traits.innerHTML = e.def.webPattern
-      ? (partWeaknessHtml || '<span class="trait spider-no-weakness"><strong>약점 없음</strong></span>')
-      : regularTraits
+    // 보스 전용 HUD는 아래 패턴 레일이 같은 상태를 더 명확히 설명한다. 작은 상태
+    // 칩까지 중복하면 HUD가 모델의 얼굴을 덮으므로 배우 이름표에서만 유지한다.
+    traits.innerHTML = bossHud ? '' : regularTraits
     const partHost = plate.querySelector<HTMLElement>('.spider-parts')
     if (partHost) {
-      partHost.hidden = true
-      partHost.innerHTML = ''
+      partHost.hidden = !e.parts.length
+      if (!partHost.hidden) {
+        partHost.style.gridTemplateColumns = `repeat(${e.parts.length}, minmax(0, 1fr))`
+        partHost.innerHTML = e.parts.map((part) => {
+          const weakness = part.def.weakness?.label ?? '약점 없음'
+          const active = part === activePart
+          return `<span class="spider-part${part.broken ? ' broken' : ''}${active ? ' active' : ''}" data-part-id="${part.def.id}">
+            <span class="spider-part-head"><b>${part.def.name}</b><em>${weakness}</em></span>
+            <span class="spider-part-bar"><i style="width:${Math.max(0, part.hp) / part.maxHp * 100}%"></i></span>
+          </span>`
+        }).join('')
+      }
     }
+    const guide = plate.querySelector<HTMLElement>('.boss-pattern-guide')
+    if (guide) {
+      guide.innerHTML = this.bossPatternGuideHtml(e, attackStep, summons, activePart)
+    }
+  }
+
+  private bossPatternGuideHtml(
+    enemy: EnemyInst,
+    attackStep: ReturnType<typeof nextEnemyAttackStep>,
+    summons: number,
+    activePart: ReturnType<typeof activeEnemyPart>,
+  ): string {
+    if (enemy.def.id === 'mantis') {
+      const now = attackStep?.name ?? '평범한 낫 베기'
+      return `<b>주요 패턴</b><span><strong>현재</strong> ${now} · 슬픔 약점 · 공격 ${bossAttackStage(enemy)}단계 ×${BOSS_ATTACK_MULTIPLIER[bossAttackStage(enemy)].toFixed(2)}${enemy.guard ? ` · 방어 ${enemy.guard}` : ''}</span><span>평타 1~2회 → 무피해 준비 → 내려베기 120%·흡혈 50%</span><em>대응 · 준비가 보이면 방어: 피해 0 + 그로기(받는 피해 ×1.5)</em>`
+    }
+    if (enemy.def.id === 'queenBee') {
+      return `<b>주요 패턴</b><span><strong>현재</strong> 일벌 ${summons}/4 · 공격 +${summons * (enemy.def.summonPattern?.attackBonusPerUnit ?? 0)} · 분노 약점${enemy.magicShield ? ` · 매직실드 ${enemy.magicShield}` : ''}</span><span>매 턴 1마리 소환 → 4마리면 다음 공격에 벌떼 돌격</span><em>대응 · 단일/2명/3명/전체 공격으로 일벌 1/2/3/전부 해산</em>`
+    }
+    if (enemy.def.id === 'elderSpider') {
+      const weak = activePart?.def.weakness?.label ?? '약점 없음'
+      const sealKey = this.pendingSpiderSeal?.slotKey ?? this.lastSpiderSealSlotKey
+      const sealLabel = sealKey
+        ? this.t.template.slots.find((slot) => slot.key === sealKey)?.label ?? sealKey
+        : '대기'
+      const sealState = this.pendingSpiderSeal ? '예고' : '완료'
+      return `<b>주요 패턴</b><span><strong>현재</strong> ${activePart?.def.name ?? '본체'} · ${weak} · 봉인 ${this.cardHand?.sealedCount ?? 0}/${enemy.def.webPattern?.maxSealedCards ?? 0} · 공격 ${bossAttackStage(enemy)}단계${enemy.guard ? ` · 방어 ${enemy.guard}` : ''}${enemy.magicShield ? ` · 매직실드 ${enemy.magicShield}` : ''}</span><span>이번 거미줄: ${sealLabel} 카드 ${sealState} · 문장마다 슬롯을 순환 봉인</span><em>대응 · 현재 약점 적중: 1장 해제 · 다리 파괴: 전부 해제</em>`
+    }
+    return ''
   }
 
   private bindActor(actor: HTMLElement) {
@@ -1370,27 +1415,87 @@ export class BattleView {
     // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
     const words = this.t.words[key] ?? this.player.deck[key] ?? []
     this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
+    this.castPendingSpiderWeb(key)
     this.renderDetail(null)
   }
 
-  /** 장로거미는 문장마다 보이는 카드 한 장만 묶는다. CardHand가 남은 선택지를 보장한다. */
+  /** 장로거미는 문장마다 슬롯을 순환 지정한다. 해당 슬롯이 열릴 때 카드 한 장만 묶는다. */
   private beginSpiderTurn() {
     const web = spiderWebAtTurnStart(this.state)
     if (!web) return
     const maxSealed = this.state.enemies[web.idx].def.webPattern?.maxSealedCards ?? 0
-    const sealed = this.cardHand.sealRandom(maxSealed)
-    const scene = this.q('.scene.battle')
-    scene.classList.remove('spider-web-cast')
-    void scene.offsetWidth
-    scene.classList.add('spider-web-cast')
-    this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-cast'), 760))
+    const slotKey = spiderSealSlotForTurn(this.order(), this.state.turn)
+    if (!slotKey) return
+    this.pendingSpiderSeal = {
+      enemyIdx: web.idx,
+      maxSealed,
+      slotKey,
+    }
+  }
+
+  private castPendingSpiderWeb(slotKey: string) {
+    const pending = this.pendingSpiderSeal
+    if (!pending || pending.slotKey !== slotKey) return
+    this.pendingSpiderSeal = null
+    this.lastSpiderSealSlotKey = slotKey
+    const sealed = this.cardHand.sealRandom(pending.maxSealed)
+    if (sealed) this.playSpiderWebProjectile(pending.enemyIdx, sealed.instanceId)
     this.log(
       sealed
-        ? `장로거미가 「${sealed.text}」 카드를 봉인했다. · 봉인 ${this.cardHand.sealedCount}/${maxSealed}`
-        : `거미줄 봉인은 최대 ${maxSealed}장까지 쌓인다. · 봉인 ${this.cardHand.sealedCount}/${maxSealed}`,
+        ? `장로거미가 ${this.t.template.slots.find((slot) => slot.key === slotKey)?.label ?? slotKey} 「${sealed.word.text}」 카드를 봉인했다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`
+        : `선택지를 남기기 위해 이번 거미줄은 빗나갔다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`,
     )
-    if (this.cardHand.sealedCount >= maxSealed) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderWebReady)
+    if (this.cardHand.sealedCount >= pending.maxSealed) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderWebReady)
     this.renderActors()
+  }
+
+  /** 장로거미에서 봉인 카드까지 실선과 거미줄 스프라이트가 함께 날아간다. */
+  private playSpiderWebProjectile(enemyIdx: number, instanceId: string) {
+    const scene = this.q<HTMLElement>('.scene.battle')
+    const source = this.root.querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"] .model-shell`)
+    const target = this.root.querySelector<HTMLElement>(`#card-hand [data-instance-id="${instanceId}"]`)
+    if (!source || !target) {
+      this.cardHand.playSealImpact(instanceId)
+      return
+    }
+    const sceneRect = scene.getBoundingClientRect()
+    const sourceRect = source.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const scaleX = sceneRect.width / scene.offsetWidth || 1
+    const scaleY = sceneRect.height / scene.offsetHeight || 1
+    const fromX = (sourceRect.left + sourceRect.width * .5 - sceneRect.left) / scaleX
+    const fromY = (sourceRect.top + sourceRect.height * .42 - sceneRect.top) / scaleY
+    const toX = (targetRect.left + targetRect.width * .5 - sceneRect.left) / scaleX
+    const toY = (targetRect.top + targetRect.height * .46 - sceneRect.top) / scaleY
+    const dx = toX - fromX
+    const dy = toY - fromY
+    const distance = Math.hypot(dx, dy)
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+
+    const line = document.createElement('i')
+    line.className = 'spider-web-shot-line'
+    line.style.left = `${fromX}px`
+    line.style.top = `${fromY}px`
+    line.style.width = `${distance}px`
+    line.style.setProperty('--web-angle', `${angle}deg`)
+
+    const projectile = document.createElement('img')
+    projectile.className = 'spider-web-projectile'
+    projectile.src = SPRITES.effect_card_web_seal
+    projectile.alt = ''
+    projectile.style.left = `${fromX}px`
+    projectile.style.top = `${fromY}px`
+    scene.append(line, projectile)
+    projectile.animate([
+      { opacity: .15, transform: 'translate(-50%, -50%) scale(.08) rotate(-18deg)' },
+      { opacity: .9, offset: .38, transform: `translate(calc(-50% + ${dx * .46}px), calc(-50% + ${dy * .46}px)) scale(.26) rotate(8deg)` },
+      { opacity: 1, transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.58) rotate(0deg)` },
+    ], { duration: 520, easing: 'cubic-bezier(.2,.72,.2,1)', fill: 'forwards' })
+    this.cardHand.playSealImpact(instanceId, 420)
+    this.timers.push(window.setTimeout(() => {
+      line.remove()
+      projectile.remove()
+    }, 620))
   }
 
   // ── 우측 정보 패널 ──
@@ -2309,9 +2414,9 @@ export class BattleView {
     this.busy = false
     this.q('.word-zone').classList.remove('is-resolving')
     this.cardHand.resetTurn()
+    this.beginSpiderTurn()
     this.renderChain()
     this.renderWords()
-    this.beginSpiderTurn()
   }
 
   /** 패배 — 진행 중 연출을 정리하고 그림일기 결과 화면으로 넘긴다. */
@@ -2449,7 +2554,7 @@ export class BattleView {
     for (const k of res.killed) await this.playDeath(k, 1, sweep)
   }
 
-  /** 현재는 2D 대체 이미지 위 연출이며, CustomEvent는 추후 GLB 본/머티리얼 디졸브 연결점이다. */
+  /** 체력 막이 깨질 때 대응하는 3D 다리 메시를 디졸브하고 아래로 떨어뜨린다. */
   private playSpiderPartBreak(enemyIdx: number, partId: string, count: number) {
     const actor = this.root.querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
     const part = this.root.querySelector<HTMLElement>(`.spider-part[data-part-id="${partId}"]`)
@@ -2465,6 +2570,7 @@ export class BattleView {
       }
     }
     actor?.classList.add('leg-dissolving')
+    dissolveCharacterParts(actor ?? null, partId, count)
     actor?.dispatchEvent(new CustomEvent('enemy-part-break', {
       detail: { partId, count },
       bubbles: true,
