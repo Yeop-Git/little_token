@@ -185,7 +185,7 @@ class BattleCharacterModel {
   private model: THREE.Object3D | null = null
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
-  private healMaterials: THREE.MeshBasicMaterial[] = []
+  private healMaterials: THREE.ShaderMaterial[] = []
   private plusParticles: PlusParticle[] = []
   private shieldMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null = null
   private shieldBaseY = 1
@@ -361,15 +361,53 @@ outgoingLight *= uBattleExposure;`)
     // 모델 발끝은 공통 발선에 두되, 원근으로 앞쪽 호가 캔버스 아래에서 잘리지 않게 오라만 살짝 든다.
     aura.position.set(center.x, groundY + 0.2, 0)
     aura.renderOrder = 6
+    const auraMaxRadius = radius * 1.06
     const auraDefs = [
-      { inner: radius * 0.52, outer: radius * 0.92, opacity: 0.44 },
-      { inner: radius * 0.82, outer: radius * 1.06, opacity: 0.72 },
+      { inner: radius * 0.52, outer: radius * 0.92 },
+      { inner: radius * 0.82, outer: radius * 1.06 },
     ]
-    auraDefs.forEach(({ inner, outer, opacity }) => {
-      const material = new THREE.MeshBasicMaterial({
-        color: 0x79f29a,
+    auraDefs.forEach(({ inner, outer }) => {
+      // 실드와 동일한 카드-버스트 결: 화이트-핫 코어 + 발밑에서 퍼지는 충격파 링.
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(0x79f29a) },
+          uOpacity: { value: 0 },
+          uProgress: { value: 0 },
+          uMaxRadius: { value: auraMaxRadius },
+        },
+        vertexShader: `
+          varying float vRadial;
+          void main() {
+            // 링 평면(로컬 XY)에서 중심으로부터의 거리 — 그룹 회전·스케일과 무관하게 안정적이다.
+            vRadial = length(position.xy);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uOpacity;
+          uniform float uProgress;
+          uniform float uMaxRadius;
+          varying float vRadial;
+          void main() {
+            float r = clamp(vRadial / uMaxRadius, 0.0, 1.3);
+
+            // 형성 순간의 버스트 플래시 — 초반에 확 밝았다 빠르게 사그라든다(카드 flash).
+            float flash = pow(1.0 - min(1.0, uProgress * 3.4), 2.0);
+
+            // 발밑에서 바깥으로 퍼지는 충격파 링(카드의 확장 링에 대응).
+            float front = mix(0.05, 1.3, clamp(uProgress * 1.9, 0.0, 1.0));
+            float wave = smoothstep(0.3, 0.0, abs(r - front));
+
+            // 안쪽일수록 흰색으로 달아오르는 화이트-핫 코어(카드의 #fff→color).
+            float hot = clamp((1.0 - r) * (0.45 + flash * 1.05) + wave * 0.9, 0.0, 1.0);
+            vec3 color = mix(uColor, vec3(1.0), hot);
+
+            float glow = 0.5 + flash * 1.7 + wave * 1.2;
+            gl_FragColor = vec4(color * glow, min(1.0, glow) * uOpacity);
+          }
+        `,
         transparent: true,
-        opacity,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         depthTest: false,
@@ -414,26 +452,47 @@ outgoingLight *= uBattleExposure;`)
       uniforms: {
         uColor: { value: new THREE.Color(0x8bdcff) },
         uOpacity: { value: 0 },
+        uProgress: { value: 0 },
       },
       vertexShader: `
         varying vec3 vNormal;
         varying vec3 vViewDirection;
+        varying float vLocalY;
         void main() {
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
           vNormal = normalize(normalMatrix * normal);
           vViewDirection = normalize(-mvPosition.xyz);
+          // 반지름과 무관하게 -1..1로 정규화한 세로 위치 — 에너지 밴드가 훑고 지날 좌표.
+          vLocalY = normalize(position).y;
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
         uniform vec3 uColor;
         uniform float uOpacity;
+        uniform float uProgress;
         varying vec3 vNormal;
         varying vec3 vViewDirection;
+        varying float vLocalY;
         void main() {
-          float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDirection))), 2.35);
-          float glow = 0.18 + fresnel * 1.35;
-          gl_FragColor = vec4(uColor * glow, min(1.0, glow) * uOpacity);
+          // 카드 버스트를 참고: 더 날카로운 림 + 시작 순간 확 터졌다 가라앉는 플래시.
+          float ndotv = abs(dot(normalize(vNormal), normalize(vViewDirection)));
+          float fresnel = pow(1.0 - ndotv, 3.1);
+
+          // 형성 순간의 버스트 플래시 — 초반에 강하게 부풀었다 빠르게 사그라든다.
+          float flash = pow(1.0 - min(1.0, uProgress * 3.4), 2.0);
+
+          // 아래에서 위로 실드를 채워 올리는 에너지 밴드(카드의 확장 링에 대응).
+          float sweepPos = mix(-1.35, 1.35, clamp(uProgress * 1.9, 0.0, 1.0));
+          float band = smoothstep(0.34, 0.0, abs(vLocalY - sweepPos));
+
+          float rim = 0.12 + fresnel * (1.25 + flash * 2.7) + band * 0.7;
+
+          // 화이트-핫 코어: 림·밴드의 가장 밝은 부분은 흰색으로 달아오른다(카드의 #fff→color).
+          float hot = clamp(fresnel * (0.55 + flash * 1.1) + band * 0.85, 0.0, 1.0);
+          vec3 color = mix(uColor, vec3(1.0), hot);
+
+          gl_FragColor = vec4(color * rim, min(1.0, rim) * uOpacity);
         }
       `,
       transparent: true,
@@ -474,12 +533,20 @@ outgoingLight *= uBattleExposure;`)
     if (this.effectKind === 'heal') {
       const progress = Math.min(1, this.effectElapsed / 0.9)
       const pulse = 1 + Math.sin(progress * Math.PI * 3) * 0.08
+      // 카드 버스트처럼 튕겨 나오는 팝 — 빠르게 부풀어 살짝 오버슈트한 뒤 정착한다.
+      const t = Math.min(1, progress * 2.6)
+      const overshoot = 1 + 2.6 * Math.pow(t - 1, 3) + 1.6 * Math.pow(t - 1, 2)
       if (this.healAura) {
-        this.healAura.scale.setScalar((0.65 + progress * 0.48) * pulse)
+        this.healAura.scale.setScalar((0.6 + overshoot * 0.55) * pulse)
         this.healAura.rotation.y = progress * Math.PI * 0.8
       }
+      // 즉각적인 어택 후 완만한 릴리스 — 터지듯 나타났다 사그라드는 밝기 곡선.
+      const envelope = progress < 0.14
+        ? progress / 0.14
+        : Math.pow(1 - (progress - 0.14) / 0.86, 1.3)
       this.healMaterials.forEach((material, index) => {
-        material.opacity = Math.sin(progress * Math.PI) * (index ? 0.72 : 0.44)
+        material.uniforms.uProgress.value = progress
+        material.uniforms.uOpacity.value = Math.max(0, envelope) * (index ? 0.72 : 0.44)
       })
       this.plusParticles.forEach((particle) => {
         const local = (progress + particle.phase) % 1
@@ -496,9 +563,17 @@ outgoingLight *= uBattleExposure;`)
 
     const progress = Math.min(1, this.effectElapsed / 1.1)
     if (this.shieldMesh) {
-      const expansion = 0.58 + Math.min(1, progress * 2.2) * 0.48
+      // 카드 버스트처럼 튕겨 나오는 팝 — 빠르게 부풀어 살짝 오버슈트한 뒤 정착한다.
+      const t = Math.min(1, progress * 2.4)
+      const overshoot = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2)
+      const expansion = 0.58 + overshoot * 0.5
       this.shieldMesh.scale.set(expansion, this.shieldBaseY * expansion, expansion)
-      this.shieldMesh.material.uniforms.uOpacity.value = Math.sin(progress * Math.PI) * 0.82
+      // 즉각적인 어택 후 완만한 릴리스 — 터지듯 나타났다 사그라드는 밝기 곡선.
+      const envelope = progress < 0.14
+        ? progress / 0.14
+        : Math.pow(1 - (progress - 0.14) / 0.86, 1.4)
+      this.shieldMesh.material.uniforms.uProgress.value = progress
+      this.shieldMesh.material.uniforms.uOpacity.value = Math.max(0, envelope) * 0.9
     }
     if (progress >= 1) this.stopEffect()
   }
