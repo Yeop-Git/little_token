@@ -1641,10 +1641,11 @@ button {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.4px;
-  text-shadow: 0 0 8px var(--wglow);
+  color: var(--rarity-color, #fff);
+  text-shadow: 0 0 8px var(--rarity-color, var(--wglow));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--wglow) 55%, transparent),
-    0 0 10px color-mix(in srgb, var(--wglow) 45%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--wglow)) 55%, transparent),
+    0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
 
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }
@@ -1737,10 +1738,79 @@ button {
 .mood-gamble { --wglow: #c79bf0; }
 .mood-sacrifice { --wglow: #ff5c6e; }
 .mood-buff { --wglow: #ffcf76; }
-.rarity-common { --wglow: #e0c48a; }
-.rarity-rare { --wglow: #6fc6dd; }
-.rarity-epic { --wglow: #c79bf0; }
-.rarity-legendary { --wglow: #ffcf76; }
+/* 희귀도색은 기능색(--wglow)과 분리한다. 포일이 공격·방어·회복 구분을 덮지 않게 하는 계약. */
+.rarity-common { --rarity-color: #d8c6a4; }
+.rarity-rare { --rarity-color: #74d8ee; }
+.rarity-epic { --rarity-color: #d59aff; }
+.rarity-legendary { --rarity-color: #ffd76a; }
+.word-cell[class*='rarity-'] { --wglow: var(--rarity-color); }
+
+/* 카드 포일 — 노멀은 무광, 희귀는 은빛, 영웅은 오로라, 전설은 금빛 프리즘. */
+.card-foil,
+.rp-foil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+.word-card.rarity-rare .card-foil,
+.reward-pick.rarity-rare .rp-foil {
+  opacity: .28;
+  background:
+    linear-gradient(112deg, transparent 20%, rgba(196, 246, 255, .08) 38%, rgba(226, 252, 255, .72) 48%, rgba(99, 207, 234, .18) 58%, transparent 76%);
+  background-size: 240% 100%;
+  background-position: 100% 0;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity-color) 62%, transparent);
+}
+.word-card.rarity-epic .card-foil,
+.reward-pick.rarity-epic .rp-foil {
+  opacity: .38;
+  background:
+    radial-gradient(circle at 18% 24%, rgba(111, 231, 255, .42), transparent 28%),
+    radial-gradient(circle at 78% 68%, rgba(255, 129, 227, .4), transparent 32%),
+    linear-gradient(125deg, transparent 12%, rgba(120, 235, 255, .35), rgba(208, 135, 255, .46), rgba(255, 167, 219, .3), transparent 88%);
+  background-size: 180% 180%;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity-color) 72%, transparent);
+  animation: epic-foil-drift 6s ease-in-out infinite alternate;
+}
+.word-card.rarity-legendary .card-foil,
+.reward-pick.rarity-legendary .rp-foil {
+  opacity: .52;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, .92) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 34%, rgba(255, 241, 158, .85) 0 1px, transparent 2px),
+    radial-gradient(circle at 42% 78%, rgba(255, 255, 255, .7) 0 1.5px, transparent 2.5px),
+    linear-gradient(118deg, transparent 8%, rgba(255, 223, 100, .22), rgba(255, 255, 255, .68), rgba(255, 168, 88, .3), transparent 90%);
+  background-size: 47px 53px, 61px 67px, 73px 79px, 220% 100%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 226, 124, .88),
+    inset 0 0 22px rgba(255, 184, 65, .32);
+  animation: legendary-foil-drift 4.8s ease-in-out infinite alternate;
+}
+.word-card.rarity-rare:hover .card-foil,
+.word-card.rarity-rare:focus-visible .card-foil,
+.reward-pick.rarity-rare:hover .rp-foil {
+  animation: rare-foil-sweep .9s ease-out both;
+}
+.word-card[class*='rarity-']:hover .card-foil,
+.word-card[class*='rarity-']:focus-visible .card-foil,
+.reward-pick[class*='rarity-']:hover .rp-foil { filter: brightness(1.25) saturate(1.16); }
+@keyframes rare-foil-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -120% 0; }
+}
+@keyframes epic-foil-drift {
+  from { background-position: 0% 20%; }
+  to { background-position: 100% 80%; }
+}
+@keyframes legendary-foil-drift {
+  from { background-position: 0 0, 0 0, 0 0, 100% 0; }
+  to { background-position: 9px 7px, -7px 11px, 13px -9px, -110% 0; }
+}
 
 .word-row {
   display: flex;
@@ -2053,6 +2123,8 @@ button {
   .draw-deck,
   .pane { transition-duration: .01ms !important; }
   .slot-step.commit-pulse { animation: none !important; }
+  .card-foil,
+  .rp-foil { animation: none !important; }
   .word-card:hover:not(.blocked):not(.drawing) .card-lift,
   .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift { transform: translateY(-24px); }
 }
@@ -2409,6 +2481,7 @@ button {
     inset 0 0 0 2px color-mix(in srgb, var(--wglow, var(--gold)) 46%, rgba(255, 255, 255, 0.12)),
     inset 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 40%, transparent);
 }
+.rp-foil { border-radius: 20px; }
 .rp-top { position: relative; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; }
 .rp-type {
   font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff;
@@ -3037,6 +3110,7 @@ button {
 
 /* ── 보상등급 — 운이 바닥을 깔고, 오버킬이 천장을 당긴다 ── */
 .grade-badge {
+  --wglow: var(--rarity-color, var(--gold));
   position: relative;
   padding: 6px 16px;
   border-radius: 30px;
@@ -3114,8 +3188,8 @@ button {
   color: var(--ink-dim);
 }
 .reward-grade b {
-  color: var(--wglow, var(--gold));
-  text-shadow: 0 0 10px var(--wglow, var(--glow));
+  color: var(--rarity-color, var(--gold));
+  text-shadow: 0 0 10px var(--rarity-color, var(--glow));
 }
 .rp-tags {
   display: flex;
@@ -3128,10 +3202,10 @@ button {
   letter-spacing: 1px;
   padding: 3px 9px;
   border-radius: 999px;
-  color: var(--wglow, #e0c48a);
+  color: var(--rarity-color, #d8c6a4);
   background: rgba(8, 6, 14, 0.5);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, #e0c48a) 62%, transparent);
-  text-shadow: 0 0 9px color-mix(in srgb, var(--wglow, #e0c48a) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, #d8c6a4) 62%, transparent);
+  text-shadow: 0 0 9px color-mix(in srgb, var(--rarity-color, #d8c6a4) 70%, transparent);
 }
 
 /* ── 행운 감탄 — 보상등급에 비례해 팅! 하고 추가 스탯이 붙은 선택지 ── */

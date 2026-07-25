@@ -1,10 +1,8 @@
 import { SKILL_ART } from '@/assets'
-import type { Word } from '@core/types'
+import { RARITY_LABEL, type Word } from '@core/types'
 
 // 클릭으로 카드를 먹일 때 고스트가 부풀어 사라지는 시간.
 const COMMIT_ANIM_MS = 340
-
-const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
 
 export const CARD_HAND_CONFIG = {
   maxHand: 6,
@@ -275,18 +273,20 @@ export class CardHand {
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
+          <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}
           <strong class="card-title">${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
+          <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
           <strong>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
           <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
         </span>`
-    return `<button class="word-card mood-${this.moodOf(card.word)}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
+    return `<button class="word-card mood-${this.moodOf(card.word)} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">

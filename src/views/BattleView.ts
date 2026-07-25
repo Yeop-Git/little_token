@@ -22,7 +22,7 @@ import {
   type ResolvedMult,
 } from '@core/compiler'
 import { conflictReason, pruneConflicts } from '@core/validator'
-import type { CompileMods, Intent, Selection, Tables, Word, FieldDef } from '@core/types'
+import { RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ENEMIES } from '@data/enemies'
 import {
@@ -41,7 +41,7 @@ import { weatherIcon } from './sprites'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
-import { defaultPlayer, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
+import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
 import { hasPassive, modsFor, passivesOf, PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -66,8 +66,6 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
-
 // 적 레일 — rank 0이 최전방. 우측 정보창(오른쪽에서 406px)에 뒷줄이 깔리지 않도록
 // 라인 전체를 플레이어 쪽으로 당겨 두었다.
 const RAIL_FRONT_RIGHT = 860
@@ -849,7 +847,7 @@ export class BattleView {
     detail.className = `info-dock glass item-detail${p ? ' is-passive' : ''}`
     detail.innerHTML = `
       <div class="wd-name">${item.name}</div>
-      <div class="wd-grade">✦ ${item.grade} · 「${item.line}」</div>
+      <div class="wd-grade">✦ ${RARITY_LABEL[ownedItemRarity(item)]} · 「${item.line}」</div>
       ${passive}
       <div class="id-stats">${rows}</div>
       <div class="id-art">${itemArt(item.art)}</div>`

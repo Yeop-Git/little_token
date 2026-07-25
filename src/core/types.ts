@@ -91,7 +91,7 @@ export interface Word {
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
 
 export const RARITY_LABEL: Record<Rarity, string> = {
-  common: '흔함',
+  common: '노멀',
   rare: '희귀',
   epic: '영웅',
   legendary: '전설',

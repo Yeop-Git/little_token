@@ -11,6 +11,7 @@ import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { GameAudio } from '@/audio/GameAudio'
+import { RARITY_LABEL } from '@core/types'
 
 interface Opts {
   item: ItemDef
@@ -84,7 +85,7 @@ export class ItemExclaimView {
               <div class="glint">✦ 새 아이템 ✦</div>
               <div class="art">${itemArt(item.art)}</div>
               <div class="iname">${item.name}</div>
-              <div class="grade">등급 · ${item.grade}</div>
+              <div class="grade">등급 · ${RARITY_LABEL[item.rarity]}</div>
             </div>
             <div class="iforge-stats glass">
               <div class="dock-title">감정된 스탯</div>
@@ -125,7 +126,7 @@ export class ItemExclaimView {
         this.opts.onDone({
           id: item.id,
           name: item.name,
-          grade: item.grade,
+          rarity: item.rarity,
           art: item.art,
           line,
           stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },

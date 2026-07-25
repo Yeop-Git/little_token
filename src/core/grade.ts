@@ -27,7 +27,7 @@ export const bumpGrade = (grade: number, n: number): number => clamp(grade + n, 
 export const overkillGain = (kills: number, wipedAll: boolean): number =>
   kills >= 2 ? kills + (wipedAll ? 1 : 0) : 0
 
-/** 등급 → 희귀도 가중치. 등급이 오르면 흔함이 줄고 상위 희귀도 확률이 열린다. */
+/** 등급 → 희귀도 가중치. 등급이 오르면 노멀이 줄고 상위 희귀도 확률이 열린다. */
 export function rarityWeights(grade: number): Record<Rarity, number> {
   const g = clamp(grade, 0, GRADE_MAX)
   return {

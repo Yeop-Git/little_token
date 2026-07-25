@@ -44,7 +44,7 @@ function grantItem(def: ItemDef) {
   applyItemReward(run.player, {
     id: def.id,
     name: def.name,
-    grade: def.grade,
+    rarity: def.rarity,
     art: def.art,
     line: '디버그 지급',
     stats: { ...def.base },

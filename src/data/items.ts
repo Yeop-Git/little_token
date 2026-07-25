@@ -13,11 +13,10 @@ export type StatKey = 'hp' | 'atk' | 'guard' | 'heal' | 'luck'
 export interface ItemDef {
   id: string
   name: string
-  grade: string // 등급 라벨
   art: string // Sprites.ts 아이콘 키
   base: Record<StatKey, number>
   flavor: string
-  rarity?: Rarity // 미지정은 흔함
+  rarity: Rarity
   /**
    * 규칙을 바꾸는 패시브. 전설 아이템 전용이며 **기본 스탯이 0이다.**
    * (감탄사로 붙는 소량은 그대로 받는다 — 감탄 화면은 코어 루프라 건너뛰지 않는다.)
@@ -48,7 +47,7 @@ export const ITEMS: Record<string, ItemDef> = {
   ribbon: {
     id: 'ribbon',
     name: '낡은 리본',
-    grade: '흔함',
+    rarity: 'common',
     art: 'ribbon',
     base: { hp: 2, atk: 0, guard: 2, heal: 0, luck: 1 },
     flavor: '어제 주운 것 같은데 기억이 안 난다.',
@@ -56,7 +55,7 @@ export const ITEMS: Record<string, ItemDef> = {
   candle: {
     id: 'candle',
     name: '몽당 양초',
-    grade: '흔함',
+    rarity: 'common',
     art: 'candle',
     base: { hp: 0, atk: 2, guard: 0, heal: 1, luck: 1 },
     flavor: '심지가 아직 살아 있다.',
@@ -71,7 +70,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   echoChime: {
     id: 'echoChime',
     name: '누댕의 메아리',
-    grade: '전설',
     art: 'ribbon',
     rarity: 'legendary',
     passive: 'echo',
@@ -81,7 +79,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   olymCarrot: {
     id: 'olymCarrot',
     name: '올림프의 당근',
-    grade: '전설',
     art: 'candle',
     rarity: 'legendary',
     passive: 'punct',
@@ -91,7 +88,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   tastyVerb: {
     id: 'tastyVerb',
     name: '맛동사',
-    grade: '전설',
     art: 'gift',
     rarity: 'legendary',
     passive: 'twinVerb',
@@ -101,7 +97,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   goldenApple: {
     id: 'goldenApple',
     name: '신데렐라의 황금사과',
-    grade: '전설',
     art: 'gift',
     rarity: 'legendary',
     passive: 'retry',
@@ -111,7 +106,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   beautyMirror: {
     id: 'beautyMirror',
     name: '미녀의 거울',
-    grade: '전설',
     art: 'ribbon',
     rarity: 'legendary',
     passive: 'twinSubj',
@@ -121,7 +115,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   snowShoe: {
     id: 'snowShoe',
     name: '백설공주의 구두',
-    grade: '전설',
     art: 'gift',
     rarity: 'legendary',
     passive: 'heavyShoe',
@@ -131,7 +124,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   redMatch: {
     id: 'redMatch',
     name: '빨간망토의 성냥',
-    grade: '전설',
     art: 'candle',
     rarity: 'legendary',
     passive: 'matchFire',
@@ -141,7 +133,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   matchCloak: {
     id: 'matchCloak',
     name: '성냥팔이 소녀의 망토',
-    grade: '전설',
     art: 'ribbon',
     rarity: 'legendary',
     passive: 'luckCloak',
@@ -151,7 +142,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   pigBbq: {
     id: 'pigBbq',
     name: '아기돼지 바베큐',
-    grade: '전설',
     art: 'gift',
     rarity: 'legendary',
     passive: 'bbq',
@@ -161,7 +151,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   pinoDoubt: {
     id: 'pinoDoubt',
     name: '피노키오의 미아핑',
-    grade: '전설',
     art: 'candle',
     rarity: 'legendary',
     passive: 'doubt',
@@ -171,7 +160,6 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   beanSprout: {
     id: 'beanSprout',
     name: '잭과 숙주나물',
-    grade: '전설',
     art: 'ribbon',
     rarity: 'legendary',
     passive: 'beanstalk',

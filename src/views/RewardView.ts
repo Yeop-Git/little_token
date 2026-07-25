@@ -3,7 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고, 상단=종류 / 하단=메인 효과 / 자세히보기=우측 정보창.
  */
 
-import type { FieldDef, Word } from '@core/types'
+import { RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -24,7 +24,6 @@ interface Opts {
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb: '동사', obj: '목적어', end: '어미' }
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
-const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 const pct = (b: number) => `${b >= 0 ? '+' : ''}${Math.round(b * 100)}%`
 
@@ -119,7 +118,7 @@ function detailHtml(opt: RewardOption): string {
     const p = it.passive ? PASSIVES[it.passive] : null
     return `
       <div class="wd-name">${it.name}</div>
-      <div class="wd-grade">✦ 아이템 · ${it.grade}</div>
+      <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[it.rarity]}</div>
       ${p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''}
       <div class="id-stats">${rows}</div>
       <div class="wd-inf">${p ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '감탄사를 조립해 추가 스탯이 붙는다.'}</div>
@@ -181,10 +180,11 @@ export class RewardView {
     const badge = p.reinforce ? '▲ RANK UP' : p.kind === 'item' ? '● ITEM' : '✦ NEW'
     const cls = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
     return `
-      <div class="reward-pick ${mood} ${cls}" data-i="${i}">
+      <div class="reward-pick ${mood} rarity-${p.rarity} ${cls}" data-i="${i}">
         ${bgHtml(p)}
         <span class="rp-tint" aria-hidden="true"></span>
         <span class="rp-veil" aria-hidden="true"></span>
+        <span class="rp-foil" aria-hidden="true"></span>
         <div class="rp-top">
           <span class="rp-type">${typeLabel(p)}</span>
           <span class="rp-tags">
