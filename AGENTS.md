@@ -178,6 +178,24 @@
 - `src/tools`: 데이터 덤프와 전 조합 밸런스 검사
 - `src/assets`: 빌드에 포함되는 배경, 스프라이트와 폰트
 
+## 에셋 최적화 규격
+
+- 새 GLB는 `src/assets/models`에 넣은 직후 `npm run assets:optimize`를 실행한다.
+  GLB가 참조하는 텍스처는 모델 파일 안에 임베드하고 가로·세로 어느 축도
+  1,024px를 넘지 않는 **1K 텍스처**로 통일한다. 원본이 더 작으면 확대하지 않는다.
+- GLB 바이너리와 임베디드 이미지를 직접 손으로 고치지 않는다. 변환은
+  `scripts/optimize-assets.ts`가 이미지 bufferView와 뒤따르는 모든 오프셋을
+  다시 정렬하도록 맡긴다.
+- `src/assets`에 들어오는 런타임 PNG는 원칙적으로 모두 WebP로 변환한다.
+  `npm run assets:optimize`는 용도별 최대 해상도와 품질로 `.webp`를 만든 뒤 원본
+  `.png`를 삭제한다. 기술적으로 PNG가 반드시 필요한 예외는 이 문서에 이유와
+  소비처를 먼저 기록하지 않는 한 추가하지 않는다.
+- 개발 서버와 프로덕션 빌드는 시작 전에 에셋 최적화를 자동 실행한다.
+  `npm run assets:check`는 남은 PNG와 1K를 초과한 GLB 텍스처를 실패로 처리한다.
+- 에셋 import와 매니페스트는 변환된 WebP와 최적화된 GLB만 참조한다. 새 에셋을
+  추가한 작업은 `npm run assets:optimize`, `npm run assets:check` 결과를 함께
+  검증한다.
+
 ## 작업 및 검증 규칙
 
 - 기존 플레이 흐름을 유지하는 수정은 가능한 가장 낮은 버전 자리부터 올린다.

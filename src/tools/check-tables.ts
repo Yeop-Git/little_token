@@ -58,7 +58,7 @@ function checkTables(name: string, t: Tables): Violation[] {
 
 /**
  * 일러스트 연결 검사 — 단어의 art 키가 실제로 등록돼 있는가.
- * assets/index.ts는 png를 import하므로 tsx로 못 읽는다. 키만 텍스트로 뽑아 대조한다.
+ * assets/index.ts는 이미지 파일을 import하므로 tsx로 못 읽는다. 키만 텍스트로 뽑아 대조한다.
  * (CSV 헤더가 깨져 art 열이 통째로 사라진 적이 있어 이 검사를 남긴다.)
  */
 function checkArt(): string[] {

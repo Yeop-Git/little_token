@@ -12,5 +12,6 @@
 
 # 바이너리 — 변환 금지.
 *.png binary
+*.webp binary
 *.woff2 binary
 *.mp3 binary

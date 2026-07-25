@@ -1,6 +1,6 @@
 /**
  * 날씨 아이콘(플랫 인라인 SVG, currentColor). 배우/배경은 실제 PNG 에셋(assets/),
- * UI/아이템 아이콘은 ui/Icons.ts를 쓴다.
+ * UI/아이템 아이콘은 ui/Icons.ts를 쓴다. 런타임 래스터 에셋은 WebP를 쓴다.
  */
 
 export const weatherIcon = (w: string): string => {

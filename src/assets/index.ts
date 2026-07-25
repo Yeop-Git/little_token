@@ -4,11 +4,12 @@
  */
 
 import bg001 from './backgrounds/bg_001.webp'
-import backgroundDark from './backgrounds/backgroundDark.png'
-import combatGuide from './backgrounds/combat_guide.png'
+import backgroundDark from './backgrounds/backgroundDark.webp'
+import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import player001 from './sprites/player_001.webp'
+import playerModel from './models/player.glb?url'
 import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
@@ -35,6 +36,17 @@ import skill3007 from './sprites/skills/skill_3007.webp'
 import skill7001 from './sprites/skills/skill_7001.webp'
 import skill7002 from './sprites/skills/skill_7002.webp'
 import skill7003 from './sprites/skills/skill_7003.webp'
+import itemSnack from './sprites/items/item_001.webp'
+import itemChime from './sprites/items/item_002.webp'
+import itemMirror from './sprites/items/item_003.webp'
+import itemShoe from './sprites/items/item_004.webp'
+import itemApple from './sprites/items/item_005.webp'
+import itemCarrot from './sprites/items/item_006.webp'
+import itemMatch from './sprites/items/item_007.webp'
+import itemCloak from './sprites/items/item_008.webp'
+import itemBbq from './sprites/items/item_009.webp'
+import itemPino from './sprites/items/item_010.webp'
+import itemBeanstalk from './sprites/items/item_011.webp'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
 import paperMapParade from './audio/paper-map-parade.mp3'
 import sentenceComplete from './audio/sentence-complete.mp3'
@@ -50,13 +62,13 @@ export const BACKGROUNDS: Record<string, string> = {
   battleDark: backgroundDark,
 }
 
+export const GUIDE_ART = { combat: combatGuide }
+
 // 타이틀 화면 — 배경 일러스트 + 발광 로고
 export const TITLE = {
   bg: titleBg,
   logo: titleLogo,
 }
-
-export const GUIDE_ART = { combat: combatGuide }
 
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상
 export const TOKEN_FACES = {
@@ -70,6 +82,11 @@ export const SPRITES: Record<string, string> = {
   player_001: player001,
   enemy_moth: enemyMoth,
   enemy_roach: enemyRoach,
+}
+
+// 전장용 GLB. 상세 카드에는 계속 대응되는 SPRITES 초상을 사용한다.
+export const MODELS: Record<string, string> = {
+  player: playerModel,
 }
 
 // 맥락카드 일러스트 — Word.art가 이 키를 참조한다.
@@ -97,6 +114,24 @@ export const SKILL_ART: Record<string, string> = {
   '7001': skill7001,
   '7002': skill7002,
   '7003': skill7003,
+}
+
+/**
+ * 아이템 일러스트 — ItemDef.art가 이 키를 참조한다.
+ * 여기 없는 키는 Icons.itemArt의 SVG 폴백으로 떨어진다(노멀 아이템 2종).
+ */
+export const ITEM_ART: Record<string, string> = {
+  snack: itemSnack, // 맛동사
+  chime: itemChime, // 누댕의 메아리
+  mirror: itemMirror, // 미녀의 거울
+  shoe: itemShoe, // 백설공주의 구두
+  apple: itemApple, // 신데렐라의 황금사과
+  carrot: itemCarrot, // 올림프의 당근
+  match: itemMatch, // 빨간망토의 성냥
+  cloak: itemCloak, // 성냥팔이 소녀의 망토
+  bbq: itemBbq, // 아기돼지 바베큐
+  pino: itemPino, // 피노키오의 미아핑
+  beanstalk: itemBeanstalk, // 잭과 숙주나물
 }
 
 export const FONT_URL = griunFont

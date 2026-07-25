@@ -23,7 +23,7 @@ import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { ALL_REWARD_WORDS, EARLY_WORDS, PUNCT_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import {
   allDead,
@@ -47,10 +47,17 @@ import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type Owned
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CardHand } from '@/ui/CardHand'
+import { CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
+import {
+  destroyCharacterModels,
+  isCharacterModelReady,
+  mountCharacterModel,
+  playCharacterAnimation,
+  suspendCharacterModel,
+} from '@views/BattleCharacterModel'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -71,11 +78,11 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-// 적 레일 — 스테이지의 최대 8마리를 모두 바닥선에 세우되, 많아지면 뒤쪽만 압축한다.
-// 3마리 이후를 DOM에서 빼면 실제 적이 투명해진 것처럼 보여 전황을 읽을 수 없어진다.
+// 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
+// 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
 const RAIL_FRONT_RIGHT = 860
 const RAIL_GAP = 260
-const RAIL_BACK_RIGHT = 40
+const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
 const BUG_COUNT_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
   <ellipse cx="24" cy="26" rx="10" ry="14" fill="currentColor" fill-opacity=".16"/><path d="M19 14c0-5 10-5 10 0M14 21 8 17M34 21l6-4M14 29l-7 2M34 29l7 2M17 37l-5 5M31 37l5 5M24 16v24"/>
@@ -126,6 +133,8 @@ export class BattleView {
   private playerPreempting = false
   private actionOrderSignature = ''
   private readonly enemyPool = new Map<string, HTMLElement[]>()
+  /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
+  private readonly debugSpawnedWords = new Map<string, Word>()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
   private killsThisBattle = 0
 
@@ -156,6 +165,8 @@ export class BattleView {
     document.removeEventListener('pointercancel', this.onPointerUp, true)
     this.cardHand.destroy()
     this.introDialogue?.destroy()
+    destroyCharacterModels(this.root)
+    this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
   }
 
@@ -164,6 +175,24 @@ export class BattleView {
     if (this.busy || this.over) return
     this.state.playerHp = 0
     void this.lose()
+  }
+
+  /** Developer-only shortcut; the spawned card exists only in the current slot hand. */
+  async debugSpawnCard(word: Word): Promise<string> {
+    if (this.busy || this.over) return '지금은 카드를 생성할 수 없습니다.'
+    const key = this.order()[this.slotIndex]
+    const compatibleSlot = key === 'subj2' ? 'subj' : key === 'verb2' ? 'verb' : key
+    const slotLabel = this.t.template.slots[this.slotIndex]?.label ?? key
+    if (word.slot !== compatibleSlot) return `현재 ${slotLabel} 칸에는 ${compatibleSlot} 카드만 생성할 수 있습니다.`
+
+    const result: DebugCardSpawnResult = await this.cardHand.debugSpawn(word)
+    if (result === 'spawned') {
+      this.debugSpawnedWords.set(`${key}:${word.id}`, word)
+      return `${word.text} 카드를 현재 손패에 생성했습니다.`
+    }
+    if (result === 'already-in-hand') return `${word.text} 카드는 이미 현재 손패에 있습니다.`
+    if (result === 'hand-full') return '현재 손패가 가득 찼습니다.'
+    return '카드 생성 준비가 끝난 뒤 다시 시도해 주세요.'
   }
 
   private onPointerDown = () => {
@@ -338,9 +367,8 @@ export class BattleView {
     const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
     // 전투 대상은 항상 최전방.
     this.target = frontIdx(s)
-    // 전투 수는 8마리까지 늘어난다. 전원은 레일에 남기고, updateFoe에서 수를
-    // 기준으로 간격과 크기만 압축한다.
-    const visible = alive
+    const visible = alive.slice(0, MAX_VISIBLE_ENEMIES)
+    const hiddenWaiting = alive.length - visible.length
     const visibleSet = new Set(visible)
 
     let you = host.querySelector<HTMLElement>('.actor.you')
@@ -350,6 +378,7 @@ export class BattleView {
       this.bindActor(you)
     }
     this.updatePlayer(you)
+    mountCharacterModel(you, CHARACTER_VISUALS.player)
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -363,14 +392,33 @@ export class BattleView {
       }
       this.updateFoe(el, e, rank, visible.length)
     })
+    this.renderEnemyOverflow(host, hiddenWaiting)
     this.renderStats()
     this.renderActionOrder()
+  }
+
+  private renderEnemyOverflow(host: HTMLElement, count: number) {
+    let badge = host.querySelector<HTMLElement>('.enemy-overflow-count')
+    if (count <= 0) {
+      badge?.remove()
+      return
+    }
+    if (!badge) {
+      host.insertAdjacentHTML('beforeend', `
+        <div class="enemy-overflow-count" role="status" aria-live="polite">
+          ${BUG_COUNT_ICON}<b></b><span>레일 대기</span>
+        </div>`)
+      badge = host.querySelector<HTMLElement>('.enemy-overflow-count')!
+    }
+    badge.querySelector<HTMLElement>('b')!.textContent = `적 × ${count}`
+    badge.setAttribute('aria-label', `대기 중인 적 ${count}마리`)
   }
 
   private releaseFoe(el: HTMLElement) {
     const key = el.dataset.poolKey
     el.getAnimations().forEach((animation) => animation.cancel())
     el.classList.remove('front', 'target', 'back', 'strikes-first', 'hit', 'lunge')
+    suspendCharacterModel(el)
     el.remove()
     if (!key) return
     const pool = this.enemyPool.get(key) ?? []
@@ -380,14 +428,25 @@ export class BattleView {
 
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
     const key = enemy.def.id
-    const el = this.enemyPool.get(key)?.pop() ?? (() => {
+    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
+    const pool = this.enemyPool.get(key)
+    let pooled: HTMLElement | undefined
+    // 준비 중인 WebGL 인스턴스를 풀에서 성급히 꺼내면 빈 캔버스나 2D 초상이
+    // 한 프레임 노출된다. 첫 프레임 출력이 검증된 항목만 선택한다.
+    if (pool) {
+      for (let index = pool.length - 1; index >= 0; index -= 1) {
+        if (!isCharacterModelReady(pool[index], visual)) continue
+        pooled = pool.splice(index, 1)[0]
+        break
+      }
+    }
+    const el = pooled ?? (() => {
       const template = document.createElement('template')
       template.innerHTML = this.foeHtml(i, enemy).trim()
       const actor = template.content.firstElementChild as HTMLElement
       this.bindActor(actor)
       return actor
     })()
-    const visual = this.enemyVisual(enemy)
     el.dataset.i = String(i)
     el.dataset.character = visual.id
     el.dataset.poolKey = key
@@ -396,11 +455,8 @@ export class BattleView {
     const image = el.querySelector<HTMLImageElement>('.battle-sprite')!
     image.src = visual.portrait2d
     image.alt = enemy.def.name
+    mountCharacterModel(el, visual)
     return el
-  }
-
-  private enemyVisual(enemy: EnemyInst): CharacterVisualDef {
-    return CHARACTER_VISUALS[enemy.def.sprite === 'enemy_roach' ? 'roach' : 'moth']
   }
 
   // 날짜 아래 행동 순서 — 레퍼런스의 세로 초상화 열을 가져오되, 실제 전투 규칙처럼
@@ -428,7 +484,7 @@ export class BattleView {
     const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
       key: `enemy-${front}`,
       name: enemy!.def.name,
-      portrait: this.enemyVisual(enemy!).portrait2d,
+      portrait: CHARACTER_VISUALS[enemy!.def.id as 'moth' | 'roach'].portrait2d,
       side: 'enemy',
       timing,
       note,
@@ -466,7 +522,7 @@ export class BattleView {
       entries.push({
         key: `enemy-${i}`,
         name: waiting.def.name,
-        portrait: this.enemyVisual(waiting).portrait2d,
+        portrait: CHARACTER_VISUALS[waiting.def.id as 'moth' | 'roach'].portrait2d,
         side: 'enemy',
         timing: 'waiting',
         note: '레일 대기',
@@ -518,6 +574,7 @@ export class BattleView {
   }
 
   private playerHtml(): string {
+    const modelStatus = CHARACTER_VISUALS.player.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬 상세 보기">
         <div class="nameplate glass">
@@ -525,7 +582,7 @@ export class BattleView {
           <div class="hpbar you"><div class="fill"></div></div>
         </div>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
       </div>`
   }
 
@@ -538,7 +595,8 @@ export class BattleView {
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
-    const visual = this.enemyVisual(e)
+    const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
+    const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor foe" data-i="${i}" data-character="${visual.id}"
         role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
@@ -547,16 +605,16 @@ export class BattleView {
             <span class="nm">${e.def.name}</span>
             <span class="hpn"></span>
           </div>
-        <div class="hp-row">
-          <div class="hpbar foe"><div class="fill"></div></div>
-        </div>
-        <div class="enemy-traits" aria-label="적 특성"></div>
+          <div class="hp-row">
+            <div class="hpbar foe"><div class="fill"></div></div>
+          </div>
+          <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
         </span>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
         <span class="guard-hint" aria-hidden="true">우선 방어하세요!</span>
       </div>`
   }
@@ -564,10 +622,7 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    const gap = visibleCount <= 1
-      ? RAIL_GAP
-      : Math.min(RAIL_GAP, (RAIL_FRONT_RIGHT - RAIL_BACK_RIGHT) / (visibleCount - 1))
-    el.style.right = `${RAIL_FRONT_RIGHT - rank * gap}px`
+    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
     el.style.bottom = '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
@@ -582,8 +637,7 @@ export class BattleView {
     // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
-    // 4번째부터는 이름표를 접어 모델과 서로 겹치지 않게 한다.
-    plate.classList.toggle('gone', rank >= 3)
+    plate.classList.remove('gone')
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
@@ -715,10 +769,6 @@ export class BattleView {
       // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
       if (intent.doubtCount > 0) {
         extra += `<span class="chain-word ctx doubt"><b class="cw-text">${DOUBT_SUFFIX}</b><em class="cw-note gamble">×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}</em></span>`
-      }
-      if (intent.emotionResonance > 1) {
-        const emotion = intent.emotions.find((value, index, all) => all.indexOf(value) !== index)!
-        extra += `<span class="chain-word ctx emotion ${emotion}"><b class="cw-text">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</b><em class="cw-note combo">공명 ×${intent.emotionResonance.toFixed(2)}</em></span>`
       }
       // 부조화(어긋난 맥락) — 위력이 깎인다는 걸 실행 전에 보여준다.
       if (intent.penalties.length) {
@@ -1054,7 +1104,7 @@ export class BattleView {
       ...Object.values(this.player.deck).flat().map((word) => word.id),
       ...(punctOwned ? PUNCT_WORDS.map((word) => word.id) : []),
     ])
-    const catalog = [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS, ...PUNCT_WORDS]
+    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat(), ...PUNCT_WORDS]
       .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
     const found = catalog.filter((word) => owned.has(word.id)).length
     const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미', punct: '문장부호' }
@@ -1193,7 +1243,10 @@ export class BattleView {
 
   private pick(id: string) {
     const key = this.order()[this.slotIndex]
-    const w = this.t.words[key].find((x) => x.id === id)!
+    const debugKey = `${key}:${id}`
+    const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
+    if (!w) return
+    this.debugSpawnedWords.delete(debugKey)
     GameAudio.play('paper')
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
@@ -1513,7 +1566,7 @@ export class BattleView {
     this.setPhase('본인 캐릭터 행동')
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
-    const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.targetCount) >= 2
+    const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.aoe === 'all') >= 2
     if (sweep) await this.slowmoWindup()
 
     // 실제 본행동 발동 + 꽂힘 연출
@@ -1566,39 +1619,25 @@ export class BattleView {
     await this.enemyPhase('second')
 
     if (this.state.pending) {
-      const automated = applyPendingAttack(this.state)
-      if (automated) {
-        await this.strike(automated)
-        this.log(automated.text)
-        this.renderActors()
-        if (automated.killed.length > 0) engageFront(this.state)
-        const pendingGain = overkillGain(automated.killed.length, allDead(this.state))
-        if (pendingGain > 0) await this.dingGrade(pendingGain)
-      } else {
-      const p = this.state.pending
-      const targets = p.targetCount === 'all' ? aliveIdx(this.state) : [p.target]
-      const killed: number[] = []
-      for (const ti of targets) {
-        const e = this.state.enemies[ti]
-        if (!e || e.dead) continue
-        e.hp -= p.dmg
-        const el = this.q(`#actors .actor.foe[data-i="${ti}"]`)
-        if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
-        this.popAt(ti, `${p.dmg}`, 'dmg big')
-        if (e.hp <= 0) {
-          e.dead = true
-          killed.push(ti)
+      const result = applyPendingAttack(this.state)
+      if (result) {
+        for (const hit of result.hits) {
+          const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
+          if (hit.magicShieldBroken) this.popAt(hit.target, '매직실드!', 'guard')
+          else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
+          else if (hit.dmg > 0) {
+            if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
+            this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
+          }
         }
-      }
-      this.log(`예약된 문장 발동 → ${p.dmg} 피해`)
-      this.state.pending = null
-      await sleep(300)
-      for (const k of killed) await this.playDeath(k, 1)
-      this.renderActors()
-      if (killed.length > 0) engageFront(this.state)
-      // 예약 문장의 몰살도 오버킬로 인정한다.
-      const pendingGain = overkillGain(killed.length, allDead(this.state))
-      if (pendingGain > 0) await this.dingGrade(pendingGain)
+        this.log(result.text)
+        await sleep(300)
+        for (const k of result.killed) await this.playDeath(k, 1)
+        this.renderActors()
+        if (result.killed.length > 0) engageFront(this.state)
+        // 예약 문장의 몰살도 오버킬로 인정한다.
+        const pendingGain = overkillGain(result.killed.length, allDead(this.state))
+        if (pendingGain > 0) await this.dingGrade(pendingGain)
       }
     }
 
@@ -1684,7 +1723,7 @@ export class BattleView {
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
     res: {
-      hits: { target: number; dmg: number; guardAbsorbed?: number; magicShieldBroken?: boolean; weak?: boolean }[]
+      hits: { target: number; dmg: number }[]
       selfDmg: number
       heal: number
       killed: number[]
@@ -1695,6 +1734,7 @@ export class BattleView {
     const attacking = res.hits.length > 0
     if (attacking) {
       GameAudio.play('paperAttack')
+      playCharacterAnimation(you, 'attack')
       you.classList.add('lunge')
     }
     await sleep(attacking ? (sweep ? 120 : 170) : 40)
@@ -1707,17 +1747,11 @@ export class BattleView {
 
     for (const h of res.hits) {
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
-      if (h.magicShieldBroken) {
-        if (el) SquareBurst.playOn(el, 'guard', { spread: 120 })
-        this.popAt(h.target, '매직실드!', 'guard')
-      } else {
-        if (el && h.dmg > 0) {
-          SquareBurst.playOn(el, h.weak ? 'gold' : 'damage', { spread: 120 })
-          this.hitOne(el)
-        }
-        if (h.guardAbsorbed) this.popAt(h.target, `방어 -${h.guardAbsorbed}`, 'guard')
-        if (h.dmg > 0) this.popAt(h.target, `${h.weak ? '약점! ' : ''}${h.dmg}`, 'dmg big')
+      if (el) {
+        SquareBurst.playOn(el, 'damage', { spread: 120 })
+        this.hitOne(el)
       }
+      this.popAt(h.target, `${h.dmg}`, 'dmg big')
     }
     if (attacking) {
       await sleep(250)
@@ -1744,11 +1778,10 @@ export class BattleView {
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.
-  private predictKills(dmg: number, target: number, targetCount: Intent['targetCount']): number {
+  private predictKills(dmg: number, target: number, aoe: boolean): number {
     if (dmg <= 0) return 0
     const alive = aliveIdx(this.state)
-    if (targetCount === 'all') return alive.filter((i) => this.state.enemies[i].hp <= dmg).length
-    if (targetCount > 1) return alive.slice(0, targetCount).filter((i, n) => this.state.enemies[i].hp <= Math.round(dmg * [1, .7, .5][n])).length
+    if (aoe) return alive.filter((i) => this.state.enemies[i].hp <= dmg).length
     let left = dmg
     let kills = 0
     for (const i of alive) {
@@ -2017,6 +2050,7 @@ export class BattleView {
         }
         continue
       }
+      playCharacterAnimation(foe ?? null, 'attack')
       foe?.classList.add('lunge')
       await sleep(170)
       const you = this.q<HTMLElement>('.actor.you')
@@ -2026,17 +2060,6 @@ export class BattleView {
       this.log(st.text)
       await sleep(240)
       foe?.classList.remove('lunge')
-      if (st.counterHit) {
-        const hit = st.counterHit
-        if (hit.magicShieldBroken) this.popAt(hit.target, '매직실드!', 'guard')
-        else if (hit.dmg > 0) {
-          this.popAt(hit.target, `카운터 ${hit.dmg}`, 'dmg big')
-          this.hitOne(foe!)
-        }
-        if (hit.guardAbsorbed) this.popAt(hit.target, `방어 -${hit.guardAbsorbed}`, 'guard')
-        this.log(`카운터 ×${(st.absorbed > 0 ? hit.dmg / st.absorbed : 0).toFixed(2)}`)
-        if (this.state.enemies[hit.target]?.dead) await this.playDeath(hit.target)
-      }
     }
     this.renderActors()
   }

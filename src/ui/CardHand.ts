@@ -43,6 +43,8 @@ interface CardInstance {
   word: Word
 }
 
+export type DebugCardSpawnResult = 'spawned' | 'already-in-hand' | 'hand-full' | 'unavailable'
+
 interface SlotHandState {
   hand: CardInstance[]
   deck: CardInstance[]
@@ -196,6 +198,32 @@ export class CardHand {
   /** 이번 전투에서 아직 쓰지 않은 뽑기 횟수 — 승리 시 보상등급으로 환산된다. */
   get savedDraws(): number {
     return Math.max(0, this.drawsLeft)
+  }
+
+  /** 개발 치트 전용 — 뽑기 횟수를 쓰지 않고 현재 슬롯 손패에 카드 한 장을 넣는다. */
+  async debugSpawn(word: Word): Promise<DebugCardSpawnResult> {
+    const state = this.currentState()
+    if (!state || this.destroyed || this.processing) return 'unavailable'
+    if (state.hand.some((card) => card.word.id === word.id)) return 'already-in-hand'
+    if (state.hand.length >= CARD_HAND_CONFIG.maxHand) return 'hand-full'
+
+    const epoch = this.epoch
+    const deckIndex = state.deck.findIndex((card) => card.word.id === word.id)
+    const card = deckIndex >= 0 ? state.deck.splice(deckIndex, 1)[0] : this.makeInstance(this.slotKey, word)
+    state.hand.push(card)
+    this.processing = true
+    this.drawingId = card.instanceId
+    this.render()
+    try {
+      await this.animateDraw(card.instanceId, epoch)
+    } finally {
+      if (epoch === this.epoch) {
+        this.processing = false
+        this.drawingId = null
+        this.render()
+      }
+    }
+    return 'spawned'
   }
 
   private currentState(): SlotHandState | undefined {

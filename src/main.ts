@@ -21,11 +21,12 @@ import { startGrade } from '@core/grade'
 import { clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
-import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { GameAudio } from '@/audio/GameAudio'
+import { installFoilShaders } from '@/ui/FoilShader'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -35,6 +36,7 @@ let devCheatCleanup: (() => void) | null = null
 let battleRequest = 0
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
+installFoilShaders()
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
@@ -46,7 +48,7 @@ fit()
 let run = newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
-void preloadBattleResources(run.player.deck)
+void preloadBattleResources(run.player.deck, run.player.items)
 let current: { destroy?: () => void } | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
@@ -84,6 +86,12 @@ function cardCatalog(): Word[] {
   )
 }
 
+function spawnCardCatalog(): Word[] {
+  return [...cardCatalog(), ...GROW_WORDS, ...PUNCT_WORDS].filter(
+    (word, index, all) => all.findIndex((entry) => entry.id === word.id) === index,
+  )
+}
+
 function unlockAllCards() {
   const owned = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
   for (const word of cardCatalog()) {
@@ -110,7 +118,8 @@ function defeatPlayer() {
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
   const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
-  const rewardWords = ALL_REWARD_WORDS
+  const rewardWords = Object.values(REWARD_WORDS).flat()
+  const spawnWords = spawnCardCatalog()
   const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
@@ -140,6 +149,16 @@ function mountDevCheat(active: SceneName) {
             </select>
             <button type="button" data-word-grant>바로 해금</button>
           </div>
+        </section>
+        <section class="dev-cheat-section">
+          <h3>WORD CARD SPAWN</h3>
+          <div class="dev-cheat-card-spawn">
+            <select id="dev-card-spawn-select" aria-label="손패에 생성할 단어 카드">
+              ${spawnWords.map((word) => `<option value="${word.id}">${word.text} · ${word.slot} · ${RARITY_LABEL[word.rarity ?? 'common']}</option>`).join('')}
+            </select>
+            <button type="button" data-card-spawn${active === 'battle' ? '' : ' disabled'}>손패에 생성</button>
+          </div>
+          <p class="dev-cheat-result" data-card-spawn-result aria-live="polite">전투 중 현재 슬롯과 같은 종류의 카드를 즉시 생성합니다.</p>
         </section>
         <section class="dev-cheat-section">
           <h3>RUN TOOLS</h3>
@@ -191,6 +210,16 @@ function mountDevCheat(active: SceneName) {
     const selected = shell.querySelector<HTMLSelectElement>('#dev-word-select')!.value
     const word = rewardWords.find((entry) => entry.id === selected)
     if (word) grantWord(word)
+  })
+  shell.querySelector<HTMLButtonElement>('[data-card-spawn]')!.addEventListener('click', async () => {
+    const selected = shell.querySelector<HTMLSelectElement>('#dev-card-spawn-select')!.value
+    const word = spawnWords.find((entry) => entry.id === selected)
+    const result = shell.querySelector<HTMLElement>('[data-card-spawn-result]')!
+    if (!word || !(current instanceof BattleView)) {
+      result.textContent = '전투 화면에서만 카드를 생성할 수 있습니다.'
+      return
+    }
+    result.textContent = await current.debugSpawnCard(word)
   })
   shell.querySelectorAll<HTMLButtonElement>('[data-run-tool]').forEach((button) =>
     button.addEventListener('click', () => {
@@ -275,7 +304,7 @@ function goCombatGuide() {
 
 async function goBattle(intro = false) {
   const request = ++battleRequest
-  await preloadBattleResources(run.player.deck)
+  await preloadBattleResources(run.player.deck, run.player.items)
   if (request !== battleRequest) return
   reset()
   const st = stageFor(run.day)
