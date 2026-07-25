@@ -1,5 +1,6 @@
-import type { RunState } from './run'
-import type { Emotion } from './types'
+import { reinforceWord, type RunState } from './run'
+import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
+import type { Emotion, Word } from './types'
 
 const SAVE_KEY = 'little-token.run.v1'
 const TUTORIAL_KEY = 'little-token.tutorial-seen.v1'
@@ -9,6 +10,51 @@ const TUTORIAL_KEY = 'little-token.tutorial-seen.v1'
 const LEGACY_SUBJECT_EMOTIONS: Record<string, Emotion> = {
   na: 'joy', eoje: 'sorrow', nado: 'pleasure', oneul: 'joy',
   gyeop: 'sorrow', naman: 'anger', dachin: 'anger', uri: 'pleasure',
+}
+
+// 리뉴얼에서 사라진 고밀도 공격 카드는 같은 감정의 현행 특수 보상으로 바꾼다.
+// 저장된 강화 단계는 아래 동기화 과정에서 그대로 계승한다.
+const CARD_REPLACEMENTS: Record<string, string> = {
+  baksal: 'focusStrike',
+  hwissda: 'scatterThree',
+}
+
+const CURRENT_CARD_BY_ID = new Map(
+  [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS].map((word) => [word.id, word]),
+)
+
+function cloneCurrentCard(base: Word, level: number): Word {
+  const card: Word = {
+    ...base,
+    tags: [...base.tags],
+    effects: base.effects ? { ...base.effects } : undefined,
+    variance: base.variance ? { ...base.variance } : undefined,
+    level: 1,
+  }
+  for (let step = 1; step < Math.max(1, level); step++) reinforceWord(card)
+  return card
+}
+
+/** 저장된 카드가 이전 CSV 정의를 품고 있어도 현행 카드와 감정으로 동기화한다. */
+function migrateCardDefinitions(run: RunState): boolean {
+  let migrated = false
+  for (const [slot, savedCards] of Object.entries(run.player.deck)) {
+    const merged = new Map<string, Word>()
+    for (const saved of savedCards) {
+      const id = CARD_REPLACEMENTS[saved.id] ?? saved.id
+      const base = CURRENT_CARD_BY_ID.get(id)
+      if (!base) {
+        merged.set(saved.id, saved)
+        continue
+      }
+      const existing = merged.get(id)
+      const level = (existing?.level ?? 0) + (saved.level ?? 1)
+      merged.set(id, cloneCurrentCard(base, level))
+      if (id !== saved.id || saved.text !== base.text || saved.emotion !== base.emotion) migrated = true
+    }
+    run.player.deck[slot] = [...merged.values()]
+  }
+  return migrated
 }
 
 function isRunState(value: unknown): value is RunState {
@@ -46,6 +92,7 @@ export function loadRun(): RunState | null {
         }
       }
     }
+    migrated = migrateCardDefinitions(parsed) || migrated
     if (migrated) saveRun(parsed)
     return parsed
   } catch {
