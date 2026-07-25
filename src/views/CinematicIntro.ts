@@ -23,6 +23,18 @@ const SPEED = 0.73
 /** 걷히는 데 걸리는 시간. style.css의 .cine-veil 트랜지션과 같은 값이어야 한다. */
 const FADE_MS = 1800
 /**
+ * 걷힘이 끝난 걸 알아채는 건 transitionend가 맡고, 이 타이머는 그게 안 올 때만 쓴다
+ * (탭이 뒤로 가 있거나 트랜지션 자체가 안 붙는 경우). 실제 길이보다 넉넉해야
+ * 타이머가 먼저 터져서 걷히다 만 화면을 잘라내는 일이 없다.
+ */
+const FADE_FALLBACK_MS = FADE_MS + 400
+/**
+ * 넘겨준 뒤 영상 자원을 놓기까지 두는 시간.
+ * 디코더를 푸는 건 메인 스레드를 꽤 잡아먹어서, 화면이 막 넘어간 프레임에 얹으면
+ * 그 순간이 툭 끊긴다. 타이틀 UI가 올라오기 전 조용한 틈으로 미룬다.
+ */
+const RELEASE_DELAY_MS = 600
+/**
  * 컷 몇 초(실제 시간) 전에 걷기 시작하는가. 작을수록 영상 끝자락에 붙는다.
  * 페이드가 컷보다 길어도 된다 — 마지막 프레임에 멈춘 채로 마저 흐려지고,
  * 그 프레임이 곧 타이틀 배경이라 멈춘 티가 안 난다.
@@ -43,8 +55,10 @@ export class CinematicIntro {
   private fadeTimer = 0
   private giveUpTimer = 0
   private safetyTimer = 0
+  private releaseTimer = 0
   private fading = false
   private finished = false
+  private released = false
 
   constructor(host: HTMLElement, private opts: Opts) {
     this.el = document.createElement('div')
@@ -77,6 +91,8 @@ export class CinematicIntro {
     this.video.addEventListener('timeupdate', this.tick)
     // 첫 프레임이 준비돼야 검은 화면을 걷는다 — 안 그러면 흰 깜빡임이 생긴다.
     this.video.addEventListener('loadeddata', () => this.el.classList.add('playing'), { once: true })
+    // 걷힘이 실제로 끝나는 순간을 트랜지션한테 직접 듣는다(아래 onFadeEnd 참고).
+    this.el.addEventListener('transitionend', this.onFadeEnd)
 
     this.giveUpTimer = window.setTimeout(this.finish, GIVE_UP_MS)
     void this.play()
@@ -86,12 +102,28 @@ export class CinematicIntro {
     clearTimeout(this.fadeTimer)
     clearTimeout(this.giveUpTimer)
     clearTimeout(this.safetyTimer)
+    clearTimeout(this.releaseTimer)
     this.video.removeEventListener('timeupdate', this.tick)
+    this.el.removeEventListener('transitionend', this.onFadeEnd)
     this.el.removeEventListener('click', this.skip)
     window.removeEventListener('keydown', this.skip)
-    this.video.pause()
-    this.video.removeAttribute('src')
+    this.release()
     this.el.remove()
+  }
+
+  /**
+   * 디코더와 버퍼를 실제로 놓아준다.
+   * 소스를 <source> 자식으로 물렸을 땐 src 속성을 지워 봐야 아무 일도 안 일어난다 —
+   * 자식을 떼고 load()까지 불러야 파이프라인이 풀린다. 예전엔 이게 헛돌아서
+   * 영상 자원이 GC 때까지 살아 있었고, 그 정리가 아무 때나 튀어나왔다.
+   */
+  private release() {
+    if (this.released) return
+    this.released = true
+    this.video.pause()
+    this.video.querySelector('source')?.remove()
+    this.video.removeAttribute('src')
+    this.video.load()
   }
 
   /**
@@ -140,13 +172,28 @@ export class CinematicIntro {
     clearTimeout(this.giveUpTimer)
     clearTimeout(this.safetyTimer)
     this.el.classList.add('leaving')
-    this.fadeTimer = window.setTimeout(this.finish, FADE_MS)
+    this.fadeTimer = window.setTimeout(this.finish, FADE_FALLBACK_MS)
+  }
+
+  /**
+   * 걷힘이 끝나는 순간에 맞춰 넘긴다.
+   * 트랜지션은 클래스가 붙은 프레임이 아니라 그 다음 스타일 계산부터 흐르기 시작한다.
+   * 그래서 같은 길이의 타이머로 재면 늘 한 프레임씩 먼저 터져서, 아직 다 안 걷힌 화면을
+   * 잘라내게 된다 — 마지막에 툭 튀던 게 이거다. 끝을 재는 건 트랜지션한테 맡긴다.
+   */
+  private onFadeEnd = (e: TransitionEvent) => {
+    if (e.target === this.el && e.propertyName === 'opacity') this.finish()
   }
 
   private finish = () => {
     if (this.finished) return
     this.finished = true
-    this.destroy()
+    clearTimeout(this.fadeTimer)
+    // 걷힌 뒤라면 화면은 이미 넘어갔다. 여기서 영상 자원까지 같이 풀면 넘겨주는 그 한 프레임이
+    // 통째로 밀린다 — 넘기는 건 지금, 무거운 정리는 타이틀 UI가 올라오기 전 조용한 틈으로.
+    // 영상을 아예 못 튼 경우엔 덮개가 아직 그대로라 미룰 수가 없다(미루면 검은 화면이 남는다).
+    if (this.fading) this.releaseTimer = window.setTimeout(() => this.destroy(), RELEASE_DELAY_MS)
+    else this.destroy()
     this.opts.onDone()
   }
 }
