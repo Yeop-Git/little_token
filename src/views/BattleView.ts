@@ -58,6 +58,7 @@ interface Opts {
   encounter: string[]
   /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
   onWin: (grade: number) => void
+  onLose: () => void
   onHome?: () => void
   player?: PlayerState
   tables?: Tables
@@ -96,6 +97,7 @@ export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
   private onWin: (grade: number) => void
+  private onLose: () => void
   private onHome?: () => void
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
@@ -129,6 +131,7 @@ export class BattleView {
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
     this.onWin = opts.onWin
+    this.onLose = opts.onLose
     this.onHome = opts.onHome
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
@@ -1592,10 +1595,7 @@ export class BattleView {
       this.setPhase('선공 상대 행동')
       await this.enemyPhase('first')
       if (this.state.playerHp <= 0) {
-        this.releaseTally()
-        this.over = true
-        this.setPhase('패배')
-        this.log('일기장이 너무 상했다… (패배)')
+        await this.lose()
         return
       }
     }
@@ -1623,6 +1623,11 @@ export class BattleView {
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
     let kills = res.killed.length
+    if (this.state.playerHp <= 0) {
+      await this.lose()
+      return
+    }
+
     if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
@@ -1679,9 +1684,8 @@ export class BattleView {
     }
 
     if (this.state.playerHp <= 0) {
-      this.over = true
-      this.setPhase('패배')
-      this.log('일기장이 너무 상했다… (패배)')
+      await this.lose()
+      return
     } else if (allDead(this.state)) {
       this.over = true
       this.setPhase('전투 승리')
@@ -1713,6 +1717,17 @@ export class BattleView {
    * 런 전체에 남아야 하므로 플레이어 스탯(hp)까지 함께 올린다.
    * 겹칠수록 이름이 길어진다: 무럭무럭 → 무럭무럭무럭무럭.
    */
+  private async lose(): Promise<void> {
+    if (this.over) return
+    this.releaseTally()
+    this.over = true
+    this.setPhase('패배')
+    this.log('일기장이 너무 상했다…')
+    this.renderActors()
+    await sleep(520)
+    this.onLose()
+  }
+
   private async growUp(n: number): Promise<void> {
     this.player.stats.hp += n
     this.state.playerMax += n

@@ -9,6 +9,7 @@ import { BattleView } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
+import { DefeatView } from '@views/DefeatView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
@@ -44,7 +45,7 @@ let run = newRun()
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
 void preloadBattleResources(run.player.deck)
 let current: { destroy?: () => void } | null = null
-type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item'
+type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
 
@@ -79,7 +80,7 @@ function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
   const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
   const rewardWords = Object.values(REWARD_WORDS).flat()
-  const sceneLabel: Record<SceneName, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
+  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
       <b>${def.name}</b><span>${def.passive ? '문장 규칙' : '스탯 아이템'}${owned.has(def.id) ? ' · 보유 중' : ''}</span>
@@ -93,7 +94,7 @@ function mountDevCheat(active: SceneName) {
         <section class="dev-cheat-section">
           <h3>SCENE JUMP</h3>
           <div class="dev-cheat-scenes">
-            ${(['title', 'intro', 'battle', 'reward', 'item'] as SceneName[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
+            ${(['title', 'intro', 'battle', 'reward', 'item'] as Exclude<SceneName, 'defeat'>[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
           </div>
         </section>
         <section class="dev-cheat-section">
@@ -225,6 +226,10 @@ async function goBattle(intro = false) {
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
     onWin: (grade) => goReward(grade),
+    onLose: () => {
+      clearRun()
+      goDefeat()
+    },
     onHome: goTitle,
     intro,
   })
@@ -273,6 +278,22 @@ function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck)) {
   mountMeta('item')
 }
 
+function goDefeat() {
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  current = new DefeatView(stage, {
+    day: run.day,
+    onNewRun: () => {
+      run = newRun()
+      saveRun(run)
+      void goBattle(true)
+    },
+    onTitle: goTitle,
+  })
+  mountMeta('defeat')
+}
+
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
 const params = new URLSearchParams(location.search)
 const start = (params.get('scene') as SceneName) || 'title'
@@ -283,6 +304,7 @@ if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
 void FontManager.load()
 if (start === 'reward') goReward()
 else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
 else goTitle()

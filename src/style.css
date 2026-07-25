@@ -2777,14 +2777,16 @@ button {
    ========================================================================== */
 
 .reward-scene,
-.item-scene {
+.item-scene,
+.defeat-scene {
   display: grid;
   place-items: center;
   background-size: cover;
   background-position: center 42%;
 }
 .reward-scene::before,
-.item-scene::before {
+.item-scene::before,
+.defeat-scene::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -2798,6 +2800,51 @@ button {
   justify-content: center;
   gap: 22px;
 }
+.defeat-scene::before {
+  background: rgba(17, 13, 18, 0.72);
+  backdrop-filter: grayscale(.78) blur(6px);
+}
+.defeat-paper {
+  position: relative;
+  width: 860px;
+  min-height: 470px;
+  padding: 76px 92px 68px;
+  text-align: center;
+  color: #3f3029;
+  background:
+    linear-gradient(96deg, rgba(103, 67, 49, .16) 0 2px, transparent 2px 100%),
+    repeating-linear-gradient(0deg, rgba(104, 75, 56, .10) 0 1px, transparent 1px 38px),
+    #f1ddba;
+  box-shadow: 0 30px 94px rgba(0, 0, 0, .68), inset 0 0 0 3px rgba(112, 73, 49, .18);
+  transform: rotate(-1.3deg);
+  animation: defeat-page-in .65s cubic-bezier(.24, .92, .28, 1) both;
+}
+.defeat-paper::after {
+  content: '';
+  position: absolute;
+  inset: 13px;
+  pointer-events: none;
+  border: 1px dashed rgba(107, 70, 49, .32);
+}
+@keyframes defeat-page-in {
+  from { opacity: 0; transform: translateY(42px) rotate(-5deg) scale(.94); }
+  to { opacity: 1; transform: translateY(0) rotate(-1.3deg) scale(1); }
+}
+.defeat-kicker {
+  color: #b15a4f;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 6px;
+}
+.defeat-paper h1 { margin: 20px 0 16px; font-size: 54px; color: #4a2e2e; }
+.defeat-day { margin: 0; font-size: 21px; font-weight: 800; }
+.defeat-note { margin: 21px auto 38px; color: #725d50; font-size: 17px; }
+.defeat-actions { position: relative; z-index: 1; display: flex; justify-content: center; gap: 14px; }
+.defeat-actions button { min-width: 220px; padding: 16px 26px; border-radius: 12px; font-size: 19px; font-weight: 900; transition: transform .16s ease, filter .16s ease; }
+.defeat-actions button:hover, .defeat-actions button:focus-visible { transform: translateY(-4px) rotate(1.3deg); filter: brightness(1.06); }
+.defeat-new { color: #fff9e8; background: #a85145; box-shadow: 0 7px 0 #713a35, 0 11px 18px rgba(74, 35, 30, .28); }
+.defeat-title { color: #5f4538; background: rgba(255, 250, 229, .74); box-shadow: inset 0 0 0 2px rgba(105, 70, 51, .3); }
+
 .reward-card {
   position: relative;
   width: 1000px;
