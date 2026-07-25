@@ -252,6 +252,8 @@ export interface EnemyDef {
   attackPattern?: readonly {
     name: string
     bonusAtk: number
+    /** 이 패턴이 재생할 공격 클립. 피해를 정하는 보스 체력 단계와는 독립적이다. */
+    animationStage?: 1 | 2 | 3
     /** 기본 공격 피해에 적용하는 기술별 위력 비율. 0이면 피해 없는 쇼 동작이다. */
     damageScale?: number
     /** 이 기술을 한 번 더 반복할 확률. 한 사이클에서 최대 한 번만 굴린다. */

@@ -40,7 +40,7 @@ export interface EnemyInst {
   summonsRight: number
   /** 같은 전투 턴에 턴 시작 소환을 두 번 처리하지 않기 위한 표식. */
   lastSummonTurn: number
-  /** 여덟 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
+  /** 거미 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
   parts: EnemyPartInst[]
   webTurns: number
   lastWebTurn: number
@@ -86,7 +86,13 @@ export interface BattleState {
 
 export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1): EnemyInst {
   const hpPerBar = Math.max(1, Math.round(def.hp * hpMult))
-  const bars = def.boss ? Math.max(1, Math.floor(healthBars)) : 1
+  // 부위 보스는 부위 하나가 곧 체력 한 줄이다. 호출부의 막 수와 어긋나더라도
+  // 부위 배열을 기준으로 잡아 총 체력·HUD·실제 피해 풀이 항상 일치하게 한다.
+  const bars = def.parts?.length
+    ? def.parts.length
+    : def.boss
+      ? Math.max(1, Math.floor(healthBars))
+      : 1
   const maxHp = hpPerBar * bars
   return {
     def,
@@ -499,8 +505,10 @@ export interface EnemyStrike {
   text: string
   dealt: number
   idx: number
-  /** 보스의 현재 체력 구간에 맞춘 공격 애니메이션·피해 단계. 일반 적은 1이다. */
+  /** 보스의 현재 체력 구간에 맞춘 피해 단계. 일반 적은 1이다. */
   attackStage: BossAttackStage
+  /** 실제 재생할 공격 클립 단계. 패턴 지정이 없으면 체력 기반 attackStage를 따른다. */
+  animationStage: BossAttackStage
   absorbed: number
   /** 강한 기술이 플레이어의 남은 방어를 수치와 무관하게 전부 지웠는가. */
   guardShattered: boolean
@@ -526,9 +534,10 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const enemy = state.enemies[front]
   if (enemy.initiativePhase !== phase || state.turn < enemy.nextAttackTurn) return strikes
 
-  const attackStage = bossAttackStage(enemy)
-  const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
   const attackStep = nextEnemyAttackStep(enemy)
+  const attackStage = bossAttackStage(enemy)
+  const animationStage = attackStep?.animationStage ?? attackStage
+  const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
@@ -580,6 +589,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     dealt,
     idx: front,
     attackStage,
+    animationStage,
     absorbed,
     guardShattered,
     lifeStolen,

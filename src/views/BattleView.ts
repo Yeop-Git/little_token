@@ -807,7 +807,7 @@ export class BattleView {
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
         </div>
-        <div class="spider-parts" hidden aria-label="장로거미의 여덟 다리와 본체"></div>
+        <div class="spider-parts" hidden aria-label="장로거미의 네 다리와 본체"></div>
         <div class="enemy-traits"></div>
       </section>`
   }
@@ -2935,7 +2935,7 @@ export class BattleView {
       }
       // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
-      playCharacterAnimation(foe ?? null, st.attackStage === 1 ? 'attack' : `attack${st.attackStage}`)
+      playCharacterAnimation(foe ?? null, st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>('.model-shell')?.animate(
           [

@@ -18,11 +18,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
     hp: 38, atk: 7, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
-      { name: '평범한 낫 베기', bonusAtk: 0, repeatOnceChance: 0.5 },
-      { name: '강공격 자세 잡기', bonusAtk: 0, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
+      { name: '평범한 낫 베기', bonusAtk: 0, animationStage: 1, repeatOnceChance: 0.5 },
+      { name: '강공격 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
       {
         name: '큰낫 내려베기',
         bonusAtk: 0,
+        animationStage: 3,
         damageScale: 1.2,
         shatterGuard: true,
         lifeStealRate: 0.5,
@@ -49,22 +50,17 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
-    // 42 × 9부위는 기존 70 × 5막과 비슷한 총 결전 길이를 유지한다.
     hp: 42, atk: 12, every: 2, initiative: 'first',
     sprite: 'boss_elder_spider', guard: 12, magicShield: 1,
     parts: [
-      { id: 'leg-force', name: '첫째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'force', label: '힘' } },
-      { id: 'leg-joy', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
-      { id: 'leg-warm', name: '셋째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'warm', label: '온기' } },
-      { id: 'leg-anger', name: '넷째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
-      { id: 'leg-grit', name: '다섯째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'grit', label: '버팀' } },
-      { id: 'leg-sorrow', name: '여섯째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'sorrow', label: '슬픔' } },
-      { id: 'leg-tear', name: '일곱째 다리', kind: 'leg', weakness: { kind: 'tag', value: 'tear', label: '눈물' } },
-      { id: 'leg-pleasure', name: '여덟째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'pleasure', label: '즐거움' } },
+      { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
+      { id: 'leg-anger', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
+      { id: 'leg-sorrow', name: '셋째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'sorrow', label: '슬픔' } },
+      { id: 'leg-pleasure', name: '넷째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'pleasure', label: '즐거움' } },
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, attackPerTension: 1, maxAttackBonus: 4 },
-    note: '현재 다리의 공개 약점을 맞히면 피해 ×1.5와 함께 거미줄을 하나 끊는다. 다리 체력 한 칸을 전부 깎거나 같은 감정 2장으로 감정 공명을 터뜨리면 사방의 거미줄을 전부 날려 장력을 0으로 만든다. 매 문장마다 손패 한 장이 봉인되며, 장력 4에서는 사방의 거미줄이 한꺼번에 조여든 뒤 터진다.',
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 현재 다리의 약점을 맞히면 피해 ×1.5와 함께 거미줄을 하나 끊는다. 다리 체력 한 칸을 전부 깎거나 같은 감정 2장으로 감정 공명을 터뜨리면 사방의 거미줄을 전부 날려 장력을 0으로 만든다. 매 문장마다 손패 한 장이 봉인되며, 장력 4에서는 사방의 거미줄이 한꺼번에 조여든 뒤 터진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',
