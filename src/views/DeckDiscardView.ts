@@ -29,17 +29,24 @@ function cardContents(word: Word, label: string, action: string): string {
 function candidateHtml(word: Word, index: number): string {
   const rarity = word.rarity ?? 'common'
   return `
-    <button class="discard-pick rarity-${rarity}" type="button" data-i="${index}">
+    <button class="discard-pick discard-card-face rarity-${rarity}" type="button" data-i="${index}">
       ${cardContents(word, `보유 카드 ${index + 1}`, '이 카드를 버리기')}
     </button>`
 }
 
+/**
+ * 새로 들어올 카드는 미리보기다 — 고를 수 있는 자리가 아니다.
+ * 예전에는 이 카드도 후보 버튼과 같은 `.discard-pick` 클래스를 써서 호버하면
+ * 똑같이 떠올랐고, 아래의 클릭 핸들러도 같이 붙었다. 누르면 `data-i`가 없어
+ * `candidates[NaN]`이 undefined로 나와 그 자리에서 예외가 났고 — 화면은 그대로,
+ * 아무 일도 일어나지 않았다. 클래스를 나누고 포인터를 아예 안 받게 한다.
+ */
 function incomingHtml(word: Word): string {
   const rarity = word.rarity ?? 'common'
   return `
     <aside class="discard-preview" aria-label="새로 들어올 카드">
       <div class="discard-preview-label">새로 들어올 카드</div>
-      <div class="discard-pick discard-new-card rarity-${rarity}">
+      <div class="discard-card-face discard-new-card rarity-${rarity}">
         ${cardContents(word, '새 카드', '이 카드가 들어옵니다')}
       </div>
     </aside>`
@@ -74,10 +81,17 @@ export class DeckDiscardView {
         </div>
       </div>`
 
-    this.root.querySelectorAll<HTMLButtonElement>('.discard-pick').forEach((button) => {
+    // 고를 수 있는 건 보유 카드 버튼뿐이다. 자리 번호가 없거나 후보 밖을 가리키는
+    // 클릭은 아무것도 버리지 않고 조용히 넘긴다 — 화면이 멈춰 버리는 것보다 낫다.
+    let chosen = false
+    this.root.querySelectorAll<HTMLButtonElement>('.discard-pick[data-i]').forEach((button) => {
       button.addEventListener('click', () => {
+        if (chosen) return
+        const target = opts.candidates[Number(button.dataset.i)]
+        if (!target) return
+        chosen = true
         button.classList.add('is-chosen')
-        window.setTimeout(() => opts.onDiscard(opts.candidates[Number(button.dataset.i)]), 180)
+        window.setTimeout(() => opts.onDiscard(target), 180)
       })
     })
   }
