@@ -43,6 +43,11 @@ export const EMOTION_LABEL: Record<Emotion, string> = {
 export const EMOTION_ICON: Record<Emotion, string> = {
   joy: '☀', anger: '✦', sorrow: '☂', pleasure: '♪', neutral: '·',
 }
+
+/** 오래된 저장 데이터처럼 감정 값이 비어 있어도 화면과 전투 규칙을 안전하게 유지한다. */
+export function emotionOrNeutral(emotion: Emotion | undefined): Emotion {
+  return emotion ?? 'neutral'
+}
 /** 전체 공격은 기존 aoe와 호환하고, 나머지는 적 레일 앞쪽부터 세는 타격 수다. */
 export type TargetCount = 1 | 2 | 3 | 'all'
 

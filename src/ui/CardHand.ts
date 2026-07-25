@@ -1,5 +1,5 @@
 import { SKILL_ART } from '@/assets'
-import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type Word } from '@core/types'
+import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 
 // 클릭으로 카드를 먹일 때 고스트가 부풀어 사라지는 시간.
 const COMMIT_ANIM_MS = 340
@@ -334,7 +334,8 @@ export class CardHand {
       const selected = this.selectedId === card.instanceId
       const drawing = this.drawingId === card.instanceId
       const rarity = card.word.rarity ?? 'common'
-      button.className = `word-card mood-${this.moodOf(card.word)} emotion-${card.word.emotion} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${drawing ? ' drawing' : ''}`
+      const emotionKey = emotionOrNeutral(card.word.emotion)
+      button.className = `word-card mood-${this.moodOf(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !!blocked
       button.setAttribute('aria-label', blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`)
@@ -348,8 +349,8 @@ export class CardHand {
       if (badge) badge.textContent = `${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}`
       const note = button.querySelector<HTMLElement>('.card-note')
       if (note) note.textContent = blocked ?? card.word.note
-      const emotion = button.querySelector<HTMLElement>('.card-emotion')
-      if (emotion) emotion.textContent = `${EMOTION_ICON[card.word.emotion]} ${EMOTION_LABEL[card.word.emotion]}`
+      const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
+      if (emotionBadge) emotionBadge.textContent = `${EMOTION_ICON[emotionKey]} ${EMOTION_LABEL[emotionKey]}`
       const footer = button.querySelector<HTMLElement>('.card-front > small')
       if (footer) footer.textContent = blocked ? '맥락 충돌' : 'WORD CARD'
     }
@@ -367,6 +368,7 @@ export class CardHand {
     const level = card.word.level ?? 1
     // 대상 범위 대신 등급·강화 단계를 보여준다 — 카드에서 알고 싶은 건 이쪽이다.
     const rarity = card.word.rarity ?? 'common'
+    const emotion = emotionOrNeutral(card.word.emotion)
     const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
     // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
     const front = artUrl
@@ -375,19 +377,19 @@ export class CardHand {
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[card.word.emotion]} ${EMOTION_LABEL[card.word.emotion]}</span>
+          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
           <strong class="card-title">${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[card.word.emotion]} ${EMOTION_LABEL[card.word.emotion]}</span>
+          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
           <strong>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
           <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
         </span>`
-    return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${card.word.emotion} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
+    return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">

@@ -1,6 +1,7 @@
 import { compile } from '@core/compiler'
 import { reinforceWord } from '@core/run'
 import type { EnemyDef, Intent, Word } from '@core/types'
+import { wordValueLines } from '@core/wordText'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { applyIntent, applyPendingAttack, enemyTurn, makeEnemy, type BattleState } from '../sim/reference'
@@ -26,6 +27,9 @@ const result = compile({ subj: word('subj', 'joy'), adv: word('adv', 'joy'), ver
 assert(result.emotionResonance === 1.3, 'emotion resonance')
 const neutralResult = compile({ subj: word('subj', 'neutral'), adv: word('adv', 'neutral'), verb: word('v', 'neutral') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })
 assert(neutralResult.emotionResonance === 1, 'neutral cards do not resonate')
+const legacyWord = { ...word('legacy', 'neutral'), emotion: undefined } as unknown as Word
+assert(wordValueLines(legacyWord)[0].text.includes('무감정'), 'legacy save emotion fallback')
+assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [], multCap: 9 }).emotionResonance === 1, 'legacy emotion does not resonate')
 
 for (const kind of ['attack', 'guard', 'heal'] as const) {
   const counts = new Map(['joy', 'anger', 'sorrow', 'pleasure'].map((emotion) => [emotion, 0]))

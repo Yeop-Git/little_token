@@ -25,7 +25,20 @@ export function loadRun(): RunState | null {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
-    return isRunState(parsed) ? parsed : null
+    if (!isRunState(parsed)) return null
+
+    // 감정 속성 도입 전 저장된 카드도 현재 데이터 형식으로 올린다.
+    let migrated = false
+    for (const words of Object.values(parsed.player.deck)) {
+      for (const word of words) {
+        if (!word.emotion) {
+          word.emotion = 'neutral'
+          migrated = true
+        }
+      }
+    }
+    if (migrated) saveRun(parsed)
+    return parsed
   } catch {
     return null
   }
