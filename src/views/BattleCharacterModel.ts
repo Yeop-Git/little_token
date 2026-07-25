@@ -91,6 +91,7 @@ class BattleCharacterModel {
   private model: THREE.Object3D | null = null
   private disposed = false
   private active = true
+  private firstFrameRendered = false
   private requestedAnimation: BattleAnimation = 'idle'
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
@@ -128,7 +129,6 @@ class BattleCharacterModel {
         attack: this.actionFor(gltf, 'attack'),
       }
       this.mixer.addEventListener('finished', this.onAnimationFinished)
-      this.shell.dataset.modelStatus = 'ready-3d'
       this.play(this.requestedAnimation)
     } catch (error) {
       console.warn(`3D 캐릭터 모델을 불러오지 못해 2D 초상을 사용합니다: ${this.visual.id}`, error)
@@ -230,6 +230,20 @@ class BattleCharacterModel {
     if (this.disposed || !this.active || !this.shell.isConnected) return
     this.mixer?.update(delta)
     this.renderer.render(this.scene, this.camera)
+    if (this.model && !this.firstFrameRendered) {
+      // 실제 WebGL 컨텍스트에서 텍스처 업로드와 첫 드로우까지 성공한 뒤에만
+      // 캔버스를 공개한다. 그 전에는 2D 초상도 함께 숨겨 교체 섬광을 막는다.
+      this.firstFrameRendered = true
+      this.shell.dataset.modelStatus = 'ready-3d'
+    }
+  }
+
+  isReadyForOutput() {
+    if (this.shell.dataset.modelStatus === 'fallback-2d') return true
+    return this.firstFrameRendered
+      && this.renderer.domElement.width > 0
+      && this.renderer.domElement.height > 0
+      && !this.renderer.getContext().isContextLost()
   }
 
   setActive(active: boolean) {
@@ -262,9 +276,11 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
   if (!shell) return
   const mounted = mountedModels.get(shell)
   if (mounted) {
-    mounted.setActive(true)
+    // 풀에서 꺼낸 모델은 첫 프레임이 검증된 인스턴스만 다시 활성화한다.
+    if (mounted.isReadyForOutput()) mounted.setActive(true)
     return
   }
+  shell.dataset.modelStatus = 'preparing-3d'
   try {
     const model = new BattleCharacterModel(shell, visual)
     mountedModels.set(shell, model)
@@ -272,6 +288,21 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
     console.warn(`WebGL을 시작하지 못해 2D 초상을 사용합니다: ${visual.id}`, error)
     shell.dataset.modelStatus = 'fallback-2d'
   }
+}
+
+/** GLB 다운로드뿐 아니라 GLTF 파싱·텍스처 디코딩이 끝날 때까지 기다린다. */
+export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): Promise<void> {
+  const urls = [...new Set(visuals.flatMap((visual) => visual.model3d ? [visual.model3d] : []))]
+  return Promise.all(urls.map((url) => loadModel(url).then(() => undefined).catch(() => undefined)))
+    .then(() => undefined)
+}
+
+/** 오브젝트 풀에서 꺼내기 전에 화면 출력 준비 여부를 검사한다. */
+export function isCharacterModelReady(actor: HTMLElement, visual: CharacterVisualDef): boolean {
+  if (!visual.model3d) return true
+  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  if (!shell) return false
+  return mountedModels.get(shell)?.isReadyForOutput() ?? false
 }
 
 export function suspendCharacterModel(actor: HTMLElement) {

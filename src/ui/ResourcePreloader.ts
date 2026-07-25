@@ -1,10 +1,11 @@
-import { BACKGROUNDS, MODELS, SKILL_ART, SPRITES } from '@/assets'
+import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
 import type { Word } from '@core/types'
+import { CHARACTER_VISUALS } from '@data/characters'
+import { preloadCharacterModelResources } from '@views/BattleCharacterModel'
 
 // URL별 Promise를 기억하면 씬을 다시 열거나 덱이 성장해도 이미 예열한 이미지를
 // 다시 만들지 않는다. 새로 얻은 카드 일러스트만 다음 전투 진입 전에 추가된다.
 const imageLoads = new Map<string, Promise<void>>()
-const modelLoads = new Map<string, Promise<void>>()
 
 function loadImage(src: string): Promise<void> {
   const cached = imageLoads.get(src)
@@ -24,19 +25,6 @@ function loadImage(src: string): Promise<void> {
   return pending
 }
 
-function loadModel(src: string): Promise<void> {
-  const cached = modelLoads.get(src)
-  if (cached) return cached
-  // 응답 본문까지 읽어 브라우저 HTTP 캐시에 올려 두면 전투 첫 프레임 뒤의
-  // GLTFLoader는 네트워크를 다시 기다리지 않는다.
-  const pending = fetch(src)
-    .then((response) => response.ok ? response.arrayBuffer() : undefined)
-    .then(() => undefined)
-    .catch(() => undefined)
-  modelLoads.set(src, pending)
-  return pending
-}
-
 /** 현재 덱으로 다음 전투에 실제 쓰일 배경·카드·캐릭터 리소스만 예열한다. */
 export function preloadBattleResources(deck: Record<string, Word[]>): Promise<void> {
   const cardArt = Object.values(deck)
@@ -46,5 +34,8 @@ export function preloadBattleResources(deck: Record<string, Word[]>): Promise<vo
       return src ? [src] : []
     })
   const urls = [...new Set([...Object.values(BACKGROUNDS), ...Object.values(SPRITES), ...cardArt])]
-  return Promise.all([...urls.map(loadImage), ...Object.values(MODELS).map(loadModel)]).then(() => undefined)
+  return Promise.all([
+    ...urls.map(loadImage),
+    preloadCharacterModelResources(Object.values(CHARACTER_VISUALS)),
+  ]).then(() => undefined)
 }

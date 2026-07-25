@@ -4,7 +4,7 @@
  */
 
 import bg001 from './backgrounds/bg_001.webp'
-import backgroundDark from './backgrounds/backgroundDark.png'
+import backgroundDark from './backgrounds/backgroundDark.webp'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import player001 from './sprites/player_001.webp'

@@ -33,7 +33,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       attack: 'Armature|attack|BaseLayer',
       attackDurationMs: 440,
     },
-    modelYaw: Math.PI / 4,
+    modelYaw: Math.PI / 2,
     modelGroundOffset: 1.45,
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',

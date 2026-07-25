@@ -81,6 +81,18 @@ const FRAGMENT_SHADER = `
     return vec3(nearest, second, cellId);
   }
 
+  vec3 stainedGlassColor(float seed) {
+    float colorIndex = floor(fract(seed) * 8.0);
+    if (colorIndex < 1.0) return vec3(0.10, 0.86, 0.78); // 청록
+    if (colorIndex < 2.0) return vec3(0.18, 0.62, 1.00); // 파랑
+    if (colorIndex < 3.0) return vec3(0.48, 0.32, 0.98); // 보라
+    if (colorIndex < 4.0) return vec3(0.94, 0.25, 0.72); // 자홍
+    if (colorIndex < 5.0) return vec3(1.00, 0.38, 0.30); // 산호
+    if (colorIndex < 6.0) return vec3(1.00, 0.78, 0.18); // 금색
+    if (colorIndex < 7.0) return vec3(0.48, 0.92, 0.24); // 연두
+    return vec3(0.18, 0.82, 0.96); // 하늘
+  }
+
   vec4 epicFoil(vec2 p) {
     // 희귀의 사선 은빛과 겹치지 않도록 방향성 띠를 쓰지 않는다. 저주파
     // 오로라는 바탕색만 살리고, 영웅의 주인공은 독립적으로 점멸하는 별빛이다.
@@ -159,34 +171,30 @@ const FRAGMENT_SHADER = `
     float shellSparkle = pow(max(0.0, shellPulse), 12.0);
     facetLight += shellSparkle * (0.66 + u_hover * 0.34);
 
-    float hue = shellId * 0.76 + dot(prismP, light) * 0.18 + u_time * 0.014;
-    vec3 facetColor = spectrum(hue);
-    // 원본 일러스트가 완전히 씻겨 나가지 않도록 청록·자홍·금색의 투과색을
-    // 유지하고, 순간 반사에서만 흰빛까지 올라간다.
-    facetColor = mix(facetColor, spectrum(shellId + 0.18), 0.30);
-    vec3 edgeColor = spectrum(hue + shellGap * 3.2 + 0.14);
+    // 셀 하나에는 팔레트 색 하나만 들어간다. 셀 내부 좌표를 hue에 섞지 않아
+    // 무지개 등고선이 생기지 않고 스테인드글라스 조각처럼 읽힌다.
+    vec3 facetColor = stainedGlassColor(shellId);
+    vec3 edgeColor = mix(facetColor, vec3(0.92, 0.98, 1.0), 0.62);
 
     float beamAxis = dot(prismP, normalize(vec2(0.9, 0.42)));
     float beamCenter = sin(u_time * 0.27) * 0.78;
     float beam = exp(-pow((beamAxis - beamCenter) * 5.6, 2.0));
-    vec3 splitBeam = spectrum((beamAxis - beamCenter) * 1.7 + u_time * 0.025);
+    vec3 beamColor = mix(facetColor, vec3(1.0, 0.97, 0.86), 0.58);
 
-    vec2 pointerP = vec2(u_pointer.x * 0.5 * u_aspect, -u_pointer.y * 0.5);
-    float hoverRadius = (1.0 - u_hover) * 0.82;
-    float hoverRing = exp(-pow((length(prismP - pointerP) - hoverRadius) * 16.0, 2.0)) * u_hover;
-
-    float caustic = pow(0.5 + 0.5 * sin(
-      prismP.x * 15.0 - prismP.y * 10.0 + valueNoise(prismP * 4.0) * 4.2 + u_time * 0.36
-    ), 8.0);
+    // 호버 진입 펄스가 1→0으로 내려갈 때 셀마다 서로 다른 임계점을 지난다.
+    // 공간 파동 없이 각 조각이 한 번씩 다른 순서와 보색으로 번쩍인다.
+    float cellFlashPoint = 0.24 + shellId * 0.68;
+    float cellFlash = exp(-pow((u_hover - cellFlashPoint) * 11.0, 2.0))
+      * smoothstep(0.18, 0.28, u_hover);
+    vec3 flashColor = stainedGlassColor(fract(shellId + 0.37));
 
     vec3 color = facetColor * facetLight * 0.42;
     color += edgeColor * edge * (0.44 + facetLight * 0.38);
-    color += splitBeam * beam * (0.46 + u_hover * 0.24);
-    color += vec3(1.0, 0.91, 0.62) * caustic * 0.13;
+    color += beamColor * beam * (0.38 + u_hover * 0.22);
     color += vec3(0.78, 0.96, 1.0) * shellEdge * shellEdge * 0.22;
     color += vec3(1.0, 0.98, 0.88) * shellSparkle * 0.52;
-    color += spectrum(shellId + hoverRadius) * hoverRing * (0.52 + edge * 0.34);
-    float alpha = 0.30 + facetLight * 0.19 + edge * 0.27 + beam * 0.22 + shellSparkle * 0.18 + hoverRing * 0.28;
+    color += mix(flashColor, vec3(1.0), 0.34) * cellFlash * (0.72 + edge * 0.28);
+    float alpha = 0.30 + facetLight * 0.19 + edge * 0.27 + beam * 0.22 + shellSparkle * 0.18 + cellFlash * 0.30;
     return vec4(color, alpha);
   }
 

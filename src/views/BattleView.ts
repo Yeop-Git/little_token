@@ -52,6 +52,7 @@ import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
+  isCharacterModelReady,
   mountCharacterModel,
   playCharacterAnimation,
   suspendCharacterModel,
@@ -426,14 +427,25 @@ export class BattleView {
 
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
     const key = enemy.def.id
-    const el = this.enemyPool.get(key)?.pop() ?? (() => {
+    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
+    const pool = this.enemyPool.get(key)
+    let pooled: HTMLElement | undefined
+    // 준비 중인 WebGL 인스턴스를 풀에서 성급히 꺼내면 빈 캔버스나 2D 초상이
+    // 한 프레임 노출된다. 첫 프레임 출력이 검증된 항목만 선택한다.
+    if (pool) {
+      for (let index = pool.length - 1; index >= 0; index -= 1) {
+        if (!isCharacterModelReady(pool[index], visual)) continue
+        pooled = pool.splice(index, 1)[0]
+        break
+      }
+    }
+    const el = pooled ?? (() => {
       const template = document.createElement('template')
       template.innerHTML = this.foeHtml(i, enemy).trim()
       const actor = template.content.firstElementChild as HTMLElement
       this.bindActor(actor)
       return actor
     })()
-    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
     el.dataset.i = String(i)
     el.dataset.character = visual.id
     el.dataset.poolKey = key
@@ -561,6 +573,7 @@ export class BattleView {
   }
 
   private playerHtml(): string {
+    const modelStatus = CHARACTER_VISUALS.player.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬 상세 보기">
         <div class="nameplate glass">
@@ -568,7 +581,7 @@ export class BattleView {
           <div class="hpbar you"><div class="fill"></div></div>
         </div>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
       </div>`
   }
 
@@ -582,6 +595,7 @@ export class BattleView {
 
   private foeHtml(i: number, e: EnemyInst): string {
     const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
+    const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor foe" data-i="${i}" data-character="${visual.id}"
         role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
@@ -598,7 +612,7 @@ export class BattleView {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
         </span>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
         <span class="guard-hint" aria-hidden="true">우선 방어하세요!</span>
       </div>`
   }
