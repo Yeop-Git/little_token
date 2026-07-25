@@ -20,6 +20,9 @@ import enemyMosquitoModel from './models/enemy_mosquito.glb?url'
 import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
+import token004 from './sprites/token/token_004.webp'
+import token005 from './sprites/token/token_005.webp'
+import token006 from './sprites/token/token_006.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
 import enemyFlea from './sprites/enemy_flea.webp'
 import enemyTermite from './sprites/enemy_termite.webp'
@@ -144,11 +147,15 @@ export const TITLE = {
   logo: titleLogo,
 }
 
-// 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상
+// 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상과 화면 장식.
+// crown~gloom은 다이얼로그에 아직 안 쓰이고 장식으로 먼저 들어왔다.
 export const TOKEN_FACES = {
   neutral: token001,
   smile: token002,
   sad: token003,
+  crown: token004, // 왕관을 쓰고 두 손을 볼에 모아 환호 — 보상·승리 자리
+  party: token005, // 고깔모자에 나팔 — 축하 자리
+  gloom: token006, // 파랗게 질려 고개를 떨굼 — 패배·손실 자리
 }
 
 // 카드 감정 뱃지 — 사용자 제공 수채화 캐릭터를 런타임 WebP로 최적화한 아이콘.

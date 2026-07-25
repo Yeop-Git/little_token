@@ -3872,6 +3872,47 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   0% { transform: perspective(1600px) rotateY(-52deg); opacity: 0; transform-origin: left center; }
   100% { transform: perspective(1600px) rotateY(0); opacity: 1; transform-origin: left center; }
 }
+/* 전리품 카드 머리에 앉는 토큰 장식 — 왕관을 쓰고 환호하는 초상을 대각선으로 기울여
+   카드 모서리에 살짝 걸친다. 발광·잔상은 오프닝 다이얼로그 초상(.intro-dlg-portrait-*)과
+   같은 언어를 쓴다: 본체에 어둠 한 겹 + 노란 발광 두 겹, 그리고 옆으로 민 어두운 잔상 한 겹.
+   카드가 넘어오는 page-turn이 끝날 즈음 살짝 늦게 떠오른다. */
+.reward-token {
+  position: absolute;
+  top: -58px;
+  right: -26px;
+  z-index: 3;
+  width: 190px;
+  height: 190px;
+  pointer-events: none;
+  transform: rotate(11deg);
+  animation: reward-token-in 0.66s cubic-bezier(0.2, 0.8, 0.3, 1.2) 0.34s both;
+}
+.reward-token img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.reward-token-main {
+  z-index: 1;
+  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 30px rgba(255, 220, 110, 0.55))
+    drop-shadow(0 0 70px rgba(255, 200, 70, 0.3));
+}
+.reward-token-shadow {
+  z-index: 0;
+  transform: translate(-24px, 8px);
+  opacity: 0.3;
+  filter: blur(1px) brightness(0.55) saturate(0.7);
+}
+@keyframes reward-token-in {
+  from { opacity: 0; transform: rotate(22deg) translateY(-22px) scale(0.86); }
+  to { opacity: 1; transform: rotate(11deg) translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-token { animation: none; opacity: 1; }
+}
+
 .reward-head { text-align: center; margin-bottom: 8px; }
 .reward-head .k { font-size: 18px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .reward-head .t { font-size: 46px; font-weight: 900; margin-top: 4px; color: #fff6e2; text-shadow: 0 0 24px var(--glow); }

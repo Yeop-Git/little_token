@@ -5,7 +5,7 @@
 
 import { EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
-import { BACKGROUNDS, ITEM_ART, SKILL_ART } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
@@ -148,6 +148,10 @@ export class RewardView {
       <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
           <div class="reward-card">
+            <div class="reward-token" aria-hidden="true">
+              <img class="reward-token-shadow" src="${TOKEN_FACES.crown}" alt="" />
+              <img class="reward-token-main" src="${TOKEN_FACES.crown}" alt="" />
+            </div>
             <div class="reward-head">
               <div class="k">${opts.day}일차 클리어</div>
               <div class="t hand">전리품을 고르자</div>
