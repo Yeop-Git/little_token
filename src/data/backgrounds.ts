@@ -3,7 +3,7 @@
  *
  * 규칙은 셋뿐이다.
  *   ① 1스테이지는 늘 첫 배경이다 — 게임을 처음 켠 사람이 보는 그림은 고정이어야 한다.
- *   ② 보스방은 전용 배경을 쓰고 일반 풀에 섞이지 않는다.
+ *   ② 보스방은 보스별로 지정된 배경을 쓴다.
  *   ③ 나머지는 무작위. 다만 **직전에 쓴 것은 빼고** 뽑는다 — 두 판 연속 같은 그림이
  *      나오면 배경이 바뀌는 연출 자체가 무의미해진다.
  *
@@ -11,7 +11,7 @@
  * 그림 위로 새 그림이 밀려 들어와야 해서, 부르는 쪽이 둘 다 알아야 한다.
  */
 
-import { BOSS_BACKGROUND, FIELD_BACKGROUNDS } from '@/assets'
+import { BACKGROUNDS, BOSS_BACKGROUND, FIELD_BACKGROUNDS } from '@/assets'
 
 /**
  * 배경마다의 빛 — 3D 캐릭터에 그대로 물린다.
@@ -78,13 +78,21 @@ export interface FieldBackground {
   prev: string | null
 }
 
-export function pickFieldBackground(day: number, isBoss: boolean): FieldBackground {
+const BOSS_BACKGROUNDS: Record<string, string> = {
+  mantis: BACKGROUNDS.bg002,
+  queenBee: BACKGROUNDS.bg005,
+}
+
+export function pickFieldBackground(day: number, isBoss: boolean, bossId?: string): FieldBackground {
   const prev = lastBackground
-  const next = isBoss ? BOSS_BACKGROUND : day <= 1 ? FIELD_BACKGROUNDS[0] : rollExcluding(prev)
+  const next = isBoss
+    ? BOSS_BACKGROUNDS[bossId ?? ''] ?? BOSS_BACKGROUND
+    : day <= 1 ? FIELD_BACKGROUNDS[0] : rollExcluding(prev)
   lastBackground = next
   // 조명과 무대 배치가 이 값을 읽어 간다. 배우는 배경보다 나중에 만들어지므로
   // 여기서 걸어 두면 된다.
-  const slot = isBoss ? LIGHTS.length - 1 : Math.max(0, FIELD_BACKGROUNDS.indexOf(next))
+  const fieldSlot = FIELD_BACKGROUNDS.indexOf(next)
+  const slot = fieldSlot >= 0 ? fieldSlot : LIGHTS.length - 1
   currentLight = LIGHTS[slot]
   currentStage = STAGES[slot]
   return { next, prev: prev === next ? null : prev }

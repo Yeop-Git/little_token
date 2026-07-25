@@ -13,6 +13,7 @@
  */
 
 import { VIDEO } from '@/assets'
+import { GameAudio } from '@/audio/GameAudio'
 import {
   acquireVideo,
   isVideoWarmed,
@@ -125,6 +126,7 @@ export class AttackCinematic {
     video.currentTime = 0
     this.el.classList.remove('is-out')
     this.el.classList.add('is-in')
+    GameAudio.play('cutscene')
     void video.play().catch(() => {}) // 못 틀어도 패널 자체는 지나가게 둔다
     return true
   }

@@ -305,19 +305,28 @@ export interface ApplyResult {
 }
 
 export interface PreparationResult {
+  /** 상한을 적용하기 전 문장이 만든 방어막. */
+  guardAttempted: number
+  /** 상한 적용 뒤 실제로 늘어난 방어막. */
   guardGain: number
   counterMultiplier: number
 }
 
+/** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
+export function playerGuardLimit(playerMax: number): number {
+  return Math.max(0, Math.round(playerMax))
+}
+
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
-  const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
+  const guardAttempted = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
+  const guardGain = Math.min(guardAttempted, Math.max(0, playerGuardLimit(state.playerMax) - state.guard))
   // 남은 방어막은 피해로 흡수한 만큼만 줄고, 새 방어는 그 위에 누적한다.
   // 방어가 없는 문장을 준비했다는 이유만으로 기존 방어막을 지우지 않는다.
-  if (guardGain > 0) {
-    state.guard += guardGain
-    state.counterMultiplier = intent.counterMultiplier
-  }
-  return { guardGain, counterMultiplier: state.counterMultiplier }
+  if (guardGain > 0) state.guard += guardGain
+  // 반격은 방어막이 실제로 늘었는지가 아니라 방어 문장을 세웠는지로 걸린다.
+  // 상한에 걸려 비축분이 0이어도 그 턴을 방어에 쓴 사실은 같으므로 반격은 살린다.
+  if (guardAttempted > 0) state.counterMultiplier = intent.counterMultiplier
+  return { guardAttempted, guardGain, counterMultiplier: state.counterMultiplier }
 }
 
 interface AttackPlan {

@@ -148,6 +148,14 @@ import resonanceAnger from './audio/resonance-anger.mp3'
 import resonanceSorrow from './audio/resonance-sorrow.mp3'
 import resonancePleasure from './audio/resonance-pleasure.mp3'
 import contextBonus from './audio/context-bonus.mp3'
+import swordHit from './audio/swordhit.mp3'
+import enemyAttack1 from './audio/enemyAttack1.mp3'
+import enemyAttack2 from './audio/enemyAttack2.mp3'
+import heal from './audio/heal.mp3'
+import shield from './audio/sheild.mp3'
+import cutscene from './audio/cutscene.mp3'
+import win from './audio/win.mp3'
+import hover from './audio/hover.mp3'
 
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
@@ -368,4 +376,12 @@ export const AUDIO = {
   resonanceSorrow,
   resonancePleasure,
   contextBonus,
+  swordHit,
+  enemyAttack1,
+  enemyAttack2,
+  heal,
+  shield,
+  cutscene,
+  win,
+  hover,
 }

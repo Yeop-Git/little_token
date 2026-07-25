@@ -43,6 +43,7 @@ import {
   frontIdx,
   makeEnemy,
   nextEnemyAttackStep,
+  playerGuardLimit,
   spiderWebAtTurnStart,
   spiderSealSlotForTurn,
   spiderWebTension,
@@ -89,13 +90,15 @@ interface Opts {
   field: FieldDef
   encounter: string[]
   /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
-  onWin: (grade: number) => void
+  onWin: (grade: number, resources: { hp: number; guard: number }) => void
   onLose: (cause: DefeatCause | null) => void
   /** 런 내내 누적되는 기록. 결과 화면의 찢어진 종이가 이걸 읽는다. */
   record?: RunRecord
-  onHome?: () => void
+  onHome?: (resources: { hp: number; guard: number }) => void
   onResetAll?: () => void
   player?: PlayerState
+  /** 직전 스테이지에서 남긴 체력과 방어막. */
+  resources?: { hp: number; guard: number }
   tables?: Tables
   hpMult?: number
   atkMult?: number
@@ -119,6 +122,8 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
+/** 한 공격 안에서 여러 적이 맞을 때 음계처럼 들리게 하는 타격 간격. */
+const SWORD_HIT_GAP_MS = 85
 // 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
 // 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
 // 레일의 가로 자리와 간격은 배경마다 다르되, 일반 전투 배우는 모두 같은
@@ -200,9 +205,9 @@ export interface TokenLine { text: string; tone: TokenTone }
 const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
 
 const TOKEN_BOSS_HINTS = {
-  mantisStart: say('평타 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!'),
-  mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 표시된 수치만큼 방어하자!!', 'warn'),
-  mantisGroggy: say('막아냈어, 프롬! 사마귀가 휘청거려. 지금이 기회야!!', 'relief'),
+  mantisStart: say('기본공격 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!'),
+  mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 방어야! 표시된 수치만큼 반드시 방어해!!', 'warn'),
+  mantisGroggy: say('실드는 깨졌지만 강공격은 취소야! 사마귀가 그로기에 빠졌어!!', 'relief'),
   mantisPunished: say('못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!', 'warn'),
   queenBeeStart: say('일벌 넷을 모두 쓰러뜨리면 여왕벌이 휘청거려! 관통으로 빠르게 꿰뚫자 — 분노가 약점이야!!'),
   queenBeeDispersed: say('좋아, 프롬! 일벌이 쓰러졌어!!', 'relief'),
@@ -249,7 +254,7 @@ interface Tally {
 export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
-  private onWin: (grade: number) => void
+  private onWin: (grade: number, resources: { hp: number; guard: number }) => void
   private onLose: (cause: DefeatCause | null) => void
   /** 런 기록 — 전달되지 않으면(스샷·검수 진입) 빈 기록에 적고 버린다. */
   private record: RunRecord
@@ -257,7 +262,7 @@ export class BattleView {
   private lastHurtBy: DefeatCause | null = null
   /** 방금 꽂은 문장 — 자해로 쓰러졌을 때 사인으로 적는다. */
   private lastSentence = ''
-  private onHome?: () => void
+  private onHome?: (resources: { hp: number; guard: number }) => void
   private onResetAll?: () => void
   private onIntroComplete?: () => void
   private isBoss = false
@@ -274,6 +279,7 @@ export class BattleView {
    */
   private encounterHp = 0
   private attackCine: AttackCinematic | null = null
+  private swordHitCount = 0
   /** 이번 판 배경과 직전 배경 — 직전 것이 있으면 그 위로 새 그림이 밀려 들어온다. */
   private bg: FieldBackground = { next: '', prev: null }
   private sel: Selection = {}
@@ -345,12 +351,14 @@ export class BattleView {
     const enemies = opts.encounter.map((id) =>
       makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1, this.isBoss ? opts.bossHealthBars ?? 3 : 1),
     )
-    // 체력 스탯 = 최대 체력.
+    // 최대 체력은 스탯에서, 현재 체력과 방어막은 런의 직전 스테이지에서 이어받는다.
     const maxHp = this.player.stats.hp
+    const savedHp = opts.resources?.hp ?? maxHp
+    const savedGuard = opts.resources?.guard ?? 0
     this.state = {
-      playerHp: maxHp,
+      playerHp: Math.max(0, Math.min(maxHp, savedHp)),
       playerMax: maxHp,
-      guard: 0,
+      guard: Math.max(0, Math.min(playerGuardLimit(maxHp), savedGuard)),
       counterMultiplier: 0,
       turn: 1,
       enemies,
@@ -360,9 +368,9 @@ export class BattleView {
     // 이 판의 크기 — 적 전체의 최대 체력 합. 연출 문턱을 깡수치가 아니라 이 값의 비율로
     // 잡으면 층이 올라 적이 단단해질수록 문턱도 저절로 따라 올라간다.
     this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
-    // 배경은 판마다 갈린다(1스테이지 고정 · 보스방 전용 · 나머지는 직전 것 빼고 무작위).
+    // 배경은 판마다 갈린다(1스테이지 고정 · 보스별 지정 · 나머지는 직전 것 빼고 무작위).
     // 이 한 줄이 조명과 무대 배치까지 함께 정한다.
-    this.bg = pickFieldBackground(opts.day ?? 1, this.isBoss)
+    this.bg = pickFieldBackground(opts.day ?? 1, this.isBoss, opts.encounter[0])
     // 여왕벌의 첫 일벌은 배경·연출 기준값을 확정한 뒤, 첫 행동 순서를 잡기 전에 소환한다.
     summonAtTurnStart(this.state)
     engageInitialFront(this.state)
@@ -633,7 +641,7 @@ export class BattleView {
 
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
-    this.q('#home-btn').addEventListener('click', () => this.onHome?.())
+    this.q('#home-btn').addEventListener('click', () => this.onHome?.(this.combatResources()))
 
     this.cardHand = new CardHand({
       handRoot: this.q('#card-hand'),
@@ -726,6 +734,7 @@ export class BattleView {
     this.renderEnemyOverflow(host, hiddenWaiting)
     this.renderStats()
     this.renderActionOrder()
+    this.syncMantisGuardCue()
   }
 
   private renderEnemyOverflow(host: HTMLElement, count: number) {
@@ -1017,8 +1026,38 @@ export class BattleView {
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>`}
         <div class="shadow"></div>
+        <div class="mantis-guard-cue" hidden aria-live="polite">
+          <span class="mantis-guard-shield" aria-hidden="true">◈</span>
+          <span><b>방어 필수</b><em></em></span>
+        </div>
         <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
       </div>`
+  }
+
+  /** 사마귀의 예고 다음 턴에만 프롬 옆에 작은 방어 목표를 남긴다. */
+  private syncMantisGuardCue() {
+    const cue = this.root.querySelector<HTMLElement>('.mantis-guard-cue')
+    if (!cue) return
+    const mantis = this.state.enemies.find((enemy) => !enemy.dead && enemy.def.id === 'mantis')
+    const imminent = mantis && !!nextEnemyAttackStep(mantis)?.shatterGuard
+    cue.hidden = !imminent
+    if (!mantis || !imminent) return
+    const required = enemyGuardBreakRequirement(mantis)
+    const current = Math.min(this.state.guard, required)
+    cue.querySelector<HTMLElement>('em')!.textContent = `${current}/${required}`
+    cue.classList.toggle('ready', current >= required)
+    cue.setAttribute('aria-label', `강공격 취소에 필요한 방어 ${current} / ${required}`)
+  }
+
+  private async breakMantisGuardCue() {
+    const cue = this.root.querySelector<HTMLElement>('.mantis-guard-cue')
+    if (!cue || cue.hidden) return
+    cue.classList.remove('breaking')
+    void cue.offsetWidth
+    cue.classList.add('breaking')
+    await sleep(380)
+    cue.hidden = true
+    cue.classList.remove('breaking')
   }
 
   private bossPlayerHudHtml(): string {
@@ -1046,9 +1085,10 @@ export class BattleView {
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
           <span class="boss-weakness-mark" hidden></span>
+          <span class="boss-first-mark" hidden title="선공 — 내 문장 직후, 나보다 먼저 때린다">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
+          </span>
         </div>
-        <div class="enemy-traits" hidden></div>
-        <div class="spider-parts" hidden></div>
       </section>`
   }
 
@@ -1153,9 +1193,10 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
+    const guardLimit = playerGuardLimit(s.playerMax)
     const hud = this.isBoss ? this.q('#boss-player-health-hud') : el
     hud.querySelector<HTMLElement>('.hpn')!.innerHTML =
-      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
+      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}`
     this.paintGuardedHpBar(hud.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
@@ -1297,8 +1338,13 @@ export class BattleView {
       const bossHud = this.root.querySelector<HTMLElement>('#boss-health-hud')
       if (bossHud) this.updateFoePlate(bossHud, e, true)
     }
-    // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
-    el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
+    const strikesFirst = front && !e.dead && e.initiativePhase === 'first'
+    // 일반 적은 캐릭터 옆 경고를, 보스는 상단 체력 HUD에 통합된 표식을 같은 상태값으로 갱신한다.
+    el.classList.toggle('strikes-first', strikesFirst)
+    if (e.def.boss) {
+      const bossFirst = this.root.querySelector<HTMLElement>('#boss-health-hud .boss-first-mark')
+      if (bossFirst) bossFirst.hidden = !strikesFirst
+    }
   }
 
   /**
@@ -1414,9 +1460,12 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
+    // 보스 상단 HUD는 체력바와 약점만 갱신한다. 선공은 배우 옆 공용 경고 표식이
+    // 실제 initiativePhase가 first일 때만 맡고, 패턴/단계/방어 텍스트는 출력하지 않는다.
+    if (bossHud) return
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
-    // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다. 보스 상단 HUD만 보조 텍스트를 유지한다.
-    traits.hidden = !bossHud
+    // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다.
+    traits.hidden = true
     const weak = e.def.weakEmotion
     const attackStage = bossAttackStage(e)
     const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
@@ -1429,7 +1478,6 @@ export class BattleView {
       : partWeakness
         ? `<span class="trait weak spider-tag-weak"><strong>${partWeakness.label} 태그 ×1.5</strong></span>`
         : ''
-    traits.classList.toggle('spider-weakness-only', !!e.def.webPattern)
     const regularTraits = [
       partWeaknessHtml || (weak ? `<span class="trait weak emotion-${weak}">${emotionBadgeContent(weak)}<strong>약점</strong></span>` : ''),
       activePart ? `<span class="trait spider-active">${activePart.def.name} · ${Math.max(0, activePart.hp)}/${activePart.maxHp}</span>` : '',
@@ -2626,12 +2674,17 @@ export class BattleView {
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
     if (prep.guardGain > 0) {
+      GameAudio.play('shield')
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
       // 캐릭터의 실드 형성과 같은 프레임에 체력바도 차오르기 시작한다.
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       await this.rollTotal(prep.guardGain, 'guard')
       await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
+    }
+    if (prep.guardAttempted > prep.guardGain) {
+      this.popPlayer(`실드 한도 ${playerGuardLimit(this.state.playerMax)}`, 'guard')
+      this.log(`방어막은 최대 체력만큼만 비축한다 — ${this.state.guard}/${playerGuardLimit(this.state.playerMax)}`)
     }
     this.renderActors()
 
@@ -2898,6 +2951,7 @@ export class BattleView {
   ) {
     const you = this.q<HTMLElement>('.actor.you')
     const attacking = res.hits.length > 0
+    this.swordHitCount = 0
     if (heavy && attacking && this.heavyHeld) {
       // 이미 칼을 들어올린 채 멈춰 있다. 돌진을 먼저 출발시켜 내리치는 프레임에
       // 적과 딱 붙게 만든 뒤(0.44초 중 42%가 최대) 붙들고 있던 클립을 놓는다.
@@ -2925,6 +2979,9 @@ export class BattleView {
       this.q('#actors').classList.add('rail-rush')
     }
 
+    let remainingSwordHits = res.hits.filter((hit) =>
+      hit.dmg > 0 && !hit.summonShieldBlocked && !hit.magicShieldBroken,
+    ).length
     for (const h of res.hits) {
       if (h.summonShieldBlocked) {
         this.popAt(h.target, '일벌 호위 · 본체 무적', 'guard big')
@@ -2935,6 +2992,10 @@ export class BattleView {
         continue
       }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
+      if (h.dmg > 0) {
+        GameAudio.playSwordHit(this.swordHitCount++)
+        remainingSwordHits--
+      }
       if (el) {
         // 강타는 접점의 섬광을 먼저 피운다 — 정지 프레임에 붙들 그림이 있어야 한다.
         if (heavy) this.flashImpact(el, this.encounterHp > 0 ? h.dmg / this.encounterHp : 0)
@@ -2945,6 +3006,7 @@ export class BattleView {
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
+      if (remainingSwordHits > 0) await sleep(SWORD_HIT_GAP_MS)
     }
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
     const hitTargets = res.hits
@@ -2988,6 +3050,7 @@ export class BattleView {
       if (!heavy) await fly
     }
     if (res.heal) {
+      GameAudio.play('heal')
       playCharacterAnimation(you, 'heal')
       const fly = this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
       if (!heavy) await fly
@@ -3427,6 +3490,7 @@ export class BattleView {
       const e = this.state.enemies[front]
       const before = e.hp
       e.hp -= overflow
+      GameAudio.playSwordHit(this.swordHitCount++)
       // 깊고 화려한 관통 — 콤보에 따라 블라스트/불꽃/흔들림이 커진다.
       ember.classList.add('stab')
       this.showComboBadge(combo)
@@ -3551,6 +3615,7 @@ export class BattleView {
     this.over = true
     this.setPhase('전투 승리')
     const victoryStartedAt = performance.now()
+    GameAudio.play('win')
     const victory = Math.random() < 0.5 ? 'victory1' : 'victory2'
     playCharacterAnimation(this.q<HTMLElement>('.actor.you'), victory)
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
@@ -3563,7 +3628,14 @@ export class BattleView {
     await this.gradeFinale()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)
-    this.onWin(this.grade)
+    this.onWin(this.grade, this.combatResources())
+  }
+
+  private combatResources(): { hp: number; guard: number } {
+    return {
+      hp: Math.max(0, Math.min(this.state.playerMax, this.state.playerHp)),
+      guard: Math.max(0, Math.min(playerGuardLimit(this.state.playerMax), this.state.guard)),
+    }
   }
 
   // 띵·띵·띵 — 처치 수만큼 등급이 연타로 튀어오른다. 만렙이면 조용히 멈춘다.
@@ -3770,6 +3842,7 @@ export class BattleView {
       // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
       playCharacterAnimation(foe ?? null, st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`)
+      if (!st.telegraphText) GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(
           [
@@ -3803,7 +3876,8 @@ export class BattleView {
         if (st.guardShattered) {
           const you = this.q<HTMLElement>('.actor.you')
           SquareBurst.playOn(you, 'guard', { spread: 115 })
-          this.popPlayer('실드 전량 파괴!', 'guard big')
+          await this.breakMantisGuardCue()
+          this.popPlayer('실드 파괴 · 강공격 취소!', 'guard big')
         }
         if (st.counterHit) {
           if (st.counterHit.magicShieldBroken) {

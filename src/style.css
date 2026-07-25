@@ -1289,7 +1289,23 @@ button {
 }
 .endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
 .endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
-.actor.foe.boss > .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.5)); }
+.actor.foe.boss {
+  /* 모델 안의 투명 여백이 가장 큰 사마귀를 기준으로 잡고, 가로 실루엣이 큰
+     여왕벌·장로거미는 아래 전용 값에서 줄인다. */
+  --boss-display-scale: 1.55;
+  --boss-bottom: -165px;
+}
+.actor.foe.boss[data-character='queenBee'] {
+  --boss-display-scale: 1.45;
+  --boss-bottom: -165px;
+}
+.actor.foe.boss[data-character='elderSpider'] {
+  --boss-display-scale: 1.4;
+  --boss-bottom: -160px;
+}
+.actor.foe.boss > .model-shell {
+  transform: scale(calc(var(--model-scale, 1) * var(--boss-display-scale)));
+}
 .actor.foe.boss.front > .model-shell {
   filter:
     blur(var(--model-blur, 0))
@@ -1297,8 +1313,8 @@ button {
 }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
 
-/* 보스전은 프롬의 등 뒤에서 보스를 올려다보는 3인칭 구도다. 모델의 하반신은
-   카드 뒤로 내려 카드 아래에 서 있는 것처럼 보이고, 체력 HUD는 좌하단에 고정한다. */
+/* 보스전은 프롬의 등 뒤에서 보스를 올려다보는 3인칭 구도다. 보스의 전신은
+   상단 캐스트 레일과 하단 카드 사이에 남기고, 체력 HUD는 좌하단에 고정한다. */
 .scene.battle[data-boss='true'] .actor.you {
   /* 하단 중앙 카드 열을 비워 두도록 전경의 프롬을 좌측 구석으로 물린다. */
   left: calc(50% - 560px);
@@ -1335,15 +1351,19 @@ button {
 .scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 15px; }
 .scene.battle[data-boss='true'] .boss-player-health-hud .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
+  /* 모델 원점은 카드 쪽으로 내려가지만 실제 발끝은 카드 위에 남는다. 투명 여백을
+     포함한 박스가 아니라 화면에 보이는 실루엣을 기준으로 보스별 위치를 맞춘다. */
+  bottom: var(--boss-bottom) !important;
   z-index: 38 !important;
 }
 .scene.battle[data-boss='true'] .actor.foe.boss > .model-shell {
   /* 상단 HUD 아래부터 카드 영역 위까지 남은 높이를 사용한다. 예전의 500px대 차감은
-     낮은 창에서 보스를 일반 적보다 작게 만들었으므로, 안전 여백만 남기고 확대한다. */
+     낮은 창에서 보스를 일반 적보다 작게 만들었으므로, 안전 여백만 남기고 확대한다.
+     모델별 뷰포트 차이는 유지한 채 보스별 공용 변수로 최대 안전 배율을 적용한다. */
   width: min(620px, calc(100vh - 280px));
   height: min(630px, calc(100vh - 270px));
   z-index: 2;
-  transform: none;
+  transform: scale(calc(var(--model-scale, 1) * var(--boss-display-scale)));
 }
 /* 여왕벌은 가로로 넓고 앞뒤 깊이가 큰 모델이라 같은 뷰포트에서는 다른 보스보다
    실루엣이 작게 보인다. 낮은 데스크톱 창에서도 무대의 주인공으로 읽히도록 전용
@@ -1362,7 +1382,7 @@ button {
   display: none;
 }
 
-/* 보스 HUD는 이름과 체력을, 오른쪽 보조 표식은 현재 약점과 행동 순서만 보여 준다. */
+/* 보스 HUD는 이름·체력·현재 약점만 보여 준다. 선공은 배우 옆 공용 경고가 맡는다. */
 .boss-health-hud {
   position: absolute;
   top: 24px;
@@ -1410,23 +1430,6 @@ button {
   font-weight: 900;
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
-.boss-health-hud .enemy-traits {
-  justify-content: center;
-  min-height: 0;
-  margin-top: 8px;
-}
-.boss-health-hud .enemy-traits .trait {
-  min-height: 24px;
-  padding: 3px 8px;
-  gap: 5px;
-  border-width: 1px;
-  border-radius: 7px;
-  font-size: 11px;
-  box-shadow: none;
-}
-.boss-health-hud .enemy-traits .emotion-face,
-.boss-health-hud .enemy-traits .emotion-symbol { width: 16px; height: 16px; }
-.boss-health-hud .spider-parts { margin-top: 7px; }
 .spider-parts {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
@@ -1604,6 +1607,9 @@ button {
 .boss-token .battle-sprite { object-position: center; }
 .token-speech {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   left: 158px;
   top: 8px;
   z-index: 5;
@@ -1674,7 +1680,60 @@ button {
   transform: rotate(-11deg);
   animation: token-mark-stamp .46s cubic-bezier(.2, 1.7, .32, 1) both;
 }
-.token-speech-text { display: block; }
+.token-speech-text { display: block; width: 100%; }
+
+/* 큰낫 예고가 떠 있는 한 턴 동안만 프롬 옆에 남는 작은 방어 목표.
+   실제 방어막은 체력바에 계속 표시하고, 이 표식은 “지금 방어해야 한다”만 크게 읽힌다. */
+.mantis-guard-cue {
+  position: absolute;
+  left: 50%;
+  bottom: 250px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 116px;
+  padding: 7px 12px 7px 8px;
+  color: #dff9ff;
+  border: 2px solid rgba(124, 226, 255, .86);
+  border-radius: 24px;
+  background: rgba(18, 62, 80, .88);
+  box-shadow: inset 0 0 0 2px rgba(222, 251, 255, .16), 0 0 18px rgba(81, 209, 255, .45), 0 5px 14px rgba(0, 0, 0, .42);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: mantis-guard-cue-pulse .82s ease-in-out infinite alternate;
+}
+.mantis-guard-cue[hidden] { display: none; }
+.mantis-guard-shield {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  flex: 0 0 auto;
+  color: #173d55;
+  font-size: 20px;
+  font-weight: 900;
+  background: linear-gradient(145deg, #f0feff, #65d6f5 62%, #278bb9);
+  clip-path: polygon(50% 0, 94% 16%, 86% 72%, 50% 100%, 14% 72%, 6% 16%);
+  filter: drop-shadow(0 0 7px rgba(112, 229, 255, .9));
+}
+.mantis-guard-cue > span:last-child { display: grid; gap: 1px; text-align: left; }
+.mantis-guard-cue b { color: #fff; font-size: 13px; line-height: 1; white-space: nowrap; }
+.mantis-guard-cue em { color: #8eeaff; font-size: 15px; font-style: normal; font-weight: 900; line-height: 1; }
+.mantis-guard-cue.ready {
+  border-color: #fff0a0;
+  box-shadow: inset 0 0 0 2px rgba(255, 250, 205, .2), 0 0 22px rgba(255, 222, 92, .65), 0 5px 14px rgba(0, 0, 0, .42);
+}
+.mantis-guard-cue.ready em { color: #fff0a0; }
+.mantis-guard-cue.breaking { animation: mantis-guard-cue-break .38s ease-out forwards; }
+@keyframes mantis-guard-cue-pulse {
+  to { transform: translateX(-50%) translateY(-4px) scale(1.035); filter: brightness(1.14); }
+}
+@keyframes mantis-guard-cue-break {
+  0% { opacity: 1; transform: translateX(-50%) scale(1); }
+  38% { opacity: 1; transform: translateX(-50%) scale(1.18) rotate(-4deg); filter: brightness(1.8); }
+  100% { opacity: 0; transform: translateX(-50%) scale(.35) rotate(12deg); filter: brightness(2); }
+}
 
 /* 핵심 경고 — 빨간 색연필. 스스로 사라지지 않으므로 요란하게 떨지 않고
    테두리 붉은 기운만 천천히 숨 쉬게 해 오래 떠 있어도 피로하지 않게 한다. */
@@ -1928,10 +1987,11 @@ button {
 .summoned-allies {
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  bottom: 35px;
   z-index: 1;
-  width: 1000px;
-  height: 380px;
+  /* 여왕벌 날개 바깥으로 두 겹의 호위가 펼쳐지되 하단 카드 안전선을 넘지 않는다. */
+  width: 1100px;
+  height: 390px;
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -1939,8 +1999,8 @@ button {
   position: absolute;
   bottom: 0;
   display: block;
-  width: 190px;
-  height: 260px;
+  width: 200px;
+  height: 272px;
   transform-origin: center bottom;
   filter: drop-shadow(0 0 10px rgba(255, 200, 71, .46)) drop-shadow(0 10px 12px rgba(30, 18, 6, .32));
 }
@@ -1985,10 +2045,10 @@ button {
 .queen-worker-hp > .fill {
   width: 100%;
 }
-.queen-worker.left[data-slot='1'] { left: 215px; bottom: 55px; }
-.queen-worker.left[data-slot='2'] { left: 20px; bottom: 0; }
-.queen-worker.right[data-slot='1'] { right: 215px; bottom: 55px; }
-.queen-worker.right[data-slot='2'] { right: 20px; bottom: 0; }
+.queen-worker.left[data-slot='1'] { left: 230px; bottom: 64px; }
+.queen-worker.left[data-slot='2'] { left: 15px; bottom: 10px; }
+.queen-worker.right[data-slot='1'] { right: 230px; bottom: 64px; }
+.queen-worker.right[data-slot='2'] { right: 15px; bottom: 10px; }
 .queen-worker.left { transform: rotate(-4deg); }
 .queen-worker.right { transform: scaleX(-1) rotate(-4deg); }
 /* 오른쪽 일벌의 모델만 바라보는 방향을 뒤집고, 이름표 글자는 다시 정방향으로 돌린다. */
@@ -2594,13 +2654,7 @@ button {
 .actor.foe.strikes-first .first-mark { display: inline-flex; }
 .actor.foe.back .first-mark { display: none; }
 .scene.battle[data-boss='true'] .actor.foe.boss .first-mark {
-  position: fixed;
-  top: 92px;
-  bottom: auto;
-  left: calc(50% + min(380px, 28vw) + 90px);
-  z-index: 70;
-  /* 오른쪽에 남은 폭이 좁아지면 두 글자가 한 자씩 세로로 접혀 「선/공」이 된다. */
-  white-space: nowrap;
+  display: none;
 }
 .boss-weakness-mark {
   display: none;
@@ -2643,6 +2697,26 @@ button {
   letter-spacing: .06em;
   white-space: nowrap;
 }
+.boss-first-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 27px;
+  padding: 2px 9px 2px 5px;
+  color: #ff9a70;
+  border: 1px solid rgba(255, 126, 78, .72);
+  border-radius: 999px;
+  background: rgba(55, 13, 13, .82);
+  box-shadow: 0 0 12px rgba(255, 74, 34, .28);
+  text-shadow: 0 0 9px rgba(255, 94, 48, .8), 0 2px 4px rgba(0, 0, 0, .9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.boss-first-mark[hidden] { display: none; }
+.boss-first-mark svg { width: 20px; height: 20px; fill: currentColor; }
+.boss-first-mark svg .bang { stroke: #351008; stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.boss-first-mark b { color: #fff1d9; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
 .scene.battle[data-boss='true'] .actor.foe.boss .guard-hint { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
 .nameplate.gone ~ .first-mark {
@@ -5526,7 +5600,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 덱 상한 교체 — 보유 카드 전체를 보여 주되, 8장에서는 카드 영역만 스크롤한다. */
 .discard-scene { box-sizing: border-box; padding: 18px 0; }
 .discard-card {
-  width: min(1320px, calc(100vw - 112px));
+  width: min(1600px, calc(100vw - 112px));
   height: calc(100vh - 36px);
   max-height: calc(100vh - 36px);
   box-sizing: border-box;
@@ -5539,8 +5613,14 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .discard-card .reward-head .t { font-size: 40px; }
 .discard-incoming { flex: none; margin: 10px auto 18px; text-align: center; color: var(--ink-dim); font-size: 17px; }
 .discard-incoming b { color: #fff2da; font-size: 21px; }
-.discard-grid {
+.discard-body {
   --discard-card-height: clamp(370px, 23vw, 430px);
+  display: flex;
+  flex: 1 1 0;
+  gap: 24px;
+  min-height: 0;
+}
+.discard-grid {
   flex: 1 1 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   /* 카드와 행의 높이를 같은 값으로 고정한다. aspect-ratio만 쓰면 CSS Grid가
@@ -5554,6 +5634,30 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   overscroll-behavior: contain;
   scrollbar-color: rgba(255, 220, 140, .65) rgba(255, 255, 255, .06);
 }
+.discard-preview {
+  position: relative;
+  flex: 0 0 min(280px, 19vw);
+  align-self: flex-start;
+  padding: 4px 10px 0 0;
+}
+.discard-preview::before {
+  content: '';
+  position: absolute;
+  top: 42px;
+  bottom: 10px;
+  left: -13px;
+  width: 1px;
+  background: linear-gradient(transparent, rgba(255, 220, 140, .48) 15%, rgba(255, 220, 140, .48) 85%, transparent);
+}
+.discard-preview-label {
+  margin: 0 0 10px;
+  color: #ffe29a;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-align: center;
+  text-shadow: 0 0 14px rgba(255, 194, 73, .55);
+}
 .discard-pick {
   position: relative; display: flex; flex-direction: column; width: 100%; height: var(--discard-card-height); min-height: 0;
   overflow: hidden; border-radius: 20px; color: #fff;
@@ -5562,6 +5666,12 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .discard-pick:hover, .discard-pick:focus-visible { transform: translateY(-9px); filter: brightness(1.12); }
 .discard-pick.is-chosen { transform: translateY(18px) rotate(-3deg); opacity: .35; }
+.discard-new-card {
+  height: calc(var(--discard-card-height) - 36px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.55), inset 0 0 0 3px var(--wglow, var(--gold)), 0 0 24px color-mix(in srgb, var(--wglow, var(--gold)) 28%, transparent);
+}
+.discard-new-card .discard-order { color: #fff1a8; }
+.discard-new-card .discard-action { background: rgba(53, 117, 83, .88); }
 .discard-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
 .discard-veil { position: absolute; inset: 0; background: linear-gradient(rgba(5,3,10,.28), rgba(5,3,10,.2) 42%, rgba(5,3,10,.96)); }
 .discard-order, .discard-copy, .discard-meta, .discard-pick strong, .discard-effect, .discard-action { position: relative; z-index: 1; display: block; }

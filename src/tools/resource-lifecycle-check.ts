@@ -32,7 +32,7 @@ const rules: Rule[] = [
     allowed: { 'src/views/BattleCharacterModel.ts': 1 },
   },
   {
-    label: 'WebGLRenderer는 캐릭터 모델의 공용 풀에서만 생성해야 합니다',
+    label: 'WebGLRenderer 생성은 캐릭터 모델의 제한된 풀에서만 관리해야 합니다',
     pattern: /\bnew\s+THREE\.WebGLRenderer\s*\(/g,
     allowed: { 'src/views/BattleCharacterModel.ts': 1 },
   },

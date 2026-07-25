@@ -11,21 +11,38 @@ interface Opts {
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식어', verb: '동사' }
 
-function cardHtml(word: Word, index: number): string {
+function cardContents(word: Word, label: string, action: string): string {
   const art = word.art ? SKILL_ART[word.art] : undefined
   const rarity = word.rarity ?? 'common'
   return `
+    ${art ? `<img class="discard-art" src="${art}" alt="" />` : ''}
+    <span class="discard-veil" aria-hidden="true"></span>
+    <span class="discard-order">${label}</span>
+    <span class="discard-copy">
+      <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
+      <strong>${word.text}</strong>
+      <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || word.note}</span>
+      <span class="discard-action">${action}</span>
+    </span>`
+}
+
+function candidateHtml(word: Word, index: number): string {
+  const rarity = word.rarity ?? 'common'
+  return `
     <button class="discard-pick rarity-${rarity}" type="button" data-i="${index}">
-      ${art ? `<img class="discard-art" src="${art}" alt="" />` : ''}
-      <span class="discard-veil" aria-hidden="true"></span>
-      <span class="discard-order">보유 카드 ${index + 1}</span>
-      <span class="discard-copy">
-        <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
-        <strong>${word.text}</strong>
-        <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || word.note}</span>
-        <span class="discard-action">이 카드를 버리기</span>
-      </span>
+      ${cardContents(word, `보유 카드 ${index + 1}`, '이 카드를 버리기')}
     </button>`
+}
+
+function incomingHtml(word: Word): string {
+  const rarity = word.rarity ?? 'common'
+  return `
+    <aside class="discard-preview" aria-label="새로 들어올 카드">
+      <div class="discard-preview-label">새로 들어올 카드</div>
+      <div class="discard-pick discard-new-card rarity-${rarity}">
+        ${cardContents(word, '새 카드', '이 카드가 들어옵니다')}
+      </div>
+    </aside>`
 }
 
 export class DeckDiscardView {
@@ -46,10 +63,13 @@ export class DeckDiscardView {
             <div class="t hand">한 장을 지우고 새 문장을 쓰자</div>
           </div>
           <div class="discard-incoming">
-            새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 현재 보유 카드 중 한 장을 골라 버린다.
+            오른쪽의 새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 현재 보유 카드 중 한 장을 골라 버린다.
           </div>
-          <div class="reward-grid discard-grid">
-            ${opts.candidates.map(cardHtml).join('')}
+          <div class="discard-body">
+            <div class="reward-grid discard-grid">
+              ${opts.candidates.map(candidateHtml).join('')}
+            </div>
+            ${incomingHtml(opts.incoming)}
           </div>
         </div>
       </div>`

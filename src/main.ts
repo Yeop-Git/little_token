@@ -97,10 +97,18 @@ function grantItem(def: ItemDef) {
 
 // 디버그 단어 해금 — 실제 보상과 같은 등록 경로를 타므로 이미 보유한 카드는 반복강화된다.
 function grantWord(word: Word) {
-  registerWord(run.player, word)
-  saveRun(run)
-  if (lastScene === 'reward') goReward()
-  else goBattle()
+  const back = () => {
+    saveRun(run)
+    if (lastScene === 'reward') goReward()
+    else goBattle()
+  }
+  const result = registerWord(run.player, word)
+  // 칸이 가득 차면 보상과 같은 교체 화면을 연다. 그냥 흘리면 버튼이 먹통인 것처럼 보인다.
+  if (result.kind === 'needs-discard') {
+    goDiscard(word, result.candidates, back)
+    return
+  }
+  back()
 }
 
 function cardCatalog(): Word[] {
@@ -521,6 +529,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
     record: run.record,
+    resources: run.combat,
     tables: makeEarlyTables(run.player.deck, run.player),
     debugCombat: debugCombatModes,
     onWin: handleBattleWin,
@@ -529,7 +538,11 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
       clearRun()
       goResult('lost', cause)
     },
-    onHome: () => goTitle(), // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
+    onHome: (resources) => {
+      run.combat = resources
+      saveRun(run)
+      goTitle()
+    }, // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
     onResetAll: resetAllRecordsAndStart,
 
     intro,
@@ -548,7 +561,8 @@ async function preloadUpcomingBattle() {
   ])
 }
 
-function handleBattleWin(grade: number) {
+function handleBattleWin(grade: number, resources: { hp: number; guard: number }) {
+  run.combat = resources
   // 넘긴 날 — 결과 종이가 "어디까지 갔는지"로 읽는 값이다.
   run.record.daysCleared += 1
   if (run.day === 15 && !run.endingSeen) {
@@ -593,7 +607,8 @@ function advanceReward(grade: number, phase: RewardPhase) {
   goBattleWithBossIntro()
 }
 
-function goDiscard(incoming: Word, candidates: Word[], grade: number, phase: 'subject' | 'verb') {
+/** 교체를 마친 뒤 어디로 돌아갈지는 부르는 쪽이 정한다 — 보상 흐름과 치트가 같은 화면을 쓴다. */
+function goDiscard(incoming: Word, candidates: Word[], onDone: () => void) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
@@ -603,7 +618,7 @@ function goDiscard(incoming: Word, candidates: Word[], grade: number, phase: 'su
     onDiscard: (discarded) => {
       const result = registerWord(run.player, incoming, discarded.id)
       if (result.kind === 'needs-discard') return
-      advanceReward(grade, phase)
+      onDone()
     },
   })
 }
@@ -629,7 +644,7 @@ function goReward(
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
         if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, grade, phase as 'subject' | 'verb')
+          goDiscard(opt.word, result.candidates, () => advanceReward(grade, phase))
         } else {
           advanceReward(grade, phase)
         }

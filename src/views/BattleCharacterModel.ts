@@ -153,9 +153,18 @@ const SPIDER_PART_ORDER = ['leg-joy', 'leg-anger', 'leg-sorrow', 'leg-pleasure']
 const modelLoads = new Map<string, Promise<GLTF>>()
 const modelLoader = new GLTFLoader()
 const normalizedClipCache = new WeakMap<THREE.AnimationClip, Map<string, THREE.AnimationClip>>()
-const MAX_POOLED_RENDERERS = 8
-const RENDERER_POOL_IDLE_MS = 60_000
-const rendererPool: Array<{ renderer: THREE.WebGLRenderer; releaseTimer: number }> = []
+// Chrome 계열의 일반적인 WebGL 컨텍스트 한계(대개 16)까지 채우지 않고,
+// 여왕벌 + 일벌 무리처럼 동시에 배우가 많은 전투에도 충분한 여유를 둔다.
+const MAX_RENDERER_CONTEXTS = 12
+const MAX_POOLED_RENDERERS = 6
+const RENDERER_POOL_IDLE_MS = 30_000
+interface PooledRenderer {
+  renderer: THREE.WebGLRenderer
+  releaseTimer: number
+  releasedAt: number
+}
+const rendererPool: PooledRenderer[] = []
+let liveRendererCount = 0
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
 let animationFrame = 0
@@ -173,10 +182,40 @@ function loadModel(url: string): Promise<GLTF> {
   return pending
 }
 
+function disposeRenderer(renderer: THREE.WebGLRenderer) {
+  renderer.dispose()
+  if (!renderer.getContext().isContextLost()) renderer.forceContextLoss()
+  liveRendererCount = Math.max(0, liveRendererCount - 1)
+}
+
+function disposePooledRenderer(entry: PooledRenderer) {
+  window.clearTimeout(entry.releaseTimer)
+  const index = rendererPool.indexOf(entry)
+  if (index >= 0) rendererPool.splice(index, 1)
+  disposeRenderer(entry.renderer)
+}
+
 function acquireRenderer(): THREE.WebGLRenderer {
-  const pooled = rendererPool.pop()
-  if (pooled) window.clearTimeout(pooled.releaseTimer)
-  const renderer = pooled?.renderer ?? new THREE.WebGLRenderer({
+  while (rendererPool.length) {
+    const pooled = rendererPool.pop()!
+    window.clearTimeout(pooled.releaseTimer)
+    if (pooled.renderer.getContext().isContextLost()) {
+      disposeRenderer(pooled.renderer)
+      continue
+    }
+    pooled.renderer.domElement.hidden = false
+    return pooled.renderer
+  }
+
+  while (liveRendererCount >= MAX_RENDERER_CONTEXTS && rendererPool.length) {
+    const leastRecentlyUsed = rendererPool[0]
+    if (leastRecentlyUsed) disposePooledRenderer(leastRecentlyUsed)
+  }
+  if (liveRendererCount >= MAX_RENDERER_CONTEXTS) {
+    throw new Error(`WebGL 컨텍스트 안전 한계(${MAX_RENDERER_CONTEXTS})에 도달했습니다.`)
+  }
+
+  const renderer = new THREE.WebGLRenderer({
     alpha: true,
     antialias: true,
     powerPreference: 'high-performance',
@@ -185,27 +224,35 @@ function acquireRenderer(): THREE.WebGLRenderer {
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.domElement.className = 'battle-model'
   renderer.domElement.setAttribute('aria-hidden', 'true')
+  liveRendererCount += 1
   return renderer
 }
 
 function releaseRenderer(renderer: THREE.WebGLRenderer) {
   renderer.domElement.remove()
-  if (renderer.getContext().isContextLost() || rendererPool.length >= MAX_POOLED_RENDERERS) {
-    renderer.dispose()
+  if (renderer.getContext().isContextLost()) {
+    disposeRenderer(renderer)
     return
   }
+
   renderer.setRenderTarget(null)
   renderer.renderLists.dispose()
   renderer.resetState()
   renderer.info.reset()
-  const entry = { renderer, releaseTimer: 0 }
-  entry.releaseTimer = window.setTimeout(() => {
-    const index = rendererPool.indexOf(entry)
-    if (index < 0) return
-    rendererPool.splice(index, 1)
-    renderer.dispose()
-  }, RENDERER_POOL_IDLE_MS)
+
+  const entry: PooledRenderer = {
+    renderer,
+    releaseTimer: 0,
+    releasedAt: performance.now(),
+  }
+  entry.releaseTimer = window.setTimeout(() => disposePooledRenderer(entry), RENDERER_POOL_IDLE_MS)
   rendererPool.push(entry)
+  rendererPool.sort((a, b) => a.releasedAt - b.releasedAt)
+
+  while (rendererPool.length > MAX_POOLED_RENDERERS) {
+    const leastRecentlyUsed = rendererPool[0]
+    if (leastRecentlyUsed) disposePooledRenderer(leastRecentlyUsed)
+  }
 }
 
 function runAnimationFrame(now: number) {
@@ -474,7 +521,7 @@ class BattleCharacterModel {
       await this.loadCompanion()
     } catch (error) {
       console.warn(`3D 캐릭터 모델을 불러오지 못해 2D 초상을 사용합니다: ${this.visual.id}`, error)
-      this.shell.dataset.modelStatus = 'fallback-2d'
+      this.useFallbackPortrait()
     }
   }
 
@@ -1238,7 +1285,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     // 풀에 있는 동안 캔버스에는 defeat의 마지막 프레임이 남는다. DOM에 다시
     // 붙이기 전에 idle 첫 자세를 즉시 그려 재스폰 섬광을 막는다.
     this.mixer?.update(0)
-    this.renderer.render(this.scene, this.camera)
+    if (!this.renderer.getContext().isContextLost()) this.renderer.render(this.scene, this.camera)
   }
 
   private resize() {
@@ -1260,6 +1307,10 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   render(delta: number, now: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
+    if (this.renderer.getContext().isContextLost()) {
+      this.useFallbackPortrait()
+      return
+    }
     this.pendingRenderDelta = Math.min(0.1, this.pendingRenderDelta + delta)
     const lowQuality = document.documentElement.dataset.graphics === 'low'
     const waitingEnemy = !!this.shell.closest('.actor.foe.back')
@@ -1298,8 +1349,16 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       && !this.renderer.getContext().isContextLost()
   }
 
+  useFallbackPortrait() {
+    if (this.disposed) return
+    this.shell.dataset.modelStatus = 'fallback-2d'
+    this.renderer.domElement.hidden = true
+    this.setActive(false)
+  }
+
   setActive(active: boolean) {
     if (this.disposed || active === this.active) return
+    if (active && this.shell.dataset.modelStatus === 'fallback-2d') return
     this.active = active
     if (active) addToAnimationFrame(this)
     else removeFromAnimationFrame(this)

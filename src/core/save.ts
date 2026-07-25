@@ -140,6 +140,18 @@ export function loadRun(): RunState | null {
       migrated = true
     }
     migrated = migrateCombatBalance(parsed) || migrated
+    // 이전 저장은 전투마다 풀피·방어 0으로 시작했으므로 보정된 최대 체력에서 새 지속 규칙을 시작한다.
+    if (!parsed.combat || typeof parsed.combat.hp !== 'number' || typeof parsed.combat.guard !== 'number') {
+      parsed.combat = { hp: parsed.player.stats.hp, guard: 0 }
+      migrated = true
+    } else {
+      const hp = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.hp))
+      const guard = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.guard))
+      if (hp !== parsed.combat.hp || guard !== parsed.combat.guard) {
+        parsed.combat = { hp, guard }
+        migrated = true
+      }
+    }
     for (const words of Object.values(parsed.player.deck)) {
       for (const word of words) {
         const subjectEmotion = LEGACY_SUBJECT_EMOTIONS[word.id]

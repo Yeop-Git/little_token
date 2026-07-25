@@ -14,6 +14,14 @@ type EffectName =
   | 'resonanceSorrow'
   | 'resonancePleasure'
   | 'contextBonus'
+  | 'swordHit'
+  | 'enemyAttack1'
+  | 'enemyAttack2'
+  | 'heal'
+  | 'shield'
+  | 'cutscene'
+  | 'win'
+  | 'hover'
 type BgmName = 'title' | 'storyEaten' | 'battlePaperPages' | 'battlePaperTaiko' | 'battleHeroicMarch' | 'bossSaltSkater' | 'bossQueenBee' | 'bossElderSpider'
 const VOLUME_KEY = 'little-token-master-volume'
 const BGM_VOLUME = 0.16
@@ -29,9 +37,17 @@ const EFFECT_VOLUME: Record<EffectName, number> = {
   resonanceSorrow: 0.48,
   resonancePleasure: 0.48,
   contextBonus: 0.52,
+  swordHit: 0.54,
+  enemyAttack1: 0.48,
+  enemyAttack2: 0.48,
+  heal: 0.46,
+  shield: 0.5,
+  cutscene: 0.52,
+  win: 0.5,
+  hover: 0.24,
 }
 const BATTLE_EFFECTS = Object.keys(EFFECT_VOLUME) as EffectName[]
-const UI_EFFECTS: EffectName[] = ['button', 'cardHover']
+const UI_EFFECTS: EffectName[] = ['button', 'cardHover', 'hover']
 const BUFFERED_BATTLE_EFFECTS = BATTLE_EFFECTS.filter((effect) => effect !== 'pencil')
 
 const BGM_TRACK: Record<BgmName, string> = {
@@ -77,6 +93,7 @@ class GameAudioController {
   private pencilVoice: number | null = null
   private pencilStopTimer: number | null = null
   private lastCardHoverAt = 0
+  private lastUiHoverAt = 0
   private buttonSoundsInstalled = false
   private streamsUnlocked = false
   private masterVolume = savedVolume()
@@ -191,10 +208,36 @@ class GameAudioController {
         void Promise.all(this.preloadPreparedStreams())
       }
       const target = event.target
-      const button = target instanceof Element ? target.closest<HTMLButtonElement>('button') : null
-      if (!button || button.matches('.word-card')) return
+      const interactive = target instanceof Element
+        ? target.closest<HTMLElement>('button, [role="button"]')
+        : null
+      if (!interactive || interactive.matches('.word-card, :disabled, [aria-disabled="true"]')) return
       this.play('button')
     }, true)
+    // pointerenter는 버블링하지 않는다. pointerover를 위임하되 같은 버튼의 자식
+    // 사이를 움직인 경우는 걸러, 버튼 하나에 hover가 한 번만 들리게 한다.
+    document.addEventListener('pointerover', (event) => {
+      const target = event.target
+      const interactive = target instanceof Element
+        ? target.closest<HTMLElement>('button, [role="button"]')
+        : null
+      if (!interactive || interactive.matches('.word-card, :disabled, [aria-disabled="true"]')) return
+      if (event.relatedTarget instanceof Node && interactive.contains(event.relatedTarget)) return
+      this.play('hover')
+    }, true)
+  }
+
+  /** 한 공격 연쇄의 0-based 타격 순서. 여섯 번째부터는 1.5배속을 유지한다. */
+  playSwordHit(hitIndex: number) {
+    const source = this.getEffect('swordHit')
+    const voice = source.play()
+    source.volume(EFFECT_VOLUME.swordHit, voice)
+    source.rate(Math.min(1.5, 1 + Math.max(0, hitIndex) * 0.1), voice)
+  }
+
+  playEnemyAttack(animationStage = 1) {
+    // 기본 공격은 1번, 강화된 2·3단계 공격은 더 긴 2번 소리를 쓴다.
+    this.play(animationStage > 1 ? 'enemyAttack2' : 'enemyAttack1')
   }
 
   play(effect: EffectName) {
@@ -202,6 +245,11 @@ class GameAudioController {
       const now = performance.now()
       if (now - this.lastCardHoverAt < 70) return
       this.lastCardHoverAt = now
+    }
+    if (effect === 'hover') {
+      const now = performance.now()
+      if (now - this.lastUiHoverAt < 55) return
+      this.lastUiHoverAt = now
     }
     const source = this.getEffect(effect)
     const voice = source.play()
@@ -275,7 +323,7 @@ class GameAudioController {
       html5: streams,
       preload: streams ? 'metadata' : true,
       volume: EFFECT_VOLUME[effect],
-      pool: effect === 'cardHover' ? 8 : effect === 'pencil' ? 1 : 5,
+      pool: effect === 'cardHover' || effect === 'hover' || effect === 'swordHit' ? 8 : effect === 'pencil' ? 1 : 5,
     })
     source.on('loaderror', () => this.failedLoads.add(source))
     this.effects.set(effect, source)

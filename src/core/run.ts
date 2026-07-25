@@ -41,6 +41,8 @@ export type DefeatCause =
 
 export interface RunState {
   player: PlayerState
+  /** 스테이지를 넘어 유지되는 현재 생존 자원. 최대 체력은 player.stats.hp가 기준이다. */
+  combat: RunCombatState
   day: number
   /** 결과 화면에 보여 줄 이 런의 누적 기록. */
   record: RunRecord
@@ -57,6 +59,11 @@ export interface RunState {
    * 7초짜리 영상을 매번 다시 보여 줄 이유는 없다.
    */
   bossCinematicSeen?: number[]
+}
+
+export interface RunCombatState {
+  hp: number
+  guard: number
 }
 
 export type RewardPhase = 'subject' | 'item' | 'verb'
@@ -86,8 +93,10 @@ export function startingPlayer(): PlayerState {
 }
 
 export function newRun(): RunState {
+  const player = startingPlayer()
   return {
-    player: startingPlayer(),
+    player,
+    combat: { hp: player.stats.hp, guard: 0 },
     day: 1,
     record: emptyRunRecord(),
     balanceVersion: COMBAT_BALANCE_VERSION,

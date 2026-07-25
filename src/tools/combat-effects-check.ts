@@ -1,5 +1,5 @@
 import { compile } from '@core/compiler'
-import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer, type RunState, emptyRunRecord } from '@core/run'
+import { DECK_LIMITS, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
 import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
@@ -17,6 +17,7 @@ import {
   applyPreparation,
   enemyTurn,
   makeEnemy,
+  playerGuardLimit,
   spiderWebAtTurnStart,
   spiderSealSlotForTurn,
   spiderWebTension,
@@ -34,6 +35,7 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
 const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, counterMultiplier: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra });
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
+{ const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
 { const player = defaultPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'battle fallback starts at hp 52 and guard 3') }
 {
   const legacy = { player: { ...startingPlayer(), stats: { hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 } }, day: 4, endless: false, endingSeen: false } as Omit<RunState, 'balanceVersion'>
@@ -41,7 +43,16 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(!migrateCombatBalance(legacy as RunState) && legacy.player.stats.hp === 52 && legacy.player.stats.guard === 3, 'combat balance migration is idempotent')
 }
 {
-  const legacy = { player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } }, day: 9, record: emptyRunRecord(), balanceVersion: 0, endless: false, endingSeen: false, reward: null }
+  const legacy = {
+    player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } },
+    combat: { hp: 68, guard: 0 },
+    day: 9,
+    record: emptyRunRecord(),
+    balanceVersion: 0,
+    endless: false,
+    endingSeen: false,
+    reward: null,
+  }
   migrateCombatBalance(legacy)
   assert(legacy.player.stats.hp === 100 && legacy.player.stats.guard === 7, 'legacy growth survives combat balance migration')
 }
@@ -59,6 +70,19 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const s = state([makeEnemy(foe('mosquito', { pierceGuard: true }))]); s.guard = 7; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.piercedGuard && r.dealt === 4 && r.absorbed === 0 && s.guard === 7 && !r.counterHit, 'enemy pierces player guard') }
 { const s = state([makeEnemy(foe('guard-remains'))]); s.guard = 7; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.absorbed === 4 && s.guard === 3 && s.counterMultiplier === 1.5, 'guard remains after absorbing a smaller hit'); applyPreparation(s, attack(), 1); assert(s.guard === 3 && s.counterMultiplier === 1.5, 'non-guard preparation preserves remaining guard') }
 { const s = state([makeEnemy(foe('guard-stacks'))]); s.guard = 3; const r = applyPreparation(s, attack({ guard: 5 }), 1); assert(r.guardGain === 5 && s.guard === 8, 'new guard stacks with remaining guard') }
+{
+  const s = state([makeEnemy(foe('guard-cap'))])
+  s.guard = 28
+  const r = applyPreparation(s, attack({ guard: 10 }), 1)
+  assert(playerGuardLimit(s.playerMax) === 30 && r.guardAttempted === 10 && r.guardGain === 2 && s.guard === 30, 'player guard is capped at max hp and reports the applied gain')
+}
+{
+  // 상한에 막혀 비축분이 0이어도 그 턴을 방어에 썼으므로 반격은 걸려 있어야 한다.
+  const s = state([makeEnemy(foe('guard-cap-counter'))])
+  s.guard = playerGuardLimit(s.playerMax)
+  const r = applyPreparation(s, attack({ guard: 10, counterMultiplier: 1.5 }), 1)
+  assert(r.guardGain === 0 && r.counterMultiplier === 1.5 && s.counterMultiplier === 1.5, 'guard sentence still arms the counter at the guard cap')
+}
 { const card: Word = { id: 'counter', text: '', slot: 'verb', tags: [], emotion: 'sorrow', kind: 'guard', effects: { counterMultiplier: 1.5 }, note: '' }; reinforceWord(card); assert(card.effects?.counterMultiplier === 1.75, 'counter reinforce') }
 { const s = state([makeEnemy(foe('delay', { hp: 20 }))]); applyIntent(s, attack({ timing: 'delayed', hitCount: 2, pierceGuard: true, emotions: ['anger'] }), 1, 0); const r = applyPendingAttack(s)!; assert(r.hits.length === 2 && s.enemies[0].hp === 0, 'delayed plan') }
 { const boss = makeEnemy(foe('layered', { boss: true, hp: 20 }), 1, 1, 3); const s = state([boss]); const r = applyIntent(s, attack({ base: 45 }), 1, 0); assert(boss.maxHp === 60 && boss.hp === 15 && !boss.dead && r.hits[0].barsBroken === 2, 'boss damage crosses multiple health bars without a per-hit cap') }
