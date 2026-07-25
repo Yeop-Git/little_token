@@ -40,7 +40,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
+import { SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
@@ -52,6 +52,7 @@ import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHa
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_RATIO } from '@/ui/AttackCinematic'
+import { currentFieldStage, pickFieldBackground, type FieldBackground } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
@@ -77,6 +78,8 @@ interface Opts {
   hpMult?: number
   atkMult?: number
   isBoss?: boolean
+  /** 현재 층. 배경 고르기에 쓴다 — 1스테이지는 늘 첫 배경으로 고정한다. */
+  day?: number
   /** 현재 보스의 체력 막 수. 일반 전투에는 전달하지 않는다. */
   bossHealthBars?: number
   /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
@@ -91,8 +94,7 @@ type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 // 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
 // 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
-const RAIL_FRONT_RIGHT = 860
-const RAIL_GAP = 260
+// 레일의 자리·간격·물러남은 배경마다 다르다(data/backgrounds.ts의 FieldStage).
 const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
 const TOKEN_BOSS_LINES = [
@@ -153,6 +155,13 @@ export class BattleView {
    */
   private encounterHp = 0
   private attackCine: AttackCinematic | null = null
+  /** 이번 판 배경과 직전 배경 — 직전 것이 있으면 그 위로 새 그림이 밀려 들어온다. */
+  private bg: FieldBackground = { next: '', prev: null }
+  /**
+   * 적 줄의 흐트러짐 — 자로 잰 듯 늘어서면 뻣뻣해 보인다.
+   * 전투가 열릴 때 한 번만 굴린다. 매 렌더마다 다시 굴리면 적이 제자리에서 덜덜 떤다.
+   */
+  private railJitter: { x: number; y: number }[] = []
   private sel: Selection = {}
   private slotIndex = 0
   private target = 0
@@ -206,6 +215,15 @@ export class BattleView {
     // 이 판의 크기 — 적 전체의 최대 체력 합. 연출 문턱을 깡수치가 아니라 이 값의 비율로
     // 잡으면 층이 올라 적이 단단해질수록 문턱도 저절로 따라 올라간다.
     this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
+    // 배경은 판마다 갈린다(1스테이지 고정 · 보스방 전용 · 나머지는 직전 것 빼고 무작위).
+    // 이 한 줄이 조명과 무대 배치까지 함께 정한다.
+    this.bg = pickFieldBackground(opts.day ?? 1, this.isBoss)
+    // 맨 앞줄은 타격 지점이라 건드리지 않고, 뒷줄만 조금씩 흐트러뜨린다.
+    this.railJitter = Array.from({ length: MAX_VISIBLE_ENEMIES }, (_, rank) =>
+      rank === 0
+        ? { x: 0, y: 0 }
+        : { x: Math.round((Math.random() * 2 - 1) * 34), y: Math.round((Math.random() * 2 - 1) * 13) },
+    )
     engageInitialFront(this.state)
     this.grade = startGrade(this.player.stats.luck)
     this.target = aliveIdx(this.state)[0] ?? 0
@@ -306,10 +324,16 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${this.bg.prev ?? this.bg.next});--actor-bottom:${currentFieldStage().bottom}px">
+        ${
+          this.bg.prev
+            ? `<div class="field-swap" aria-hidden="true" style="background-image:url(${this.bg.next})"></div>`
+            : ''
+        }
         ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
         <div class="weather-wash"></div>
+        <div class="storybook-grade" aria-hidden="true"></div>
 
         <div class="hud-top">
           <div class="hud-left-stack">
@@ -798,13 +822,17 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
-    el.style.bottom = this.isBoss && e.def.boss ? '24px' : '26px'
+    // 레일은 배경마다 다르다 — 가운데 골목이 깊게 뚫린 그림이면 좁게 모아 위로
+    // 물러나게 하고, 트인 벌판이면 넓게 벌린다(data/backgrounds.ts의 FieldStage).
+    const st = currentFieldStage()
+    const jit = this.railJitter[rank] ?? { x: 0, y: 0 }
+    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${st.railRight - rank * st.railGap + jit.x}px`
+    el.style.bottom = this.isBoss && e.def.boss ? '24px' : `${st.bottom + rank * st.railRise + jit.y}px`
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
     el.style.opacity = `${1 - depth * 0.2}`
-    el.style.setProperty('--model-scale', `${1 - depth * 0.24}`)
+    el.style.setProperty('--model-scale', `${1 - depth * st.railShrink}`)
     el.style.setProperty('--model-blur', `${depth * 1.5}px`)
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)

@@ -729,6 +729,65 @@ button {
     radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(8, 6, 12, 0.35) 100%);
 }
 
+/* ── 배경 교체 와이프 ──
+   전리품을 고르고 판이 닫히면, 적이 들어오기 전에 새 전장이 왼쪽에서 오른쪽으로 밀려온다.
+   판때기가 미끄러져 들어오는 게 아니라 **마스크가 훑고 지나간다** — 새 그림은 처음부터
+   제자리에 꽉 차 있고, 마스크의 그라데이션 경계만 왼쪽에서 오른쪽으로 흐른다.
+   그래서 이음매가 선이 아니라 번짐으로 남아 배경이 자연스럽게 갈린다.
+   아래 .scene.battle의 background-image에는 직전 배경이 깔려 있어 그 위를 덮어 간다. */
+.field-swap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  /* 마스크를 요소보다 3배 넓게 두고 위치만 옮긴다. 0%면 불투명 구간(0~35%)이 요소를
+     통째로 덮고, 100%면 투명 구간만 걸려 아무것도 안 보인다. */
+  -webkit-mask-image: linear-gradient(90deg, #000 0 35%, transparent 65%);
+  mask-image: linear-gradient(90deg, #000 0 35%, transparent 65%);
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: field-swap-wipe 1.7s cubic-bezier(0.33, 0.9, 0.28, 1) 0.15s both;
+}
+@keyframes field-swap-wipe {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+  to {
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-swap { animation: none; -webkit-mask-image: none; mask-image: none; }
+}
+
+/* ── 동화 색감 그레이딩 ──
+   배경(그린 그림)과 3D 캐릭터(렌더된 것)는 태생이 달라서 그냥 얹으면 따로 논다.
+   둘 위에 한 겹을 덮어 같은 색으로 눌러 주면 한 장면처럼 보인다.
+   배우(z 6~10)보다는 위, HUD(z 96~)보다는 아래에 앉아서 UI 글자는 물들이지 않는다.
+   soft-light라 밝은 데는 덜 먹고 어두운 데는 더 먹어서 대비가 뭉개지지 않는다. */
+.storybook-grade {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 226, 168, 0.85), transparent 62%),
+    radial-gradient(ellipse at 12% 96%, rgba(126, 150, 196, 0.5), transparent 58%),
+    radial-gradient(ellipse at 88% 92%, rgba(150, 126, 178, 0.42), transparent 58%),
+    linear-gradient(180deg, rgba(255, 214, 150, 0.34), rgba(96, 108, 158, 0.38));
+}
+/* 밤·비에는 차가운 쪽으로 기운다 — 날씨 워시와 같은 방향으로 밀어야 서로 안 싸운다. */
+.battle[data-weather='night'] .storybook-grade { opacity: 0.5; filter: hue-rotate(-12deg) saturate(0.9); }
+.battle[data-weather='rain'] .storybook-grade { opacity: 0.54; filter: hue-rotate(-6deg) saturate(0.94); }
+
 /* 날씨/밤낮 워시 — 배경 위에 톤 오버레이(적/UI보다 아래) */
 .weather-wash {
   position: absolute;
@@ -1308,7 +1367,9 @@ button {
 /* 배우 */
 .actor {
   position: absolute;
-  bottom: 26px;
+  /* 발끝 높이는 배경마다 다르다 — 그림의 바닥선을 실측해 잡은 값이 씬에 실려 온다
+     (data/backgrounds.ts의 FieldStage). 값이 없으면 기존 배치를 그대로 쓴다. */
+  bottom: var(--actor-bottom, 26px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1319,8 +1380,10 @@ button {
   outline: none;
 }
 .actor.you {
-  /* 310→360 확장분의 절반만큼 좌측을 당겨 캐릭터 중심은 기존 위치에 고정한다. */
-  left: 225px;
+  /* 310→360 확장분의 절반만큼 좌측을 당겨 캐릭터 중심은 기존 위치에 고정한다.
+     프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
+     화면 끝에 붙여 두면 잘려 나온 것처럼 보여서 왼쪽에 한 뼘 여백을 남긴다. */
+  left: 290px;
 }
 .actor .model-shell {
   position: relative;

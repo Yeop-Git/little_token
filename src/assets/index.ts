@@ -4,6 +4,11 @@
  */
 
 import bg001 from './backgrounds/bg_001.webp'
+import bg002 from './backgrounds/bg_002.webp'
+import bg003 from './backgrounds/bg_003.webp'
+import bg004 from './backgrounds/bg_004.webp'
+import bg005 from './backgrounds/bg_005.webp'
+import bg006 from './backgrounds/bg_006.webp'
 import backgroundDark from './backgrounds/backgroundDark.webp'
 import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
@@ -141,8 +146,22 @@ import contextBonus from './audio/context-bonus.mp3'
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
   bg001,
+  bg002,
+  bg003,
+  bg004,
+  bg005,
+  bg006,
   battleDark: backgroundDark,
 }
+
+/**
+ * 일반 전투 배경 풀 — 스테이지마다 여기서 하나를 뽑는다.
+ * bg006은 보스방 전용이라 뺀다. battleDark는 옛 어두운 판이라 이제 안 쓴다.
+ */
+export const FIELD_BACKGROUNDS: string[] = [bg001, bg002, bg003, bg004, bg005]
+
+/** 보스방 배경 — 일반 풀에 섞이지 않는다. */
+export const BOSS_BACKGROUND = bg006
 
 export const GUIDE_ART = { combat: combatGuide }
 
