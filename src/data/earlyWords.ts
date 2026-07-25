@@ -21,6 +21,24 @@ import { SPECIAL_REWARD_WORDS } from './specialWords'
 export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS, SPECIAL_REWARD_WORDS }
 export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
 
+const QUEEN_BEE_TACTIC: Word = {
+  ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
+  id: 'queenBeeTactic',
+  note: '토큰의 공략 단어 · 공격 ×0.9 · 일벌 2마리 퇴치',
+  lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
+}
+
+/** 덱에 범위 단어가 없어도 여왕벌의 일벌 퇴치가 운에 막히지 않게 해 주는 전투 한정 단어. */
+export function tablesForEncounter(tables: Tables, enemyId?: string): Tables {
+  if (enemyId !== 'queenBee') return tables
+  const verbs = tables.words.verb ?? []
+  if (verbs.some((word) => word.id === QUEEN_BEE_TACTIC.id)) return tables
+  return {
+    ...tables,
+    words: { ...tables.words, verb: [...verbs, QUEEN_BEE_TACTIC] },
+  }
+}
+
 export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']
 
 const MULT_CAP = 2.5

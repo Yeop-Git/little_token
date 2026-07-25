@@ -21,10 +21,10 @@ import {
 import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { emotionBadgeContent, emotionIconBadge } from '@/ui/EmotionBadge'
+import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
 import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { tacticalGuideForEnemy } from '@data/tacticalCards'
 import {
@@ -36,6 +36,7 @@ import {
   applyPreparation,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
+  enemyGuardBreakRequirement,
   enemyTurn,
   engageFront,
   engageInitialFront,
@@ -174,17 +175,34 @@ const TOKEN_BOSS_LINES = [
   '으으... 그래도 물러나면 안 돼!',
   '조심해! 뭔가 오고 있어!',
 ] as const
+/**
+ * 토큰의 말투 세기. 보스 패턴 경고와 파훼 방법은 전부 토큰의 말풍선으로 나가고,
+ * 지금 놓치면 아픈 것만 `warn`으로 올려 빨간 색연필 쪽지가 된다.
+ *
+ * `warn`은 스스로 사라지지 않는다. 큰낫이 올라간 걸 알려 놓고 카드를 고르는 사이에
+ * 말풍선이 꺼지면 경고를 본 의미가 없다.
+ */
+export type TokenTone = 'calm' | 'warn' | 'relief'
+export interface TokenLine { text: string; tone: TokenTone }
+const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
+
 const TOKEN_BOSS_HINTS = {
-  mantisStart: '평타 뒤에 큰낫을 들어! 그때 방어를 준비하자!!',
-  mantisTelegraph: '위험해, 프롬! 다음엔 강력한 공격이 날아올 것 같아...!!',
-  mantisGroggy: '막아냈어, 프롬! 사마귀가 휘청거려. 지금이 기회야!!',
-  queenBeeStart: '일벌이 모이면 무서운 일이 일어날 것만 같아...!!',
-  queenBeeSwarmReady: '일벌이 다 모였어! 다음 공격 전에 흩어 놓자!!',
-  queenBeeDispersed: '좋아, 프롬! 넓게 공격하니까 일벌이 흩어졌어!!',
-  elderSpiderMiss: '프롬! 약점 속성을 노리면 거미줄을 끊을 수 있을 것 같아!!',
-  elderSpiderWebReady: '거미줄이 팽팽해졌어! 이번엔 꼭 약점을 노리자!!',
-  elderSpiderWebCut: '맞았어, 프롬! 거미줄이 느슨해지고 있어!!',
+  mantisStart: say('평타 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!'),
+  mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 표시된 수치만큼 방어하자!!', 'warn'),
+  mantisGroggy: say('막아냈어, 프롬! 사마귀가 휘청거려. 지금이 기회야!!', 'relief'),
+  mantisPunished: say('못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!', 'warn'),
+  queenBeeStart: say('일벌 넷을 모두 쓰러뜨리면 여왕벌이 휘청거려! 관통으로 빠르게 꿰뚫자 — 분노가 약점이야!!'),
+  queenBeeDispersed: say('좋아, 프롬! 일벌이 쓰러졌어!!', 'relief'),
+  elderSpiderMiss: say('약점이 아니면 그 다리에서 막혀! 지금 약점을 노려 봐!!', 'warn'),
+  elderSpiderWebReady: say('거미줄이 다 조여들었어! 이번엔 꼭 약점을 노리자!!', 'warn'),
+  elderSpiderWebCut: say('맞았어, 프롬! 거미줄이 느슨해지고 있어!!', 'relief'),
 } as const
+
+/** 다리가 떨어질 때마다 다음 약점을 이름으로 알려 준다 — 이 보스의 유일한 공략이다. */
+const spiderNextWeaknessLine = (weakness: string | null): TokenLine =>
+  weakness
+    ? say(`다리가 떨어졌어! 이번엔 「${weakness}」 감정이 약점이야!!`, 'relief')
+    : say('다리를 전부 끊었어! 이제 본체야 — 약점은 없어, 힘껏 밀어붙이자!!', 'relief')
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
   'target',
@@ -275,7 +293,9 @@ export class BattleView {
   private tokenSpeechTimer = 0
   private tokenSpeechHideTimer = 0
   private bossPatternSolved = false
-  private bossPatternHint: string | null = null
+  private bossPatternHint: TokenLine | null = null
+  /** 지금 화면에 붙잡아 둔 핵심 경고가 있는가. 한가한 응원이 이걸 덮지 못하게 한다. */
+  private tokenHolding = false
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
   private pendingSpiderSeal: { enemyIdx: number; maxSealed: number; slotKey: string } | null = null
 
@@ -294,7 +314,7 @@ export class BattleView {
       ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI, companion: undefined }
       : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
-    this.t = opts.tables ?? TABLES
+    this.t = tablesForEncounter(opts.tables ?? TABLES, opts.encounter[0])
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
     const enemies = opts.encounter.map((id) =>
@@ -447,10 +467,12 @@ export class BattleView {
   // 홀드를 풀어 천천히 밀려들어오게 한다. 전투 상태는 손대지 않는다.
   private mountIntro() {
     const scene = this.q('.scene.battle')
+    scene.classList.add('is-tutorial-dialogue')
     scene.classList.add('is-intro-hold')
     this.introDialogue = new IntroDialogue(scene, {
       onComplete: () => {
         this.introDialogue = null
+        scene.classList.remove('is-tutorial-dialogue')
         this.onIntroComplete?.()
         this.releaseEnemies(scene)
       },
@@ -583,14 +605,7 @@ export class BattleView {
     this.renderRelics()
     this.clearDetailDock()
     if (this.isBoss) {
-      const bossId = this.state.enemies[0]?.def.id
-      const initialPatternHint = bossId === 'mantis'
-        ? TOKEN_BOSS_HINTS.mantisStart
-        : bossId === 'queenBee'
-          ? TOKEN_BOSS_HINTS.queenBeeStart
-          : bossId === 'elderSpider'
-            ? TOKEN_BOSS_HINTS.elderSpiderMiss
-            : null
+      const initialPatternHint = this.bossOpeningHint()
       if (initialPatternHint) this.scheduleBossTokenHint(initialPatternHint, 900)
       else this.scheduleBossTokenSpeech(1800)
     }
@@ -810,10 +825,10 @@ export class BattleView {
     el.dataset.poolKey = key
     el.setAttribute('aria-label', `${enemy.def.name} 상세 보기`)
     el.querySelector<HTMLElement>('.nm')!.textContent = enemy.def.name
-    const image = el.querySelector<HTMLImageElement>('.battle-sprite')!
+    const image = el.querySelector<HTMLImageElement>(':scope > .model-shell > .battle-sprite')!
     image.src = visual.portrait2d
     image.alt = enemy.def.name
-    const modelShell = el.querySelector<HTMLElement>('.model-shell')!
+    const modelShell = el.querySelector<HTMLElement>(':scope > .model-shell')!
     if (!visual.model3d) modelShell.dataset.modelStatus = 'fallback-2d'
     mountCharacterModel(el, visual)
     return el
@@ -842,8 +857,6 @@ export class BattleView {
     const enemyActive = this.phaseLabel.includes('상대 행동')
     const playerActive = this.phaseLabel.includes('본인 캐릭터') || this.phaseLabel.includes('선수')
     const attackStep = enemy ? nextEnemyAttackStep(enemy) : null
-    const summonPattern = enemy?.def.summonPattern
-    const summons = enemy ? summonCount(enemy) : 0
     const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
       key: `enemy-${front}`,
       name: enemy!.def.name,
@@ -853,7 +866,6 @@ export class BattleView {
       note: [
         note,
         attackStep?.name,
-        summonPattern ? (summons >= summonPattern.releaseAt ? '벌떼 돌격 준비' : `${summonPattern.name} ${summons}/${summonPattern.max}`) : '',
       ].filter(Boolean).join(' · '),
       active,
     })
@@ -977,8 +989,10 @@ export class BattleView {
             <div class="boss-hp-segments" hidden></div>
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
+          <span class="boss-weakness-mark" hidden></span>
         </div>
         <div class="enemy-traits" hidden></div>
+        <div class="spider-parts" hidden></div>
       </section>`
   }
 
@@ -995,43 +1009,75 @@ export class BattleView {
       </div>`
   }
 
+  /**
+   * 전투를 여는 한마디. 보스 HUD에 상시 패턴표가 없으므로 이 첫 대사가 약점과
+   * 대응법을 모두 지고 간다. 파훼에 성공할 때까지 토큰이 계속 되뇐다.
+   */
+  private bossOpeningHint(): TokenLine | null {
+    const boss = this.state.enemies[0]
+    if (!boss) return null
+    if (boss.def.id === 'mantis') return TOKEN_BOSS_HINTS.mantisStart
+    if (boss.def.id === 'queenBee') return TOKEN_BOSS_HINTS.queenBeeStart
+    if (boss.def.id === 'elderSpider') {
+      const weak = activeEnemyPart(boss)?.def.weakness?.label
+      return say(weak
+        ? `거미줄은 방패를 넘어 와! 다리마다 약점이 다르니까 — 첫째 다리는 「${weak}」 감정이야!!`
+        : '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!')
+    }
+    return null
+  }
+
   private scheduleBossTokenSpeech(delay: number) {
     clearTimeout(this.tokenSpeechTimer)
     this.tokenSpeechTimer = window.setTimeout(() => {
       if (this.over) return
-      this.showBossTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
+      // 한가한 응원은 경고를 밀어내지 않는다. 큰낫이 올라간 채로 "힘내!"가 뜨면
+      // 화면이 지금 무엇이 급한지 스스로 뒤집는 셈이다.
+      if (this.tokenHolding) return this.scheduleBossTokenSpeech(7600)
+      this.showBossTokenSpeech(say(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length]))
       this.tokenSpeechIndex += 1
       this.scheduleBossTokenSpeech(7600)
     }, delay)
     this.timers.push(this.tokenSpeechTimer)
   }
 
-  private scheduleBossTokenHint(line: string, delay = 0) {
+  private scheduleBossTokenHint(line: TokenLine, delay = 0) {
     this.bossPatternHint = line
     clearTimeout(this.tokenSpeechTimer)
     this.tokenSpeechTimer = window.setTimeout(() => {
       if (this.over) return
-      this.showBossTokenSpeech(line)
+      const next = this.bossPatternHint ?? line
+      this.showBossTokenSpeech(next)
       if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
-      else this.scheduleBossTokenHint(this.bossPatternHint ?? line, 7600)
+      else this.scheduleBossTokenHint(next, 7600)
     }, delay)
     this.timers.push(this.tokenSpeechTimer)
   }
 
-  private showBossTokenSpeech(line: string) {
+  private showBossTokenSpeech(line: TokenLine) {
     const bubble = this.root.querySelector<HTMLElement>('.token-speech')
+    const token = this.root.querySelector<HTMLElement>('.boss-token')
     if (!bubble) return
     clearTimeout(this.tokenSpeechHideTimer)
-    bubble.textContent = line
+    const mark = line.tone === 'warn' ? '!' : line.tone === 'relief' ? '✓' : ''
+    bubble.innerHTML = `${mark ? `<b class="token-speech-mark" aria-hidden="true">${mark}</b>` : ''}<span class="token-speech-text">${line.text}</span>`
+    bubble.dataset.tone = line.tone
+    token?.setAttribute('data-tone', line.tone)
     bubble.classList.remove('is-speaking')
     // 연속 대사도 말풍선의 손글씨 팝업을 첫 프레임부터 다시 재생한다.
     void bubble.offsetWidth
     bubble.classList.add('is-speaking')
-    this.tokenSpeechHideTimer = window.setTimeout(() => bubble.classList.remove('is-speaking'), 3600)
+    this.tokenHolding = line.tone === 'warn'
+    // 핵심 경고는 스스로 꺼지지 않는다. 다음 대사가 덮거나 파훼에 성공할 때까지 남는다.
+    if (this.tokenHolding) return
+    this.tokenSpeechHideTimer = window.setTimeout(() => {
+      bubble.classList.remove('is-speaking')
+      token?.removeAttribute('data-tone')
+    }, line.tone === 'relief' ? 4200 : 3600)
     this.timers.push(this.tokenSpeechHideTimer)
   }
 
-  private showBossTokenHint(line: string) {
+  private showBossTokenHint(line: TokenLine) {
     if (!this.isBoss || this.over) return
     this.bossPatternHint = line
     clearTimeout(this.tokenSpeechTimer)
@@ -1040,7 +1086,7 @@ export class BattleView {
     else this.scheduleBossTokenHint(line, 7600)
   }
 
-  private resolveBossPattern(line: string) {
+  private resolveBossPattern(line: TokenLine) {
     if (!this.isBoss || this.over) return
     this.bossPatternSolved = true
     this.bossPatternHint = null
@@ -1074,12 +1120,19 @@ export class BattleView {
     const visual = this.visualForEnemy(e)
     const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
     const summonPattern = e.def.summonPattern
+    const workerVisual = CHARACTER_VISUALS.workerBee
     const summonedAllies = summonPattern
       ? `<div class="summoned-allies" aria-label="${summonPattern.name} 호위">
           ${(['left', 'right'] as const).flatMap((side) =>
             Array.from({ length: summonPattern.maxPerSide }, (_, slot) =>
               `<span class="queen-worker ${side}" data-side="${side}" data-slot="${slot + 1}" hidden>
-                <img src="${SPRITES[summonPattern.sprite]}" alt="${summonPattern.name}">
+                <span class="queen-worker-nameplate nameplate glass" aria-label="일벌 체력 1 / 1">
+                  <span class="row"><b class="nm">일벌</b><span class="hpn">1/1</span></span>
+                  <span class="queen-worker-hp hpbar foe"><i class="fill"></i></span>
+                </span>
+                <span class="model-shell" data-model-status="${workerVisual.model3d ? 'preparing-3d' : 'fallback-2d'}">
+                  <img class="battle-sprite" src="${SPRITES[summonPattern.sprite]}" alt="${summonPattern.name}">
+                </span>
               </span>`,
             ),
           ).join('')}
@@ -1119,7 +1172,25 @@ export class BattleView {
       const side = worker.dataset.side
       const slot = Number(worker.dataset.slot)
       const count = side === 'left' ? enemy.summonsLeft : enemy.summonsRight
-      worker.hidden = slot > count
+      const visible = slot <= count
+      const wasHidden = worker.hidden
+      worker.hidden = !visible
+      if (visible) {
+        if (wasHidden) worker.getAnimations().forEach((animation) => animation.cancel())
+        const hp = (side === 'left' ? enemy.summonHpLeft : enemy.summonHpRight)[slot - 1]
+          ?? enemy.def.summonPattern?.hp
+          ?? 1
+        const maxHp = enemy.def.summonPattern?.hp ?? 1
+        const nameplate = worker.querySelector<HTMLElement>('.queen-worker-nameplate')
+        const hpText = worker.querySelector<HTMLElement>('.hpn')
+        const fill = worker.querySelector<HTMLElement>('.queen-worker-hp > .fill')
+        nameplate?.setAttribute('aria-label', `일벌 체력 ${hp} / ${maxHp}`)
+        if (hpText) hpText.textContent = `${hp}/${maxHp}`
+        if (fill) fill.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`
+        mountCharacterModel(worker, CHARACTER_VISUALS.workerBee)
+      } else {
+        suspendCharacterModel(worker)
+      }
     })
     host.setAttribute('aria-label', `${enemy.def.summonPattern?.name ?? '호위'} ${summonCount(enemy)}마리`)
     host.classList.toggle('swarm-ready', summonCount(enemy) >= (enemy.def.summonPattern?.releaseAt ?? Infinity))
@@ -1130,7 +1201,17 @@ export class BattleView {
     // 일반 전투 레일은 원근 단차를 두지 않는다. 모든 적을 같은 바닥선과 크기로
     // 세우고, 배경별 차이는 가로 자리와 간격에만 남긴다.
     const st = currentFieldStage()
-    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${st.railRight - rank * st.railGap}px`
+    if (this.isBoss && e.def.boss) {
+      // 보스마다 뷰포트 폭이 달라도 배우의 실루엣 중심은 항상 무대 정중앙에 둔다.
+      // 개별 translate 속성은 공격·피격의 transform 애니메이션과 서로 덮어쓰지 않는다.
+      el.style.left = '50%'
+      el.style.right = 'auto'
+      el.style.translate = '-50% 0'
+    } else {
+      el.style.left = 'auto'
+      el.style.right = `${st.railRight - rank * st.railGap}px`
+      el.style.translate = 'none'
+    }
     el.style.bottom = this.isBoss && e.def.boss ? '24px' : `${st.bottom}px`
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 보스 외 모든 적은 프롬과 같은 시각 크기·선명도를 유지한다.
@@ -1194,6 +1275,27 @@ export class BattleView {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}">${glyph}</span>`)
     }
 
+    const bossWeakness = e.def.boss
+      ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-weakness-mark')
+      : el.querySelector<HTMLElement>('.boss-weakness-mark')
+    if (bossWeakness) {
+      bossWeakness.hidden = !weak
+      bossWeakness.className = `boss-weakness-mark${weak?.kind === 'emotion' ? ` emotion-${weak.value}` : ''}`
+      bossWeakness.setAttribute('aria-label', weak ? `${weak.label} 약점` : '')
+      bossWeakness.innerHTML = weak?.kind === 'emotion'
+        ? `${emotionIconContent(weak.value as Emotion)}<b>약점</b>`
+        : weak
+          ? '<strong aria-hidden="true">!</strong><b>약점</b>'
+          : ''
+    }
+    // 보스의 머리 위에는 상태 아이콘을 두지 않는다. 현재 약점은 상단 체력바 바로
+    // 오른쪽에 붙이고, 나머지 규칙은 상세 카드와 연출이 맡는다.
+    if (e.def.boss) {
+      host.hidden = true
+      host.innerHTML = ''
+      return
+    }
+
     if (weak?.kind === 'emotion') {
       add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), `약점 · ${weak.label} 감정 피해 ×1.5`)
     } else if (weak) {
@@ -1216,8 +1318,12 @@ export class BattleView {
     if (e.guard > 0) add('guard', icon('shield'), `방어 ${e.guard} · 다음 피해부터 먼저 흡수`)
     if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, `마법실드 ${e.magicShield} · 공격 ${e.magicShield}회를 완전히 차단`)
     if (e.def.pierceGuard) add('pierce', icon('sword'), '관통 · 방어를 무시하고 체력에 피해')
-    if (summonPattern) add(`summon${summons >= summonPattern.releaseAt ? ' ready' : ''}`, icon('jar'), `${summonPattern.name} ${summons}/${summonPattern.max} · 공격력 +${summons * summonPattern.attackBonusPerUnit}`)
-    if (e.def.webPattern) add(`web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`, '<b>✣</b>', `거미줄 봉인 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards} · 현재 다리 약점을 맞히면 봉인 해제`)
+    if (summonPattern) add(
+      `summon${summons >= (summonPattern.releaseAt ?? Infinity) ? ' ready' : ''}`,
+      icon('jar'),
+      `${summonPattern.name} ${summons}/${summonPattern.max} · 공격력 +${summons * (summonPattern.attackBonusPerUnit ?? 0)}`,
+    )
+    if (e.def.webPattern) add(`web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`, '<b>✣</b>', `거미줄 봉인 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards} · 현재 다리 약점 공격 또는 약점 속성 방어·회복으로 봉인 해제`)
     if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', `그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}`)
     const tacticalGuide = tacticalGuideForEnemy(e.def.id)
     if (tacticalGuide) add('tactic', '<b>✦</b>', `${tacticalGuide.title} · ${tacticalGuide.tooltip}`)
@@ -1258,9 +1364,8 @@ export class BattleView {
     const attackStage = bossAttackStage(e)
     const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
     const attackStep = nextEnemyAttackStep(e)
+    const requiredGuard = enemyGuardBreakRequirement(e)
     const groggy = this.state.turn <= e.groggyUntilTurn
-    const summonPattern = e.def.summonPattern
-    const summons = summonCount(e)
     const partWeakness = activePart?.def.weakness
     const partWeaknessHtml = partWeakness?.kind === 'emotion'
       ? `<span class="trait weak emotion-${partWeakness.value}">${emotionBadgeContent(partWeakness.value as Emotion)}<strong>${partWeakness.label} ×1.5</strong></span>`
@@ -1278,13 +1383,7 @@ export class BattleView {
         ? `<span class="trait boss-attack">다음: ${attackStep.name}${attackStep.damageScale === 0 ? ' · 피해 없음' : attackStep.damageScale != null && attackStep.damageScale !== 1 ? ` · 위력 ${Math.round(attackStep.damageScale * 100)}%` : attackStep.bonusAtk > 0 ? ` · 공격 +${attackStep.bonusAtk}` : ''}</span>`
         : '',
       attackStep?.shatterGuard
-        ? '<span class="trait shatter">방어 성공: 피해 0·그로기 / 실패: 흡혈 50%</span>'
-        : '',
-      summonPattern
-        ? `<span class="trait summon${summons >= summonPattern.releaseAt ? ' ready' : ''}">일벌 ${summons}/${summonPattern.max} · 공격 +${summons * summonPattern.attackBonusPerUnit}</span>`
-        : '',
-      summonPattern && summons >= summonPattern.releaseAt
-        ? '<span class="trait swarm">다음 공격: 벌떼 돌격 · 일벌 전원 출격</span>'
+        ? `<span class="trait shatter">필요 방어 ${requiredGuard} · 성공: 피해 0+그로기</span>`
         : '',
       groggy
         ? `<span class="trait groggy">그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}</span>`
@@ -1293,9 +1392,8 @@ export class BattleView {
       e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
       e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
     ].join('')
-    // 보스 전용 HUD는 아래 패턴 레일이 같은 상태를 더 명확히 설명한다. 작은 상태
-    // 칩까지 중복하면 HUD가 모델의 얼굴을 덮으므로 배우 이름표에서만 유지한다.
-    traits.innerHTML = bossHud ? '' : regularTraits
+    traits.hidden = regularTraits.length === 0
+    traits.innerHTML = regularTraits
     const partHost = plate.querySelector<HTMLElement>('.spider-parts')
     if (partHost) {
       partHost.hidden = !e.parts.length
@@ -1397,7 +1495,9 @@ export class BattleView {
             ...(attackStep ? [['다음 기술', attackStep.name]] : []),
             ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
-            ...(currentPart?.def.weakness ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×1.5`]] : []),
+            ...(currentPart?.def.weakness
+              ? [['현재 약점', `${currentPart.def.weakness.label} · 공격 피해 ×1.5 · 방어·회복도 봉인 -1`]]
+              : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
             ...(enemy.def.weakEmotion
@@ -1571,7 +1671,17 @@ export class BattleView {
     // 테이블 목록을 먼저 본다 — 덱에 없는 유령 카드(무럭무럭·문장부호)가 여기에만 있다.
     // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
     const words = this.t.words[key] ?? this.player.deck[key] ?? []
-    this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
+    const front = this.state.enemies[frontIdx(this.state)]
+    const needsQueenAnswer = front?.def.id === 'queenBee'
+      && summonCount(front) > 0
+      && (key === 'verb' || key === 'verb2')
+    this.cardHand.showSlot(
+      key,
+      words,
+      this.sel[key],
+      (word) => conflictReason(word, this.slotIndex, this.sel, this.t),
+      needsQueenAnswer ? (word) => word.kind === 'attack' && (!!word.effects?.pierceGuard || word.targetCount === 'all' || (word.targetCount ?? 1) >= 2) : undefined,
+    )
     this.castPendingSpiderWeb(key)
     this.renderDetail(null)
   }
@@ -2518,9 +2628,9 @@ export class BattleView {
     this.releaseTally()
     await this.strike(res, sweep, heavy)
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
-    if (res.summonsDispersed > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed)
-      this.log(`넓게 번진 문장이 일벌 ${res.summonsDispersed}마리를 흩어 냈다.`)
+    if (res.summonDamage > 0) {
+      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonGroggyTriggered)
+      this.log(`문장이 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     const rouletteNote = resolved.outcome === 'crit' ? ' · 대성공!' : resolved.outcome === 'fail' ? ' · 실패…' : ''
     this.log(
@@ -2574,16 +2684,17 @@ export class BattleView {
       if (result) {
         for (const hit of result.hits) {
           const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
-          if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining)
+          if (hit.summonShieldBlocked) this.popAt(hit.target, '일벌 호위 · 본체 무적', 'guard big')
+          else if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining)
           else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
             this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
           }
         }
-        if (result.summonsDispersed > 0) {
-          await this.playSummonDispersal(result.hits[0]?.target ?? this.target, result.summonsDispersed)
-          this.log(`예약 문장이 일벌 ${result.summonsDispersed}마리를 흩어 냈다.`)
+        if (result.summonDamage > 0) {
+          await this.playSummonDispersal(result.hits[0]?.target ?? this.target, result.summonsDispersed, result.summonDamage, result.summonBacklashDamage, result.summonGroggyTriggered)
+          this.log(`예약 문장이 일벌에게 ${result.summonDamage} 피해${result.summonsDispersed > 0 ? ` · ${result.summonsDispersed}마리 퇴치` : ''}.`)
         }
         this.log(result.text)
         await sleep(300)
@@ -2680,9 +2791,9 @@ export class BattleView {
     // 메아리는 예비 동작을 다시 밟지 않는다 — 칼을 두 번 들어올리면 늘어진다.
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
     await this.strike(res, sweep, heavy)
-    if (res.summonsDispersed > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed)
-      this.log(`메아리가 일벌 ${res.summonsDispersed}마리를 더 흩어 냈다.`)
+    if (res.summonDamage > 0) {
+      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonGroggyTriggered)
+      this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
     this.renderActors()
@@ -2700,6 +2811,7 @@ export class BattleView {
         dmg: number
         magicShieldBroken: boolean
         magicShieldRemaining: number
+        summonShieldBlocked?: boolean
         weak?: boolean
         barsBroken?: number
         partId?: string
@@ -2711,6 +2823,7 @@ export class BattleView {
       selfDmg: number
       heal: number
       killed: number[]
+      supportWebCut?: { target: number; tensionReduced: number } | null
     },
     sweep = false,
     heavy: AttackCut | null = null,
@@ -2745,6 +2858,10 @@ export class BattleView {
     }
 
     for (const h of res.hits) {
+      if (h.summonShieldBlocked) {
+        this.popAt(h.target, '일벌 호위 · 본체 무적', 'guard big')
+        continue
+      }
       if (h.magicShieldBroken) {
         await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
         continue
@@ -2761,6 +2878,7 @@ export class BattleView {
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
     }
+    if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
     const hitTargets = res.hits
       .filter((hit) => hit.dmg > 0)
       .map((hit) => this.q<HTMLElement>(`#actors .actor.foe[data-i="${hit.target}"]`))
@@ -2825,7 +2943,7 @@ export class BattleView {
     void scene.offsetWidth
     scene.classList.add('spider-web-cut')
     this.popAt(enemyIdx, released > 0 ? '약점 파훼! 카드 봉인 -1' : '약점 파훼!', 'buff big')
-    this.log(`현재 다리의 약점을 맞혀 카드 봉인 ${released}개를 풀었다.`)
+    this.log(`현재 다리의 약점을 문장에 담아 카드 봉인 ${released}개를 풀었다.`)
     this.resolveBossPattern(TOKEN_BOSS_HINTS.elderSpiderWebCut)
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-cut'), 720))
   }
@@ -2847,7 +2965,10 @@ export class BattleView {
     }
     this.popAt(enemyIdx, '다리 절단! 거미줄 전부 해제!', 'buff big')
     this.log(`다리가 떨어지는 충격에 카드 봉인 ${released}개가 즉시 풀렸다.`)
-    this.resolveBossPattern(TOKEN_BOSS_HINTS.elderSpiderWebCut)
+    // 다리가 바뀌면 노려야 할 감정도 바뀐다. 부위 목록의 작은 뱃지만으로는
+    // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
+    const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
+    this.resolveBossPattern(spiderNextWeaknessLine(nextWeak))
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-burst'), 880))
   }
 
@@ -3381,7 +3502,7 @@ export class BattleView {
   private async flyToPlayer(text: string, cls: string, theme: 'self' | 'heal' | 'guard') {
     const pboxEl = this.q('#pbox')
     const you = this.q<HTMLElement>('.actor.you')
-    const modelShell = you.querySelector<HTMLElement>('.model-shell') ?? you
+    const modelShell = you.querySelector<HTMLElement>(':scope > .model-shell') ?? you
     const to = this.toStageCenter(modelShell.getBoundingClientRect())
     const fx = pboxEl.offsetWidth / 2
     const fy = pboxEl.offsetHeight * 0.5
@@ -3442,29 +3563,24 @@ export class BattleView {
         `.actor.foe[data-i="${summon.idx}"] .queen-worker[data-side="${summon.side}"][data-slot="${summon.slot}"]`,
       )
       if (!worker) continue
+      playCharacterAnimation(worker, 'appear')
       worker.classList.remove('summoning')
       void worker.offsetWidth
       worker.classList.add('summoning')
       this.popAt(summon.idx, `${summon.name} ${summon.count}/${summon.max}`, 'buff')
       this.log(`${this.state.enemies[summon.idx].def.name}이 ${summon.name}을 불렀다 — 호위 ${summon.count}/${summon.max}`)
-      const releaseAt = this.state.enemies[summon.idx].def.summonPattern?.releaseAt
-      if (releaseAt != null && summon.count >= releaseAt) {
-        this.showBossTokenHint(TOKEN_BOSS_HINTS.queenBeeSwarmReady)
-      }
       await sleep(260)
       worker.classList.remove('summoning')
     }
   }
 
-  private async playSummonDispersal(enemyIdx: number, count: number) {
-    const workers = [...this.root.querySelectorAll<HTMLElement>(
+  private async playSummonDispersal(enemyIdx: number, count: number, damage: number, backlashDamage = 0, groggyTriggered = false) {
+    const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
       `.actor.foe[data-i="${enemyIdx}"] .queen-worker:not([hidden])`,
-    )].slice(-count)
-    if (workers.length === 0) {
-      this.renderActors()
-      return
-    }
+    )]
+    const workers = count > 0 ? visibleWorkers.slice(-count) : []
     workers.forEach((worker, index) => {
+      playCharacterAnimation(worker, 'defeat')
       worker.animate(
         [
           { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
@@ -3473,10 +3589,20 @@ export class BattleView {
         { duration: 280, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
       )
     })
-    this.popAt(enemyIdx, `일벌 -${count}`, 'guard big')
-    await sleep(300)
+    this.popAt(enemyIdx, count > 0 ? `일벌 ${damage} 피해 · ${count}마리 퇴치` : `일벌 ${damage} 피해`, count > 0 ? 'guard big' : 'dmg')
+    await sleep(count > 0 ? 300 : 160)
+    if (backlashDamage > 0) {
+      this.popAt(enemyIdx, `본체 ${backlashDamage}`, 'dmg big')
+      this.log(`쓰러진 일벌이 여왕벌 본체에 ${backlashDamage} 피해를 되돌렸다.`)
+    }
+    if (groggyTriggered) {
+      this.popAt(enemyIdx, '일벌 4마리 퇴치! 그로기+공격 스킵!', 'buff big')
+      this.log('일벌 네 마리를 모두 퇴치해 여왕벌이 그로기되고 예정 공격이 한 턴 밀렸다.')
+      this.resolveBossPattern(say('지금이 빈틈이에요!!', 'relief'))
+      await sleep(260)
+    }
     this.renderActors()
-    this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
+    if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
   }
 
   private async playSwarmRelease(enemyIdx: number): Promise<void> {
@@ -3487,6 +3613,7 @@ export class BattleView {
     if (!player || workers.length === 0) return
     const target = player.getBoundingClientRect()
     workers.forEach((worker, index) => {
+      playCharacterAnimation(worker, 'attack')
       const from = worker.getBoundingClientRect()
       const dx = target.left + target.width * .65 - (from.left + from.width / 2)
       const dy = target.top + target.height * .45 - (from.top + from.height / 2)
@@ -3516,7 +3643,7 @@ export class BattleView {
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
       playCharacterAnimation(foe ?? null, st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`)
       if (st.telegraphText) {
-        foe?.querySelector<HTMLElement>('.model-shell')?.animate(
+        foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(
           [
             { transform: 'rotate(0deg) scale(1)' },
             { transform: 'rotate(-2deg) scale(1.035)', offset: .55 },
@@ -3567,6 +3694,10 @@ export class BattleView {
       if (st.lifeStolen > 0) {
         this.renderActors()
         await this.playEnemyLifesteal(st.idx, st.lifeStolen)
+        // 흡혈은 내려베기를 못 막았다는 뜻이다. 실패한 그 순간에 다음 대응을 다시 말해 준다.
+        if (this.state.enemies[st.idx]?.def.id === 'mantis') {
+          this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisPunished)
+        }
       }
       if (st.groggyEntered) {
         this.popAt(st.idx, '그로기!', 'buff big')

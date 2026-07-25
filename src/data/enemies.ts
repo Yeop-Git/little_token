@@ -33,32 +33,41 @@ export const ENEMIES: Record<string, EnemyDef> = {
         groggyRequiresGuardShatter: true,
       },
     ],
-    note: '평타를 무작위로 1~2회 사용한 뒤 한 턴 동안 큰낫을 들어 강공격을 예고한다. 내려베기를 방어하면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기된다. 방어하지 못하면 일반 위력의 1.2배 피해를 받고 사마귀가 절반을 흡혈한다.',
+    note: '평타를 무작위로 1~2회 사용한 뒤 한 턴 동안 큰낫을 들어 강공격을 예고한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기된다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
     hp: 68, atk: 7, every: 3, initiative: 'second',
-    sprite: 'boss_queen_bee', magicShield: 2, weakEmotion: 'anger',
+    sprite: 'boss_queen_bee', weakEmotion: 'anger',
     summonPattern: {
       name: '일벌',
       sprite: 'enemy_worker_bee',
-      // 한 턴에 둘씩 부른다. 공격 한 번은 최소 한 마리를 흩으므로, 매 턴 하나만
-      // 불러서는 호위가 영영 차지 않아 벌떼 돌격이 발동하지 않는다. 둘씩 불러야
-      // "좁게 때리면 모이고, 넓게 때리면 흩어진다"가 실제 선택이 된다.
-      perTurn: 2,
+      // 10층 덱의 평범한 문장은 한두 마리를 순서대로 정리하고, 덱 상한(약 160)은
+      // 네 마리 총 120 체력을 한 번에 관통할 수 있는 기준이다.
+      hp: 30,
+      // 전투 시작과 호위 전멸 다음 턴에만 네 마리를 한꺼번에 세운다. 중간 보충을
+      // 막아 매 웨이브가 "네 마리를 모두 퇴치하면 그로기"라는 완결된 목표가 된다.
+      perTurn: 4,
       max: 4,
       maxPerSide: 2,
-      attackBonusPerUnit: 1.5,
-      releaseAt: 4,
+      refillOnlyWhenEmpty: true,
+      pierceWhileEscorted: true,
+      backlashMaxHpRatePerUnit: 0.015,
+      groggyEvery: 4,
+      groggyDamageMult: 1.5,
     },
-    note: '3턴마다 공격하며, 매 턴 시작에 좌우를 번갈아 일벌 두 마리를 불러 최대 4마리의 호위를 만든다. 일벌마다 공격이 +1.5 되고, 넷이 모이면 다음 공격에 모두 돌격한 뒤 호위가 비워진다. 단일·2명·3명 공격은 각각 일벌 1·2·3마리를, 전체 공격은 전부 흩어 낸다.',
+    note: '전투 시작에 체력 30인 일벌 네 마리를 호위로 세우며, 한 마리라도 남아 있으면 여왕벌의 공격이 방어를 관통한다. 공격의 초과 피해는 대상 수만큼 다음 일벌로 이어지고, 관통 공격은 대상 수 제한 없이 남은 일벌을 계속 꿰뚫어 극고점에서는 네 마리를 한꺼번에 퇴치할 수 있다. 일벌 한 마리마다 여왕벌 최대 체력의 1.5%가 본체에 들어가며, 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 예정 공격이 한 턴 밀린다. 그로기가 끝난 다음 턴에는 새 일벌 네 마리를 소환해 같은 주기를 반복한다.',
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
     // 다리 하나가 곧 체력 한 막이다. 막당 체력이 낮으면 문장 하나가 다리 둘을
     // 한꺼번에 끊어 기쁨·분노·슬픔·즐거움 약점이 드러나기도 전에 사라진다.
-    hp: 70, atk: 12, every: 2, initiative: 'first',
-    sprite: 'boss_elder_spider', guard: 12, magicShield: 1,
+    //
+    // 거미줄은 방패 위를 타고 넘어 몸을 감는다(pierceGuard). 방어로 버티는 길을
+    // 막아야 "지금 드러난 약점을 읽어 다리를 끊는다"가 유일한 활로가 된다.
+    // 대신 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
+    hp: 58, atk: 12, every: 2, initiative: 'first',
+    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, pierceGuard: true,
     parts: [
       { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
       { id: 'leg-anger', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
@@ -67,7 +76,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점을 맞히면 피해 ×1.5와 함께 봉인 하나를 풀고, 그 문장만 다음 다리와 본체까지 관통한다. 약점을 빗나간 문장은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄은 방어막을 넘어 몸에 직접 감기므로 막아서 버틸 수 없고, 대신 한 번의 피해가 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×1.5와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',

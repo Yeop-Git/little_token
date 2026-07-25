@@ -1,5 +1,6 @@
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
+import { preloadImages } from '@/ui/ResourceLibrary'
 
 interface Opts {
   /** fresh=true면 이어하던 런을 버리고 처음부터 시작한다. */
@@ -128,14 +129,7 @@ export class TitleView {
 
     // 로딩 전에는 검은 화면 — 배경/로고가 준비되면 흐릿하게 전체 페이드인(중앙이 조금 더 먼저).
     const reveal = this.root.querySelector<HTMLElement>('.title-reveal')
-    const preload = [TITLE.bg, TITLE.logo].map(
-      (src) =>
-        new Promise<void>((res) => {
-          const im = new Image()
-          im.onload = im.onerror = () => res()
-          im.src = src
-        }),
-    )
+    const preload = preloadImages([TITLE.bg, TITLE.logo])
     if (this.opts.holdUi) reveal?.classList.add('ui-held')
     // 떠오름이 끝나면 흐림을 뗀다(위 .settled 참고). 여기서 안 떼면 시네마틱이 걷히는
     // 동안 영상 위에 타이틀 화면 전체를 굽는 필터 패스가 하나 더 얹힌다.
@@ -145,7 +139,7 @@ export class TitleView {
     reveal?.addEventListener('transitionend', (e) => {
       if (e.target === reveal && e.propertyName === 'filter') settle()
     })
-    Promise.all(preload).then(() => {
+    preload.then(() => {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
         this.settleTimer = window.setTimeout(settle, SETTLE_FALLBACK_MS)

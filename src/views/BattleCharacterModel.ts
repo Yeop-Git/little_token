@@ -4,15 +4,16 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
 
-export type BattleAnimation = 'idle' | 'walk' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
-/** 한 번만 재생하고 끝나는 동작. idle과 walk는 계속 도는 클립이라 여기 안 든다. */
-type OneShotAnimation = Exclude<BattleAnimation, 'idle' | 'walk'>
+export type BattleAnimation = 'idle' | 'idle2' | 'walk' | 'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
+/** 한 번만 재생하고 끝나는 동작. idle 계열과 walk는 계속 도는 클립이라 여기 안 든다. */
+type OneShotAnimation = Exclude<BattleAnimation, 'idle' | 'idle2' | 'walk'>
 const MODEL_VIEW_HEIGHT = 3.6
 // 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
 const MODEL_FIT_HEIGHT = 2.78
 const COMPANION_FIT_HEIGHT = 0.72
 const TRANSITION_SECONDS = 0.18
-const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'attack2', 'attack3', 'heal', 'shield'])
+const LOOP_BLEND_SAMPLE_RATE = 30
+const RETURN_TO_IDLE = new Set<BattleAnimation>(['appear', 'attack', 'attack2', 'attack3', 'heal', 'shield'])
 
 type BattleWeather = 'sunny' | 'rain' | 'night'
 
@@ -46,6 +47,25 @@ function makeBattleToonGradient(): THREE.DataTexture {
 }
 
 const BATTLE_TOON_GRADIENT = makeBattleToonGradient()
+let companionGlowTexture: THREE.CanvasTexture | null = null
+
+function getCompanionGlowTexture(): THREE.CanvasTexture {
+  if (companionGlowTexture) return companionGlowTexture
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const context = canvas.getContext('2d')!
+  const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 62)
+  gradient.addColorStop(0, 'rgba(255,244,188,.12)')
+  gradient.addColorStop(0.26, 'rgba(255,220,116,.16)')
+  gradient.addColorStop(0.58, 'rgba(255,185,72,.1)')
+  gradient.addColorStop(1, 'rgba(255,174,56,0)')
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 128, 128)
+  companionGlowTexture = new THREE.CanvasTexture(canvas)
+  companionGlowTexture.colorSpace = THREE.SRGBColorSpace
+  return companionGlowTexture
+}
 
 /**
  * 전장의 배경색을 캐릭터 텍스처에 아주 얕게 섞는다. 자체광 비중을 높여
@@ -131,6 +151,11 @@ const SPIDER_PART_NODES: Record<string, string> = {
 const SPIDER_PART_ORDER = ['leg-joy', 'leg-anger', 'leg-sorrow', 'leg-pleasure'] as const
 
 const modelLoads = new Map<string, Promise<GLTF>>()
+const modelLoader = new GLTFLoader()
+const normalizedClipCache = new WeakMap<THREE.AnimationClip, Map<string, THREE.AnimationClip>>()
+const MAX_POOLED_RENDERERS = 8
+const RENDERER_POOL_IDLE_MS = 60_000
+const rendererPool: Array<{ renderer: THREE.WebGLRenderer; releaseTimer: number }> = []
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
 let animationFrame = 0
@@ -139,9 +164,48 @@ let previousFrame = 0
 function loadModel(url: string): Promise<GLTF> {
   const cached = modelLoads.get(url)
   if (cached) return cached
-  const pending = new GLTFLoader().loadAsync(url)
+  const pending = modelLoader.loadAsync(url).catch((error) => {
+    // 한 번의 전송/파싱 실패를 세션 전체의 영구 실패로 만들지 않는다.
+    modelLoads.delete(url)
+    throw error
+  })
   modelLoads.set(url, pending)
   return pending
+}
+
+function acquireRenderer(): THREE.WebGLRenderer {
+  const pooled = rendererPool.pop()
+  if (pooled) window.clearTimeout(pooled.releaseTimer)
+  const renderer = pooled?.renderer ?? new THREE.WebGLRenderer({
+    alpha: true,
+    antialias: true,
+    powerPreference: 'high-performance',
+  })
+  renderer.setClearColor(0x000000, 0)
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.domElement.className = 'battle-model'
+  renderer.domElement.setAttribute('aria-hidden', 'true')
+  return renderer
+}
+
+function releaseRenderer(renderer: THREE.WebGLRenderer) {
+  renderer.domElement.remove()
+  if (renderer.getContext().isContextLost() || rendererPool.length >= MAX_POOLED_RENDERERS) {
+    renderer.dispose()
+    return
+  }
+  renderer.setRenderTarget(null)
+  renderer.renderLists.dispose()
+  renderer.resetState()
+  renderer.info.reset()
+  const entry = { renderer, releaseTimer: 0 }
+  entry.releaseTimer = window.setTimeout(() => {
+    const index = rendererPool.indexOf(entry)
+    if (index < 0) return
+    rendererPool.splice(index, 1)
+    renderer.dispose()
+  }, RENDERER_POOL_IDLE_MS)
+  rendererPool.push(entry)
 }
 
 function runAnimationFrame(now: number) {
@@ -177,6 +241,10 @@ function normalizedClip(
   loopBlendSeconds = 0,
   endTrimSeconds = 0,
 ): THREE.AnimationClip {
+  const cacheKey = `${seamlessLoop ? 1 : 0}:${loopBlendSeconds}:${endTrimSeconds}`
+  const variants = normalizedClipCache.get(source) ?? new Map<string, THREE.AnimationClip>()
+  const cached = variants.get(cacheKey)
+  if (cached) return cached
   const clip = source.clone()
   const firstTime = clip.tracks.reduce((earliest, track) => {
     const time = track.times[0]
@@ -193,7 +261,7 @@ function normalizedClip(
 
   clip.resetDuration()
 
-  if (seamlessLoop && endTrimSeconds > 0) {
+  if (endTrimSeconds > 0) {
     const trimmedEndTime = Math.max(0, clip.duration - endTrimSeconds)
     clip.tracks.forEach((track) => {
       const valueSize = track.getValueSize()
@@ -223,12 +291,11 @@ function normalizedClip(
   if (seamlessLoop) {
     clip.tracks.forEach((track) => {
       const valueSize = track.getValueSize()
-      const lastOffset = track.values.length - valueSize
-      if (lastOffset <= 0) return
-
       const endTime = track.times[track.times.length - 1] ?? clip.duration
       const blendDuration = Math.min(Math.max(0, loopBlendSeconds), endTime)
       if (blendDuration <= 0) {
+        const lastOffset = track.values.length - valueSize
+        if (lastOffset <= 0) return
         for (let component = 0; component < valueSize; component += 1) {
           track.values[lastOffset + component] = track.values[component]
         }
@@ -237,31 +304,48 @@ function normalizedClip(
 
       const blendStart = endTime - blendDuration
       const firstValue = Array.from(track.values.slice(0, valueSize))
-      for (let keyIndex = 0; keyIndex < track.times.length; keyIndex += 1) {
-        const time = track.times[keyIndex]
-        if (time < blendStart) continue
-        const progress = THREE.MathUtils.clamp((time - blendStart) / blendDuration, 0, 1)
-        const eased = progress * progress * (3 - 2 * progress)
-        const offset = keyIndex * valueSize
+      const interpolatingTrack = track as typeof track & {
+        createInterpolant: (result: Float32Array) => { evaluate: (time: number) => ArrayLike<number> }
+      }
+      const interpolant = interpolatingTrack.createInterpolant(new Float32Array(valueSize))
+      const times = Array.from(track.times).filter((time) => time < blendStart)
+      const values = Array.from(track.values.slice(0, times.length * valueSize))
+      const sampleCount = Math.max(2, Math.ceil(blendDuration * LOOP_BLEND_SAMPLE_RATE))
+
+      // 원본 키가 성긴 클립도 실제 0.5초 동안 보간되도록 연결 구간을 다시
+      // 샘플링한다. smootherstep은 구간 양끝의 속도와 가속도를 0으로 만들어
+      // 원본 동작에서 연결 자세로 들어갈 때 생기던 작은 꺾임까지 감춘다.
+      for (let sample = 0; sample <= sampleCount; sample += 1) {
+        const progress = sample / sampleCount
+        const time = blendStart + blendDuration * progress
+        const eased = progress * progress * progress * (progress * (progress * 6 - 15) + 10)
+        const sampledValue = Array.from(interpolant.evaluate(time))
         if (track instanceof THREE.QuaternionKeyframeTrack && valueSize === 4) {
           new THREE.Quaternion()
-            .fromArray(track.values, offset)
+            .fromArray(sampledValue)
             .slerp(new THREE.Quaternion().fromArray(firstValue), eased)
-            .toArray(track.values, offset)
-          continue
+            .toArray(sampledValue)
+        } else {
+          for (let component = 0; component < valueSize; component += 1) {
+            sampledValue[component] = THREE.MathUtils.lerp(
+              sampledValue[component],
+              firstValue[component],
+              eased,
+            )
+          }
         }
-        for (let component = 0; component < valueSize; component += 1) {
-          track.values[offset + component] = THREE.MathUtils.lerp(
-            track.values[offset + component],
-            firstValue[component],
-            eased,
-          )
-        }
+        times.push(time)
+        values.push(...sampledValue)
       }
+
+      track.times = new Float32Array(times)
+      track.values = new Float32Array(values)
     })
   }
 
   clip.resetDuration()
+  variants.set(cacheKey, clip)
+  normalizedClipCache.set(source, variants)
   return clip
 }
 
@@ -319,11 +403,7 @@ class BattleCharacterModel {
   private spiderPartDissolves: SpiderPartDissolve[] = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
-    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setClearColor(0x000000, 0)
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.domElement.className = 'battle-model'
-    this.renderer.domElement.setAttribute('aria-hidden', 'true')
+    this.renderer = acquireRenderer()
     // 캐릭터 중심을 바라보는 약한 하향 시점이 기본이다. 깊이가 특히 긴
     // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
     this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
@@ -378,6 +458,8 @@ class BattleCharacterModel {
         // walk가 여기 빠져 있으면 play('walk')가 조용히 아무것도 하지 않는다 —
         // 매니페스트와 GLB에 클립이 다 있는데도 등장·레일 이동이 idle로 끌려오던 이유다.
         walk: this.actionFor(gltf, 'walk'),
+        idle2: this.actionFor(gltf, 'idle2'),
+        appear: this.actionFor(gltf, 'appear'),
         attack: this.actionFor(gltf, 'attack'),
         attack2: this.actionFor(gltf, 'attack2'),
         attack3: this.actionFor(gltf, 'attack3'),
@@ -438,21 +520,8 @@ class BattleCharacterModel {
   }
 
   private makeCompanionGlow(): THREE.Sprite {
-    const canvas = document.createElement('canvas')
-    canvas.width = 128
-    canvas.height = 128
-    const context = canvas.getContext('2d')!
-    const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 62)
-    gradient.addColorStop(0, 'rgba(255,244,188,.12)')
-    gradient.addColorStop(0.26, 'rgba(255,220,116,.16)')
-    gradient.addColorStop(0.58, 'rgba(255,185,72,.1)')
-    gradient.addColorStop(1, 'rgba(255,174,56,0)')
-    context.fillStyle = gradient
-    context.fillRect(0, 0, 128, 128)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
     const material = new THREE.SpriteMaterial({
-      map: texture,
+      map: getCompanionGlowTexture(),
       color: 0xffd878,
       transparent: true,
       opacity: 0.16,
@@ -543,9 +612,11 @@ class BattleCharacterModel {
     return clip && this.mixer
       ? this.mixer.clipAction(normalizedClip(
         clip,
-        animation === 'idle',
+        animation === 'idle' || animation === 'idle2',
         (this.visual.animations?.idleLoopBlendMs ?? 0) / 1000,
-        (this.visual.animations?.idleEndTrimMs ?? 0) / 1000,
+        (animation === 'idle'
+          ? this.visual.animations?.idleEndTrimMs ?? 0
+          : this.visual.animations?.endTrimsMs?.[animation as OneShotAnimation] ?? 0) / 1000,
       ))
       : undefined
   }
@@ -1054,7 +1125,10 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     if (event.action !== this.current) return
     const finished = (Object.entries(this.actions) as [BattleAnimation, THREE.AnimationAction | undefined][])
       .find(([, action]) => action === event.action)?.[0]
-    if (finished && RETURN_TO_IDLE.has(finished)) this.play('idle')
+    if (finished && RETURN_TO_IDLE.has(finished)) {
+      // 사마귀의 큰낫 준비는 평상 idle로 풀지 않고 전용 대기 자세를 유지한다.
+      this.play(finished === 'attack2' && this.actions.idle2 ? 'idle2' : 'idle')
+    }
   }
 
   private onPointerDown = (event: PointerEvent) => {
@@ -1109,14 +1183,14 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     if (animation !== 'idle') this.shell.dataset.modelLastAction = animation
     const next = this.actions[animation]
     if (!next) return 0
-    if (next === this.current && (animation === 'idle' || animation === 'walk')) return 0
+    if (next === this.current && (animation === 'idle' || animation === 'idle2' || animation === 'walk')) return 0
 
     if (animation === 'heal' || animation === 'shield') this.startEffect(animation)
     else if (animation !== 'idle') this.stopEffect()
 
     next.reset().enabled = true
     // walk는 idle과 같이 계속 도는 클립이다 — 도착할 때까지 반복해야 걸어오는 것으로 보인다.
-    const loops = animation === 'idle' || animation === 'walk'
+    const loops = animation === 'idle' || animation === 'idle2' || animation === 'walk'
     const oneShotMs = stretchMs ?? this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
     if (!loops) {
       const playbackRate = this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1
@@ -1132,7 +1206,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     next.play()
     if (this.current && this.current !== next) this.current.crossFadeTo(next, TRANSITION_SECONDS, false)
     this.current = next
-    return animation === 'idle'
+    return animation === 'idle' || animation === 'idle2'
       ? 0
       : (oneShotMs
         ?? next.getClip().duration * 1000 / (this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1))
@@ -1263,19 +1337,21 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.companion?.traverse((object) => {
       if (!(object instanceof THREE.Mesh || object instanceof THREE.Sprite)) return
       const materials = Array.isArray(object.material) ? object.material : [object.material]
-      materials.forEach((material) => {
-        if (material instanceof THREE.SpriteMaterial) material.map?.dispose()
-        material.dispose()
-      })
+      materials.forEach((material) => material.dispose())
     })
-    this.renderer.dispose()
-    this.renderer.domElement.remove()
+    releaseRenderer(this.renderer)
   }
+}
+
+function modelShellFor(actor: HTMLElement): HTMLElement | null {
+  return actor.matches('.model-shell')
+    ? actor
+    : actor.querySelector<HTMLElement>(':scope > .model-shell')
 }
 
 export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualDef) {
   if (!visual.model3d) return
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (!shell) return
   const mounted = mountedModels.get(shell)
   if (mounted) {
@@ -1310,13 +1386,13 @@ export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): P
 /** 오브젝트 풀에서 꺼내기 전에 화면 출력 준비 여부를 검사한다. */
 export function isCharacterModelReady(actor: HTMLElement, visual: CharacterVisualDef): boolean {
   if (!visual.model3d) return true
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (!shell) return false
   return mountedModels.get(shell)?.isReadyForOutput() ?? false
 }
 
 export function suspendCharacterModel(actor: HTMLElement) {
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (shell) mountedModels.get(shell)?.setActive(false)
 }
 
@@ -1326,7 +1402,7 @@ export function playCharacterAnimation(
   stretchMs?: number,
 ): number {
   if (!actor) return 0
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (!shell) return 0
   return mountedModels.get(shell)?.play(animation, stretchMs) ?? 0
 }
@@ -1341,13 +1417,13 @@ export function characterAnimationOf(actor: HTMLElement | null): BattleAnimation
 
 export function freezeCharacterAnimation(actor: HTMLElement | null, frozen: boolean) {
   if (!actor) return
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (shell) mountedModels.get(shell)?.setFrozen(frozen)
 }
 
 export function dissolveCharacterParts(actor: HTMLElement | null, partId: string, count = 1) {
   if (!actor) return
-  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  const shell = modelShellFor(actor)
   if (shell) mountedModels.get(shell)?.dissolveSpiderParts(partId, count)
 }
 

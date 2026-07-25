@@ -849,7 +849,8 @@ button {
    프롬의 노란 우비가 초록으로 바뀌어 버렸다 — 캐릭터 고유색은 배경에 맞춘다고
    갈아치울 수 있는 게 아니다. 통일은 조명(3D 주광·반사광)이 이미 하고 있고,
    여기는 마지막에 결을 맞추는 정도만 맡는다. */
-.actor .battle-model {
+.actor .battle-model,
+.queen-worker .battle-model {
   filter: sepia(var(--model-grade, 0.1))
     hue-rotate(calc((var(--model-grade-hue, 45deg) - 40deg) * 0.18)) saturate(1.06);
 }
@@ -1288,8 +1289,12 @@ button {
 }
 .endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
 .endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
-.actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.5)); }
-.actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 26px rgba(255, 118, 78, .72)); }
+.actor.foe.boss > .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.5)); }
+.actor.foe.boss.front > .model-shell {
+  filter:
+    blur(var(--model-blur, 0))
+    drop-shadow(0 10px 12px rgba(4, 8, 18, .58));
+}
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
 
 /* 보스전은 프롬의 등 뒤에서 보스를 올려다보는 3인칭 구도다. 모델의 하반신은
@@ -1304,7 +1309,7 @@ button {
   width: 520px;
   height: 520px;
 }
-.scene.battle[data-boss='true'] .actor.you .model-shell {
+.scene.battle[data-boss='true'] .actor.you > .model-shell {
   width: 520px;
   height: 520px;
   filter: none;
@@ -1332,17 +1337,32 @@ button {
 .scene.battle[data-boss='true'] .actor.foe.boss {
   z-index: 38 !important;
 }
-.scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
-  width: clamp(330px, 38vh, 410px);
-  height: clamp(340px, 39vh, 420px);
+.scene.battle[data-boss='true'] .actor.foe.boss > .model-shell {
+  /* 상단 HUD 아래부터 카드 영역 위까지 남은 높이를 사용한다. 예전의 500px대 차감은
+     낮은 창에서 보스를 일반 적보다 작게 만들었으므로, 안전 여백만 남기고 확대한다. */
+  width: min(620px, calc(100vh - 280px));
+  height: min(630px, calc(100vh - 270px));
   z-index: 2;
-  transform: scale(1.2);
+  transform: none;
 }
-.scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
+/* 여왕벌은 가로로 넓고 앞뒤 깊이가 큰 모델이라 같은 뷰포트에서는 다른 보스보다
+   실루엣이 작게 보인다. 낮은 데스크톱 창에서도 무대의 주인공으로 읽히도록 전용
+   뷰포트를 키우되, 상단 HUD와 하단 카드 사이의 안전 높이는 남긴다. */
+.scene.battle[data-boss='true'] .actor.foe.boss[data-character='queenBee'] > .model-shell {
+  width: min(680px, calc(100vh - 300px));
+  height: min(690px, calc(100vh - 290px));
+}
+/* 장로거미는 다리 너비가 곧 위압감이다. 세로 안전 영역은 공용 보스와 같게 두고
+   가로 뷰포트를 넓혀 아홉 부위가 중앙에서 좌우로 펼쳐지게 한다. */
+.scene.battle[data-boss='true'] .actor.foe.boss[data-character='elderSpider'] > .model-shell {
+  width: min(760px, calc(100vh - 120px));
+  height: min(620px, calc(100vh - 250px));
+}
+.scene.battle[data-boss='true'] .actor.foe.boss > .nameplate {
   display: none;
 }
 
-/* 보스 HUD는 이름과 체력만 남기고 전투 규칙은 모델 위 상태 아이콘으로 보여 준다. */
+/* 보스 HUD는 이름과 체력을, 오른쪽 보조 표식은 현재 약점과 행동 순서만 보여 준다. */
 .boss-health-hud {
   position: absolute;
   top: 24px;
@@ -1390,6 +1410,23 @@ button {
   font-weight: 900;
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
+.boss-health-hud .enemy-traits {
+  justify-content: center;
+  min-height: 0;
+  margin-top: 8px;
+}
+.boss-health-hud .enemy-traits .trait {
+  min-height: 24px;
+  padding: 3px 8px;
+  gap: 5px;
+  border-width: 1px;
+  border-radius: 7px;
+  font-size: 11px;
+  box-shadow: none;
+}
+.boss-health-hud .enemy-traits .emotion-face,
+.boss-health-hud .enemy-traits .emotion-symbol { width: 16px; height: 16px; }
+.boss-health-hud .spider-parts { margin-top: 7px; }
 .spider-parts {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
@@ -1466,7 +1503,7 @@ button {
 @keyframes spider-fleck {
   to { opacity: 0; transform: translate(var(--x), var(--y)) scale(.1); filter: blur(2px); }
 }
-.actor.foe.leg-dissolving .model-shell::after {
+.actor.foe.leg-dissolving > .model-shell::after {
   content: '';
   position: absolute;
   inset: 14% 5%;
@@ -1574,7 +1611,15 @@ button {
   width: 330px;
   min-height: 76px;
   padding: 14px 28px 17px;
-  color: #4a3225;
+  /* 말풍선 종이는 한 벌이고 잉크 색만 갈린다 — 평소는 갈색 연필, 핵심 경고는
+     빨간 색연필, 파훼 성공은 초록 잉크. 종이 결과 테두리 붓질은 그대로 두어
+     경고가 UI 알림이 아니라 같은 그림일기의 한 줄로 읽히게 한다. */
+  --speech-paper: #f3e5c6;
+  --speech-ink: #4a3225;
+  --speech-rule: rgba(112, 82, 59, .065);
+  --speech-edge: rgba(91, 58, 38, .78);
+  --speech-halo: transparent;
+  color: var(--speech-ink);
   font-size: 18px;
   font-weight: 900;
   line-height: 1.35;
@@ -1586,12 +1631,15 @@ button {
   opacity: 0;
   transform: translate(-14px, 12px) rotate(-2deg) scale(.82);
   transform-origin: left bottom;
-  border: 2px solid rgba(91, 58, 38, .78);
+  border: 2px solid var(--speech-edge);
   border-radius: 48% 44% 46% 42% / 54% 48% 52% 46%;
   background:
-    repeating-linear-gradient(0deg, transparent 0 17px, rgba(112, 82, 59, .065) 18px),
-    #f3e5c6;
-  box-shadow: inset 0 0 0 3px rgba(255, 251, 231, .52), 0 9px 22px rgba(0, 0, 0, .42);
+    repeating-linear-gradient(0deg, transparent 0 17px, var(--speech-rule) 18px),
+    var(--speech-paper);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 251, 231, .52),
+    0 9px 22px rgba(0, 0, 0, .42),
+    0 0 0 0 var(--speech-halo);
   text-shadow: 0 1px rgba(255, 255, 255, .5);
 }
 .token-speech::after {
@@ -1601,12 +1649,76 @@ button {
   bottom: 7px;
   width: 31px;
   height: 25px;
-  background: #f3e5c6;
-  border-bottom: 2px solid rgba(91, 58, 38, .78);
+  background: var(--speech-paper);
+  border-bottom: 2px solid var(--speech-edge);
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
   transform: rotate(14deg);
 }
 .token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
+
+/* 말머리 뱃지 — 종이에 눌러 그린 동그라미 안의 「!」·「✓」. */
+.token-speech-mark {
+  position: absolute;
+  left: -14px;
+  top: -16px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--speech-paper);
+  font: 900 22px/1 Georgia, serif;
+  border-radius: 52% 48% 46% 54% / 48% 54% 46% 52%;
+  background: var(--speech-edge);
+  box-shadow: 0 0 0 3px var(--speech-paper), 0 3px 9px rgba(0, 0, 0, .38);
+  text-shadow: none;
+  transform: rotate(-11deg);
+  animation: token-mark-stamp .46s cubic-bezier(.2, 1.7, .32, 1) both;
+}
+.token-speech-text { display: block; }
+
+/* 핵심 경고 — 빨간 색연필. 스스로 사라지지 않으므로 요란하게 떨지 않고
+   테두리 붉은 기운만 천천히 숨 쉬게 해 오래 떠 있어도 피로하지 않게 한다. */
+.token-speech[data-tone='warn'] {
+  --speech-paper: #ffe6dc;
+  --speech-ink: #96231a;
+  --speech-rule: rgba(180, 52, 38, .12);
+  --speech-edge: #b8342a;
+  --speech-halo: rgba(226, 74, 48, .3);
+  font-size: 19px;
+  letter-spacing: -.01em;
+}
+.token-speech[data-tone='warn'].is-speaking {
+  animation:
+    token-speech-slam .5s cubic-bezier(.16, 1.6, .3, 1) both,
+    token-speech-alarm 2.4s ease-in-out .5s infinite;
+}
+.token-speech[data-tone='warn'] .token-speech-mark { animation-delay: .12s; }
+
+/* 파훼 성공 — 초록 잉크. 곧 사라지므로 한 번만 환하게 밝아진다. */
+.token-speech[data-tone='relief'] {
+  --speech-paper: #e6f6df;
+  --speech-ink: #1f6b44;
+  --speech-rule: rgba(40, 110, 70, .1);
+  --speech-edge: #2f8a58;
+  --speech-halo: rgba(96, 206, 138, .28);
+}
+.token-speech[data-tone='relief'].is-speaking {
+  animation:
+    token-speech-pop 4.2s cubic-bezier(.2, .9, .24, 1) both,
+    token-speech-cheer .7s ease-out both;
+}
+
+/* 토큰 본체도 말투를 따라간다 — 놀란 선이 붉게 곤두서거나, 안심하고 잦아든다. */
+.boss-token[data-tone='warn'] { filter: drop-shadow(0 0 16px rgba(255, 116, 82, .62)); }
+.boss-token[data-tone='warn'] .model-shell { animation-duration: .4s; }
+.boss-token[data-tone='warn'] .token-panic-lines i {
+  height: 24px;
+  background: #ff8a6a;
+  box-shadow: 0 0 10px rgba(255, 92, 56, .95);
+}
+.boss-token[data-tone='relief'] { filter: drop-shadow(0 0 16px rgba(150, 240, 180, .55)); }
+.boss-token[data-tone='relief'] .model-shell { animation-duration: 2.2s; }
+.boss-token[data-tone='relief'] .token-panic-lines i { opacity: .35; }
 .token-panic-lines {
   position: absolute;
   top: 14px;
@@ -1643,9 +1755,32 @@ button {
   88% { opacity: 1; transform: translate(2px, -3px) rotate(.5deg) scale(1.01); }
   100% { opacity: 0; transform: translate(7px, -12px) rotate(1deg) scale(.94); }
 }
+/* 경고는 종이를 탁 내려놓듯 두 번 흔들린 뒤 그 자리에 남는다(fill: both). */
+@keyframes token-speech-slam {
+  0% { opacity: 0; transform: translate(-18px, 16px) rotate(-6deg) scale(.74); }
+  46% { opacity: 1; transform: translate(3px, -4px) rotate(2.4deg) scale(1.06); }
+  68% { transform: translate(-2px, 1px) rotate(-1.8deg) scale(.99); }
+  84% { transform: translate(1px, -1px) rotate(.8deg) scale(1.01); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(-1deg) scale(1); }
+}
+@keyframes token-speech-alarm {
+  0%, 100% { box-shadow: inset 0 0 0 3px rgba(255, 251, 231, .52), 0 9px 22px rgba(0, 0, 0, .42), 0 0 0 0 var(--speech-halo); }
+  50% { box-shadow: inset 0 0 0 3px rgba(255, 251, 231, .52), 0 9px 22px rgba(0, 0, 0, .42), 0 0 0 9px transparent, 0 0 26px 4px var(--speech-halo); }
+}
+@keyframes token-speech-cheer {
+  0% { filter: brightness(1.5) saturate(1.3); }
+  100% { filter: none; }
+}
+@keyframes token-mark-stamp {
+  0% { opacity: 0; transform: rotate(28deg) scale(2.1); }
+  100% { opacity: 1; transform: rotate(-11deg) scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   .boss-token, .boss-token .model-shell { animation-duration: 8s; }
   .token-speech.is-speaking { animation-timing-function: ease; }
+  /* 경고는 계속 떠 있는 요소라 숨쉬기까지 끄고 색과 뱃지만으로 세기를 전한다. */
+  .token-speech[data-tone='warn'].is-speaking { animation: token-speech-slam .5s ease both; }
+  .token-speech-mark { animation: none; }
 }
 .scene.battle[data-boss='true'] .hud-player-stats .hud-stat[data-stat-key='hp'] { display: none; }
 
@@ -1669,7 +1804,7 @@ button {
      화면 끝에 붙여 두면 잘려 나온 것처럼 보여서 왼쪽에 한 뼘 여백을 남긴다. */
   left: var(--player-left, 290px);
 }
-.actor .model-shell {
+.actor > .model-shell {
   position: relative;
   width: 310px;
   height: 360px;
@@ -1681,12 +1816,12 @@ button {
   touch-action: none;
   user-select: none;
 }
-.scene.battle:not([data-boss='true']) .actor.you .model-shell {
+.scene.battle:not([data-boss='true']) .actor.you > .model-shell {
   width: 280px;
   height: 330px;
 }
-.actor .model-shell[data-model-dragging='true'] { cursor: grabbing; }
-.actor.foe .model-shell {
+.actor > .model-shell[data-model-dragging='true'] { cursor: grabbing; }
+.actor.foe > .model-shell {
   width: 280px;
   height: 330px;
 }
@@ -1707,9 +1842,9 @@ button {
   pointer-events: none;
 }
 /* 원본 투명 여백이 더 큰 바퀴벌레도 좀나방과 같은 약 273px 실루엣 높이로 정규화한다. */
-.actor.foe[data-character='roach'] .model-shell { width: 309px; }
+.actor.foe[data-character='roach'] > .model-shell { width: 309px; }
 /* 모든 적은 선명하게 유지하고, 현재 대상만 발광으로 구분한다. */
-.actor.foe.front .model-shell {
+.actor.foe.front > .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px color-mix(in srgb, var(--glow) 48%, transparent));
 }
 .battle-sprite {
@@ -1731,8 +1866,8 @@ button {
 .model-shell[data-model-status='ready-3d'] .battle-model { opacity: 1; }
 .model-shell[data-model-status='ready-3d'] .battle-sprite { visibility: hidden; }
 .model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
-.actor.you .model-shell:hover,
-.actor.you:focus-visible .model-shell {
+.actor.you > .model-shell:hover,
+.actor.you:focus-visible > .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
 }
 /* 투영 그림자 대신 발선만 배경에 살짝 묻는 접지 흔적을 둔다. */
@@ -1806,10 +1941,10 @@ button {
 .summoned-allies {
   position: absolute;
   left: 50%;
-  bottom: 22px;
+  bottom: 10px;
   z-index: 1;
-  width: 1100px;
-  height: 310px;
+  width: 1000px;
+  height: 380px;
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -1817,19 +1952,60 @@ button {
   position: absolute;
   bottom: 0;
   display: block;
-  width: 130px;
-  height: 185px;
+  width: 190px;
+  height: 260px;
   transform-origin: center bottom;
   filter: drop-shadow(0 0 10px rgba(255, 200, 71, .46)) drop-shadow(0 10px 12px rgba(30, 18, 6, .32));
 }
 .queen-worker[hidden] { display: none; }
-.queen-worker img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
-.queen-worker.left[data-slot='1'] { left: 170px; bottom: 42px; }
-.queen-worker.left[data-slot='2'] { left: 40px; bottom: 4px; }
-.queen-worker.right[data-slot='1'] { right: 110px; bottom: 42px; }
-.queen-worker.right[data-slot='2'] { right: -34px; bottom: 4px; }
+.queen-worker .model-shell {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.queen-worker .queen-worker-nameplate {
+  position: absolute;
+  top: -2px;
+  bottom: auto;
+  left: 50%;
+  z-index: 4;
+  display: block;
+  width: 108px;
+  margin: 0;
+  padding: 5px 7px 7px;
+  border: 1px solid rgba(255, 225, 181, .32);
+  border-radius: 10px;
+  background: rgba(26, 17, 24, .82);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 4px 12px rgba(0, 0, 0, .5);
+  transform: translateX(-50%);
+}
+.queen-worker .queen-worker-nameplate .row {
+  margin-bottom: 3px;
+}
+.queen-worker .queen-worker-nameplate .nm {
+  font-size: 11px;
+  letter-spacing: .03em;
+}
+.queen-worker .queen-worker-nameplate .hpn {
+  font-size: 9px;
+}
+.queen-worker-hp {
+  position: relative;
+  width: 100%;
+  height: 10px;
+}
+.queen-worker-hp > .fill {
+  width: 100%;
+}
+.queen-worker.left[data-slot='1'] { left: 215px; bottom: 55px; }
+.queen-worker.left[data-slot='2'] { left: 20px; bottom: 0; }
+.queen-worker.right[data-slot='1'] { right: 215px; bottom: 55px; }
+.queen-worker.right[data-slot='2'] { right: 20px; bottom: 0; }
 .queen-worker.left { transform: rotate(-4deg); }
 .queen-worker.right { transform: scaleX(-1) rotate(-4deg); }
+/* 오른쪽 일벌의 모델만 바라보는 방향을 뒤집고, 이름표 글자는 다시 정방향으로 돌린다. */
+.queen-worker.right .queen-worker-nameplate { transform: translateX(-50%) scaleX(-1); }
 .summoned-allies.swarm-ready .queen-worker {
   animation: worker-danger .55s ease-in-out infinite alternate;
   filter: drop-shadow(0 0 15px rgba(255, 133, 47, .76)) drop-shadow(0 10px 12px rgba(30, 18, 6, .32));
@@ -2370,7 +2546,7 @@ button {
 .enemy-intel-icon.tactic { color: #f5d88e; border-color: rgba(245, 216, 142, .76); background: rgba(93, 57, 19, .54); }
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
-.actor.foe .model-shell { cursor: default; }
+.actor.foe > .model-shell { cursor: default; }
 /* 일반 적의 특성 칩은 패널 높이에 포함하지 않는다. 그래야 특성 유무와 관계없이
    프롬과 모든 적의 이름·HP 바가 정확히 같은 수평선에 놓인다. */
 .scene.battle:not([data-boss='true']) .actor.foe .enemy-traits {
@@ -2444,8 +2620,51 @@ button {
   position: fixed;
   top: 92px;
   bottom: auto;
-  left: calc(50% + 470px);
+  left: calc(50% + min(380px, 28vw) + 90px);
   z-index: 70;
+  /* 오른쪽에 남은 폭이 좁아지면 두 글자가 한 자씩 세로로 접혀 「선/공」이 된다. */
+  white-space: nowrap;
+}
+.boss-weakness-mark {
+  display: none;
+}
+.boss-health-hud .boss-weakness-mark {
+  position: static;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 27px;
+  padding: 2px 8px 2px 4px;
+  color: var(--emotion-color, #ffe69a);
+  border: 1px solid color-mix(in srgb, var(--emotion-color, #ffe69a) 48%, transparent);
+  border-radius: 999px;
+  background: rgba(17, 9, 16, .72);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--emotion-color, #ffe69a) 75%, transparent),
+    0 3px 5px rgba(0, 0, 0, .92);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.boss-health-hud .boss-weakness-mark[hidden] {
+  display: none;
+}
+.boss-health-hud .boss-weakness-mark .emotion-face {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--emotion-color, #ffe69a) 65%, transparent));
+}
+.boss-health-hud .boss-weakness-mark .emotion-symbol,
+.boss-health-hud .boss-weakness-mark > strong {
+  font-size: 19px;
+  line-height: 1;
+}
+.boss-health-hud .boss-weakness-mark b {
+  color: #fff4d6;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  white-space: nowrap;
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .guard-hint { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
@@ -2492,7 +2711,7 @@ button {
   transform: translate(-50%, 0);
 }
 
-.actor.foe.strikes-first .model-shell {
+.actor.foe.strikes-first > .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 20px rgba(255, 66, 36, 0.55)) drop-shadow(0 0 46px rgba(255, 56, 26, 0.22))
     drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
   animation: first-strike-glow 1.05s ease-in-out infinite alternate;
@@ -3370,6 +3589,10 @@ button {
   box-shadow: 0 8px 24px rgba(0, 0, 0, .28), inset 0 0 0 2px rgba(255, 255, 255, .025);
   backdrop-filter: blur(7px);
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+/* 첫 만남 튜토리얼의 대사 조립 UI와 전투 문장 진행표가 겹쳐 보이지 않게 한다. */
+.scene.battle.is-tutorial-dialogue .slot-step {
+  display: none;
 }
 .scene.battle[data-boss='true'] .slot-step {
   left: 430px;

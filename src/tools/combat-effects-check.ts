@@ -4,7 +4,7 @@ import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
 import { wordValueLines } from '@core/wordText'
-import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
@@ -68,13 +68,70 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '평타', bonusAtk: 0, animationStage: 1, repeatOnceChance: .5 }, { name: '강공격 자세', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '준비' }, { name: '큰낫 내려베기', bonusAtk: 0, animationStage: 3, damageScale: 1.2, shatterGuard: true, lifeStealRate: .5, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-pattern', { atk: 7, attackPattern: pattern })); const s = state([mantis]); const rolls = [0, .9, 0, 0]; const rng = () => rolls.shift() ?? 0; let r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 7 && r.animationStage === 1 && r.text.includes('평타') && mantis.attackPatternIndex === 1, 'mantis normal attack uses attack1 and can advance after one hit'); mantis.nextAttackTurn = 1; r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 0 && r.animationStage === 2 && r.telegraphText === '준비', 'mantis telegraph uses attack2 without damage'); mantis.hp = 20; mantis.nextAttackTurn = 1; r = enemyTurn(s, rng, 'second')[0]; assert(r.dealt === 8 && r.animationStage === 3 && r.lifeStolen === 4 && mantis.hp === 24 && !r.groggyEntered, 'mantis strong attack uses attack3; failed defense takes 1.2x damage and lifesteal without groggy'); assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 10, 'failed defense does not grant a vulnerability window') }
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '평타', bonusAtk: 0, repeatOnceChance: .5 }, { name: '강공격 자세', bonusAtk: 0, damageScale: 0, telegraphText: '준비' }]; const mantis = makeEnemy(foe('mantis-repeat', { atk: 7, attackPattern: pattern })); const s = state([mantis]); const rolls = [0, .1, 0]; const rng = () => rolls.shift() ?? 0; enemyTurn(s, rng, 'second'); assert(mantis.attackPatternIndex === 0 && mantis.attackStepRepeated, 'mantis can randomly schedule a second normal attack'); mantis.nextAttackTurn = 1; enemyTurn(s, rng, 'second'); assert(mantis.attackPatternIndex === 1 && !mantis.attackStepRepeated, 'mantis normal attack repeats at most once before telegraphing') }
 { const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, lifeStealRate: .5, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-shatter', { atk: 7, attackPattern: pattern })); const s = state([mantis]); s.guard = 30; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.guardShattered && r.absorbed === 30 && r.dealt === 0 && r.lifeStolen === 0 && r.groggyEntered && s.guard === 0, 'successful defense erases guard, prevents 1.2x overflow and lifesteal, and opens groggy'); s.turn = 2; assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 15, 'successful defense grants the groggy damage window') }
-{ const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-first-groggy', { atk: 7, initiative: 'first', attackPattern: pattern })); const s = state([mantis]); s.guard = 1; const r = enemyTurn(s, () => 0, 'first')[0]; assert(r.groggyEntered && mantis.groggyUntilTurn === 1, 'first-phase shatter opens groggy only for the same turn main action'); assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 15, 'first-phase groggy boosts the immediate main action'); s.turn = 2; assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 10, 'first-phase groggy does not grant a second boosted turn') }
+{ const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-first-groggy', { atk: 7, initiative: 'first', attackPattern: pattern })); const s = state([mantis]); s.guard = 11; const r = enemyTurn(s, () => 0, 'first')[0]; assert(r.guardRequired === 11 && r.groggyEntered && mantis.groggyUntilTurn === 1, 'visible guard requirement opens first-phase groggy only when fully met'); assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 15, 'first-phase groggy boosts the immediate main action'); s.turn = 2; assert(applyIntent(s, attack({ base: 10 }), 1, 0).hits[0].dmg === 10, 'first-phase groggy does not grant a second boosted turn') }
+{ const pattern: NonNullable<EnemyDef['attackPattern']> = [{ name: '큰낫 내려베기', bonusAtk: 0, damageScale: 1.2, shatterGuard: true, lifeStealRate: .5, groggyDamageMult: 1.5, groggyRequiresGuardShatter: true }]; const mantis = makeEnemy(foe('mantis-short-guard', { atk: 7, attackPattern: pattern })); mantis.hp = 20; const s = state([mantis]); s.guard = 5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.guardRequired === 11 && !r.guardShattered && r.absorbed === 5 && r.dealt === 3 && r.lifeStolen === 2 && !r.groggyEntered, 'insufficient guard absorbs normally but does not open groggy') }
 { const regular = makeEnemy(foe('unphased', { hp: 30, atk: 10 })); regular.hp = 1; const r = enemyTurn(state([regular]), () => 0, 'second')[0]; assert(r.attackStage === 1 && r.dealt === 10, 'regular enemy damage does not scale with low hp') }
 { const queen = makeEnemy(foe('queen-summon', { atk: 10, summonPattern: { name: '일벌', sprite: 'enemy_worker_bee', perTurn: 1, max: 4, maxPerSide: 2, attackBonusPerUnit: .5, releaseAt: 4 } })); const s = state([queen]); summonAtTurnStart(s); summonAtTurnStart(s); assert(queen.summonsLeft === 1 && queen.summonsRight === 0, 'queen summons only once at the same turn start'); s.turn = 2; summonAtTurnStart(s); s.turn = 3; summonAtTurnStart(s); s.turn = 4; summonAtTurnStart(s); assert(queen.summonsLeft === 2 && queen.summonsRight === 2, 'queen alternates summons up to two workers per side'); queen.nextAttackTurn = 1; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 12 && r.summonsReleased === 4 && summonCount(queen) === 0, 'four workers add only two damage then all leave on swarm charge') }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); for (let turn = 1; turn <= 4; turn++) { s.turn = turn; summonAtTurnStart(s) } let r = applyIntent(s, attack({ targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'single-target attack always leaves a worker-bee answer'); r = applyIntent(s, attack({ targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'two-target attack disperses two workers without reducing boss damage'); r = applyIntent(s, attack({ targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'all-target attack disperses every remaining worker') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 30, targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'a 30-damage single-target attack defeats one full-health worker'); r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'a two-target attack carries its damage through two reachable workers'); r = applyIntent(s, attack({ base: 30, targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'an all-target attack can reach the final worker') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 4 && r.summonDamage === 120 && r.summonBacklashDamage === 4 && r.hits[0].dmg === 180 && queen.hp === hp - 184 && r.summonGroggyTriggered && queen.summonsDefeated === 0, 'a 120-damage piercing high roll defeats all four workers and reaches the groggy body'); assert(queen.nextAttackTurn === 2 && queen.groggyUntilTurn === 1 && queen.groggyDamageMult === 1.5, 'four workers skip the imminent attack and amplify the current sentence') }
+{ const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); assert(t.words.verb.some((word) => word.id === 'queenBeeTactic' && word.targetCount === 2), 'queen encounter lends a two-target tactic even when the deck has no range answer') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3, 'the fourth cumulative worker triggers groggy and skips the due attack') }
+{
+  const queen = makeEnemy(ENEMIES.queenBee)
+  const s = state([queen]); summonAtTurnStart(s)
+  assert(summonCount(queen) === 4, 'queen opens with a complete four-worker wave')
+  const hp = queen.hp
+  let r = applyIntent(s, attack({ base: 30, targetCount: 1 }), 1, 0)
+  assert(r.summonsDispersed === 1 && r.summonBacklashDamage === 1 && queen.hp === hp - 1, 'each defeated worker deals direct backlash through body immunity')
+  assert(r.hits[0].summonShieldBlocked && r.hits[0].dmg === 0 && summonCount(queen) === 3, 'queen body remains immune while any worker survives')
+  s.turn = 2; summonAtTurnStart(s)
+  assert(summonCount(queen) === 3, 'a partially defeated worker wave does not refill')
+  r = applyIntent(s, attack({ base: 60, targetCount: 1, pierceGuard: true }), 1, 0)
+  assert(r.summonsDispersed === 2 && summonCount(queen) === 1 && r.hits[0].summonShieldBlocked, 'pierce carries overflow beyond the normal target limit but cannot reach the body while one survives')
+}
+{
+  const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
+  const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1
+  const hp = queen.hp
+  const r = applyIntent(s, attack({ base: 120, targetCount: 2, pierceGuard: true }), 1, 0)
+  assert(r.summonsDispersed === 4 && r.summonBacklashDamage === 12 && r.summonGroggyTriggered, 'two-target pierce clears the complete worker wave and opens groggy')
+  assert(r.hits[0].dmg === 180 && queen.hp === hp - 192, 'the wave-clearing sentence reaches the body with groggy damage after direct worker backlash')
+  assert(queen.nextAttackTurn === 2 && queen.groggyUntilTurn === 1, 'worker-wave groggy skips the imminent queen attack for one turn')
+  s.turn = 2; summonAtTurnStart(s)
+  assert(summonCount(queen) === 4, 'queen summons a fresh four-worker wave after groggy recovery')
+}
+{
+  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); s.guard = 99
+  summonAtTurnStart(s); queen.nextAttackTurn = 1
+  const r = enemyTurn(s, () => 0, 'second')[0]
+  assert(r.piercedGuard && r.absorbed === 0 && s.guard === 99, 'queen attack pierces player guard while a worker escort survives')
+}
 // 10층에 도착한 플레이어의 실제 최대 체력(시작 20 + 아홉 층의 아이템 보상)을 기준으로 잰다.
 // 픽스처 기본값 30은 1층 언저리 수치라 중간 보스의 한 방 판정 기준이 되지 못한다.
 { const stage = stageFor(10); const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); s.playerHp = s.playerMax = 52; summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax * .7 && queen.nextAttackTurn === 4, 'day-10 queen cannot take more than two thirds of a day-10 player on her worst opening roll and gives three turns before attacking again') }
+// 모여든 호위가 한꺼번에 덤비면 방패 위로 넘어온다 — 방어로 버티는 길을 막아
+// "모이기 전에 넓게 흩어 놓는다"만 답으로 남긴다.
+{
+  const queen = makeEnemy(foe('queen-swarm', { atk: 10, summonPattern: { name: '일벌', sprite: 'enemy_worker_bee', perTurn: 2, max: 4, maxPerSide: 2, attackBonusPerUnit: 1.5, releaseAt: 4 } }))
+  const s = state([queen]); s.guard = 30
+  summonAtTurnStart(s); s.turn = 2; summonAtTurnStart(s)
+  assert(summonCount(queen) === 4, 'two-per-turn summons fill the escort ring in two turns')
+  queen.nextAttackTurn = 1
+  const r = enemyTurn(s, () => 0, 'second')[0]
+  assert(r.summonsReleased === 4 && r.piercedGuard && r.dealt === 16 && r.absorbed === 0 && s.guard === 30, 'swarm charge pierces player guard instead of being absorbed')
+  queen.nextAttackTurn = 1
+  const plain = enemyTurn(s, () => 0, 'second')[0]
+  assert(!plain.piercedGuard && plain.dealt === 0 && plain.absorbed === 10, 'a queen strike without a full escort ring is still blockable')
+}
+// 장로거미는 방패를 넘어 오지만 한 방이 최대 체력의 1/5을 넘지 않는다.
+{
+  const stage = stageFor(15)
+  const spider = makeEnemy(ENEMIES.elderSpider, stage.atkMult, stage.hpMult, stage.bossHealthBars)
+  const s = state([spider]); s.playerHp = s.playerMax = 100; s.guard = 400
+  const r = enemyTurn(s, () => .999, 'first')[0]
+  assert(r.piercedGuard && r.absorbed === 0 && s.guard === 400, 'spider web goes over the shield instead of consuming it')
+  assert(r.dealt === 20 && s.playerHp === 80, 'a single spider strike is capped at a fifth of max hp')
+}
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
   spider.guard = 0
@@ -107,15 +164,27 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(web.tension === 3, 'spider web pressure does not grow past the card-seal maximum')
 }
 {
+  const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
+  spider.guard = 0
+  spider.magicShield = 0
+  const s = state([spider])
+  let r = applyIntent(s, attack({ base: 900, emotions: ['joy'] }), 1, 0)
+  assert(r.hits[0].weak && r.hits[0].barsBroken === 1 && activeEnemyPart(spider)?.def.id === 'leg-anger', 'weakness alone stops after the current spider leg')
+  r = applyIntent(s, attack({ base: 900, emotions: ['anger'], combos: ['완벽한 맥락'] }), 1, 0)
+  assert(r.hits[0].weak && r.hits[0].barsBroken === 4 && spider.dead, 'weakness plus a named combo earns multi-part penetration')
+}
+{
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 99)
   spider.guard = 0
   spider.magicShield = 0
   const s = state([spider])
   const weaknesses = ['joy', 'anger', 'sorrow', 'pleasure'] as const
   assert(spider.healthBars === 5 && spider.maxHp === spider.hpPerBar * 5, 'spider parts fix total health to five bars')
+  // 다리 하나를 겨우 넘기는 위력. 막당 체력을 다시 잡아도 검사가 따라오도록 계산해 둔다.
+  const breakOneLeg = Math.ceil((spider.hpPerBar + 1) / 1.5)
   for (const weakness of weaknesses) {
     assert(activeEnemyPart(spider)?.def.weakness?.value === weakness, `spider reveals ${weakness} weakness in sequence`)
-    const r = applyIntent(s, attack({ base: 50, emotions: [weakness] }), 1, 0)
+    const r = applyIntent(s, attack({ base: breakOneLeg, emotions: [weakness] }), 1, 0)
     assert(r.hits[0].weak && r.hits[0].barsBroken === 1, `spider ${weakness} leg takes weakness damage and breaks`)
   }
   assert(activeEnemyPart(spider)?.def.id === 'body' && !activeEnemyPart(spider)?.def.weakness, 'spider body is the fifth and weakness-free health bar')
@@ -136,6 +205,19 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(r.hits[0].barsBroken === 0 && !r.hits[0].weak, 'emotion burst test does not accidentally break or match the active leg')
   assert(!r.hits[0].webBurst && r.hits[0].tensionReduced === 0, 'emotion resonance alone does not clear card seals')
   assert(spiderWebTension(spider) === 3, 'only a matching weakness or a broken leg releases spider seals')
+}
+{
+  const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
+  const s = state([spider])
+  spiderWebAtTurnStart(s)
+  s.turn = 2
+  spiderWebAtTurnStart(s)
+  const hpBefore = spider.hp
+  let r = applyIntent(s, attack({ kind: 'guard', base: 0, guard: 8, emotions: ['joy'] }), 1, 0)
+  assert(r.hits.length === 0 && r.supportWebCut?.tensionReduced === 1 && spiderWebTension(spider) === 1, 'matching-weakness guard releases one spider card seal without dealing damage')
+  r = applyIntent(s, attack({ kind: 'heal', base: 0, heal: 6, emotions: ['joy'] }), 1, 0)
+  assert(r.hits.length === 0 && r.supportWebCut?.tensionReduced === 1 && spiderWebTension(spider) === 0, 'matching-weakness heal releases one spider card seal without dealing damage')
+  assert(spider.hp === hpBefore && activeEnemyPart(spider)?.def.id === 'leg-joy', 'support weakness cuts neither damage nor break the active spider leg')
 }
 
 const regularEnemyIds = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito']

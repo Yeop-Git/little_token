@@ -6,6 +6,34 @@ import { icon } from '@/ui/Icons'
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
 const COMMIT_POP_MS = 180
+const COMMIT_BURST_PIECES = 18
+const commitBurstPool: HTMLElement[] = []
+
+function acquireCommitBurst(): HTMLElement {
+  const pooled = commitBurstPool.pop()
+  if (pooled) {
+    pooled.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
+    return pooled
+  }
+  const burst = document.createElement('span')
+  burst.className = 'card-commit-burst'
+  burst.setAttribute('aria-hidden', 'true')
+  for (let i = 0; i < COMMIT_BURST_PIECES; i += 1) {
+    const piece = document.createElement('i')
+    const angle = (360 / COMMIT_BURST_PIECES) * i + (i % 2) * 7
+    const distance = 92 + (i % 5) * 18
+    piece.style.setProperty('--burst-angle', `${angle}deg`)
+    piece.style.setProperty('--burst-distance', `${distance}px`)
+    piece.style.setProperty('--burst-delay', `${(i % 3) * 12}ms`)
+    burst.append(piece)
+  }
+  return burst
+}
+
+function releaseCommitBurst(burst: HTMLElement) {
+  burst.remove()
+  if (commitBurstPool.length < 2) commitBurstPool.push(burst)
+}
 
 export const CARD_HAND_CONFIG = {
   /** Subjects/modifiers open three choices; the eight-card verb deck opens four. */
@@ -256,7 +284,13 @@ export class CardHand {
     return this.sealedWordIds.has(typeof word === 'string' ? word : word.id)
   }
 
-  showSlot(slotKey: string, words: Word[], chosen: Word | undefined, conflictOf: ConflictResolver) {
+  showSlot(
+    slotKey: string,
+    words: Word[],
+    chosen: Word | undefined,
+    conflictOf: ConflictResolver,
+    preferred?: (word: Word) => boolean,
+  ) {
     const changed = this.slotKey !== slotKey
     if (changed) {
       this.epoch++
@@ -288,8 +322,11 @@ export class CardHand {
         : shuffled
       // 역할별 보장 카드가 앞쪽을 다시 채운 뒤에도 거미줄에 묶이지 않은 선택지 하나는
       // 반드시 첫 손패에 남긴다. 누적 봉인이 문장 완성을 막아서는 안 된다.
+      const preferredWords = preferred
+        ? ensureCardInInitialDraw(roleOrderedWords, initialCount, (word) => preferred(word) && !this.conflictOf(word))
+        : roleOrderedWords
       const orderedWords = ensureCardInInitialDraw(
-        roleOrderedWords,
+        preferredWords,
         initialCount,
         (word) => !this.sealedWordIds.has(word.id) && !this.conflictOf(word),
       )
@@ -728,23 +765,12 @@ export class CardHand {
     const scaleY = stageRect.height / this.stage.offsetHeight || 1
     const visibleCenterX = (Math.max(0, stageRect.left) + Math.min(window.innerWidth, stageRect.right)) / 2
     const visibleCenterY = (Math.max(0, stageRect.top) + Math.min(window.innerHeight, stageRect.bottom)) / 2
-    const burst = document.createElement('span')
-    burst.className = 'card-commit-burst'
-    burst.setAttribute('aria-hidden', 'true')
+    const burst = acquireCommitBurst()
     burst.style.left = `${((visibleCenterX - stageRect.left) / scaleX).toFixed(1)}px`
     burst.style.top = `${((visibleCenterY - stageRect.top) / scaleY).toFixed(1)}px`
     burst.style.setProperty('--burst-color', getComputedStyle(button).getPropertyValue('--wglow').trim() || '#ffe3a1')
-    for (let i = 0; i < 18; i++) {
-      const piece = document.createElement('i')
-      const angle = (360 / 18) * i + (i % 2) * 7
-      const distance = 92 + (i % 5) * 18
-      piece.style.setProperty('--burst-angle', `${angle}deg`)
-      piece.style.setProperty('--burst-distance', `${distance}px`)
-      piece.style.setProperty('--burst-delay', `${(i % 3) * 12}ms`)
-      burst.append(piece)
-    }
     this.stage.append(burst)
-    window.setTimeout(() => burst.remove(), 720)
+    window.setTimeout(() => releaseCommitBurst(burst), 720)
   }
 
   // 덱 버튼 — 이번 스테이지에 남은 추가 드로우 횟수를 보여준다(덱 장수가 아니다).

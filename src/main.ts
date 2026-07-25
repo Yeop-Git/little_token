@@ -469,7 +469,10 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     import('@views/BattleView'),
     import('@/ui/ResourcePreloader'),
   ])
-  await preloadBattleResources(run.player.deck, run.player.items, st.encounter)
+  await Promise.all([
+    preloadBattleResources(run.player.deck, run.player.items, st.encounter),
+    GameAudio.preloadBattleAudio(run.day, st.isBoss ? st.encounter[0] : undefined),
+  ])
   if (request !== battleRequest) return
   reset()
   GameAudio.playBattleBgm(run.day, st.isBoss ? st.encounter[0] : undefined)
@@ -504,7 +507,10 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
 async function preloadUpcomingBattle() {
   const { preloadBattleResources } = await import('@/ui/ResourcePreloader')
   const st = stageFor(run.day)
-  await preloadBattleResources(run.player.deck, run.player.items, st.encounter)
+  await Promise.all([
+    preloadBattleResources(run.player.deck, run.player.items, st.encounter),
+    GameAudio.preloadBattleAudio(run.day, st.isBoss ? st.encounter[0] : undefined),
+  ])
 }
 
 function handleBattleWin(grade: number) {
