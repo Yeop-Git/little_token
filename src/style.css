@@ -472,6 +472,26 @@ button {
   filter: blur(0);
 }
 
+/* 영상 위에 얹는 반딧불이 — 타이틀과 같은 무리를 같은 자리에 그린다(TitleView.addFireflyLayer).
+   걷힌 다음에 켜면 없던 것들이 한꺼번에 생겨서 티가 확 난다. 영상 끝자락부터 천천히
+   배어 나오게 두면 화면이 넘어갈 즈음엔 이미 거기 있던 것처럼 보인다.
+   z-index는 타이틀 쪽 순서를 따라간다 — 발광(2)·비네트(4)보다 위. */
+.cine-fireflies {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  /* 반드시 컷보다 먼저 끝나야 한다(FIREFLY_LEAD_SEC = 3.2초 전에 시작하므로 1.2초 여유).
+     걷힐 때까지 이 페이드가 남아 있으면 얼려 둔 화면에 움직이는 게 하나 끼어든다. */
+  transition: opacity 2s ease;
+}
+.cine-veil.fireflies .cine-fireflies {
+  opacity: 1;
+}
+
 .cine-video {
   position: absolute;
   /* 타이틀 배경(.title-atmos)과 같은 화각으로 깔아야 겹칠 때 어긋나지 않는다. */
