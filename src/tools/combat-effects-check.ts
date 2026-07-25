@@ -71,7 +71,9 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 { const regular = makeEnemy(foe('unphased', { hp: 30, atk: 10 })); regular.hp = 1; const r = enemyTurn(state([regular]), () => 0, 'second')[0]; assert(r.attackStage === 1 && r.dealt === 10, 'regular enemy damage does not scale with low hp') }
 { const queen = makeEnemy(foe('queen-summon', { atk: 10, summonPattern: { name: '일벌', sprite: 'enemy_worker_bee', perTurn: 1, max: 4, maxPerSide: 2, attackBonusPerUnit: .5, releaseAt: 4 } })); const s = state([queen]); summonAtTurnStart(s); summonAtTurnStart(s); assert(queen.summonsLeft === 1 && queen.summonsRight === 0, 'queen summons only once at the same turn start'); s.turn = 2; summonAtTurnStart(s); s.turn = 3; summonAtTurnStart(s); s.turn = 4; summonAtTurnStart(s); assert(queen.summonsLeft === 2 && queen.summonsRight === 2, 'queen alternates summons up to two workers per side'); queen.nextAttackTurn = 1; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 12 && r.summonsReleased === 4 && summonCount(queen) === 0, 'four workers add only two damage then all leave on swarm charge') }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); for (let turn = 1; turn <= 4; turn++) { s.turn = turn; summonAtTurnStart(s) } let r = applyIntent(s, attack({ targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'single-target attack always leaves a worker-bee answer'); r = applyIntent(s, attack({ targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'two-target attack disperses two workers without reducing boss damage'); r = applyIntent(s, attack({ targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'all-target attack disperses every remaining worker') }
-{ const stage = stageFor(10); const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax && queen.nextAttackTurn === 4, 'day-10 queen cannot one-shot base hp on her worst opening roll and gives three turns before attacking again') }
+// 10층에 도착한 플레이어의 실제 최대 체력(시작 20 + 아홉 층의 아이템 보상)을 기준으로 잰다.
+// 픽스처 기본값 30은 1층 언저리 수치라 중간 보스의 한 방 판정 기준이 되지 못한다.
+{ const stage = stageFor(10); const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); s.playerHp = s.playerMax = 52; summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax * .7 && queen.nextAttackTurn === 4, 'day-10 queen cannot take more than two thirds of a day-10 player on her worst opening roll and gives three turns before attacking again') }
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
   spider.guard = 0
@@ -80,12 +82,17 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(spider.parts.length === 5 && spider.healthBars === 5 && activeEnemyPart(spider)?.def.id === 'leg-joy', 'spider starts with four sequential legs and one body')
   let web = spiderWebAtTurnStart(s)!
   assert(web.tension === 1 && spiderWebAtTurnStart(s) === null, 'spider web advances once per turn')
-  let r = applyIntent(s, attack({ base: 28, emotions: ['joy'] }), 1, 0)
-  assert(r.hits[0].weak && r.hits[0].dmg === 42 && r.hits[0].barsBroken === 1, 'active spider leg weakness grants x1.5 and drops one leg')
+  let r = applyIntent(s, attack({ base: 50, emotions: ['joy'] }), 1, 0)
+  assert(r.hits[0].weak && r.hits[0].dmg === 75 && r.hits[0].barsBroken === 1, 'active spider leg weakness grants x1.5 and drops one leg')
   assert(r.hits[0].webBurst && r.hits[0].tensionReduced === 1 && spiderWebTension(spider) === 0, 'dropping one spider health bar blows away every web layer')
   assert(activeEnemyPart(spider)?.def.id === 'leg-anger', 'next leg reveals a different weakness after the current leg drops')
   r = applyIntent(s, attack({ base: 10, emotions: ['joy'] }), 1, 0)
   assert(!r.hits[0].weak && r.hits[0].dmg === 10, 'old spider weakness no longer applies to the next leg')
+  // 약점을 빗나간 문장은 아무리 세도 지금 다리에서 멈춘다. 강한 문장 하나가
+  // 다리 둘을 한꺼번에 끊으면 남은 약점이 드러날 순서를 잃는다.
+  r = applyIntent(s, attack({ base: 900, emotions: ['joy'] }), 1, 0)
+  assert(!r.hits[0].weak && r.hits[0].barsBroken === 1 && activeEnemyPart(spider)?.def.id === 'leg-sorrow', 'a missed weakness stops at the current leg instead of tearing through the next one')
+  assert(spider.parts[2].hp === spider.parts[2].maxHp, 'the leg behind the current one keeps full health when the weakness was missed')
   s.turn = 2
   web = spiderWebAtTurnStart(s)!
   s.turn = 3
@@ -107,7 +114,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(spider.healthBars === 5 && spider.maxHp === spider.hpPerBar * 5, 'spider parts fix total health to five bars')
   for (const weakness of weaknesses) {
     assert(activeEnemyPart(spider)?.def.weakness?.value === weakness, `spider reveals ${weakness} weakness in sequence`)
-    const r = applyIntent(s, attack({ base: 28, emotions: [weakness] }), 1, 0)
+    const r = applyIntent(s, attack({ base: 50, emotions: [weakness] }), 1, 0)
     assert(r.hits[0].weak && r.hits[0].barsBroken === 1, `spider ${weakness} leg takes weakness damage and breaks`)
   }
   assert(activeEnemyPart(spider)?.def.id === 'body' && !activeEnemyPart(spider)?.def.weakness, 'spider body is the fifth and weakness-free health bar')

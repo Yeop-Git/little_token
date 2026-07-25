@@ -348,9 +348,11 @@ function damageEnemy(
     ? enemy.parts.filter((candidate) => !candidate.broken).length
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (part) {
-    // 강한 문장은 한 다리의 남은 체력에서 멈추지 않는다. 다음 다리와 본체까지
-    // 순차 관통시켜 기존 다중 체력막의 폭발적인 상한 판타지를 보존한다.
-    let remaining = dealt
+    // 지금 드러난 약점을 맞힌 문장만 다음 다리와 본체까지 순차 관통해 다중
+    // 체력막의 폭발적인 상한 판타지를 낸다. 약점을 빗나간 문장은 그 다리의
+    // 관절에서 멈춘다 — 안 그러면 강한 문장 하나가 다리 둘을 한꺼번에 끊어
+    // 기쁨·분노·슬픔·즐거움이 드러나기도 전에 사라진다.
+    let remaining = weak ? dealt : Math.min(dealt, part.hp)
     for (const candidate of enemy.parts.slice(enemy.parts.indexOf(part))) {
       if (remaining <= 0) break
       const applied = Math.min(candidate.hp, remaining)
@@ -544,7 +546,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
       * (attackStep?.damageScale ?? 1),
   )
   // 장로거미는 카드 봉인 파훼를 읽을 시간을 주도록 한 번의 체력 피해를 제한한다.
-  const webShowCap = Math.max(1, Math.round(state.playerMax * .35))
+  const webShowCap = Math.max(1, Math.round(state.playerMax * .5))
   const raw = enemy.def.webPattern
     ? Math.min(uncappedRaw, webShowCap)
     : uncappedRaw

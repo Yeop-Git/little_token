@@ -249,6 +249,11 @@ export class CardHand {
     return this.sealedWordIds.size
   }
 
+  /** 상세 보기에서도 손패 카드와 같은 거미줄 봉인 상태를 표시한다. */
+  isSealed(word: Word | string): boolean {
+    return this.sealedWordIds.has(typeof word === 'string' ? word : word.id)
+  }
+
   showSlot(slotKey: string, words: Word[], chosen: Word | undefined, conflictOf: ConflictResolver) {
     const changed = this.slotKey !== slotKey
     if (changed) {

@@ -1333,16 +1333,16 @@ button {
   z-index: 38 !important;
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
-  width: 390px;
-  height: 430px;
+  width: clamp(330px, 38vh, 410px);
+  height: clamp(340px, 39vh, 420px);
   z-index: 2;
-  transform: scale(1.5);
+  transform: scale(1.2);
 }
 .scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
   display: none;
 }
 
-/* 상단 중앙을 통째로 쓰는 보스 전용 체력 HUD. 막 수는 텍스트 대신 분절로만 보여 준다. */
+/* 보스 HUD는 이름과 체력만 남기고 전투 규칙은 모델 위 상태 아이콘으로 보여 준다. */
 .boss-health-hud {
   position: absolute;
   top: 24px;
@@ -1350,7 +1350,7 @@ button {
   z-index: 62;
   /* 좌측 주인공 스탯과 우측 시스템 메뉴 사이의 안전 여백을 남긴다. */
   width: min(760px, 56vw);
-  padding: 10px 24px 14px;
+  padding: 9px 24px 12px;
   color: #fff1d2;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 176, 113, .66);
@@ -1390,46 +1390,6 @@ button {
   font-weight: 900;
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
-.boss-health-hud .enemy-traits {
-  position: static;
-  justify-content: center;
-  width: 100%;
-  margin-top: 7px;
-  transform: none;
-}
-.boss-pattern-guide {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  align-items: center;
-  margin-top: 8px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255, 213, 153, .24);
-  border-radius: 8px;
-  background: rgba(12, 7, 14, .58);
-  color: #f3dfc6;
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.25;
-}
-.boss-pattern-guide > b {
-  grid-row: 1 / span 3;
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  padding-right: 10px;
-  color: #ffb678;
-  font-size: 11px;
-  letter-spacing: .12em;
-  border-right: 1px solid rgba(255, 190, 126, .24);
-}
-.boss-pattern-guide span,
-.boss-pattern-guide em { display: block; min-width: 0; }
-.boss-pattern-guide strong { color: #ffd58d; }
-.boss-pattern-guide em { color: #9ee9d3; font-style: normal; font-weight: 900; }
-.boss-pattern-guide:empty { display: none; }
-.boss-health-hud .spider-parts { margin-top: 8px; }
-.boss-health-hud .spider-parts + .boss-pattern-guide { margin-top: 6px; }
 .spider-parts {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
@@ -1456,7 +1416,9 @@ button {
 .spider-part.broken { opacity: .2; filter: grayscale(1); }
 .spider-part-head { display: flex; justify-content: space-between; gap: 3px; color: #d8c2a2; font-size: 9px; line-height: 1; }
 .spider-part-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spider-part-head em { color: #ffd878; font-style: normal; font-weight: 900; }
+.spider-part-head em { display: inline-flex; align-items: center; gap: 2px; color: var(--emotion-color, #ffd878); font-style: normal; font-weight: 900; }
+.spider-part-head em .emotion-face { width: 11px; height: 11px; object-fit: contain; }
+.spider-part-head em > span { white-space: nowrap; }
 .spider-part-bar { display: block; height: 5px; margin-top: 4px; overflow: hidden; border-radius: 4px; background: rgba(0, 0, 0, .6); }
 .spider-part-bar i { display: block; height: 100%; background: linear-gradient(90deg, #a42331, #ff7359); transition: width .32s ease; }
 .spider-part.active .spider-part-bar i { box-shadow: 0 0 8px #ff765b; }
@@ -1703,10 +1665,9 @@ button {
   outline: none;
 }
 .actor.you {
-  /* 310→360 확장분의 절반만큼 좌측을 당겨 캐릭터 중심은 기존 위치에 고정한다.
-     프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
+  /* 프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
      화면 끝에 붙여 두면 잘려 나온 것처럼 보여서 왼쪽에 한 뼘 여백을 남긴다. */
-  left: 290px;
+  left: var(--player-left, 290px);
 }
 .actor .model-shell {
   position: relative;
@@ -1720,7 +1681,10 @@ button {
   touch-action: none;
   user-select: none;
 }
-.actor.you .model-shell { width: 360px; }
+.scene.battle:not([data-boss='true']) .actor.you .model-shell {
+  width: 280px;
+  height: 330px;
+}
 .actor .model-shell[data-model-dragging='true'] { cursor: grabbing; }
 .actor.foe .model-shell {
   width: 280px;
@@ -1778,7 +1742,7 @@ button {
   opacity: 1;
   z-index: -1;
 }
-/* 뒷줄 적은 모델과 같은 비율로 작아져야 발밑이 어긋나 보이지 않는다. */
+/* 일반 전투의 적은 모두 같은 크기라 그림자도 같은 비율을 유지한다. */
 .actor.foe .shadow {
   transform: scaleX(var(--model-scale, 1));
 }
@@ -2038,10 +2002,6 @@ button {
   opacity: 1;
   filter: none;
 }
-.actor.foe.rank-last .nameplate.faint {
-  opacity: 1;
-  filter: none;
-}
 .actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
 .nameplate .row {
   display: flex;
@@ -2135,6 +2095,14 @@ button {
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
 .actor.foe .model-shell { cursor: default; }
+/* 일반 적의 특성 칩은 패널 높이에 포함하지 않는다. 그래야 특성 유무와 관계없이
+   프롬과 모든 적의 이름·HP 바가 정확히 같은 수평선에 놓인다. */
+.scene.battle:not([data-boss='true']) .actor.foe .enemy-traits {
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  right: 14px;
+}
 .trait { padding: 2px 5px; border-radius: 7px; font-size: 10px; font-weight: 900; line-height: 1.2; background: rgba(10, 8, 16, .58); }
 .trait.guard { color: #8ee4f4; border: 1px solid rgba(142, 228, 244, .42); }
 .trait.magic { color: #d9aaff; border: 1px solid rgba(217, 170, 255, .48); }
@@ -2808,9 +2776,9 @@ button {
   padding: 10px 34px;
   border-radius: 24px;
 }
-/* 보스 HUD가 상단 중앙을 쓰므로 문장 캐스트는 그 아래의 독립된 레일에 둔다. */
+/* 짧아진 보스 HUD 아래에 문장 캐스트 전용 레일을 고정한다. */
 .scene.battle[data-boss='true'] .chain-rail {
-  top: 158px;
+  top: 116px;
 }
 .chain-rail.has-sentence {
   background: linear-gradient(105deg, rgba(10, 7, 16, .82), rgba(26, 17, 25, .74) 52%, rgba(10, 7, 16, .82));
@@ -3059,12 +3027,11 @@ button {
   position: absolute;
   left: 500px;
   right: 110px;
-  bottom: 12px;
+  bottom: 13px;
   z-index: 7;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
 }
 /* 단어 영역 아래 은은한 어둠 스크림(가독성) — 경계선이 안 보이게 아주 흐리게만 */
 .word-zone::before {
@@ -3082,17 +3049,30 @@ button {
 /* 보스전은 전경의 프롬과 손패가 겹치지 않게 카드 축을 더 오른쪽으로 물린다. */
 .scene.battle[data-boss='true'] .word-zone { left: 620px; right: 72px; }
 
-/* 슬롯 진행 스텝 — 손패 아래 최하단. 박혀 있어도 읽히게 크고 두껍게. */
+/* 슬롯 진행 스텝 — 카드 레일에서 분리해 일반전 좌하단에 고정한다.
+   보스전에서는 같은 자리를 플레이어 체력이 쓰므로 그 오른쪽에 이어 붙인다. */
 .slot-step {
-  position: relative;
+  position: absolute;
+  left: 38px;
+  bottom: 28px;
   z-index: 950;
-  margin-top: 2px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 30px;
+  gap: 6px;
+  min-height: 42px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 235, 195, .16);
+  border-radius: 12px;
+  font-size: 24px;
   font-weight: 900;
+  background: linear-gradient(90deg, rgba(10, 7, 16, .76), rgba(10, 7, 16, .32));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28), inset 0 0 0 2px rgba(255, 255, 255, .025);
+  backdrop-filter: blur(7px);
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+.scene.battle[data-boss='true'] .slot-step {
+  left: 430px;
+  bottom: 38px;
 }
 .slot-step .step {
   color: var(--ink-faint);
@@ -3124,14 +3104,14 @@ button {
 .card-table {
   position: relative;
   width: 100%;
-  height: 263px;
+  height: 230px;
 }
 .card-hand {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 255px;
+  height: 230px;
   perspective: 1100px;
 }
 .word-card {
@@ -3441,7 +3421,8 @@ button {
   background-size: 100% 100%, auto, auto, auto;
   background-repeat: no-repeat;
 }
-.word-card.sealed .card-web-overlay { display: grid; }
+.word-card.sealed .card-web-overlay,
+.word-detail.sealed .card-web-overlay { display: grid; }
 .card-web-overlay::before {
   content: '';
   position: absolute;
@@ -3463,6 +3444,10 @@ button {
 .card-web-overlay b { align-self: end; margin-bottom: 2px; font-size: 16px; }
 .card-web-overlay small { align-self: start; padding: 3px 9px; color: #ffd1d1; font-size: 12px; font-weight: 900; }
 .word-card.sealed .card-note { z-index: 13; color: #fff3f6; text-shadow: 0 2px 5px #210d18; }
+.word-detail.sealed .card-web-overlay {
+  inset: 0;
+  border-radius: inherit;
+}
 .word-card.web-catching { opacity: 1; filter: brightness(1.35) saturate(.45) drop-shadow(0 0 24px rgba(238, 226, 255, .94)); }
 .word-card.web-catching .card-web-overlay { animation: web-card-catch .82s cubic-bezier(.18,.82,.25,1) both; }
 @keyframes web-card-catch {

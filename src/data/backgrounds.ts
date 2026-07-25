@@ -96,7 +96,7 @@ export function resetFieldBackground() {
 }
 
 /**
- * 배경마다의 무대 배치 — 얼마나 내려 서고, 적이 어느 깊이로 밀려오는가.
+ * 배경마다의 무대 배치 — 배우를 얼마나 내려 세우고, 가로로 어디에 펼칠지 정한다.
  *
  * **바꾸지 않는 것**: 프롬은 언제나 화면 왼쪽에서 오른쪽을 보고 서고, 적은 오른쪽에서
  * 왼쪽으로 밀려온다. 이건 전투의 읽는 방향 자체라 배경이 달라져도 흔들리면 안 된다.
@@ -104,7 +104,7 @@ export function resetFieldBackground() {
  * (배경 하나에서 가운데로 옮기고 화면을 등지게 해 봤다가 다른 판과 너무 튀어서 되돌렸다.)
  *
  * 공통 바닥선을 하나 정하면 어느 배경에선가는 반드시 어색해진다. 그림마다 바닥이 난
- * 높이가 다르기 때문이다. 그래서 높이와 깊이감만 배경별로 따로 잡는다.
+ * 높이가 다르기 때문이다. 그래서 높이와 가로 간격만 배경별로 따로 잡는다.
  *
  * 발끝은 그림의 바닥선에 딱 붙이지 않는다 — 붙이면 오히려 종이에 눌린 것처럼 보이고,
  * 무엇보다 모든 배경의 바닥선(0.72~0.87)이 손패 UI 위쪽 경계(0.694)보다 아래라
@@ -119,10 +119,6 @@ export interface FieldStage {
   railRight: number
   /** 뒷줄로 갈수록 벌어지는 가로 간격. */
   railGap: number
-  /** 뒷줄이 위로 물러나는 정도 — 크면 깊은 길에서 걸어 나오는 느낌이 난다. */
-  railRise: number
-  /** 뒷줄이 작아지는 정도. 길이 깊을수록 크게 준다. */
-  railShrink: number
   /**
    * 프롬의 가로 자리(왼쪽 여백, 기본 290). 서는 쪽과 보는 방향은 절대 안 바뀌고,
    * 그림의 구조물을 피해 한 뼘 정도만 밀고 당기는 용도다.
@@ -142,26 +138,25 @@ export interface FieldStage {
  * 나머지도 눈으로 하나씩 맞췄다. 결과적으로 발끝은 0.700~0.754에 걸쳐 있다.
  * 손패 UI 위쪽 경계가 0.694라 숫자만 보면 겹칠 것 같지만, 손패는 화면 가운데 아래에
  * 모여 있고 배우는 좌우로 갈라져 서므로 실제로는 부딪히지 않는다.
- * 깊이감의 나머지는 아래 railRise·railShrink가 맡는다.
+ * 일반 전투의 모든 배우는 같은 바닥선과 시각 크기를 쓴다.
  */
 const STAGES: FieldStage[] = [
   // bg001 바닥 0.778 — 넓은 광장. 기본 배치, 옆에서 마주 본다.
-  { bottom: -26, railRight: 860, railGap: 260, railRise: 10, railShrink: 0.24 },
+  { bottom: -26, railRight: 860, railGap: 260 },
   // bg002 바닥 0.833 — 가운데 골목. 처음엔 플레이어를 가운데로 옮기고 화면을 등지게
-  // 해 봤는데 다른 배경과 너무 튀어서 되돌렸다. 자리와 방향은 공통을 따르고,
-  // 골목의 깊이감은 뒷줄이 더 물러나고 더 작아지는 것으로만 낸다.
-  { bottom: -76, railRight: 830, railGap: 240, railRise: 34, railShrink: 0.34 },
+  // 해 봤는데 다른 배경과 너무 튀어서 되돌렸다. 자리와 방향은 공통을 따른다.
+  { bottom: -76, railRight: 830, railGap: 240 },
   // bg003 바닥 0.822 — 흐린 하늘, 트인 벌판. 넓게 벌려 선다.
-  { bottom: -29, railRight: 900, railGap: 280, railRise: 14, railShrink: 0.26 },
+  { bottom: -29, railRight: 900, railGap: 280 },
   // bg004 — 측정이 유일하게 못 미더운 배경이다. 경계 후보 1순위(0.611)는 세기가 약했고
   // 2순위 0.722를 골랐는데, 둘 다 실제 바닥이 아니라 중간 구조물의 경계였다.
   // 그 값으로 잡으니 눈에 확연히 떠 보여서 다른 배경과 같은 높이로 되돌렸다.
-  { bottom: -112, railRight: 840, railGap: 250, railRise: 22, railShrink: 0.3, playerLeft: 230 },
+  { bottom: -112, railRight: 840, railGap: 250, playerLeft: 230 },
   // bg005 바닥 0.867 — 가장 낮은 바닥. 그만큼 배우도 가장 아래로 내린다.
   // 빛이 왼쪽에서 오므로 적은 조금 더 오른쪽 깊이에 둔다.
-  { bottom: -84, railRight: 920, railGap: 240, railRise: 26, railShrink: 0.3 },
+  { bottom: -84, railRight: 920, railGap: 240 },
   // bg006 보스방 — 배치는 보스 전용 규칙이 따로 덮는다. 바닥만 맞춘다.
-  { bottom: -29, railRight: 860, railGap: 260, railRise: 0, railShrink: 0.24 },
+  { bottom: -29, railRight: 860, railGap: 260 },
 ]
 
 let currentStage: FieldStage = STAGES[0]
