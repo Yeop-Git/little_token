@@ -22,7 +22,7 @@ import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent } from '@/ui/EmotionBadge'
-import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
+import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
@@ -300,6 +300,7 @@ export class BattleView {
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
+          <div class="resonance-flash" id="resonance" aria-live="polite"></div>
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
         </div>
@@ -1436,8 +1437,11 @@ export class BattleView {
     if (!dealsDamage && !heals) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind: 'dmg' }
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
+    const resonanceEmotion = this.resonantEmotion(intent.emotions)
     const cls = (p: { source: string; value: number }) =>
-      p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
+      p.source === 'emotion' && resonanceEmotion
+        ? `resonance emotion-${resonanceEmotion}`
+        : p.source === 'combo' ? 'combo' : p.source === 'coherence' ? 'down' : p.source === 'stat' ? 'stat' : p.value < 1 ? 'down' : 'buff'
     // 동사가 둘이면 한 문장이 피해와 회복을 동시에 만든다 — 집계판은 자기 풀만 더한다.
     // (안 그러면 방어 깡수치가 피해 총합에 섞여 화면 숫자와 실제 피해가 어긋난다.)
     const lane = dealsDamage ? 'damage' : 'heal'
@@ -1473,32 +1477,49 @@ export class BattleView {
         <div class="tally-x">×</div>
         <div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div>
       </div>
-      <div class="tally-feed"></div>
+      <div class="tally-feed tally-flat-feed"></div>
+      <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
+      <div class="tally-feed tally-mult-feed"></div>
       <div class="tally-total"></div>`
     this.q('#pbox').appendChild(el)
     requestAnimationFrame(() => el.classList.add('in'))
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
-    const feed = el.querySelector<HTMLElement>('.tally-feed')!
+    const flatFeed = el.querySelector<HTMLElement>('.tally-flat-feed')!
+    const multFeed = el.querySelector<HTMLElement>('.tally-mult-feed')!
     await sleep(200)
 
     let base = 0
     for (const f of tally.flats) {
       base += f.value
       baseBox.querySelector('b')!.textContent = String(base)
-      this.tallyChip(feed, `${f.label} +${f.value}`, f.cls)
+      this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
       this.bump(baseBox)
       await sleep(165)
     }
     let mult = 1
+    const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
+    const multStarted = performance.now()
+    if (hasRisingMultiplier) {
+      el.classList.add('mult-rising')
+      GameAudio.playMultiplierRise()
+    }
     for (const [i, m] of tally.mults.entries()) {
       mult *= m.value
       multBox.querySelector('b')!.textContent = mult.toFixed(2)
-      this.tallyChip(feed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
+      this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
       // 배율이 겹칠수록 판이 뜨거워진다.
       el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
       this.bump(multBox)
-      await sleep(185)
+      await sleep(235)
+    }
+    if (hasRisingMultiplier) {
+      const remainingSoundMs = Math.max(0, 930 - (performance.now() - multStarted))
+      if (remainingSoundMs) await sleep(remainingSoundMs)
+      el.classList.remove('mult-rising')
+      el.classList.add('mult-settled')
+      await sleep(420)
+      el.classList.remove('mult-settled')
     }
 
     // 깡 × 배율이 다 모이면 잠깐 멈춰 읽을 시간을 준다 — 호버 중이면 더 기다리고, 클릭하면 즉시.
@@ -1607,6 +1628,31 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => el.remove(), 340))
   }
 
+  private resonantEmotion(emotions: readonly Emotion[]): Emotion | null {
+    return (['joy', 'anger', 'sorrow', 'pleasure'] as const).find(
+      (emotion) => emotions.filter((entry) => entry === emotion).length >= 2,
+    ) ?? null
+  }
+
+  /** 공명은 맥락 보너스와 섞지 않고, 감정색 배율을 먼저 읽히게 한다. */
+  private async showEmotionResonance(intent: Intent) {
+    const emotion = this.resonantEmotion(intent.emotions)
+    if (!emotion) return
+    const el = this.q('#resonance')
+    const count = intent.emotions.filter((entry) => entry === emotion).length
+    el.className = `resonance-flash emotion-${emotion}`
+    el.innerHTML = `
+      <div class="resonance-head">${emotionBadgeContent(emotion)}<span>공명</span></div>
+      <div class="resonance-value"><small>배율</small><b>×${intent.emotionResonance.toFixed(2)}</b></div>
+      <div class="resonance-note">같은 감정 ${count}장</div>`
+    el.classList.remove('show')
+    void el.offsetWidth
+    el.classList.add('show')
+    GameAudio.playResonance(intent.emotions)
+    await sleep(860)
+    el.classList.remove('show')
+  }
+
   private tallyChip(feed: HTMLElement, text: string, cls: string) {
     const chip = document.createElement('span')
     chip.className = `tally-chip ${cls}`
@@ -1663,7 +1709,7 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(150)
 
-    if (intent.emotionResonance > 1) GameAudio.playResonance(intent.emotions)
+    if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
 
     // 맥락(관용구) 발동 배너
     if (intent.combos.length) {
@@ -1675,7 +1721,8 @@ export class BattleView {
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await sleep(760)
+      await sleep(900)
+      el.classList.remove('show')
     }
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.

@@ -1551,6 +1551,32 @@ button {
   gap: 6px;
   max-width: 620px;
 }
+.tally-mult-feed { min-height: 0; }
+.tally-phase {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 0;
+  overflow: hidden;
+  color: #ffd27a;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  opacity: 0;
+  transition: height .2s ease, opacity .2s ease;
+}
+.tally-phase i { width: 56px; height: 1px; background: linear-gradient(90deg, transparent, currentColor); box-shadow: 0 0 10px currentColor; }
+.tally-phase i:last-child { transform: scaleX(-1); }
+.tally.mult-rising .tally-phase,
+.tally.mult-settled .tally-phase { height: 24px; opacity: 1; }
+.tally.mult-rising .tally-box.mult {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, #ffd27a 52%, transparent), 0 0 28px color-mix(in srgb, #ffb35c 38%, transparent), 0 12px 30px rgba(0, 0, 0, .28);
+}
+.tally.mult-rising .tally-box.mult b { animation: mult-reel-glow .42s ease-in-out infinite alternate; }
+.tally.mult-rising .tally-mult-feed { min-height: 28px; }
+.tally.mult-settled .tally-box.mult { animation: mult-settle .42s cubic-bezier(.2, 1.35, .35, 1); }
+@keyframes mult-reel-glow { to { filter: brightness(1.25); transform: translateY(-2px); } }
+@keyframes mult-settle { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
 /* 배율 내역 — 타원 배경 없이 글자+그림자만으로 깔끔하게 */
 .tally-chip {
   padding: 1px 4px;
@@ -1567,6 +1593,11 @@ button {
 .tally-chip.heal { color: #c6f39a; }
 .tally-chip.stat { color: #9fd8ff; }
 .tally-chip.buff { color: #ffd27a; }
+.tally-chip.resonance { font-size: 18px; }
+.tally-chip.resonance.emotion-joy { color: #fdd355; }
+.tally-chip.resonance.emotion-anger { color: #ef4b33; }
+.tally-chip.resonance.emotion-sorrow { color: #88cdf2; }
+.tally-chip.resonance.emotion-pleasure { color: #b4cb4f; }
 .tally-chip.combo {
   color: #ffe6a8;
   font-size: 18px;
@@ -1838,6 +1869,43 @@ button {
   30% { transform: translate(-50%, -50%) scale(1) rotate(0); }
   78% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -54%) scale(1.02); }
+}
+
+/* 감정 공명은 맥락 보너스와 독립된, 감정색 배율 한 줄로 읽힌다. */
+.resonance-flash {
+  --resonance-color: var(--emotion-color, #ffd27a);
+  position: absolute;
+  /* 문장 체인 아래의 전용 레일: 중앙 정산판·배우와 같은 자리를 쓰지 않는다. */
+  top: 166px;
+  left: 50%;
+  z-index: 87;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px 16px;
+  border: 1px solid color-mix(in srgb, var(--resonance-color) 72%, transparent);
+  border-radius: 999px;
+  color: #fff7e8;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--resonance-color) 18%, rgba(10, 7, 16, .92)), rgba(10, 7, 16, .9));
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--resonance-color) 13%, transparent), 0 0 26px color-mix(in srgb, var(--resonance-color) 26%, transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+.resonance-flash.show { animation: resonance-show .86s ease forwards; }
+.resonance-head { display: inline-flex; align-items: center; gap: 6px; color: var(--resonance-color); font-size: 14px; font-weight: 900; letter-spacing: 1px; }
+.resonance-head .emotion-face { width: 21px; height: 21px; }
+.resonance-head > span:last-child { padding-left: 6px; border-left: 1px solid color-mix(in srgb, var(--resonance-color) 65%, transparent); }
+.resonance-value { display: flex; align-items: baseline; gap: 10px; }
+.resonance-value small { color: color-mix(in srgb, var(--resonance-color) 82%, #fff); font-size: 12px; font-weight: 800; }
+.resonance-value b { color: var(--resonance-color); font-size: 28px; line-height: 1; text-shadow: 0 0 18px color-mix(in srgb, var(--resonance-color) 74%, transparent); }
+.resonance-note { padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--resonance-color) 38%, transparent); color: #e3d8c8; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.scene.battle[data-boss='true'] .resonance-flash { top: 192px; }
+@keyframes resonance-show {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(.94); }
+  18%, 72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(1.01); }
 }
 
 .flash {
