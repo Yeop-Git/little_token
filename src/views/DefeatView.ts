@@ -1,4 +1,5 @@
 import { BACKGROUNDS } from '@/assets'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   day: number
@@ -17,6 +18,7 @@ export class DefeatView {
   destroy() {}
 
   private mount() {
+    GameAudio.playDefeatBgm()
     this.root.innerHTML = `
       <main class="scene defeat-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="defeat-paper" role="status" aria-live="polite">
