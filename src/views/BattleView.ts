@@ -46,7 +46,7 @@ import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type Owned
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CardHand } from '@/ui/CardHand'
+import { CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
@@ -70,11 +70,11 @@ interface Opts {
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-// 적 레일 — 스테이지의 최대 8마리를 모두 바닥선에 세우되, 많아지면 뒤쪽만 압축한다.
-// 3마리 이후를 DOM에서 빼면 실제 적이 투명해진 것처럼 보여 전황을 읽을 수 없어진다.
+// 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
+// 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
 const RAIL_FRONT_RIGHT = 860
 const RAIL_GAP = 260
-const RAIL_BACK_RIGHT = 40
+const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
 const BUG_COUNT_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
   <ellipse cx="24" cy="26" rx="10" ry="14" fill="currentColor" fill-opacity=".16"/><path d="M19 14c0-5 10-5 10 0M14 21 8 17M34 21l6-4M14 29l-7 2M34 29l7 2M17 37l-5 5M31 37l5 5M24 16v24"/>
@@ -125,6 +125,8 @@ export class BattleView {
   private playerPreempting = false
   private actionOrderSignature = ''
   private readonly enemyPool = new Map<string, HTMLElement[]>()
+  /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
+  private readonly debugSpawnedWords = new Map<string, Word>()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
   private killsThisBattle = 0
 
@@ -163,6 +165,24 @@ export class BattleView {
     if (this.busy || this.over) return
     this.state.playerHp = 0
     void this.lose()
+  }
+
+  /** Developer-only shortcut; the spawned card exists only in the current slot hand. */
+  async debugSpawnCard(word: Word): Promise<string> {
+    if (this.busy || this.over) return '지금은 카드를 생성할 수 없습니다.'
+    const key = this.order()[this.slotIndex]
+    const compatibleSlot = key === 'subj2' ? 'subj' : key === 'verb2' ? 'verb' : key
+    const slotLabel = this.t.template.slots[this.slotIndex]?.label ?? key
+    if (word.slot !== compatibleSlot) return `현재 ${slotLabel} 칸에는 ${compatibleSlot} 카드만 생성할 수 있습니다.`
+
+    const result: DebugCardSpawnResult = await this.cardHand.debugSpawn(word)
+    if (result === 'spawned') {
+      this.debugSpawnedWords.set(`${key}:${word.id}`, word)
+      return `${word.text} 카드를 현재 손패에 생성했습니다.`
+    }
+    if (result === 'already-in-hand') return `${word.text} 카드는 이미 현재 손패에 있습니다.`
+    if (result === 'hand-full') return '현재 손패가 가득 찼습니다.'
+    return '카드 생성 준비가 끝난 뒤 다시 시도해 주세요.'
   }
 
   private onPointerDown = () => {
@@ -337,9 +357,8 @@ export class BattleView {
     const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
     // 전투 대상은 항상 최전방.
     this.target = frontIdx(s)
-    // 전투 수는 8마리까지 늘어난다. 전원은 레일에 남기고, updateFoe에서 수를
-    // 기준으로 간격과 크기만 압축한다.
-    const visible = alive
+    const visible = alive.slice(0, MAX_VISIBLE_ENEMIES)
+    const hiddenWaiting = alive.length - visible.length
     const visibleSet = new Set(visible)
 
     let you = host.querySelector<HTMLElement>('.actor.you')
@@ -362,8 +381,26 @@ export class BattleView {
       }
       this.updateFoe(el, e, rank, visible.length)
     })
+    this.renderEnemyOverflow(host, hiddenWaiting)
     this.renderStats()
     this.renderActionOrder()
+  }
+
+  private renderEnemyOverflow(host: HTMLElement, count: number) {
+    let badge = host.querySelector<HTMLElement>('.enemy-overflow-count')
+    if (count <= 0) {
+      badge?.remove()
+      return
+    }
+    if (!badge) {
+      host.insertAdjacentHTML('beforeend', `
+        <div class="enemy-overflow-count" role="status" aria-live="polite">
+          ${BUG_COUNT_ICON}<b></b><span>레일 대기</span>
+        </div>`)
+      badge = host.querySelector<HTMLElement>('.enemy-overflow-count')!
+    }
+    badge.querySelector<HTMLElement>('b')!.textContent = `적 × ${count}`
+    badge.setAttribute('aria-label', `대기 중인 적 ${count}마리`)
   }
 
   private releaseFoe(el: HTMLElement) {
@@ -558,10 +595,7 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    const gap = visibleCount <= 1
-      ? RAIL_GAP
-      : Math.min(RAIL_GAP, (RAIL_FRONT_RIGHT - RAIL_BACK_RIGHT) / (visibleCount - 1))
-    el.style.right = `${RAIL_FRONT_RIGHT - rank * gap}px`
+    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
     el.style.bottom = '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
@@ -576,8 +610,7 @@ export class BattleView {
     // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
-    // 4번째부터는 이름표를 접어 모델과 서로 겹치지 않게 한다.
-    plate.classList.toggle('gone', rank >= 3)
+    plate.classList.remove('gone')
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
@@ -1176,7 +1209,10 @@ export class BattleView {
 
   private pick(id: string) {
     const key = this.order()[this.slotIndex]
-    const w = this.t.words[key].find((x) => x.id === id)!
+    const debugKey = `${key}:${id}`
+    const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
+    if (!w) return
+    this.debugSpawnedWords.delete(debugKey)
     GameAudio.play('paper')
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
