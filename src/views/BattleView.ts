@@ -49,7 +49,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
-import { GraphicsSettings, type GraphicsQuality } from '@/ui/GameSettings'
+import { openSettingsModal } from '@/ui/SettingsModal'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -219,16 +219,18 @@ export class BattleView {
               <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
               <ol id="action-order-list"></ol>
             </aside>
-            <div class="hud-left-status">
-              <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
-              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
-            </div>
           </div>
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-status">
-            <div class="hud-actions glass" aria-label="시스템 메뉴">
-              <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
-              <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
+            <div class="hud-status-bar">
+              <div class="hud-right-status" aria-label="전투 상태">
+                <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><i aria-hidden="true">|</i><em id="phase">주어</em></div>
+                <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+              </div>
+              <div class="hud-actions glass" aria-label="시스템 메뉴">
+                <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
+                <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
+              </div>
             </div>
             <div class="effect-log" id="log"></div>
           </div>
@@ -615,7 +617,18 @@ export class BattleView {
   private setPhase(label: string) {
     this.phaseLabel = label
     const el = this.root.querySelector<HTMLElement>('#phase')
-    if (el) el.textContent = label
+    if (el) {
+      const short: Record<string, string> = {
+        '준비 효과': '준비',
+        '선수 · 먼저 움직였다': '선수',
+        '선공 상대 행동': '적 선공',
+        '본인 캐릭터 행동': '본행동',
+        '후공 상대 행동': '적 후공',
+        '단어 완성': '완성',
+        '전투 승리': '승리',
+      }
+      el.textContent = short[label] ?? label.replace(/ 선택$/, '')
+    }
     this.renderActionOrder()
   }
 
@@ -1040,44 +1053,7 @@ export class BattleView {
   }
 
   private openSettings() {
-    const host = this.q('#overlay')
-    const volume = Math.round(GameAudio.getVolume() * 100)
-    const graphics = GraphicsSettings.get()
-    host.innerHTML = `
-      <div class="ov-backdrop"></div>
-      <section class="ov-panel glass settings-panel" aria-label="설정">
-        <div class="ov-head"><div class="ov-title">${icon('settings')} 설정</div><button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button></div>
-        <div class="settings-group">
-          <div class="settings-label"><b>오디오</b><span id="volume-value">${volume}%</span></div>
-          <input id="volume-range" type="range" min="0" max="100" step="5" value="${volume}" aria-label="마스터 볼륨">
-          <p>배경음악과 효과음의 전체 크기를 조절합니다.</p>
-        </div>
-        <div class="settings-group">
-          <div class="settings-label"><b>그래픽</b><span>효과 품질</span></div>
-          <div class="graphics-options" role="group" aria-label="그래픽 품질">
-            <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>고급</b><span>블러·포일·배경 효과</span></button>
-            <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>절전</b><span>효과를 줄여 가볍게</span></button>
-          </div>
-        </div>
-      </section>`
-    host.classList.add('open')
-    const close = () => this.closeOverlay()
-    host.querySelector('#ov-x')!.addEventListener('click', close)
-    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
-    const range = host.querySelector<HTMLInputElement>('#volume-range')!
-    const value = host.querySelector<HTMLElement>('#volume-value')!
-    range.addEventListener('input', () => {
-      const next = Number(range.value)
-      value.textContent = `${next}%`
-      GameAudio.setVolume(next / 100)
-    })
-    host.querySelectorAll<HTMLButtonElement>('[data-quality]').forEach((button) => {
-      button.addEventListener('click', () => {
-        GraphicsSettings.set(button.dataset.quality as GraphicsQuality)
-        host.querySelectorAll('[data-quality]').forEach((item) => item.classList.remove('on'))
-        button.classList.add('on')
-      })
-    })
+    openSettingsModal(this.root)
   }
 
   // ── 단어장(전체 덱) 오버레이 ──

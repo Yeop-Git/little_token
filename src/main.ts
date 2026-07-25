@@ -22,6 +22,7 @@ import { GraphicsSettings } from '@/ui/GameSettings'
 import { REWARD_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
+import { openSettingsModal } from '@/ui/SettingsModal'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -195,6 +196,7 @@ function goTitle() {
   stage.setAttribute('data-theme', 'day')
   current = new TitleView(stage, {
     hasSave: !!loadRun(),
+    onSettings: () => openSettingsModal(stage),
     onStart: (fresh) => {
       if (fresh) clearRun()
       const saved = fresh ? null : loadRun()

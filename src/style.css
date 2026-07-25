@@ -615,36 +615,43 @@ button {
 .action-order-item.timing-summary .action-order-portrait svg { width: 42px; height: 42px; }
 .action-order-item.timing-summary .action-order-copy b { color: var(--gold-hi); font-size: 19px; }
 
-.hud-left-status {
-  width: 196px;
-  display: grid;
-  gap: 7px;
-  margin-left: 4px;
-  pointer-events: auto;
-}
-.hud-left-status .grade-badge,
-.hud-left-status .turn-badge { width: 100%; justify-content: center; }
-.hud-left-status .turn-badge { padding: 5px 10px; gap: 9px; }
-.hud-left-status .turn-badge em { padding-left: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 @media (prefers-reduced-motion: reduce) {
   .action-order-item { transition: none; }
   .action-order-item.priority-taken .action-order-portrait,
   .action-order-item.priority-taken::after,
   .enemy-overflow-count { animation: none; }
 }
-/* 우상단은 설정·홈과 최근 전투 로그만 남겨 시스템 진입점을 선명하게 둔다. */
+/* 우상단: 캐스트 로그 위에 턴·보상 → 설정·홈 순으로 한 행에 둔다. */
 .hud-status {
   justify-self: end;
   align-self: start;
   position: relative;
-  width: 560px;
+  right: -6px;
+  width: 372px;
   min-height: 74px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 7px;
 }
+.hud-status-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.hud-right-status {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+.hud-right-status .turn-badge { min-width: 124px; justify-content: center; gap: 7px; padding-inline: 13px; }
+.hud-right-status .turn-badge i { color: var(--ink-faint); font-size: 13px; font-style: normal; opacity: .65; }
+.hud-right-status .turn-badge em { padding-left: 0; border-left: 0; font-size: 13px; }
+.hud-right-status .grade-badge { min-width: 104px; justify-content: center; padding-inline: 13px; }
 .hud-actions {
   display: flex;
   align-items: center;
@@ -722,7 +729,7 @@ button {
   height: 360px;
   transform: scale(var(--model-scale, 1));
   transform-origin: center bottom;
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
   transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), filter 0.4s ease;
 }
 .actor.foe .model-shell {
@@ -731,7 +738,7 @@ button {
 }
 /* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
 .actor.foe.front .model-shell {
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 18px color-mix(in srgb, var(--glow) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
 }
 .battle-sprite {
   display: block;
@@ -742,7 +749,7 @@ button {
 }
 .actor:hover .model-shell,
 .actor:focus-visible .model-shell {
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px var(--gold)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 24px color-mix(in srgb, var(--gold) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
 }
 /* 타원 그림자 레이어(반투명 도형) */
 .actor .shadow {
@@ -750,7 +757,7 @@ button {
   bottom: -6px;
   width: 190px;
   height: 42px;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0) 70%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0) 72%);
   border-radius: 50%;
   z-index: -1;
 }
@@ -1026,14 +1033,14 @@ button {
 }
 
 .actor.foe.strikes-first .model-shell {
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px rgba(255, 66, 36, 0.85)) drop-shadow(0 0 42px rgba(255, 56, 26, 0.4))
-    drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 20px rgba(255, 66, 36, 0.55)) drop-shadow(0 0 46px rgba(255, 56, 26, 0.22))
+    drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
   animation: first-strike-glow 1.05s ease-in-out infinite alternate;
 }
 @keyframes first-strike-glow {
   to {
-    filter: blur(var(--model-blur, 0)) drop-shadow(0 0 26px rgba(255, 90, 46, 1)) drop-shadow(0 0 60px rgba(255, 66, 30, 0.6))
-      drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+    filter: blur(var(--model-blur, 0)) drop-shadow(0 0 30px rgba(255, 90, 46, .68)) drop-shadow(0 0 66px rgba(255, 66, 30, 0.32))
+      drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
   }
 }
 /* 뒷줄은 힌트까지 띄우면 소란하니 최전방만 */
@@ -1082,8 +1089,8 @@ button {
   font-size: 46px;
   pointer-events: none;
   z-index: 90;
-  -webkit-text-stroke: 1px rgba(22, 11, 16, .72);
-  text-shadow: 0 4px 2px rgba(0, 0, 0, .88), 0 0 6px #09060c, 0 0 22px currentColor;
+  -webkit-text-stroke: .6px rgba(22, 11, 16, .42);
+  text-shadow: 0 5px 12px rgba(0, 0, 0, .38), 0 0 24px color-mix(in srgb, currentColor 68%, transparent);
   animation: pop-up 0.95s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
 .pop.dmg { color: #ff9a72; }
@@ -1116,8 +1123,8 @@ button {
   font-size: 104px;
   font-weight: 900;
   pointer-events: none;
-  -webkit-text-stroke: 2px rgba(18, 8, 14, .76);
-  text-shadow: 0 5px 3px rgba(0, 0, 0, .9), 0 0 10px #09060c, 0 0 34px currentColor;
+  -webkit-text-stroke: 1px rgba(18, 8, 14, .42);
+  text-shadow: 0 7px 18px rgba(0, 0, 0, .38), 0 0 38px color-mix(in srgb, currentColor 68%, transparent);
   animation: total-in 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .big-total.dmg { color: #ff9a72; }
@@ -1148,8 +1155,8 @@ button {
   transform: translate(-50%, -50%) scale(1);
   padding: 20px 28px;
   border-radius: 34px;
-  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .88), rgba(10, 7, 16, .6) 58%, transparent 76%);
-  filter: drop-shadow(0 16px 28px rgba(0,0,0,.62));
+  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .68), rgba(10, 7, 16, .32) 60%, transparent 79%);
+  filter: drop-shadow(0 18px 34px rgba(0,0,0,.28));
 }
 /* 준비 효과·선공이 지나가는 동안 총합은 한쪽에 물러나 대기한다(다시 계산하지 않는다) */
 .tally.parked {
@@ -1166,7 +1173,7 @@ button {
   border-radius: 16px;
   text-align: center;
   background: rgba(10, 7, 16, 0.74);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1), 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 .tally-box .tl {
   display: block;
@@ -1202,7 +1209,7 @@ button {
   font-size: 16px;
   font-weight: 900;
   color: #fff2da;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.85), 0 0 14px currentColor;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.38), 0 0 16px color-mix(in srgb, currentColor 72%, transparent);
   animation: tally-chip-in 0.26s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 @keyframes tally-chip-in {
@@ -1215,12 +1222,12 @@ button {
 .tally-chip.combo {
   color: #ffe6a8;
   font-size: 18px;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 18px rgba(255, 170, 60, 0.9);
+  text-shadow: 0 4px 11px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 170, 60, 0.7);
 }
 .tally-chip.crit {
   color: #fff;
   font-size: 18px;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 22px rgba(255, 90, 28, 0.95);
+  text-shadow: 0 4px 11px rgba(0, 0, 0, 0.4), 0 0 24px rgba(255, 90, 28, 0.72);
 }
 .tally-chip.down { color: #b7a9c8; }
 .tally-total {
@@ -1228,8 +1235,8 @@ button {
   font-weight: 900;
   line-height: 1;
   color: #ff9a72;
-  -webkit-text-stroke: 2px rgba(18, 8, 14, .72);
-  text-shadow: 0 5px 3px rgba(0, 0, 0, .88), 0 0 9px #09060c, 0 0 38px currentColor;
+  -webkit-text-stroke: 1px rgba(18, 8, 14, .4);
+  text-shadow: 0 8px 20px rgba(0, 0, 0, .36), 0 0 42px color-mix(in srgb, currentColor 72%, transparent);
   transition: font-size 0.3s cubic-bezier(0.2, 1.2, 0.3, 1);
 }
 .tally.heal .tally-total { color: #b6f38a; }
@@ -1438,7 +1445,7 @@ button {
   min-width: 520px;
   padding: 26px 44px;
   border-radius: 48px;
-  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .86), rgba(10, 7, 16, .42) 62%, transparent 78%);
+  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .66), rgba(10, 7, 16, .24) 64%, transparent 80%);
   text-align: center;
   pointer-events: none;
   opacity: 0;
@@ -1454,8 +1461,8 @@ button {
   font-size: 76px;
   font-weight: 900;
   color: #fff6e2;
-  -webkit-text-stroke: 1px rgba(24, 12, 16, .72);
-  text-shadow: 0 0 36px var(--glow), 0 0 10px var(--glow), 0 6px 16px rgba(0, 0, 0, .96);
+  -webkit-text-stroke: .6px rgba(24, 12, 16, .4);
+  text-shadow: 0 0 40px color-mix(in srgb, var(--glow) 72%, transparent), 0 8px 22px rgba(0, 0, 0, .38);
 }
 .combo-flash .mult {
   margin-top: 8px;
@@ -2103,8 +2110,8 @@ button {
 .info-dock {
   position: absolute;
   right: 34px;
-  top: 142px;
-  bottom: 324px;
+  top: 122px;
+  bottom: 344px;
   width: 372px;
   z-index: 7;
   border-radius: 22px;
@@ -2120,7 +2127,7 @@ button {
   background: linear-gradient(90deg, transparent, var(--wglow, var(--gold)), transparent);
   box-shadow: 0 0 16px var(--wglow, var(--gold));
 }
-.cast-dock { --wglow: var(--gold); top: 122px; bottom: 344px; }
+.cast-dock { --wglow: var(--gold); }
 /* 단어 상세 — 일러스트를 패널 전체에 풀로 깔고, 글은 아래쪽 스크림 위에 */
 .info-dock.word-detail { padding: 0; justify-content: flex-end; }
 .word-detail .wd-art {
@@ -2385,34 +2392,38 @@ button {
 .bag-item:hover { transform: translateY(-6px); filter: drop-shadow(0 0 16px var(--glow)); }
 .bag-empty { font-size: 18px; color: var(--ink-faint); }
 
-/* ───────── 우측 플레이어 스탯표 ───────── */
-/* 좌하단 플레이어 스탯 독 — 납작한 리스트지만 읽히는 크기로. */
+/* 좌하단 플레이어 스탯 독 — 상단은 전장 기준점에 고정하고 페이즈 행까지 아래로 확장한다. */
 .stat-dock {
   position: absolute;
-  left: 34px;
+  left: 44px;
+  top: 748px;
   bottom: 30px;
-  width: 244px;
+  width: 232px;
   z-index: 7;
-  padding: 14px 18px 12px;
-  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 15px 17px 13px;
+  border-radius: 16px 7px 16px 7px;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 170, .14), 0 12px 28px rgba(0,0,0,.42);
 }
 .stat-dock .dock-title {
-  font-size: 16px;
+  font-size: 18px;
   margin-bottom: 8px;
-  padding-bottom: 7px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .stat-dock .stat {
   gap: 10px;
+  min-height: 32px;
   padding: 3px 2px;
   border-radius: 0;
   background: none;
   box-shadow: none;
 }
-.stat-dock .stat-list { gap: 4px; }
-.stat-dock .stat .si { width: 19px; height: 19px; }
+.stat-dock .stat-list { flex: 1; justify-content: space-evenly; gap: 5px; }
+.stat-dock .stat .si { width: 21px; height: 21px; }
 .stat-dock .stat .sl { font-size: 15px; }
-.stat-dock .stat .sv { font-size: 19px; }
+.stat-dock .stat .sv { font-size: 20px; }
 .dock-title {
   font-size: 18px;
   font-weight: 900;
@@ -3688,8 +3699,8 @@ button {
   padding: 5px 12px;
   border-radius: 16px;
   background: rgba(9, 6, 14, .68);
-  box-shadow: inset 0 0 0 1px rgba(255, 220, 150, .12), 0 5px 14px rgba(0,0,0,.42);
-  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 150, .12), 0 7px 18px rgba(0,0,0,.24);
+  text-shadow: 0 4px 11px rgba(0, 0, 0, 0.38);
 }
 .mult-now:empty { display: none; }
 .mult-now .mn-lane {
@@ -3700,7 +3711,7 @@ button {
 .mult-now .mn-flat {
   font-size: 26px;
   color: #9fd8ff;
-  text-shadow: 0 0 16px rgba(120, 190, 255, 0.65), 0 3px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 18px rgba(120, 190, 255, 0.55), 0 4px 11px rgba(0, 0, 0, 0.36);
 }
 .mult-now .mn-x {
   font-size: 18px;
@@ -3709,7 +3720,7 @@ button {
 .mult-now .mn-mult {
   font-size: 32px;
   color: #ffd27a;
-  text-shadow: 0 0 18px rgba(255, 190, 90, 0.8), 0 3px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 20px rgba(255, 190, 90, 0.66), 0 4px 11px rgba(0, 0, 0, 0.36);
   transition: color 0.2s, text-shadow 0.2s;
 }
 /* 삐리리릭 — 숫자가 튀는 동안은 살짝 흔들리고 흐릿하다 */
@@ -3731,7 +3742,7 @@ button {
 /* 배율이 크게 붙으면 계속 뜨겁게 타오른다 */
 .mult-now.hot .mn-mult {
   color: #ffb04a;
-  text-shadow: 0 0 26px rgba(255, 150, 50, 0.95), 0 0 54px rgba(255, 110, 30, 0.6), 0 3px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 30px rgba(255, 150, 50, 0.74), 0 0 58px rgba(255, 110, 30, 0.38), 0 5px 13px rgba(0, 0, 0, 0.36);
 }
 /* 동사 전 — 깡수치 자리는 숨기고 배율만 */
 .mult-now.no-flat .mn-flat,
