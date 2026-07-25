@@ -240,6 +240,13 @@ function mountDevCheat(active: SceneName) {
     panel.classList.remove('open')
     panel.setAttribute('aria-hidden', 'true')
   }
+  const toggleWithBackquote = (event: KeyboardEvent) => {
+    if (event.code !== 'Backquote' || event.repeat) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if (panel.classList.contains('open')) close()
+    else open()
+  }
   const goScene = (scene: SceneName) => {
     if (scene === 'title') goTitle()
     else if (scene === 'intro') goBattle(true)
@@ -313,8 +320,12 @@ function mountDevCheat(active: SceneName) {
   }
   fitCorner()
   window.addEventListener('resize', fitCorner)
+  // 한/영 상태와 무관하게 물리 백틱 키로 열고 닫는다. 캡처 단계에서 받아
+  // 시네마틱의 '아무 키나 건너뛰기' 같은 씬별 단축키보다 먼저 처리한다.
+  window.addEventListener('keydown', toggleWithBackquote, true)
   devCheatCleanup = () => {
     window.removeEventListener('resize', fitCorner)
+    window.removeEventListener('keydown', toggleWithBackquote, true)
     corner.remove()
     devCheatCleanup = null
   }

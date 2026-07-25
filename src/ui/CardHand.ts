@@ -66,6 +66,25 @@ interface SlotHandState {
   deck: CardInstance[]
 }
 
+/**
+ * 초기 손패에 조건을 만족하는 카드가 없으면 덱의 첫 대상 카드와 교환한다.
+ * 이미 섞인 순서는 가능한 한 유지해 나머지 카드의 무작위성을 바꾸지 않는다.
+ */
+export function ensureCardInInitialDraw(
+  words: Word[],
+  initialCount: number,
+  predicate: (word: Word) => boolean,
+): Word[] {
+  const ordered = [...words]
+  if (initialCount <= 0 || ordered.slice(0, initialCount).some(predicate)) return ordered
+
+  const guaranteedIndex = ordered.findIndex((word, index) => index >= initialCount && predicate(word))
+  if (guaranteedIndex < 0) return ordered
+
+  ;[ordered[initialCount - 1], ordered[guaranteedIndex]] = [ordered[guaranteedIndex], ordered[initialCount - 1]]
+  return ordered
+}
+
 interface CardHandOptions {
   handRoot: HTMLElement
   deckButton: HTMLButtonElement
@@ -162,9 +181,15 @@ export class CardHand {
 
     let state = this.states.get(slotKey)
     if (!state) {
-      const shuffled = this.shuffle(words).map((word) => this.makeInstance(slotKey, word))
-      const initialCount = Math.min(2, shuffled.length)
-      state = { hand: shuffled.slice(0, initialCount), deck: shuffled.slice(initialCount) }
+      const initialCount = Math.min(2, words.length)
+      const ordered = ensureCardInInitialDraw(
+        this.shuffle(words),
+        initialCount,
+        // ③ 동사의 첫 손패에는 현재 문맥에서 고를 수 있는 공격을 최소 한 장 보장한다.
+        // 모순 카드를 억지로 살리지는 않아 Validator의 차단 규칙은 그대로 유지한다.
+        (word) => word.kind === 'attack' && !this.conflictOf(word),
+      ).map((word) => this.makeInstance(slotKey, word))
+      state = { hand: ordered.slice(0, initialCount), deck: ordered.slice(initialCount) }
       this.states.set(slotKey, state)
     }
 

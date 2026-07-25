@@ -23,9 +23,27 @@ interface BattleAtmosphere {
 }
 
 /**
- * 전장의 배경색을 캐릭터 텍스처에 아주 얕게 섞는다. 광원 반응형 재질로
- * 바꾸지 않아 언릿 카툰 인상은 유지하고, 발밑은 배경의 청록 그림자에 더
- * 잠기며 머리 쪽은 하늘색을 조금 받게 한다.
+ * 명암 경계가 너무 단순한 2단 셀 셰이딩 대신, 일러스트의 붓질처럼 면이
+ * 네 단계로 나뉘게 한다. 자체광으로 원본 텍스처 색을 보존하므로 어두운
+ * 면도 검게 꺼지지 않고 배경 안에서 재질 디테일만 드러난다.
+ */
+function makeBattleToonGradient(): THREE.DataTexture {
+  const values = [118, 166, 211, 255]
+  const data = new Uint8Array(values.flatMap((value) => [value, value, value, 255]))
+  const texture = new THREE.DataTexture(data, values.length, 1, THREE.RGBAFormat)
+  texture.minFilter = THREE.NearestFilter
+  texture.magFilter = THREE.NearestFilter
+  texture.generateMipmaps = false
+  texture.needsUpdate = true
+  return texture
+}
+
+const BATTLE_TOON_GRADIENT = makeBattleToonGradient()
+
+/**
+ * 전장의 배경색을 캐릭터 텍스처에 아주 얕게 섞는다. 자체광 비중을 높여
+ * 언릿 카툰 인상은 유지하고, 발밑은 배경의 청록색에 더 잠기며 머리 쪽은
+ * 하늘색을 조금 받게 한다.
  */
 const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
   sunny: {
@@ -258,6 +276,13 @@ class BattleCharacterModel {
     // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
     this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
     this.camera.lookAt(0, visual.cameraTargetY ?? 1.45, 0)
+    // 그림자를 만들지 않는 공용 카툰 조명. 따뜻한 하늘빛과 청록 지면빛은
+    // 배경의 팔레트를 따라가고, 사선 주광은 모델의 접힌 면만 얕게 구분한다.
+    const skyFill = new THREE.HemisphereLight(0xffe9bd, 0x40555a, 0.58)
+    const keyLight = new THREE.DirectionalLight(0xffedc7, 1.42)
+    keyLight.position.set(-3.5, 6, 5)
+    keyLight.castShadow = false
+    this.scene.add(skyFill, keyLight)
     this.scene.add(this.effects)
     this.shell.append(this.renderer.domElement)
     this.shell.dataset.modelInteractive = 'true'
@@ -315,7 +340,7 @@ class BattleCharacterModel {
 
       const model = cloneSkeleton(gltf.scene)
       model.rotation.y = companion.modelYaw ?? 0
-      this.useCompanionUnlitMaterials(model)
+      this.useUnlitMaterials(model)
       model.updateMatrixWorld(true)
       const bounds = new THREE.Box3().setFromObject(model)
       const size = bounds.getSize(new THREE.Vector3())
@@ -345,29 +370,6 @@ class BattleCharacterModel {
     } catch (error) {
       console.warn(`도우미 3D 모델을 불러오지 못했습니다: ${companion.name}`, error)
     }
-  }
-
-  private useCompanionUnlitMaterials(model: THREE.Object3D) {
-    model.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return
-      const originals = Array.isArray(object.material) ? object.material : [object.material]
-      const replacements = originals.map((material) => {
-        const source = material as THREE.MeshStandardMaterial
-        return new THREE.MeshBasicMaterial({
-          name: `${material.name}-token-unlit`,
-          color: source.color?.clone() ?? new THREE.Color(0xffffff),
-          map: source.map ?? null,
-          alphaMap: source.alphaMap ?? null,
-          transparent: material.transparent,
-          opacity: material.opacity,
-          alphaTest: material.alphaTest,
-          side: material.side,
-          vertexColors: source.vertexColors,
-          toneMapped: false,
-        })
-      })
-      object.material = Array.isArray(object.material) ? replacements : replacements[0]
-    })
   }
 
   private makeCompanionGlow(): THREE.Sprite {
@@ -491,11 +493,22 @@ class BattleCharacterModel {
       const originals = Array.isArray(object.material) ? object.material : [object.material]
       const replacements = originals.map((material) => {
         const source = material as THREE.MeshStandardMaterial
-        const unlit = new THREE.MeshBasicMaterial({
-          name: `${material.name}-battle-unlit`,
-          color: source.color?.clone() ?? new THREE.Color(0xffffff),
+        const baseColor = source.color?.clone() ?? new THREE.Color(0xffffff)
+        const toon = new THREE.MeshToonMaterial({
+          name: `${material.name}-battle-toon`,
+          color: baseColor,
           map: source.map ?? null,
           alphaMap: source.alphaMap ?? null,
+          aoMap: source.aoMap ?? null,
+          aoMapIntensity: source.aoMapIntensity,
+          normalMap: source.normalMap ?? null,
+          normalScale: source.normalScale?.clone(),
+          bumpMap: source.bumpMap ?? null,
+          bumpScale: source.bumpScale,
+          emissive: baseColor,
+          emissiveMap: source.map ?? null,
+          emissiveIntensity: 0.5,
+          gradientMap: BATTLE_TOON_GRADIENT,
           transparent: material.transparent,
           opacity: material.opacity,
           alphaTest: material.alphaTest,
@@ -503,15 +516,15 @@ class BattleCharacterModel {
           vertexColors: source.vertexColors,
           toneMapped: false,
         })
-        this.applyBattleAtmosphere(unlit, atmosphere, weather ?? 'sunny')
-        return unlit
+        this.applyBattleAtmosphere(toon, atmosphere, weather ?? 'sunny')
+        return toon
       })
       object.material = Array.isArray(object.material) ? replacements : replacements[0]
     })
   }
 
   private applyBattleAtmosphere(
-    material: THREE.MeshBasicMaterial,
+    material: THREE.MeshToonMaterial,
     atmosphere: BattleAtmosphere,
     weather: BattleWeather,
   ) {
@@ -537,7 +550,7 @@ uniform float uBattleSkyMix;
 uniform float uBattleGroundMix;
 uniform float uBattleExposure;
 varying float vBattleHeight;`)
-        .replace('vec3 outgoingLight = reflectedLight.indirectDiffuse;', `vec3 outgoingLight = reflectedLight.indirectDiffuse;
+        .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;
 float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBattleGroundMix;
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);

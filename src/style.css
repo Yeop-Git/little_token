@@ -80,6 +80,73 @@ body {
   --glass: rgba(26, 18, 30, 0.62);
   --glass-strong: rgba(20, 14, 24, 0.8);
   --glass-hi: rgba(255, 240, 210, 0.1);
+  /* 스크롤바 — 어두운 잉크 홈 위에 금빛 연필심이 움직이는 공용 그림일기 톤 */
+  --scroll-track: rgba(10, 7, 14, 0.5);
+  --scroll-thumb: rgba(220, 160, 77, 0.7);
+  --scroll-thumb-hover: rgba(255, 207, 118, 0.92);
+  --scroll-thumb-active: #ffe4a8;
+}
+
+/* Firefox와 Chromium/Safari의 모든 스크롤 영역을 같은 모양으로 통일한다.
+   실제로 스크롤되지 않는 요소에는 그려지지 않으므로 새 전용 클래스가 필요 없다. */
+.stage,
+.stage * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+.stage::-webkit-scrollbar,
+.stage *::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.stage::-webkit-scrollbar-track,
+.stage *::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--scroll-track);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 238, 204, 0.08),
+    inset 0 0 8px rgba(0, 0, 0, 0.32);
+}
+
+.stage::-webkit-scrollbar-thumb,
+.stage *::-webkit-scrollbar-thumb {
+  min-width: 36px;
+  min-height: 36px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, var(--gold-hi), var(--scroll-thumb) 48%, var(--gold-deep))
+    padding-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 246, 220, 0.28),
+    0 0 9px rgba(255, 194, 89, 0.18);
+}
+
+.stage::-webkit-scrollbar-thumb:hover,
+.stage *::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(180deg, #fff1c9, var(--scroll-thumb-hover) 48%, #edaa4e)
+    padding-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 251, 238, 0.42),
+    0 0 12px rgba(255, 207, 118, 0.38);
+}
+
+.stage::-webkit-scrollbar-thumb:active,
+.stage *::-webkit-scrollbar-thumb:active {
+  background: var(--scroll-thumb-active) padding-box;
+}
+
+.stage::-webkit-scrollbar-corner,
+.stage *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.stage::-webkit-scrollbar-button,
+.stage *::-webkit-scrollbar-button {
+  display: none;
 }
 
 .scene {
@@ -1002,7 +1069,7 @@ button {
 .endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
 .endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
 .actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.5)); }
-.actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
+.actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 26px rgba(255, 118, 78, .72)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
 
 /* 보스전은 프롬의 등 뒤에서 보스를 올려다보는 3인칭 구도다. 모델의 하반신은
@@ -1010,14 +1077,16 @@ button {
 .scene.battle[data-boss='true'] .actor.you {
   left: calc(50% - 260px);
   bottom: -316px;
-  z-index: 36;
+  /* 플레이어는 전경 배우다. 보스 배우의 그림자까지 같은 스태킹 컨텍스트에
+     묶여 있으므로 보스보다 한 겹 위에 두어 그림자가 플레이어를 덮지 않게 한다. */
+  z-index: 39;
   width: 520px;
   height: 520px;
 }
 .scene.battle[data-boss='true'] .actor.you .model-shell {
   width: 520px;
   height: 520px;
-  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, .38));
+  filter: none;
 }
 .scene.battle[data-boss='true'] .actor.you .shadow {
   bottom: 2px;
@@ -1167,10 +1236,12 @@ button {
 .token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
 .token-panic-lines {
   position: absolute;
-  inset: 28px 28px auto auto;
+  top: 14px;
+  left: 50%;
   z-index: 2;
   width: 52px;
   height: 46px;
+  transform: translateX(-50%);
 }
 .token-panic-lines i {
   position: absolute;
@@ -1228,7 +1299,7 @@ button {
   height: 360px;
   transform: scale(var(--model-scale, 1));
   transform-origin: center bottom;
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
+  filter: blur(var(--model-blur, 0));
   transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), filter 0.4s ease;
   cursor: grab;
   touch-action: none;
@@ -1244,7 +1315,7 @@ button {
 .actor.foe[data-character='roach'] .model-shell { width: 309px; }
 /* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
 .actor.foe.front .model-shell {
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 18px color-mix(in srgb, var(--glow) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px color-mix(in srgb, var(--glow) 48%, transparent));
 }
 .battle-sprite {
   display: block;
@@ -1267,34 +1338,29 @@ button {
 .model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
 .actor .model-shell:hover,
 .actor:focus-visible .model-shell {
-  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 24px color-mix(in srgb, var(--gold) 62%, transparent)) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.24));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
 }
-/* 캐릭터와 배경 지면을 잇는 넓은 접지 그림자. 중심의 청록 반사는 숲 바닥색을 받는다. */
+/* 투영 그림자 대신 발선만 배경에 살짝 묻는 접지 흔적을 둔다. */
 .actor .shadow {
   position: absolute;
-  bottom: -4px;
-  width: 210px;
-  height: 48px;
-  background:
-    radial-gradient(ellipse at 50% 48%, rgba(17, 30, 29, .64) 0 18%, rgba(6, 12, 15, .42) 38%, transparent 74%),
-    radial-gradient(ellipse at center, rgba(74, 91, 69, .2), transparent 68%);
+  bottom: -1px;
+  width: 126px;
+  height: 19px;
+  background: radial-gradient(ellipse at center, rgba(28, 45, 42, .18), transparent 70%);
   border-radius: 50%;
-  filter: blur(1.5px);
+  filter: blur(3px);
+  opacity: .46;
   z-index: -1;
 }
 .battle[data-weather='rain'] .actor .shadow {
-  background:
-    radial-gradient(ellipse at 50% 48%, rgba(12, 24, 31, .7) 0 18%, rgba(5, 11, 18, .48) 40%, transparent 74%),
-    radial-gradient(ellipse at center, rgba(72, 102, 116, .22), transparent 68%);
+  background: radial-gradient(ellipse at center, rgba(37, 62, 72, .2), transparent 70%);
 }
 .battle[data-weather='night'] .actor .shadow {
-  background:
-    radial-gradient(ellipse at 50% 48%, rgba(7, 10, 25, .78) 0 20%, rgba(5, 7, 18, .54) 42%, transparent 76%),
-    radial-gradient(ellipse at center, rgba(77, 88, 135, .22), transparent 70%);
+  background: radial-gradient(ellipse at center, rgba(37, 43, 72, .22), transparent 72%);
 }
 .actor.foe .shadow {
-  width: 180px;
-  height: 40px;
+  width: 108px;
+  height: 17px;
 }
 .actor.hit {
   animation: shake 0.34s ease;
@@ -2020,6 +2086,24 @@ button {
   0% { transform: translateX(0); }
   42% { transform: translateX(-260px) scale(1.06); }
   100% { transform: translateX(0); }
+}
+/* 보스전의 큰 배우는 기본 돌진 높이에서 상단 보스 체력 HUD와 시각적으로
+   겹친다. 타격 프레임만 아래로 흘려 HUD의 안전 영역을 계속 비워 둔다. */
+.scene.battle[data-boss='true'] .actor.you.lunge {
+  animation-name: lunge-you-boss;
+}
+@keyframes lunge-you-boss {
+  0% { transform: translate(0, 0); }
+  42% { transform: translate(300px, 56px) scale(1.06); }
+  100% { transform: translate(0, 0); }
+}
+.scene.battle[data-boss='true'] .actor.foe.boss.lunge {
+  animation-name: lunge-foe-boss;
+}
+@keyframes lunge-foe-boss {
+  0% { transform: translate(0, 0); }
+  42% { transform: translate(-260px, 56px) scale(1.06); }
+  100% { transform: translate(0, 0); }
 }
 
 /* 상단 발광 체인(선택 단어) — 테두리/배경 없음, 글자 발광만 */
@@ -3163,8 +3247,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 210, 122, 0.35) transparent;
 }
 .cast-entry {
   flex: none;
@@ -3713,8 +3795,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   display: none;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 210, 122, .35) transparent;
 }
 .codex-panel.detail-open .codex-detail {
   display: block;
