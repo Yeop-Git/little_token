@@ -1126,8 +1126,8 @@ export class BattleView {
           ${(['left', 'right'] as const).flatMap((side) =>
             Array.from({ length: summonPattern.maxPerSide }, (_, slot) =>
               `<span class="queen-worker ${side}" data-side="${side}" data-slot="${slot + 1}" hidden>
-                <span class="queen-worker-nameplate nameplate glass" aria-label="일벌 체력 1 / 1">
-                  <span class="row"><b class="nm">일벌</b><span class="hpn">1/1</span></span>
+                <span class="queen-worker-nameplate nameplate glass" aria-label="일벌 체력 ${summonPattern.hp ?? 1} / ${summonPattern.hp ?? 1}">
+                  <span class="row"><b class="nm">일벌</b><span class="hpn">${summonPattern.hp ?? 1}/${summonPattern.hp ?? 1}</span></span>
                   <span class="queen-worker-hp hpbar foe"><i class="fill"></i></span>
                 </span>
                 <span class="model-shell" data-model-status="${workerVisual.model3d ? 'preparing-3d' : 'fallback-2d'}">
