@@ -11,12 +11,13 @@ import { DeckDiscardView } from '@views/DeckDiscardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
 import { CombatGuideView } from '@views/CombatGuideView'
-import { DefeatView } from '@views/DefeatView'
+import { RunResultView, type RunOutcome } from '@views/RunResultView'
+import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
-import { stageFor } from '@data/stages'
+import { floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardGradeForDay } from '@data/rewards'
 import { newRun, registerWord, applyItemReward, type RewardPhase } from '@core/run'
 import { startGrade } from '@core/grade'
@@ -27,6 +28,8 @@ import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } 
 import { RARITY_LABEL, type Word } from '@core/types'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { CinematicIntro } from '@views/CinematicIntro'
+import { BossCinematic } from '@views/BossCinematic'
+import { VIDEO } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 
@@ -462,6 +465,36 @@ function goCombatGuide() {
   mountMeta('title')
 }
 
+/**
+ * 보스 조우 시네마틱이 붙는 층 — 지금은 5층 사마귀뿐이다. 영상이 더 들어오면
+ * 여기에 층과 파일을 나란히 적는다.
+ */
+const BOSS_CINEMATICS: Record<number, string> = {
+  5: VIDEO.bossCinematic1,
+}
+
+/**
+ * 전리품을 다 고른 뒤 보스전으로 들어가는 길. 시네마틱이 있는 층이면 까맣게
+ * 덮고 영상을 돌린 다음, 마지막 프레임 아래에 전장을 세워 스르륵 걷어 낸다.
+ * 같은 층을 다시 들어올 때(이어하기·치트 이동)는 컷을 반복하지 않는다.
+ */
+function goBattleWithBossIntro() {
+  const src = BOSS_CINEMATICS[floorInCycle(run.day)]
+  if (!src || run.bossCinematicSeen?.includes(run.day)) {
+    void goBattle()
+    return
+  }
+  // 본 컷은 저장에 남긴다 — 같은 보스를 다시 만날 때 매번 7초를 다시 볼 이유가 없다.
+  run.bossCinematicSeen = [...(run.bossCinematicSeen ?? []), run.day]
+  saveRun(run)
+  new BossCinematic({
+    src,
+    // 마지막 프레임이 화면을 붙들고 있는 사이에 전장을 세운다.
+    onCurtainReady: () => void goBattle(),
+    onDone: () => {},
+  })
+}
+
 async function goBattle(intro = false, onIntroComplete?: () => void) {
   const request = ++battleRequest
   const st = stageFor(run.day)
@@ -484,12 +517,14 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     bossHealthBars: st.bossHealthBars,
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
+    record: run.record,
     tables: makeEarlyTables(run.player.deck, run.player),
     debugCombat: debugCombatModes,
     onWin: handleBattleWin,
-    onLose: () => {
+    onLose: (cause) => {
+      // 저장은 지우지만 메모리의 run은 그대로 둔다 — 결과 종이가 이 값들을 읽는다.
       clearRun()
-      goDefeat()
+      goResult('lost', cause)
     },
     onHome: () => goTitle(), // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
     onResetAll: resetAllRecordsAndStart,
@@ -508,6 +543,8 @@ async function preloadUpcomingBattle() {
 }
 
 function handleBattleWin(grade: number) {
+  // 넘긴 날 — 결과 종이가 "어디까지 갔는지"로 읽는 값이다.
+  run.record.daysCleared += 1
   if (run.day === 15 && !run.endingSeen) {
     goEnding(grade)
     return
@@ -523,7 +560,9 @@ function goEnding(grade = startGrade(run.player.stats.luck)) {
     onComplete: () => {
       run.endingSeen = true
       run.endless = true
-      beginReward(grade)
+      // 컷씬이 끝나면 이 판의 기록을 종이 한 장으로 정산해 보여 주고, 거기서
+      // 엔들리스로 이어 간다. 승리도 패배와 같은 종이를 쓴다(도장만 다르다).
+      goResult('won', null, () => beginReward(grade))
     },
   })
   mountMeta('ending')
@@ -545,7 +584,7 @@ function advanceReward(grade: number, phase: RewardPhase) {
   run.reward = null
   run.day++
   saveRun(run)
-  goBattle()
+  goBattleWithBossIntro()
 }
 
 function goDiscard(incoming: Word, candidates: Word[], grade: number, phase: 'subject' | 'verb') {
@@ -578,6 +617,7 @@ function goReward(
     grade: rewardGradeForDay(grade, run.day),
     phase,
     nextField: stageFor(run.day + 1).field,
+    nextEncounter: stageFor(run.day + 1).encounter,
     options,
     onPick: (opt) => {
       if (opt.kind === 'word' && opt.word) {
@@ -611,27 +651,41 @@ function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck), nex
       } else {
         run.day++
         saveRun(run)
-        goBattle()
+        goBattleWithBossIntro()
       }
     },
   })
   mountMeta('item')
 }
 
-function goDefeat() {
+/**
+ * 런 결과 종이 — 승리와 패배가 같은 화면을 쓰고 도장만 갈린다.
+ * 저장은 이미 지워졌어도 메모리의 run에는 이 판의 기록이 남아 있어서 그걸 읽는다.
+ */
+function goResult(outcome: RunOutcome, cause?: DefeatCause | null, onContinue?: () => void) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  current = new DefeatView(stage, {
+  current = new RunResultView(stage, {
+    outcome,
     day: run.day,
+    player: run.player,
+    record: run.record,
+    cause,
+    endless: run.endless,
     onNewRun: () => {
       run = newRun()
       saveRun(run)
       startNewRunBattle()
     },
     onTitle: () => goTitle(),
+    onContinue,
   })
   mountMeta('defeat')
+}
+
+function goDefeat() {
+  goResult('lost', null)
 }
 
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.

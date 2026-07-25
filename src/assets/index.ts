@@ -123,6 +123,7 @@ import itemBeanstalk from './sprites/items/item_011.webp'
 import itemBook from './sprites/items/item_012.webp'
 import itemPencil from './sprites/items/item_013.webp'
 import cinematic from './video/cinematic.webm'
+import bossCinematic001 from './video/bosscinematic_001.webm'
 import attack001 from './video/attack_001.webm'
 import attack002 from './video/attack_002.webm'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
@@ -335,6 +336,8 @@ export const ITEM_ART: Record<string, string> = {
 // attack1은 수치가 크게 부풀었을 때, attack2는 그 일격이 판을 통째로 쓸어버릴 때.
 export const VIDEO = {
   cinematic,
+  /** 5층 사마귀 조우 — 전리품을 다 고른 뒤 암전 위로 풀화면 재생한다. */
+  bossCinematic1: bossCinematic001,
   attack1: attack001,
   attack2: attack002,
 }

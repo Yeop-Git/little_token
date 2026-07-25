@@ -1,5 +1,5 @@
 import { compile } from '@core/compiler'
-import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
+import { DECK_LIMITS, registerWord, reinforceWord, startingPlayer, type RunState, emptyRunRecord } from '@core/run'
 import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
@@ -41,7 +41,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(!migrateCombatBalance(legacy as RunState) && legacy.player.stats.hp === 52 && legacy.player.stats.guard === 3, 'combat balance migration is idempotent')
 }
 {
-  const legacy = { player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } }, day: 9, balanceVersion: 0, endless: false, endingSeen: false, reward: null }
+  const legacy = { player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } }, day: 9, record: emptyRunRecord(), balanceVersion: 0, endless: false, endingSeen: false, reward: null }
   migrateCombatBalance(legacy)
   assert(legacy.player.stats.hp === 100 && legacy.player.stats.guard === 7, 'legacy growth survives combat balance migration')
 }

@@ -16,6 +16,8 @@ import { critText, multText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
+import { ENEMIES } from '@data/enemies'
+import { tacticalGuideForEnemy } from '@data/tacticalCards'
 
 interface Opts {
   day: number
@@ -24,6 +26,8 @@ interface Opts {
   /** 전투에서 확정된 보상등급 — 카드 희귀도가 이 등급의 가중치로 굴려졌다. */
   grade: number
   nextField: FieldDef
+  /** 내일 만날 편성 — 전리품을 고르는 데 실제로 쓸모 있는 정보는 이쪽이다. */
+  nextEncounter?: readonly string[]
   options: RewardOption[]
   phase: RewardPhase
   onPick: (opt: RewardOption) => void
@@ -151,7 +155,6 @@ export class RewardView {
   constructor(root: HTMLElement, opts: Opts) {
     this.root = root
     this.opts = opts
-    const f = opts.nextField
     this.root.innerHTML = `
       <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
@@ -168,9 +171,7 @@ export class RewardView {
               </div>
               <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade.toFixed(1)}</b></div>
             </div>
-            <div class="reward-field">
-              내일은 <b>${f.date}</b> · <b>${f.title}</b><br>${f.desc}
-            </div>
+            ${this.nextUpHtml(opts)}
             <div class="reward-grid">
               ${opts.options.map((p, i) => this.pickHtml(p, i)).join('')}
             </div>
@@ -189,6 +190,35 @@ export class RewardView {
         this.showDetail(opts.options[i], el)
       })
     })
+  }
+
+  /**
+   * "내일 만날 것" 칸 — 예전에는 날씨·환경 규칙을 적었지만, 전리품을 고르는 순간에
+   * 그 정보로는 아무 결정도 못 한다. 지금은 내일 나올 벌레와 그에 맞는 공략 방향을
+   * 적는다. 카드를 고르는 손이 실제로 참고할 수 있는 값이어야 한다.
+   */
+  private nextUpHtml(opts: Opts): string {
+    const ids = opts.nextEncounter ?? []
+    const foes = ids.map((id) => ENEMIES[id]).filter(Boolean)
+    if (foes.length === 0) return ''
+    const boss = foes.find((foe) => foe.boss)
+    // 공략은 보스가 있으면 보스 기준, 없으면 가장 단단한 적 기준으로 잡는다.
+    const focus = boss ?? [...foes].sort((a, b) => b.hp - a.hp)[0]
+    const guide = tacticalGuideForEnemy(focus.id)
+    const roster = [...new Set(foes.map((foe) => foe.name))]
+      .map((name) => {
+        const count = foes.filter((foe) => foe.name === name).length
+        return `<span class="nu-foe">${name}${count > 1 ? ` ×${count}` : ''}</span>`
+      })
+      .join('')
+    return `
+      <div class="reward-next${boss ? ' is-boss' : ''}">
+        <div class="nu-head">${boss ? `내일 · <b>${boss.name}</b>와 맞선다` : '내일 만날 벌레'}</div>
+        <div class="nu-roster">${roster}</div>
+        <div class="nu-tip">${guide
+          ? `<b>${guide.title}</b> ${guide.tooltip}`
+          : `${focus.note}`}</div>
+      </div>`
   }
 
   private pickHtml(p: RewardOption, i: number): string {

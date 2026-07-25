@@ -7,9 +7,43 @@ import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerState, type PlayerSta
 import type { Word } from './types'
 import { EARLY_WORDS } from '@data/earlyWords'
 
+/**
+ * 런 한 판의 기록 — 결과 화면의 찢어진 종이에 촘촘히 적히는 값들이다.
+ * 전투 단위 수치(killsThisBattle, grade 등)와 달리 런 내내 누적되며 저장에도 실린다.
+ */
+export interface RunRecord {
+  /** 종류별 처치 수. 종이에 "흰개미 ×7"처럼 늘어놓는다. */
+  kills: Record<string, number>
+  /** 가장 센 한 방과 그때 조립한 문장. */
+  bestHit: { dmg: number; sentence: string } | null
+  /** 이 런에서 한 문장에 실린 최고 배율. */
+  bestMult: number
+  /** 한 방으로 이어 낸 최고 관통 콤보. */
+  bestCombo: number
+  /** 조립해서 꽂은 문장 수. */
+  sentences: number
+  /** 넘긴 날짜 수 — 전투를 이겨 다음 장으로 넘어간 횟수. */
+  daysCleared: number
+}
+
+export function emptyRunRecord(): RunRecord {
+  return { kills: {}, bestHit: null, bestMult: 0, bestCombo: 0, sentences: 0, daysCleared: 0 }
+}
+
+/**
+ * 무엇에게 일기장을 잃었는지. 결과 화면이 "나를 갉아먹은 것"으로 크게 보여 준다.
+ * 자기 문장의 자해로 쓰러지는 경우도 있어서 벌레로만 두지 않았다.
+ */
+export type DefeatCause =
+  /** sprite는 Sprites.ts 키, note는 그 벌레의 한 줄 소개 — 종이에 초상과 함께 적는다. */
+  | { kind: 'enemy'; enemyId: string; name: string; sprite: string; note: string }
+  | { kind: 'self'; sentence: string }
+
 export interface RunState {
   player: PlayerState
   day: number
+  /** 결과 화면에 보여 줄 이 런의 누적 기록. */
+  record: RunRecord
   /** 저장된 전투 시작 스탯 보정의 적용 버전. 구 저장은 loadRun에서 한 번만 올린다. */
   balanceVersion: number
   /** 장로거미를 쓰러뜨리고 첫 15층 이야기 뒤의 반복 구간에 진입했는가. */
@@ -18,6 +52,11 @@ export interface RunState {
   endingSeen: boolean
   /** 전투를 다시 치러 보상을 중복 획득하지 않도록 3단계 보상 진행을 저장한다. */
   reward: PendingReward | null
+  /**
+   * 보스 조우 컷을 이미 본 날짜들. 같은 보스를 다시 만날 때(이어하기·재도전)
+   * 7초짜리 영상을 매번 다시 보여 줄 이유는 없다.
+   */
+  bossCinematicSeen?: number[]
 }
 
 export type RewardPhase = 'subject' | 'item' | 'verb'
@@ -47,7 +86,15 @@ export function startingPlayer(): PlayerState {
 }
 
 export function newRun(): RunState {
-  return { player: startingPlayer(), day: 1, balanceVersion: COMBAT_BALANCE_VERSION, endless: false, endingSeen: false, reward: null }
+  return {
+    player: startingPlayer(),
+    day: 1,
+    record: emptyRunRecord(),
+    balanceVersion: COMBAT_BALANCE_VERSION,
+    endless: false,
+    endingSeen: false,
+    reward: null,
+  }
 }
 
 // 아이템 보상 = 스탯 수치 상승(스펙업).

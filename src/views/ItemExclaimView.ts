@@ -186,7 +186,7 @@ export class ItemExclaimView {
           this.revealed.add(key)
         }
         const blessHtml = bless
-          ? `<span class="bless">팅! ${STAT_LABEL[bless.stat]} +${bless.n}</span>`
+          ? `<span class="bless">${STAT_LABEL[bless.stat]} +${bless.n}</span>`
           : ''
         return `<button class="word-cell rarity-common ${picked ? 'picked' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
           <span class="w">${w.text}</span><span class="n">${w.note}</span>${blessHtml}

@@ -56,6 +56,7 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
+import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -88,7 +89,9 @@ interface Opts {
   encounter: string[]
   /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
   onWin: (grade: number) => void
-  onLose: () => void
+  onLose: (cause: DefeatCause | null) => void
+  /** 런 내내 누적되는 기록. 결과 화면의 찢어진 종이가 이걸 읽는다. */
+  record?: RunRecord
   onHome?: () => void
   onResetAll?: () => void
   player?: PlayerState
@@ -132,6 +135,12 @@ const ENEMY_ENTER_DELAY_MS = 260
 const PLAYER_ENTER_MS = 1120
 const FOE_WALK_MS = 2260
 /**
+ * 보스가 컷의 마지막 자리에서 자기 자리까지 걸어오는 시간.
+ * 실측 거리는 약 445px(중심 74% → 51%)이고, 적 등장과 같은 약 300px/초 걸음이면
+ * 1.5초쯤이다 — 둘이 같은 땅을 걷는 것으로 읽혀야 한다.
+ */
+const BOSS_WALK_MS = 1500
+/**
  * 뒷줄이 한 칸 당겨올 때 걷는 시간. style.css의 .actor 이동 트랜지션(0.42s)과
  * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
  */
@@ -160,8 +169,12 @@ const HEAVY_LUNGE_LEAD_MS = 80
 const HEAVY_FLASH_BLOOM_MS = 120
 /** 강타의 정지는 평소보다 이만큼 더 길게 — 다만 120ms를 넘기면 멈춘 게 아니라 버벅인 것으로 읽힌다. */
 const HEAVY_HIT_STOP_BONUS_MS = 26
-/** 검기가 적 하나를 지나쳐 다음 적에게 닿기까지. style.css의 .slash-beam 이동과 같아야 한다. */
-const SLASH_BEAM_MS = 260
+/**
+ * 검기가 적 하나를 지나쳐 다음 적에게 닿기까지. 짧아야 한다 —
+ * 260ms로 잡았을 때는 관통마다 화면이 기다리는 것처럼 읽혔다. 검기는 훑고 지나가는
+ * 것이고, 쓰러지는 건 그 뒤에서 알아서 일어나야 한다.
+ */
+const SLASH_BEAM_MS = 120
 /**
  * 이 배율이면 연출이 최대로 화려해진다. 문턱은 PUMP_MULT(×2) —
  * 그 사이를 0~1로 펴서 겹·크기·정지 길이·흔들림에 전부 태운다.
@@ -219,7 +232,13 @@ export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
   private onWin: (grade: number) => void
-  private onLose: () => void
+  private onLose: (cause: DefeatCause | null) => void
+  /** 런 기록 — 전달되지 않으면(스샷·검수 진입) 빈 기록에 적고 버린다. */
+  private record: RunRecord
+  /** 마지막으로 나를 다치게 한 것. 쓰러지는 순간 이 값이 곧 사인이 된다. */
+  private lastHurtBy: DefeatCause | null = null
+  /** 방금 꽂은 문장 — 자해로 쓰러졌을 때 사인으로 적는다. */
+  private lastSentence = ''
   private onHome?: () => void
   private onResetAll?: () => void
   private onIntroComplete?: () => void
@@ -260,6 +279,11 @@ export class BattleView {
   private heavyHeld = false
   /** 이번 강타에 실린 배율 — 이펙트의 화려함이 여기서 나온다. */
   private heavyMult = 0
+  /**
+   * 이번 문장에서 프레임 정지를 이미 썼는가. 정지는 **처음 검을 휘두르는 한 번**에만
+   * 붙는다 — 관통이나 메아리에서 또 멈추면 검기가 지나가는 흐름이 토막토막 끊긴다.
+   */
+  private heavyStopUsed = false
   private actionOrderSignature = ''
   private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
@@ -283,6 +307,7 @@ export class BattleView {
     this.field = opts.field
     this.onWin = opts.onWin
     this.onLose = opts.onLose
+    this.record = opts.record ?? emptyRunRecord()
     this.onHome = opts.onHome
     this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
@@ -342,23 +367,17 @@ export class BattleView {
   }
 
   /**
-   * 프롬도 자기 자리로 들어온다 — 배경마다 서는 높이가 달라서, 가만히 있으면
-   * 판이 바뀔 때마다 다른 자리에 순간이동해 있는 꼴이 된다.
+   * 프롬은 화면 밖에서 들어오지 않는다. 런 내내 같은 아이가 계속 걸어가는 중이고,
+   * 판이 바뀌는 건 그 아이가 다음 장으로 넘어간 것이지 새로 등장하는 게 아니다 —
+   * 매 판 왼쪽 밖에서 다시 걸어 들어오면 스테이지마다 딴 사람이 오는 꼴이 된다.
    *
-   * GLB의 walk 클립을 쓴다 — 매니페스트에 연결이 없어 여태 잠들어 있던 동작이다.
-   * walk는 idle처럼 계속 도는 클립이라 도착할 때까지 반복되고, 다 오면 idle로 돌린다.
+   * 그래서 자리 이동 없이 제자리에서 걷는 자세만 잠깐 보여 주고 idle로 돌아온다.
    */
   private enterPlayer() {
     const you = this.root.querySelector<HTMLElement>('.actor.you')
     if (!you) return
-    you.classList.add('is-entering')
     playCharacterAnimation(you, 'walk')
-    this.timers.push(
-      window.setTimeout(() => {
-        you.classList.remove('is-entering')
-        playCharacterAnimation(you, 'idle')
-      }, PLAYER_ENTER_MS),
-    )
+    this.timers.push(window.setTimeout(() => playCharacterAnimation(you, 'idle'), PLAYER_ENTER_MS))
   }
 
   destroy() {
@@ -477,6 +496,32 @@ export class BattleView {
     this.root.querySelectorAll<HTMLElement>('.actor.foe').forEach((foe) => {
       playCharacterAnimation(foe, 'walk')
       this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), FOE_WALK_MS))
+    })
+    this.walkBossToPost()
+  }
+
+  /**
+   * 보스는 조우 시네마틱이 걷힌 **그 자리**에서 시작해 자기 자리로 걸어 들어온다.
+   * 컷의 마지막 프레임과 다른 자리에 처음부터 서 있으면 컷이 걷히는 순간 껑충 뛴다.
+   * 출발 자리는 보스마다 다르다(style.css의 --boss-entry-right).
+   */
+  private walkBossToPost() {
+    const boss = this.root.querySelector<HTMLElement>('.actor.foe.boss')
+    if (!boss || !this.isBoss) return
+    const entry = getComputedStyle(boss).getPropertyValue('--boss-entry-right').trim()
+    if (!entry) return // 컷이 없는 보스는 예전처럼 제자리에서 시작한다
+    const post = boss.style.right // updateFoe가 넣어 둔 도착 자리
+    boss.style.transition = 'none'
+    boss.style.right = entry
+    requestAnimationFrame(() => {
+      // 걸음 속도는 적 등장과 같게 맞춘다 — 같은 땅을 걷는 것으로 읽혀야 한다.
+      boss.style.transition = `right ${BOSS_WALK_MS}ms cubic-bezier(0.3, 0.3, 0.85, 1)`
+      boss.style.right = post
+      playCharacterAnimation(boss, 'walk')
+      this.timers.push(window.setTimeout(() => {
+        playCharacterAnimation(boss, 'idle')
+        boss.style.transition = ''
+      }, BOSS_WALK_MS + 120))
     })
   }
 
@@ -1130,7 +1175,11 @@ export class BattleView {
     // 일반 전투 레일은 원근 단차를 두지 않는다. 모든 적을 같은 바닥선과 크기로
     // 세우고, 배경별 차이는 가로 자리와 간격에만 남긴다.
     const st = currentFieldStage()
-    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${st.railRight - rank * st.railGap}px`
+    // 보스의 가로 자리는 CSS 변수로 뺀다 — 조우 시네마틱의 마지막 프레임과 맞춰야 해서
+    // 보스마다 다르게 잡을 수 있어야 한다(style.css의 --boss-right).
+    el.style.right = this.isBoss && e.def.boss
+      ? 'var(--boss-right, calc(50% - 195px))'
+      : `${st.railRight - rank * st.railGap}px`
     el.style.bottom = this.isBoss && e.def.boss ? '24px' : `${st.bottom}px`
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 보스 외 모든 적은 프롬과 같은 시각 크기·선명도를 유지한다.
@@ -2447,6 +2496,7 @@ export class BattleView {
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
     //    이 숫자를 들고 준비 효과 → 선공 → 내 공격까지 이어가므로 중간에 다시 계산하지 않는다.
+    this.noteSentence(intent.sentence, mult, dealsDamage ? dmg : 0)
     const tally = this.buildTally(intent, resolved, dealsDamage)
     if (tally.total > 0) await this.playTally(tally)
 
@@ -2501,6 +2551,7 @@ export class BattleView {
         alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
       heavy = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
       this.heavyMult = heavy ? mult : 0
+      this.heavyStopUsed = false // 이번 문장의 정지 한 번을 새로 연다
     }
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
@@ -2519,7 +2570,10 @@ export class BattleView {
     await this.strike(res, sweep, heavy)
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
     if (res.summonsDispersed > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed)
+      // 강타에서는 기다리지 않는다 — 일벌이 흩어지는 것과 검기가 뻗는 건 같은 순간에
+      // 벌어져야 한다. 여기서 기다리면 정지 뒤에 텀이 하나 더 생긴다.
+      const dispersal = this.playSummonDispersal(this.target, res.summonsDispersed)
+      if (!heavy) await dispersal
       this.log(`넓게 번진 문장이 일벌 ${res.summonsDispersed}마리를 흩어 냈다.`)
     }
     const rouletteNote = resolved.outcome === 'crit' ? ' · 대성공!' : resolved.outcome === 'fail' ? ' · 실패…' : ''
@@ -2604,6 +2658,10 @@ export class BattleView {
       return
     }
 
+    // 턴이 넘어갈 때 연출 상태를 무조건 원위치시킨다. 확대·정지는 여러 갈래(패배·승리·
+    // 메아리·보스 패턴)에서 중간에 빠져나갈 수 있어서, 한 갈래라도 놓치면 화면이 조여든
+    // 채로 굳는다 — 실제로 "어두워진 화면이 안 돌아온다"는 사고가 여기서 났다.
+    this.endSlowmo()
     this.sel = {}
     this.slotIndex = 0
     this.playerPreempting = false
@@ -2634,7 +2692,7 @@ export class BattleView {
     this.renderActors()
     const defeatDuration = playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'defeat')
     await sleep(defeatDuration || 520)
-    this.onLose()
+    this.onLose(this.lastHurtBy)
   }
 
   /**
@@ -2767,31 +2825,48 @@ export class BattleView {
       .filter((actor): actor is HTMLElement => !!actor)
     if (hitTargets.length > 0) {
       const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
-      if (heavy) {
+      // 프레임 정지는 **발동당 딱 한 번**이다. 처음 검을 내리치는 그 프레임에만 붙고,
+      // 관통이나 메아리에서는 두 번 다시 멈추지 않는다 — 검기가 지나가는 흐름을
+      // 토막토막 끊으면 "슝" 하고 훑는 한 줄기가 안 된다.
+      if (heavy && !this.heavyStopUsed) {
         // 섬광이 피어날 한 프레임을 준 다음 화면째로 끊는다. 정지가 풀리는 순간
         // 흔들림과 함께 확대가 풀려서 "팡" 하고 뒤로 물러나는 것처럼 보인다.
         // 배율이 높을수록 더 오래 끊고 더 세게 흔든다 — 잘 쌓은 문장의 몫이다.
+        this.heavyStopUsed = true
         const tier = this.heavyTier()
         await sleep(HEAVY_FLASH_BLOOM_MS)
         await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
         this.shakeStage(1 + tier * 0.7)
         this.endSlowmo()
-      } else {
+      } else if (!heavy) {
         await this.attackHitStop(you, stopMs)
       }
     }
+    // 강타는 정지가 풀리는 순간 곧바로 검기가 나가야 한다. 여기서부터 아래는 전부
+    // 기다리지 않는다 — 돌진 마무리도, 수치가 날아가는 것도, 쓰러지는 것도 뒤에서
+    // 저절로 일어난다. 정지 한 순간 말고 텀이 하나라도 더 끼면 "탕→촥"이 안 된다.
     if (attacking) {
-      await sleep(250)
-      you.classList.remove('lunge', 'heavy-lunge')
+      if (heavy) this.timers.push(window.setTimeout(() => you.classList.remove('lunge', 'heavy-lunge'), 250))
+      else {
+        await sleep(250)
+        you.classList.remove('lunge', 'heavy-lunge')
+      }
     }
     // 회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다. 방어는 준비 단계에서 처리한다.
-    if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
+    if (res.selfDmg) {
+      // 내가 쓴 문장이 나를 깎았다 — 여기서 쓰러지면 사인은 벌레가 아니라 이 문장이다.
+      this.lastHurtBy = { kind: 'self', sentence: this.lastSentence }
+      const fly = this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
+      if (!heavy) await fly
+    }
     if (res.heal) {
       playCharacterAnimation(you, 'heal')
-      await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+      const fly = this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+      if (!heavy) await fly
     }
     // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
-    for (const k of res.killed) await this.playDeath(k, 1, sweep)
+    if (heavy) for (const k of res.killed) void this.playDeath(k, 1, true)
+    else for (const k of res.killed) await this.playDeath(k, 1, sweep)
   }
 
   /** 체력 막이 깨질 때 대응하는 3D 다리 메시를 디졸브하고 아래로 떨어뜨린다. */
@@ -2855,6 +2930,9 @@ export class BattleView {
   // combo가 높을수록 튀는 불꽃이 많아 관통 콤보의 화려함이 커진다.
   // fast면 쓸려나가는 흐름이 끊기지 않게 짧고 세게 끝낸다.
   private async playDeath(idx: number, combo = 1, fast = false): Promise<void> {
+    // 모든 사망 경로(본타격·관통·예약 문장·반격)가 이 함수를 지난다 — 종류별 처치는
+    // 여기 한 곳에서만 센다.
+    this.noteKill(idx)
     const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${idx}"]`)
     if (!el) return
     el.classList.remove('lunge')
@@ -2962,7 +3040,6 @@ export class BattleView {
     this.focusStageOn(this.target)
     scene.classList.add('heavy-windup')
     this.q('#actors').classList.add('slowmo')
-    scene.classList.add('slowmo-veil')
 
     const swing = playCharacterAnimation(you, 'attack', HEAVY_SWING_MS) || HEAVY_SWING_MS
     const beats = this.playerVisual.animations?.attackBeats
@@ -2974,16 +3051,20 @@ export class BattleView {
     GameAudio.play('paperAttack')
 
     // 칼을 든 채 멈춘 이 정지 화면 위로 컷이 밀려 들어온다.
-    // open은 영상 워밍업을 기다리므로 비동기다 — await 없이 받으면 Promise가
-    // 언제나 참이라 열리지 않은 경우까지 열린 것으로 셈한다.
-    const opened = (await this.attackCine?.open(cut)) ?? false
-    await sleep(opened ? (this.attackCine?.enterMs ?? 0) + HEAVY_HOLD_MS : HEAVY_HOLD_MS)
-
-    // 내리치기 전에 패널을 확실히 치운다. 컷은 화면 왼쪽 900px을 채우는 풀 일러스트라
-    // 프롬이 서 있는 자리와 타격점을 통째로 덮는다 — 붙어 있는 채로 내리치면 가장
-    // 보여줘야 할 순간이 그림 뒤에서 벌어진다.
-    await this.attackCine?.close()
-    await sleep(HEAVY_PANEL_CLEAR_MS)
+    //
+    // 붙들고 있는 시간은 **컷이 원래 쓰던 길이**(holdMsFor)를 그대로 쓴다. 여기에
+    // 짧은 상수를 넣었더니 한창일 때 멈춰서 빠지는 원본 타이밍이 통째로 잘려 나갔다 —
+    // 컷은 들어오고, 한창 돌고, 그 그림을 들고 물러나는 한 덩이여야 한다.
+    const opened = this.attackCine?.open(cut) ?? false
+    if (opened) {
+      await sleep((this.attackCine?.enterMs ?? 0) + (this.attackCine?.holdMsFor(cut) ?? HEAVY_HOLD_MS))
+      // 컷이 스스로 물러나는 것과 같은 방식으로 치운다(멈춘 그림을 들고 왼쪽으로).
+      await this.attackCine?.close()
+      await sleep(HEAVY_PANEL_CLEAR_MS)
+    } else {
+      // 컷이 아직 안 데워졌으면 정점만 짧게 붙들고 곧바로 내리친다.
+      await sleep(HEAVY_HOLD_MS)
+    }
   }
 
   /**
@@ -3057,6 +3138,35 @@ export class BattleView {
     actors.forEach((actor) => freezeCharacterAnimation(actor, false))
   }
 
+  // ── 런 기록 ── 결과 화면의 찢어진 종이에 적힐 값들을 여기서만 손댄다.
+
+  /** 문장 하나가 정산될 때 — 문장 수, 최고 배율, 가장 센 한 방과 그 문장. */
+  private noteSentence(sentence: string, mult: number, dmg: number) {
+    this.lastSentence = sentence
+    this.record.sentences += 1
+    if (mult > this.record.bestMult) this.record.bestMult = mult
+    if (dmg > (this.record.bestHit?.dmg ?? 0)) this.record.bestHit = { dmg, sentence }
+  }
+
+  /** 벌레 한 마리가 쓰러질 때 — 이름별로 센다. 종이에 "흰개미 ×7"로 늘어놓는다. */
+  private noteKill(idx: number) {
+    const name = this.state.enemies[idx]?.def.name
+    if (!name) return
+    this.record.kills[name] = (this.record.kills[name] ?? 0) + 1
+  }
+
+  /** 관통이 이어질 때마다 — 이 런의 최고 콤보를 남긴다. */
+  private noteCombo(combo: number) {
+    if (combo > this.record.bestCombo) this.record.bestCombo = combo
+  }
+
+  /** 적의 타격이 실제로 체력을 깎을 때 — 쓰러지면 이 벌레가 사인이 된다. */
+  private noteAttacker(idx: number) {
+    const def = this.state.enemies[idx]?.def
+    if (!def) return
+    this.lastHurtBy = { kind: 'enemy', enemyId: def.id, name: def.name, sprite: def.sprite, note: def.note }
+  }
+
   /** 슬로우·딤·확대가 한 점을 보게 초점을 맞춘다. */
   private focusStageOn(enemyIdx: number) {
     const front = this.root.querySelector<HTMLElement>(`#actors .actor.foe[data-i="${enemyIdx}"]`)
@@ -3098,8 +3208,7 @@ export class BattleView {
 
   private endSlowmo() {
     this.q('#actors').classList.remove('slowmo')
-    this.q('.scene.battle').classList.remove('slowmo-veil')
-    this.q('.scene.battle').classList.remove('heavy-windup')
+    this.q('.scene.battle').classList.remove('slowmo-veil', 'heavy-windup', 'hit-stop')
   }
 
   // 불꽃 파편 — 지정 배우 근처에서 사방으로 튀며 사그라든다.
@@ -3183,7 +3292,7 @@ export class BattleView {
       // 쓸어담기 중이면 아예 고속도로 — 죽고 당겨오고가 끊김 없이 이어진다.
       // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
       const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
-      await sleep(beamMs > 0 ? Math.max(140, beamMs) : gap)
+      await sleep(beamMs > 0 ? beamMs : gap)
       const e = this.state.enemies[front]
       const before = e.hp
       e.hp -= overflow
@@ -3197,7 +3306,9 @@ export class BattleView {
         this.spawnSparks(el, 6 + combo * 4)
         lastHit = el
       }
-      this.shakeStage(Math.min(1, combo / 5))
+      // 검기가 훑는 동안은 화면을 흔들지 않는다 — 관통마다 흔들면 지나가는 한 줄기가
+      // 아니라 매번 뭔가 터지며 멈추는 것으로 읽힌다(정지는 첫 칼질 한 번뿐이다).
+      if (!heavy) this.shakeStage(Math.min(1, combo / 5))
       this.popAt(front, `${overflow}`, 'dmg big')
       this.timers.push(window.setTimeout(() => ember.remove(), 220))
       // 맞은 다음에 레일이 움직인다 — 검기가 꽂힌 자리에서 쓰러지고, 그 뒤에 당겨온다.
@@ -3206,13 +3317,18 @@ export class BattleView {
       if (e.hp <= 0) {
         e.dead = true
         killedCount++
-        // 강타의 관통은 검기가 지나가는 한 줄기다 — 시체마다 560ms를 기다리면
-        // 그 줄기가 공중에서 멈춘 것처럼 끊긴다. 짧게 끝내고 다음으로 이어 준다.
-        await this.playDeath(front, combo, sweep || !!heavy)
+        this.noteCombo(combo)
+        if (heavy) {
+          // 쓰러지는 건 기다리지 않는다. 검기는 이미 다음 적으로 가 있고, 베인 것들은
+          // 그 뒤에서 우후죽순 넘어가야 한다 — 시체마다 기다리면 줄기가 공중에 멈춘다.
+          void this.playDeath(front, combo, true)
+        } else {
+          await this.playDeath(front, combo, sweep)
+        }
         overflow = overflow - before
       } else {
         overflow = 0
-        await sleep(sweep || heavy ? 160 : 320)
+        await sleep(sweep ? 160 : heavy ? 90 : 320)
       }
     }
     this.renderActors()
@@ -3248,8 +3364,10 @@ export class BattleView {
     const start = centerOf(from) ?? frontSlot
     // 다음 적에게 정확히 날아간다. 이때 그 적은 아직 당겨지지 않고 자기 자리(레일 뒤)에
     // 서 있어야 한다 — 그래서 관통 전에는 레일을 다시 그리지 않는다(resolveOverflow 참고).
+    // 궤적은 **올곧다**. 목표 높이로 기울이면 레일을 훑는 한 줄기가 아니라 여러 번
+    // 꺾인 선으로 읽힌다 — 높이는 출발점에 고정하고 가로로만 뻗는다.
     const aim = centerOf(to)
-    const end = aim ? { x: aim.x, y: aim.y - 18 } : { x: box.offsetWidth + 360, y: start.y - 30 }
+    const end = { x: aim ? aim.x : box.offsetWidth + 360, y: start.y }
     const tier = this.heavyTier()
     const step = this.heavyTierStep()
     const beam = document.createElement('div')
@@ -3533,6 +3651,9 @@ export class BattleView {
       await sleep(170)
       // 적의 타격이 닿는 순간 실제 흡수 뒤 남은 방어막을 체력바에 반영한다.
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
+      // 실제로 체력을 깎은 벌레를 기억한다 — 여기서 쓰러지면 이 벌레가 결과 화면의
+      // "나를 갉아먹은 것"이 된다. 방어에 다 막혔으면(dealt<=0) 사인이 아니다.
+      if (st.dealt > 0) this.noteAttacker(st.idx)
       if (st.dealt <= 0) {
         this.log(st.text)
         if (st.telegraphText) {

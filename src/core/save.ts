@@ -1,4 +1,4 @@
-import { COMBAT_BALANCE_VERSION, DECK_LIMITS, reinforceWord, type RunState } from './run'
+import { COMBAT_BALANCE_VERSION, DECK_LIMITS, emptyRunRecord, reinforceWord, type RunState } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import type { Emotion, Word } from './types'
 
@@ -114,6 +114,12 @@ export function loadRun(): RunState | null {
     }
     if (parsed.reward === undefined) {
       parsed.reward = null
+      migrated = true
+    }
+    // 결과 화면 기록 도입 전 저장된 런은 빈 기록으로 시작한다 — 지난 판을 소급해
+    // 셈할 방법은 없으니 0에서 이어 적는다.
+    if (!parsed.record || typeof parsed.record !== "object") {
+      parsed.record = emptyRunRecord()
       migrated = true
     }
     migrated = migrateCombatBalance(parsed) || migrated

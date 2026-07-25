@@ -101,7 +101,13 @@ export class AttackCinematic {
    */
   open(cut: AttackCut): boolean {
     const now = performance.now()
-    if (this.playing || !this.readyCuts.has(cut) || now - this.lastPlayedAt < 4500) return false
+    if (this.playing || now - this.lastPlayedAt < 4500) return false
+    if (!this.readyCuts.has(cut)) {
+      // 아직 안 데워졌으면 이번 컷은 건너뛰되(턴을 붙잡는 쪽이 더 나쁘다) 지금 데워 둔다.
+      // 이렇게 두면 첫 시도가 영상 로드보다 일렀어도 다음 강타에는 제대로 뜬다.
+      void this.warm(cut)
+      return false
+    }
     this.playing = true
     this.lastPlayedAt = now
     const video = this.videos[cut]
@@ -150,6 +156,13 @@ export class AttackCinematic {
 
     const warmup = this.warmVideo(this.videos[cut]).then((ready) => {
       if (ready) this.readyCuts.add(cut)
+      // 실패한 워밍업은 캐시하지 않는다. 첫 시도는 유휴 시점(약 1초)에 도는데 영상이
+      // 실제로 쓸 만해지는 건 약 5초 뒤다 — 실패를 캐시해 두면 다시 데울 기회가 없어
+      // 그 런 내내 컷이 한 번도 안 뜬다(실측: ready=none으로 8초까지 유지).
+      else this.warmups.delete(cut)
+      // 준비 상태를 DOM에 남긴다. 관문이 닫히면 컷은 아무 흔적 없이 건너뛰어지므로,
+      // 밖에서 볼 수 있는 값이 없으면 "왜 안 뜨는지"를 영영 못 잡는다.
+      this.el.dataset.ready = [...this.readyCuts].join(',') || 'none'
     })
     this.warmups.set(cut, warmup)
     return warmup
@@ -162,16 +175,23 @@ export class AttackCinematic {
   private async warmVideo(video: HTMLVideoElement): Promise<boolean> {
     try {
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        await this.onceOrTimeout(video, 'loadeddata', 4000)
+        // 배경에서 도는 준비 작업이라 넉넉히 기다려도 게임이 멈추지 않는다. 4초로 잡았을
+        // 때는 5MB짜리 컷이 도착하기 전에 시간이 다 되어 준비 실패로 처리됐다.
+        await this.onceOrTimeout(video, 'loadeddata', 15000)
       }
       if (this.destroyed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
 
       video.currentTime = 0
       await video.play()
       await this.firstVideoFrameOrTimeout(video, 700)
+      // 되감기 **전에** 판정한다. currentTime을 건드리면 탐색이 시작되며 readyState가
+      // HAVE_METADATA(1)로 떨어지므로, 되감은 뒤에 재면 멀쩡히 다 받아 둔 영상도
+      // 준비 안 된 것으로 읽힌다 — 그래서 readyCuts가 영영 안 채워지고 컷이 한 번도
+      // 안 떴다(실측: 두 영상 모두 HAVE_ENOUGH_DATA인데 되감은 직후엔 1).
+      const ready = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
       video.pause()
       video.currentTime = 0
-      return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+      return ready
     } catch {
       video.pause()
       // 재생 시점의 기존 fallback이 처리한다. 워밍업 실패는 전투를 막을 이유가 없다.
