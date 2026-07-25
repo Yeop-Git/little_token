@@ -54,7 +54,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { SKILL_ART, SPRITES } from '@/assets'
+import { REWARD_ART, SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
@@ -3765,10 +3765,15 @@ export class BattleView {
     }
   }
 
-  // 승리 피날레 — 보상등급 배지가 무대 중앙으로 날아와 커지며 팅! 하고 전리품에 적용된다.
+  // 승리 피날레 — CLEAR 원화와 보상등급이 함께 떠오르고 빵빠레가 울린다.
   private async gradeFinale() {
     const badge = this.q('#grade-badge')
     const scene = this.q('.scene.battle')
+    const clearBanner = document.createElement('div')
+    clearBanner.className = 'victory-clear-banner'
+    clearBanner.innerHTML = `<img src="${REWARD_ART.clear}" alt="CLEAR! 보상" />`
+    scene.appendChild(clearBanner)
+    GameAudio.play('win')
     const b = badge.getBoundingClientRect()
     const s = scene.getBoundingClientRect()
     const scale = s.width / Math.max(1, scene.offsetWidth)
@@ -3785,7 +3790,8 @@ export class BattleView {
     )
     // 애니메이션이 끝나지 않는 환경에서도 보상 화면으로는 반드시 넘어가야 한다.
     await Promise.race([anim.finished.catch(() => undefined), sleep(900)])
-    await sleep(420)
+    // CLEAR 원화와 최종 보상등급을 빵빠레 첫 구절 동안 읽을 수 있게 유지한다.
+    await sleep(1300)
   }
 
   // 턴 경과 감쇠 — 배지가 살짝 가라앉으며 식는다.

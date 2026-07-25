@@ -167,17 +167,64 @@ let animationFrame = 0
 let previousFrame = 0
 let slowFramePressure = 0
 let adaptiveRenderReduction = false
+let stableFrameTime = 0
+let fullRatePressure = 0
+let adaptiveFullRate = false
+
+function syncModelPerformanceMode() {
+  if (adaptiveRenderReduction) document.documentElement.dataset.modelPerformance = 'reduced'
+  else if (adaptiveFullRate) document.documentElement.dataset.modelPerformance = 'full-rate'
+  else delete document.documentElement.dataset.modelPerformance
+}
 
 function updateAdaptiveRenderBudget(frameMs: number) {
-  // 일시적인 탭 전환·개발자 도구 정지는 품질 저하 근거로 삼지 않는다. 배우가 둘
-  // 이상인 실제 전투에서 24ms 초과 프레임이 누적될 때만 현재 화면을 보호한다.
-  if (activeModels.size < 2 || frameMs <= 0 || frameMs >= 100) return
+  // 일시적인 탭 전환·개발자 도구 정지는 품질 변경 근거로 삼지 않는다.
+  if (frameMs <= 0 || frameMs >= 100) return
+
+  const highQuality = document.documentElement.dataset.graphics !== 'low'
+  if (!highQuality && adaptiveFullRate) {
+    adaptiveFullRate = false
+    stableFrameTime = 0
+    fullRatePressure = 0
+    syncModelPerformanceMode()
+  }
+
+  // 60Hz 기준으로 약 2.5초간 안정적인 프레임 여유가 확인되면 전경 idle 제한을
+  // 30→60fps로 푼다. 해제 뒤 부하가 생기면 짧은 히스테리시스를 거쳐 즉시 원래
+  // 제한으로 돌아가며, 다시 시험하기 전에는 충분한 안정 구간을 요구한다.
+  if (!adaptiveRenderReduction && highQuality && activeModels.size >= 2) {
+    if (adaptiveFullRate) {
+      fullRatePressure = frameMs > 21
+        ? Math.min(20, fullRatePressure + Math.max(0.75, (frameMs - 18) / 8))
+        : Math.max(0, fullRatePressure - 0.5)
+      if (fullRatePressure >= 10) {
+        adaptiveFullRate = false
+        stableFrameTime = -3_000
+        fullRatePressure = 0
+        syncModelPerformanceMode()
+      }
+    } else {
+      stableFrameTime = frameMs <= 20 && slowFramePressure < 5
+        ? Math.min(2_500, stableFrameTime + frameMs)
+        : Math.max(-3_000, stableFrameTime - frameMs * 2)
+      if (stableFrameTime >= 2_500) {
+        adaptiveFullRate = true
+        fullRatePressure = 0
+        syncModelPerformanceMode()
+      }
+    }
+  }
+
+  // 배우가 둘 이상인 실제 전투에서 24ms 초과 프레임이 오래 누적되면 해제 여부와
+  // 관계없이 기존 저사양 보호 단계까지 내린다.
+  if (activeModels.size < 2) return
   slowFramePressure = frameMs > 24
     ? Math.min(45, slowFramePressure + Math.max(0.5, (frameMs - 20) / 16.67))
     : Math.max(0, slowFramePressure - 0.35)
   if (adaptiveRenderReduction || slowFramePressure < 30) return
   adaptiveRenderReduction = true
-  document.documentElement.dataset.modelPerformance = 'reduced'
+  adaptiveFullRate = false
+  syncModelPerformanceMode()
 }
 
 function loadModel(url: string): Promise<GLTF> {
@@ -245,7 +292,10 @@ function removeFromAnimationFrame(model: BattleCharacterModel) {
   previousFrame = 0
   slowFramePressure = 0
   adaptiveRenderReduction = false
-  delete document.documentElement.dataset.modelPerformance
+  stableFrameTime = 0
+  fullRatePressure = 0
+  adaptiveFullRate = false
+  syncModelPerformanceMode()
   sharedRenderer?.renderLists.dispose()
 }
 
@@ -1289,7 +1339,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const lowQuality = document.documentElement.dataset.graphics === 'low'
     return adaptiveRenderReduction
       ? waitingEnemy ? 12 : boss ? idle ? 24 : 30 : idle ? 12 : 24
-      : waitingEnemy ? 24 : lowQuality || idle ? 30 : 60
+      : waitingEnemy ? adaptiveFullRate && !lowQuality ? 30 : 24
+        : lowQuality || idle && !adaptiveFullRate ? 30 : 60
   }
 
   wantsRender(now: number) {
@@ -1357,9 +1408,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
     if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy)
 
-    // idle은 포즈 변화가 느려 30fps에서도 자연스럽다. 클릭·공격·피격·등장처럼
-    // 플레이어가 바로 보는 동작만 60fps로 올려 여러 WebGLRenderer의 유휴 드로우를
-    // 절반으로 줄인다. 뒤 레일의 축소된 적은 24fps로도 충분하다.
+    // 기본 idle은 30fps, 뒤 레일은 24fps로 시작한다. 실제 프레임 여유가 이어지면
+    // 전경 idle은 60fps, 뒤 레일은 30fps로 올리고 부하가 감지되면 자동 복귀한다.
     const targetFps = this.targetFps()
     this.outputCanvas.dataset.renderFps = String(targetFps)
     if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return

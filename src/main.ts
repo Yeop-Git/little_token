@@ -6,7 +6,7 @@
 
 import './style.css'
 import type { BattleView as BattleViewType } from '@views/BattleView'
-import { RewardCompleteView, RewardView } from '@views/RewardView'
+import { RewardView } from '@views/RewardView'
 import { DeckDiscardView } from '@views/DeckDiscardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
@@ -443,7 +443,7 @@ function goTitle(withIntro = false) {
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
       else if (run.reward?.day === run.day) {
-        if (run.reward.phase === 'complete') goRewardComplete()
+        if (run.reward.phase === 'complete') finishReward()
         else goReward(run.reward.grade, run.reward.phase)
       }
       else void goBattle()
@@ -618,28 +618,6 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
   }
 }
 
-function rewardOptionFromRef(ref: RewardPickRef): RewardOption | null {
-  if (ref.kind === 'item') {
-    const item = ALL_ITEMS[ref.id]
-    return item
-      ? { kind: 'item', rarity: item.rarity, name: item.name, desc: '획득한 아이템', art: 'gift', item }
-      : null
-  }
-  const word = Object.values(run.player.deck).flat().find((entry) => entry.id === ref.id)
-    ?? ALL_REWARD_WORDS.find((entry) => entry.id === ref.id)
-  return word
-    ? {
-        kind: 'word',
-        rarity: word.rarity ?? 'common',
-        name: word.text,
-        desc: '획득한 단어',
-        art: 'word',
-        word,
-        reinforce: ref.reinforce,
-      }
-    : null
-}
-
 function advanceReward(grade: number, phase: RewardPhase, pick: RewardPickRef) {
   const picks = [...(run.reward?.picks ?? []), pick]
   if (phase === 'subject') {
@@ -654,32 +632,14 @@ function advanceReward(grade: number, phase: RewardPhase, pick: RewardPickRef) {
     goReward(grade, 'verb')
     return
   }
-  run.reward = { day: run.day, grade, phase: 'complete', picks }
-  saveRun(run)
-  goRewardComplete()
+  finishReward()
 }
 
-function goRewardComplete() {
-  const reward = run.reward
-  if (!reward || reward.phase !== 'complete') {
-    goReward()
-    return
-  }
-  const picks = reward.picks.map(rewardOptionFromRef).filter((pick): pick is RewardOption => pick !== null)
-  battleRequest++
-  reset()
-  stage.setAttribute('data-theme', 'day')
-  current = new RewardCompleteView(stage, {
-    day: reward.day,
-    picks,
-    onContinue: () => {
-      run.reward = null
-      run.day++
-      saveRun(run)
-      goBattleWithBossIntro()
-    },
-  })
-  mountMeta('reward')
+function finishReward() {
+  run.reward = null
+  run.day++
+  saveRun(run)
+  goBattleWithBossIntro()
 }
 
 /** 교체를 마친 뒤 어디로 돌아갈지는 부르는 쪽이 정한다 — 보상 흐름과 치트가 같은 화면을 쓴다. */

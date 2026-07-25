@@ -158,6 +158,7 @@ export function startRuntimeProfiler() {
         ready: modelShells.filter((shell) => shell.dataset.modelStatus === 'ready-3d').length,
         preparing: modelShells.filter((shell) => shell.dataset.modelStatus === 'preparing-3d').length,
         fallback: modelShells.filter((shell) => shell.dataset.modelStatus === 'fallback-2d').length,
+        performanceMode: document.documentElement.dataset.modelPerformance ?? 'standard',
         reduced: document.documentElement.dataset.modelPerformance === 'reduced',
       },
     })

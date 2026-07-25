@@ -3033,6 +3033,20 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
+.tally::before {
+  content: '';
+  position: absolute;
+  inset: -24% -18%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 48% 34% at 50% 30%, rgba(255, 194, 110, .10), transparent 78%),
+    radial-gradient(ellipse 54% 50% at 50% 48%, rgba(12, 8, 18, .58), rgba(12, 8, 18, .30) 46%, rgba(12, 8, 18, .10) 68%, transparent 88%);
+}
+.tally-slots,
+.tally-feed,
+.tally-phase,
+.tally-total { position: relative; z-index: 1; }
 .tally.in {
   opacity: 1;
   transform: translate(-50%, -50%) scale(var(--tally-fit));
@@ -5424,66 +5438,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   object-fit: contain;
   filter: drop-shadow(0 13px 18px rgba(0, 0, 0, .3));
 }
-.reward-complete-card {
-  position: relative;
-  width: 1080px;
-  padding: 24px 48px 30px;
-  border-radius: 28px;
-  background: rgba(20, 14, 24, .9);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 1px 0 var(--glass-hi);
-  animation: page-turn .7s cubic-bezier(.3, .9, .3, 1);
-  text-align: center;
-}
-.reward-clear-head {
-  height: 230px;
-  display: grid;
-  place-items: center;
-  margin: -8px auto 8px;
-}
-.reward-clear-head img {
-  width: min(600px, 100%);
-  height: 230px;
-  object-fit: contain;
-  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, .36)) drop-shadow(0 0 24px rgba(255, 224, 133, .2));
-}
-.reward-summary-grid .reward-pick {
-  min-height: 330px;
-  cursor: default;
-}
-.reward-summary-grid .reward-pick:hover {
-  transform: none;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .45), inset 0 1px 0 var(--glass-hi);
-}
-.rp-received {
-  width: max-content;
-  margin: 12px auto 0;
-  padding: 6px 13px;
-  border-radius: 999px;
-  color: #fff4c9;
-  background: rgba(14, 10, 18, .58);
-  box-shadow: inset 0 0 0 1px rgba(255, 225, 150, .4);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: .04em;
-  text-shadow: 0 2px 5px #000;
-}
-.reward-continue {
-  min-width: 230px;
-  margin-top: 22px;
-  padding: 14px 28px;
-  border-radius: 999px;
-  color: #4c3628;
-  background: linear-gradient(#fff0b6, #e7b95f);
-  box-shadow: 0 7px 0 #8d6631, 0 12px 24px rgba(0, 0, 0, .34);
-  font-size: 19px;
-  font-weight: 900;
-  transition: transform .16s ease, filter .16s ease;
-}
-.reward-continue:hover,
-.reward-continue:focus-visible {
-  transform: translateY(-3px);
-  filter: brightness(1.08);
-}
 @keyframes page-turn {
   0% { transform: perspective(1600px) rotateY(-52deg); opacity: 0; transform-origin: left center; }
   100% { transform: perspective(1600px) rotateY(0); opacity: 1; transform-origin: left center; }
@@ -6621,6 +6575,31 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .grade-badge.finale {
   z-index: 300;
   box-shadow: 0 0 0 1px rgba(255, 220, 140, 0.5), 0 0 34px var(--wglow, var(--gold)), 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.victory-clear-banner {
+  position: absolute;
+  z-index: 290;
+  left: 50%;
+  top: 132px;
+  width: 700px;
+  height: 250px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: victory-clear-in .7s cubic-bezier(.18, 1.15, .3, 1) both;
+}
+.victory-clear-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 24px rgba(0, 0, 0, .5)) drop-shadow(0 0 32px rgba(255, 224, 133, .3));
+}
+@keyframes victory-clear-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(28px) scale(.78); filter: blur(5px); }
+  58% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1.06); filter: blur(0); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .victory-clear-banner { animation: none; }
 }
 .grade-badge.finale::after {
   content: '전리품에 적용!';
