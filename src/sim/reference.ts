@@ -79,6 +79,8 @@ export interface BattleState {
   playerMax: number
   guard: number
   counterMultiplier: number
+  /** 개발 치트: 적 행동은 진행하되 플레이어 피해와 방어 소모는 막는다. */
+  damageImmune?: boolean
   turn: number
   enemies: EnemyInst[]
   pending: PendingAttack | null
@@ -549,9 +551,10 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     ? Math.min(uncappedRaw, webShowCap, webFinisher ? finisherNonlethalCap : Infinity)
     : uncappedRaw
   const piercedGuard = !!enemy.def.pierceGuard
-  const guardShattered = !!attackStep?.shatterGuard && state.guard > 0
-  const absorbed = guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
-  const dealt = guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
+  const immune = !!state.damageImmune
+  const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard > 0
+  const absorbed = immune ? 0 : guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
+  const dealt = immune ? 0 : guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
   state.playerHp -= dealt
   const lifeStolen = Math.min(
     Math.max(0, enemy.maxHp - enemy.hp),
@@ -573,6 +576,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
       + (enemy.def.boss && attackStage > 1 ? ` (공격 ${attackStage}단계 ×${attackMultiplier.toFixed(2)})` : '')
       + (summonAttackBonus > 0 ? ` (호위 공격 +${summonAttackBonus})` : '')
       + (webAttackBonus > 0 ? ` (거미줄 장력 +${webAttackBonus})` : '')
+      + (immune ? ' (무적)' : '')
       + (guardShattered ? ` (방어 ${absorbed} 전량 파괴)` : '')
       + (lifeStolen > 0 ? ` (흡혈 ${lifeStolen})` : '')
       + (groggyEntered ? ` (그로기 · 받는 피해 ×${enemy.groggyDamageMult.toFixed(1)})` : '')

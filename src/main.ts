@@ -64,6 +64,11 @@ let current: { destroy?: () => void } | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'ending' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
+// 저장 파일과 실제 밸런스에는 남기지 않는, 이번 실행 동안만 쓰는 전투 치트다.
+const debugCombatModes = {
+  invincible: false,
+  attackMultiplier: 1,
+}
 
 // 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
 // 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
@@ -123,6 +128,10 @@ function reinforceAllCards() {
 
 function defeatPlayer() {
   if (current instanceof BattleView) current.debugDefeat()
+}
+
+function applyDebugCombatModes() {
+  if (current instanceof BattleView) current.debugSetCombatModes(debugCombatModes)
 }
 
 // 디버그 스테이지 이동 — 날짜만 바꾼 뒤 일반 전투 진입 경로를 다시 타게 해
@@ -222,6 +231,8 @@ function mountDevCheat(active: SceneName) {
               <div class="dev-cheat-section-heading"><div><h3>RUN TOOLS</h3><p>런 상태 일괄 조작</p></div></div>
               <div class="dev-cheat-run-tools">
                 <button type="button" data-run-tool="defeat"${active === 'battle' || active === 'intro' ? '' : ' disabled'}>캐릭터 사망</button>
+                <button type="button" class="is-toggle${debugCombatModes.invincible ? ' on' : ''}" data-run-tool="invincible" aria-pressed="${debugCombatModes.invincible}">무적 모드 · ${debugCombatModes.invincible ? 'ON' : 'OFF'}</button>
+                <button type="button" class="is-toggle${debugCombatModes.attackMultiplier > 1 ? ' on' : ''}" data-run-tool="attack-boost" aria-pressed="${debugCombatModes.attackMultiplier > 1}">공격력 ×100 · ${debugCombatModes.attackMultiplier > 1 ? 'ON' : 'OFF'}</button>
                 <button type="button" data-run-tool="unlock-all">모든 카드 해금</button>
                 <button type="button" data-run-tool="reinforce-all">보유 카드 강화</button>
               </div>
@@ -303,8 +314,28 @@ function mountDevCheat(active: SceneName) {
   })
   shell.querySelectorAll<HTMLButtonElement>('[data-run-tool]').forEach((button) =>
     button.addEventListener('click', () => {
-      if (button.dataset.runTool === 'defeat') defeatPlayer()
-      else if (button.dataset.runTool === 'unlock-all') unlockAllCards()
+      if (button.dataset.runTool === 'defeat') {
+        defeatPlayer()
+        return
+      }
+      if (button.dataset.runTool === 'invincible') {
+        debugCombatModes.invincible = !debugCombatModes.invincible
+        button.classList.toggle('on', debugCombatModes.invincible)
+        button.setAttribute('aria-pressed', String(debugCombatModes.invincible))
+        button.textContent = `무적 모드 · ${debugCombatModes.invincible ? 'ON' : 'OFF'}`
+        applyDebugCombatModes()
+        return
+      }
+      if (button.dataset.runTool === 'attack-boost') {
+        debugCombatModes.attackMultiplier = debugCombatModes.attackMultiplier > 1 ? 1 : 100
+        const enabled = debugCombatModes.attackMultiplier > 1
+        button.classList.toggle('on', enabled)
+        button.setAttribute('aria-pressed', String(enabled))
+        button.textContent = `공격력 ×100 · ${enabled ? 'ON' : 'OFF'}`
+        applyDebugCombatModes()
+        return
+      }
+      if (button.dataset.runTool === 'unlock-all') unlockAllCards()
       else reinforceAllCards()
     }),
   )
@@ -445,6 +476,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
+    debugCombat: debugCombatModes,
     onWin: handleBattleWin,
     onLose: () => {
       clearRun()

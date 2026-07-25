@@ -1029,6 +1029,69 @@ button {
 .action-order-item.timing-summary .action-order-portrait svg { width: 42px; height: 42px; }
 .action-order-item.timing-summary .action-order-copy b { color: var(--gold-hi); font-size: 19px; }
 
+/* 가방을 열지 않아도 보이는 Slay the Spire식 보유 아이템 열. */
+.relic-strip {
+  width: 308px;
+  margin: 4px 0 0 4px;
+  pointer-events: auto;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .48));
+}
+.relic-strip[hidden] { display: none; }
+.relic-strip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0 0 7px 5px;
+  color: var(--ink-dim);
+  text-shadow: 0 2px 7px rgba(0, 0, 0, .9);
+}
+.relic-strip-head span { font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.relic-strip-head b { color: var(--gold-hi); font-size: 17px; letter-spacing: .03em; }
+.relic-icons { display: flex; flex-wrap: wrap; gap: 7px; }
+.relic-icon {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 226, 168, .34);
+  border-radius: 15px 6px 13px 7px;
+  color: var(--gold-hi);
+  background: linear-gradient(145deg, rgba(50, 36, 48, .92), rgba(19, 14, 24, .9));
+  box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .06), 0 4px 10px rgba(0, 0, 0, .45);
+  cursor: help;
+  transition: transform .16s ease, filter .16s ease;
+}
+.relic-icon .item-illus,
+.relic-icon svg { width: 80%; height: 80%; object-fit: contain; }
+.relic-icon.rarity-rare { color: #a7d8ff; border-color: rgba(129, 193, 255, .65); }
+.relic-icon.rarity-legendary { color: #ffe28a; border-color: rgba(255, 206, 86, .82); box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .08), 0 0 14px rgba(255, 188, 64, .24); }
+.relic-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 9px);
+  z-index: 120;
+  width: max-content;
+  max-width: 250px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff3d4;
+  background: rgba(16, 11, 21, .96);
+  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .2), 0 8px 18px rgba(0, 0, 0, .5);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.relic-icon:hover,
+.relic-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.16); }
+.relic-icon:hover::after,
+.relic-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
+
 @media (prefers-reduced-motion: reduce) {
   .action-order-item { transition: none; }
   .action-order-item.priority-taken .action-order-portrait,
@@ -2906,8 +2969,8 @@ button {
 /* ───────── 중앙 하단: 가로 단어 선택 ───────── */
 .word-zone {
   position: absolute;
-  left: 356px;
-  right: 420px;
+  left: 500px;
+  right: 110px;
   bottom: 12px;
   z-index: 7;
   display: flex;
@@ -2928,21 +2991,8 @@ button {
   /* 위쪽으로 크게 번지는 장식 스크림이 전장 캐릭터의 포인터 판정을 막지 않게 한다. */
   pointer-events: none;
 }
-/* 단어 ↔ 가방 슬라이드 토글(같은 자리) */
-.pane-stack { position: relative; width: 100%; height: 318px; }
-.pane {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  transition: transform 0.38s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.3s ease;
-}
-.pane.bag { transform: translateY(70px); opacity: 0; pointer-events: none; }
-.word-zone.bag-mode .pane.words { transform: translateY(70px); opacity: 0; pointer-events: none; }
-.word-zone.bag-mode .pane.bag { transform: translateY(0); opacity: 1; pointer-events: auto; }
+/* 보스전은 전경의 프롬과 손패가 겹치지 않게 카드 축을 더 오른쪽으로 물린다. */
+.scene.battle[data-boss='true'] .word-zone { left: 620px; right: 72px; }
 
 /* 슬롯 진행 스텝 — 손패 아래 최하단. 박혀 있어도 읽히게 크고 두껍게. */
 .slot-step {
@@ -3417,12 +3467,6 @@ button {
   transform: rotate(20deg);
   transform-origin: center center;
   transition: transform .18s ease, filter .18s ease, opacity .18s ease;
-}
-.battle-tools .draw-deck {
-  position: relative;
-  right: auto;
-  top: auto;
-  flex: none;
 }
 .draw-deck:hover:not(:disabled), .draw-deck:focus-visible:not(:disabled) {
   transform: translateY(-7px) rotate(21deg);
@@ -4050,25 +4094,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   .word-card:hover:not(.blocked):not(.drawing) .card-lift,
   .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift { transform: translateY(-24px); }
 }
-
-/* 가방 아이템 가로 목록(단어 자리 토글) */
-.bag-row { display: flex; justify-content: center; align-items: flex-start; gap: 34px; flex-wrap: wrap; }
-.bag-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 112px;
-  padding: 10px 12px;
-  border: 3px double rgba(255,224,151,.54);
-  border-radius: 22px 6px 22px 6px;
-  background: rgba(38,25,34,.52);
-  transition: transform 0.16s cubic-bezier(0.2, 1.4, 0.4, 1), filter 0.16s;
-}
-.bag-art { width: 74px; height: 74px; color: var(--gold); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
-.bag-name { font-size: 17px; font-weight: 800; color: #fff2da; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
-.bag-item:hover { transform: translateY(-6px); filter: drop-shadow(0 0 16px var(--glow)); }
-.bag-empty { font-size: 18px; color: var(--ink-faint); }
 
 /* 좌하단 플레이어 스탯 독 — 상단은 전장 기준점에 고정하고 페이즈 행까지 아래로 확장한다. */
 .stat-dock {
@@ -5185,6 +5210,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .dev-cheat-run-tools button:hover:not(:disabled) { background: rgba(255, 215, 106, .15); transform: translateY(-1px); }
 .dev-cheat-run-tools button:first-child { color: #ffc7bd; border-color: rgba(235, 101, 86, .38); }
+.dev-cheat-run-tools button.is-toggle { color: #d7ebff; border-color: rgba(117, 185, 255, .32); }
+.dev-cheat-run-tools button.is-toggle.on { color: #211923; border-color: #ffe4a3; background: linear-gradient(135deg, #ffe7a6, #eeac55); box-shadow: 0 0 18px rgba(255, 197, 102, .2); }
 .dev-cheat-run-tools button:disabled { opacity: .35; cursor: not-allowed; }
 .version-badge {
   position: absolute;
