@@ -68,6 +68,8 @@ export class RunResultView {
     if (outcome === 'lost') {
       GameAudio.play('gameOver')
       GameAudio.playDefeatBgm()
+    } else {
+      GameAudio.play('win')
     }
     const stamp = STAMP[outcome]
 
