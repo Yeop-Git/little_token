@@ -198,6 +198,7 @@ class BattleCharacterModel {
   private companionActionElapsed = 0
   private cameraZoom = 1
   private cameraZoomTarget = 1
+  private frozen = false
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
   private healMaterials: THREE.ShaderMaterial[] = []
@@ -345,9 +346,9 @@ class BattleCharacterModel {
     canvas.height = 128
     const context = canvas.getContext('2d')!
     const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 62)
-    gradient.addColorStop(0, 'rgba(255,255,232,1)')
-    gradient.addColorStop(0.2, 'rgba(255,226,126,.8)')
-    gradient.addColorStop(0.55, 'rgba(255,185,72,.28)')
+    gradient.addColorStop(0, 'rgba(255,244,188,.12)')
+    gradient.addColorStop(0.26, 'rgba(255,220,116,.16)')
+    gradient.addColorStop(0.58, 'rgba(255,185,72,.1)')
     gradient.addColorStop(1, 'rgba(255,174,56,0)')
     context.fillStyle = gradient
     context.fillRect(0, 0, 128, 128)
@@ -357,15 +358,15 @@ class BattleCharacterModel {
       map: texture,
       color: 0xffd878,
       transparent: true,
-      opacity: 0.58,
+      opacity: 0.16,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       toneMapped: false,
     })
     const glow = new THREE.Sprite(material)
-    glow.scale.setScalar(1.15)
-    glow.renderOrder = 10
+    glow.scale.setScalar(1.24)
+    glow.renderOrder = -1
     return glow
   }
 
@@ -383,7 +384,7 @@ class BattleCharacterModel {
     let z = 0.45 + Math.cos(t * 1.6) * 0.05
     let roll = Math.sin(t * 1.7) * 0.08
     let glowColor = 0xffd878
-    let glowStrength = 0.58
+    let glowStrength = 0.16
     let pulseSpeed = 2.2
 
     if (animation === 'attack') {
@@ -392,7 +393,7 @@ class BattleCharacterModel {
       y += Math.sin(p * Math.PI * 2) * 0.23
       roll = -Math.sin(p * Math.PI) * 0.55
       glowColor = 0xff745e
-      glowStrength = 0.82
+      glowStrength = 0.28
       pulseSpeed = 7
     } else if (animation === 'heal') {
       const p = Math.min(1, actionTime / 0.9)
@@ -400,7 +401,7 @@ class BattleCharacterModel {
       y = 1.72 + Math.sin(p * Math.PI * 2) * 0.38
       roll = p * Math.PI * 2
       glowColor = 0x7cff9d
-      glowStrength = 0.76
+      glowStrength = 0.24
       pulseSpeed = 4.6
     } else if (animation === 'shield') {
       const p = Math.min(1, actionTime / 1.1)
@@ -408,7 +409,7 @@ class BattleCharacterModel {
       y = 1.6 + Math.sin(p * Math.PI * 2 + Math.PI) * 0.5
       roll = -p * Math.PI * 2
       glowColor = 0x75ccff
-      glowStrength = 0.84
+      glowStrength = 0.27
       pulseSpeed = 5.2
     } else if (animation === 'victory1' || animation === 'victory2') {
       x = -0.88 + Math.sin(actionTime * 3.6) * 0.4
@@ -416,7 +417,7 @@ class BattleCharacterModel {
       z = 0.5 + Math.cos(actionTime * 3.6) * 0.12
       roll = Math.cos(actionTime * 3.6) * 0.38
       glowColor = 0xffec76
-      glowStrength = 0.92
+      glowStrength = 0.3
       pulseSpeed = 6
     } else if (animation === 'defeat') {
       x = -1.02 + Math.sin(actionTime * 1.8) * 0.05
@@ -424,7 +425,7 @@ class BattleCharacterModel {
       z = 0.36
       roll = 0.42 + Math.sin(actionTime * 1.4) * 0.08
       glowColor = 0x9ba7d8
-      glowStrength = 0.34
+      glowStrength = 0.1
       pulseSpeed = 1.4
     }
 
@@ -433,8 +434,8 @@ class BattleCharacterModel {
     if (this.companionGlow) {
       const pulse = 0.5 + 0.5 * Math.sin(t * pulseSpeed)
       this.companionGlow.material.color.setHex(glowColor)
-      this.companionGlow.material.opacity = glowStrength * (0.68 + pulse * 0.32)
-      this.companionGlow.scale.setScalar(1.02 + pulse * 0.28)
+      this.companionGlow.material.opacity = glowStrength * (0.76 + pulse * 0.24)
+      this.companionGlow.scale.setScalar(1.16 + pulse * 0.18)
     }
   }
 
@@ -976,7 +977,8 @@ outgoingLight *= uBattleExposure;`)
 
   render(delta: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
-    this.mixer?.update(delta)
+    const motionDelta = this.frozen ? 0 : delta
+    this.mixer?.update(motionDelta)
     this.updateCompanion(delta)
     this.updateEffect(delta)
     const zoomBlend = 1 - Math.exp(-delta * 8)
@@ -1008,6 +1010,11 @@ outgoingLight *= uBattleExposure;`)
     this.active = active
     if (active) addToAnimationFrame(this)
     else removeFromAnimationFrame(this)
+  }
+
+  /** 타격 프레임 동안 캐릭터 모델의 현재 공격 자세만 고정한다. */
+  setFrozen(frozen: boolean) {
+    this.frozen = frozen
   }
 
   destroy() {
@@ -1099,6 +1106,12 @@ export function playCharacterAnimation(actor: HTMLElement | null, animation: Bat
   const shell = actor.querySelector<HTMLElement>('.model-shell')
   if (!shell) return 0
   return mountedModels.get(shell)?.play(animation) ?? 0
+}
+
+export function freezeCharacterAnimation(actor: HTMLElement | null, frozen: boolean) {
+  if (!actor) return
+  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  if (shell) mountedModels.get(shell)?.setFrozen(frozen)
 }
 
 export function destroyCharacterModels(root: HTMLElement) {

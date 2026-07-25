@@ -2108,13 +2108,12 @@ button {
   z-index: 1;
   width: 126px;
   margin-top: 5px;
-  overflow: hidden;
+  overflow: visible;
   color: #3c291e;
-  font-size: 24px;
+  font-size: var(--card-title-size, 24px);
   font-weight: 900;
   line-height: 1.16;
   text-align: center;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-note {
@@ -2199,7 +2198,7 @@ button {
   margin: 0;
   overflow: visible;
   color: #fff;
-  font-size: 27px;
+  font-size: var(--card-title-size, 27px);
   font-weight: 900;
   text-align: center;
   white-space: nowrap;

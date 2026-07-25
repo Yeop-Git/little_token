@@ -48,12 +48,13 @@ import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type Owned
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
+import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
+  freezeCharacterAnimation,
   isCharacterModelReady,
   mountCharacterModel,
   playCharacterAnimation,
@@ -1156,11 +1157,11 @@ export class BattleView {
       ? `<div class="card-face card-front art">
           <img class="card-illus" src="${art}" alt="" aria-hidden="true">
           <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
-          ${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><strong class="card-title">${w.text}</strong><span class="card-note">${w.note}</span>
+          ${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><strong class="card-title" ${cardTitleStyle(w.text, true)}>${w.text}</strong><span class="card-note">${w.note}</span>
         </div>`
       : `<div class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
-          <strong>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
+          <strong class="card-title" ${cardTitleStyle(w.text)}>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
         </div>`
     return `<div class="deck-hover-card mood-${mood} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${face}</div>`
   }
@@ -1909,6 +1910,14 @@ export class BattleView {
       }
       this.popAt(h.target, `${h.dmg}`, 'dmg big')
     }
+    const hitTargets = res.hits
+      .filter((hit) => hit.dmg > 0)
+      .map((hit) => this.q<HTMLElement>(`#actors .actor.foe[data-i="${hit.target}"]`))
+      .filter((actor): actor is HTMLElement => !!actor)
+    if (hitTargets.length > 0) {
+      const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
+      await this.attackHitStop(you, stopMs)
+    }
     if (attacking) {
       await sleep(250)
       you.classList.remove('lunge')
@@ -2304,6 +2313,20 @@ export class BattleView {
     el.classList.remove('hit')
     void el.offsetWidth
     el.classList.add('hit')
+  }
+
+  /** 첫 타격 프레임에서 주인공의 공격 클립과 돌진만 붙들며, 관통 연쇄에는 적용하지 않는다. */
+  private async attackHitStop(actor: HTMLElement, durationMs: number) {
+    const animations = actor.getAnimations()
+      .filter((animation) => animation.playState === 'running')
+
+    freezeCharacterAnimation(actor, true)
+    animations.forEach((animation) => animation.pause())
+    await sleep(durationMs)
+    freezeCharacterAnimation(actor, false)
+    animations.forEach((animation) => {
+      if (animation.playState === 'paused') animation.play()
+    })
   }
   private log(html: string, _tally?: Tally) {
     const host = this.q('#log')

@@ -24,6 +24,19 @@ export interface LineTransform {
   zIndex: number
 }
 
+/** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
+export function cardTitleStyle(text: string, illustrated = false): string {
+  const maxSize = illustrated ? 27 : 24
+  const availableWidth = illustrated ? 140 : 126
+  const widthUnits = Array.from(text).reduce((sum, char) => {
+    if (/\s/.test(char)) return sum + 0.35
+    if (/[\u0000-\u00ff]/.test(char)) return sum + 0.62
+    return sum + 1
+  }, 0)
+  const fittedSize = Math.max(12, Math.min(maxSize, (availableWidth * 0.92) / Math.max(1, widthUnits)))
+  return `style="--card-title-size:${fittedSize.toFixed(1)}px"`
+}
+
 /** DOM과 무관한 일렬 손패 좌표 계산. 카드 묶음의 중심을 항상 화면 중앙에 맞춘다. */
 export function calculateLineTransform(index: number, count: number, availableWidth = 900): LineTransform {
   const safeCount = Math.max(1, count)
@@ -408,14 +421,14 @@ export class CardHand {
           <span class="card-veil" aria-hidden="true"></span>
           <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>
-          <strong class="card-title">${card.word.text}</strong>
+          <strong class="card-title" ${cardTitleStyle(card.word.text, true)}>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
-          <strong>${card.word.text}</strong>
+          <strong class="card-title" ${cardTitleStyle(card.word.text)}>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
           <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
         </span>`
