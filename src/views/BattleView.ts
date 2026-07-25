@@ -16,15 +16,14 @@ import {
   resolveMultiplier,
   sentenceTokens,
   statBiasOf,
-  wordFlat,
-  PREEMPT_TAG,
-  STAT_NAME,
   type ResolvedMult,
 } from '@core/compiler'
+import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
+import { comboHintHtml } from '@/ui/ComboHint'
 import { RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import {
   allDead,
@@ -32,6 +31,8 @@ import {
   applyIntent,
   applyPreparation,
   enemyTurn,
+  engageFront,
+  engageInitialFront,
   frontIdx,
   makeEnemy,
   type BattleState,
@@ -42,7 +43,7 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState, type OwnedItem } from '@core/player'
-import { hasPassive, modsFor, passivesOf, PASSIVES } from '@core/passives'
+import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
@@ -139,6 +140,7 @@ export class BattleView {
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
+    engageInitialFront(this.state)
     this.grade = startGrade(this.player.stats.luck)
     this.target = aliveIdx(this.state)[0] ?? 0
     this.mount()
@@ -697,6 +699,10 @@ export class BattleView {
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
         extra += `<span class="chain-word ctx perfect"><b class="cw-text">「${c.name}」</b><em class="cw-note combo">완벽한 맥락 ×${c.mult}</em></span>`
       }
+      // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
+      if (intent.doubtCount > 0) {
+        extra += `<span class="chain-word ctx doubt"><b class="cw-text">${DOUBT_SUFFIX}</b><em class="cw-note gamble">×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}</em></span>`
+      }
       // 부조화(어긋난 맥락) — 위력이 깎인다는 걸 실행 전에 보여준다.
       if (intent.penalties.length) {
         extra += `<span class="chain-word ctx broken"><b class="cw-text">어긋남</b><em class="cw-note down">×${intent.coherence.toFixed(2)} · ${intent.penalties[0]}</em></span>`
@@ -756,48 +762,40 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => host.classList.remove('landed'), 620))
   }
 
-  // 체인에 붙는 한 줄 설명 — 동사는 "공격 ×1 = 3", 주어/수식은 배율.
+  // 체인에 붙는 한 줄 설명 — 카드 상세·보상과 같은 표기 규칙(wordValueLines)을 쓴다.
   private chainNote(w: Word): { text: string; cls: string } | null {
-    const flat = wordFlat(w, this.player.stats)
-    if (flat > 0) {
-      const cls = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
-      // 스탯 비례 단어는 출처가 곧 이름이다 — "방어 ×1 = 2".
-      if (w.stat && w.statMult != null) return { text: `${STAT_NAME[w.stat]} ×${w.statMult} = ${flat}`, cls }
-      const lane = w.kind === 'guard' ? '방어' : w.kind === 'heal' ? '회복' : '깡'
-      return { text: `${lane} ${flat}`, cls }
-    }
-    const risk = [
-      w.effects?.recoil ? `자해 ${w.effects.recoil}` : '',
-      w.targetMode === 'both' ? '피해 40% 되돌아옴' : '',
-    ].filter(Boolean).join(' · ')
-    // 도박 범위 — 낮은 배율에 "가끔 크게 터진다"를 붙인 카드.
-    if (w.variance) {
-      const v = w.variance
-      const text = `도박 ${Math.round(v.p * 100)}% — ×${v.hi.toFixed(2)} / ×${v.lo.toFixed(2)}`
-      return { text: risk ? `${text} · ${risk}` : text, cls: 'gamble' }
-    }
-    if (w.bonus || risk) {
-      const odds = [
-        w.crit ? `대성공 ${Math.round(w.crit * 100)}%` : '',
-        w.fail ? `실패 ${Math.round(w.fail * 100)}%` : '',
-      ].filter(Boolean).join(' · ')
-      // 기준 스탯은 확률을 조용히 밀어 줄 뿐이라 화면에 이름을 드러내지 않는다.
-      const parts = [`배율 ×${(1 + (w.bonus ?? 0)).toFixed(2)}`, odds, risk].filter(Boolean)
-      return { text: parts.join(' · '), cls: risk ? 'down' : (w.bonus ?? 0) >= 0 ? 'buff' : 'down' }
-    }
-    // 대성공만 밀어 주는 단어('?')와 순수 규칙 단어('!')는 배율이 아니라 그 규칙을 적는다.
-    if (w.crit) return { text: `대성공 +${Math.round(w.crit * 100)}%`, cls: 'buff' }
-    if (w.tags.includes(PREEMPT_TAG)) return { text: w.note, cls: 'buff' }
-    return { text: '배율 ×1.00', cls: 'flat' }
+    const lines = wordValueLines(w, this.player.stats)
+    if (!lines.length) return null
+    // 도박 카드는 색을 보라로 고정한다(카드 무드와 같은 색).
+    const cls = w.variance ? 'gamble' : lines[0].cls
+    return { text: lines.map((v) => v.text).join(' · '), cls }
+  }
+
+  /**
+   * 스텝 묶음 — 라벨이 같은 연속 슬롯을 한 칸으로 묶는다("동사"+"동사 2" → 3·4 동사).
+   * 겹슬롯은 카드풀이 같아서 두 칸으로 늘어놓으면 새 슬롯처럼 오해된다.
+   */
+  private stepGroups(): { label: string; indices: number[] }[] {
+    const out: { label: string; indices: number[] }[] = []
+    this.t.template.slots.forEach((s, i) => {
+      const label = s.label.replace(/\s*\d+$/, '') // '동사 2' → '동사'
+      const last = out[out.length - 1]
+      if (last && last.label === label) last.indices.push(i)
+      else out.push({ label, indices: [i] })
+    })
+    return out
   }
 
   // ── 중앙 하단: 슬롯 스텝 + 가로 단어 ──
   private renderWords() {
-    this.q('#steps').innerHTML = this.t.template.slots
-      .map((s, i) => {
-        const key = s.key
-        const cls = i === this.slotIndex ? 'active' : this.sel[key] ? 'done' : ''
-        return `<button class="step ${cls}" data-i="${i}"><b>${i + 1}</b> ${s.label}</button>`
+    // 겹슬롯(주어 2·동사 2)은 같은 카드풀을 쓰므로 "3·4 동사" 한 칸으로 합쳐 보여준다.
+    this.q('#steps').innerHTML = this.stepGroups()
+      .map((g) => {
+        const active = g.indices.includes(this.slotIndex)
+        const done = g.indices.every((i) => this.sel[this.t.template.slots[i].key])
+        const cls = active ? 'active' : done ? 'done' : ''
+        const no = g.indices.map((i) => i + 1).join('·')
+        return `<button class="step ${cls}" data-i="${g.indices[0]}"><b>${no}</b> ${g.label}</button>`
       })
       .join('<span class="sep">·</span>')
     this.q('#steps')
@@ -810,7 +808,9 @@ export class BattleView {
       )
 
     const key = this.order()[this.slotIndex]
-    const words = this.player.deck[key] ?? this.t.words[key] ?? []
+    // 테이블 목록을 먼저 본다 — 덱에 없는 유령 카드(무럭무럭·문장부호)가 여기에만 있다.
+    // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
+    const words = this.t.words[key] ?? this.player.deck[key] ?? []
     this.cardHand.showSlot(key, words, this.sel[key], (word) => conflictReason(word, this.slotIndex, this.sel, this.t))
     if (!this.bagMode) this.renderDetail(null)
   }
@@ -849,6 +849,7 @@ export class BattleView {
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
         ${this.projectionHtml(w, key)}
         <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+        ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
       </div>`
   }
@@ -924,29 +925,14 @@ export class BattleView {
     </div>`
   }
 
-  // 단어 하나의 고유 수치 — 누적하지 않는다.
+  // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
   private wordOwnValues(w: Word): { text: string; cls: string }[] {
-    const out: { text: string; cls: string }[] = []
-    if (w.power) out.push({ text: `기본 위력 +${w.power}`, cls: 'dmg' })
-    if (w.kind === 'attack' && !w.power) out.push({ text: '적을 공격', cls: 'dmg' })
-    if (w.bonus) out.push({ text: `위력 배수 ${w.bonus >= 0 ? '+' : ''}${Math.round(w.bonus * 100)}%`, cls: 'buff' })
-    if (w.effects?.guard) out.push({ text: `방어(임시 체력) ${w.effects.guard >= 0 ? '+' : ''}${w.effects.guard}`, cls: 'guard' })
-    if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
-    if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
-    if (w.effects?.evade) out.push({ text: `회피 +${w.effects.evade}`, cls: 'guard' })
-    if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: 'buff' })
-    if (w.timing === 'delayed') out.push({ text: '다음 턴에 발동', cls: '' })
-    if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
-    if (w.targetMode === 'both') out.push({ text: '피해 40% 나에게 되돌아옴', cls: 'self' })
-    if (!out.length) out.push({ text: w.note, cls: '' })
-    return out
+    return wordValueLines(w, this.player.stats)
   }
 
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
-    const passives = passivesOf(this.player)
-      .map((p) => `<div class="hud-stat hud-passive" role="img" aria-label="${p.name}. ${p.desc}" data-tooltip="${p.name} · ${p.desc}" title="${p.name}: ${p.desc}"><span aria-hidden="true">✦</span></div>`)
-      .join('')
+    // 아이템 규칙은 가방 상세에서 읽는다 — 스탯표 아래에 탭처럼 늘어놓지 않는다.
     this.q('#stats').innerHTML =
       '<span class="hud-player-name" aria-label="주인공 이름 프롬">프롬</span>' +
       STAT_META.map(
@@ -957,7 +943,7 @@ export class BattleView {
         <b>${value}</b>
       </div>`
         },
-      ).join('') + passives
+      ).join('')
   }
 
   // ── 가방(아이템) — 하단 인라인 토글 ──
@@ -1044,11 +1030,17 @@ export class BattleView {
     const host = this.q('#overlay')
     const slots = this.t.template.slots
     const ownedWords = Object.values(this.player.deck).flat()
-    const owned = new Set(Object.values(this.player.deck).flat().map((word) => word.id))
-    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()]
+    // 문장부호는 덱에 들어오지 않는다 — 칸을 여는 아이템(올림프의 당근)을 얻으면 기록된다.
+    // 무럭무럭은 카드풀에 유령처럼 섞이는 성장 카드라 도감에 남기지 않는다.
+    const punctOwned = hasPassive(this.player, 'punct')
+    const owned = new Set([
+      ...Object.values(this.player.deck).flat().map((word) => word.id),
+      ...(punctOwned ? PUNCT_WORDS.map((word) => word.id) : []),
+    ])
+    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat(), ...PUNCT_WORDS]
       .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
     const found = catalog.filter((word) => owned.has(word.id)).length
-    const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미' }
+    const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미', punct: '문장부호' }
     const groups = [...new Set(catalog.map((word) => word.slot))]
     const encountered = new Set(this.state.enemies.map((enemy) => enemy.def.id))
     const enemyCatalog = Object.values(ENEMIES)
@@ -1536,6 +1528,9 @@ export class BattleView {
       kills += await this.echoStrike(intent, mult, sweep)
     }
 
+    // 맞대던 적이 죽었으면 새 최전방을 여기서 맞댄다 — 행동 순서 표시도 같은 상태를 읽는다.
+    if (kills > 0) engageFront(this.state)
+
     // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
     this.killsThisBattle += kills
 
@@ -1544,12 +1539,8 @@ export class BattleView {
     if (gradeGain > 0) await this.dingGrade(gradeGain)
 
     if (allDead(this.state)) {
-      this.over = true
-      this.setPhase('전투 승리')
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
-      await sleep(500)
-      await this.gradeFinale()
-      this.onWin(this.grade)
+      await this.finishWin(500)
       return
     }
 
@@ -1578,6 +1569,7 @@ export class BattleView {
       await sleep(300)
       for (const k of killed) await this.playDeath(k, 1)
       this.renderActors()
+      if (killed.length > 0) engageFront(this.state)
       // 예약 문장의 몰살도 오버킬로 인정한다.
       const pendingGain = overkillGain(killed.length, allDead(this.state))
       if (pendingGain > 0) await this.dingGrade(pendingGain)
@@ -1587,11 +1579,7 @@ export class BattleView {
       await this.lose()
       return
     } else if (allDead(this.state)) {
-      this.over = true
-      this.setPhase('전투 승리')
-      await sleep(300)
-      await this.gradeFinale()
-      this.onWin(this.grade)
+      await this.finishWin(300)
       return
     }
 
@@ -1611,11 +1599,7 @@ export class BattleView {
     this.renderWords()
   }
 
-  /**
-   * 무럭무럭 — 최대 체력이 영구히 자란다. 배율을 받지 않는 고정 수치다.
-   * 런 전체에 남아야 하므로 플레이어 스탯(hp)까지 함께 올린다.
-   * 겹칠수록 이름이 길어진다: 무럭무럭 → 무럭무럭무럭무럭.
-   */
+  /** 패배 — 진행 중 연출을 정리하고 그림일기 결과 화면으로 넘긴다. */
   private async lose(): Promise<void> {
     if (this.over) return
     this.releaseTally()
@@ -1627,6 +1611,11 @@ export class BattleView {
     this.onLose()
   }
 
+  /**
+   * 무럭무럭 — 최대 체력이 영구히 자란다. 배율을 받지 않는 고정 수치다.
+   * 런 전체에 남아야 하므로 플레이어 스탯(hp)까지 함께 올린다.
+   * 겹칠수록 이름이 길어진다: 무럭무럭 → 무럭무럭무럭무럭.
+   */
   private async growUp(n: number): Promise<void> {
     this.player.stats.hp += n
     this.state.playerMax += n
@@ -1868,6 +1857,23 @@ export class BattleView {
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
     this.q('#grade').textContent = `✦ ${this.grade}`
+  }
+
+  /**
+   * 승리 마무리 — 아낀 카드 뽑기를 보상등급으로 바꾼 뒤 피날레를 돌린다.
+   * 뽑기를 참으면 그만큼 전리품이 좋아지므로 "지금 손패로 버틸까"가 선택이 된다.
+   */
+  private async finishWin(pause: number): Promise<void> {
+    this.over = true
+    this.setPhase('전투 승리')
+    const saved = this.cardHand.savedDraws
+    if (saved > 0) {
+      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 보상등급 +${saved}`)
+      await this.dingGrade(saved)
+    }
+    await sleep(pause)
+    await this.gradeFinale()
+    this.onWin(this.grade)
   }
 
   // 띵·띵·띵 — 처치 수만큼 등급이 연타로 튀어오른다. 만렙이면 조용히 멈춘다.

@@ -19,8 +19,8 @@ export type PassiveId =
   | 'matchFire' // 빨간망토의 성냥 — 배율 칸마다 보너스 추가
   | 'luckCloak' // 성냥팔이 소녀의 망토 — 모든 동사가 운을 깡수치로 받는다
   | 'bbq' // 아기돼지 바베큐 — 이번 전투 처치 수만큼 배율 상승
-  | 'doubt' // 피노키오의 미아핑 — 맥락마다 "근데?"가 붙는다
-  | 'beanstalk' // 잭과 숙주나물 — 무럭무럭 카드와 맥락 성장
+  | 'doubt' // 피노키오의 미아핑 — 완성한 문장 끝에 "…근데?"가 붙는다
+  | 'beanstalk' // 잭과 숙주나물 — 모든 칸에 무럭무럭 카드가 섞인다
 
 /** 백설공주의 구두가 동사 깡수치에 더하는 값. */
 export const HEAVY_SHOE_FLAT = 7
@@ -28,8 +28,10 @@ export const HEAVY_SHOE_FLAT = 7
 export const MATCH_FIRE_BONUS = 0.1
 /** 아기돼지 바베큐 — 이번 전투 처치 1마리당 배율. */
 export const BBQ_PER_KILL = 0.05
-/** 피노키오의 미아핑 — 맥락 하나당 굴리는 "근데?" 배율 상한(1.0 ~ 1+이 값). */
+/** 피노키오의 미아핑 — "…근데?" 한 번의 배율 상한(1.0 ~ 1+이 값). */
 export const DOUBT_RANGE = 0.3
+/** 완성한 문장 끝에 항상 붙는 말. 문장에 그대로 들어가므로 로그·체인에 함께 보인다. */
+export const DOUBT_SUFFIX = '…근데?'
 
 export interface PassiveDef {
   id: PassiveId
@@ -87,12 +89,12 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   doubt: {
     id: 'doubt',
     name: '근데?',
-    desc: `맥락마다 ×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}이 따로 굴려 붙는다`,
+    desc: `문장을 완성하면 끝에 「${DOUBT_SUFFIX}」가 붙어 ×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}을 굴린다`,
   },
   beanstalk: {
     id: 'beanstalk',
     name: '무럭무럭',
-    desc: '무럭무럭 카드가 생기고, 맥락이 터질 때마다 최대 체력이 자란다',
+    desc: '모든 칸에 무럭무럭 카드가 유령처럼 섞인다 · 고르면 최대 체력 +1',
   },
 }
 
@@ -141,6 +143,5 @@ export function modsFor(player: PlayerState | undefined, kills = 0): CompileMods
     bonusEach: hasPassive(player, 'matchFire') ? MATCH_FIRE_BONUS : 0,
     stageMult: hasPassive(player, 'bbq') ? 1 + kills * BBQ_PER_KILL : 1,
     doubt: hasPassive(player, 'doubt'),
-    grow: hasPassive(player, 'beanstalk'),
   }
 }

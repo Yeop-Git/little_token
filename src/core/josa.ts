@@ -14,3 +14,6 @@ export const josa = (w: string, withJong: string, without: string): string =>
   w + (hasJong(w) ? withJong : without)
 
 export const eul = (w: string): string => josa(w, '을', '를')
+
+/** "나만은과 · 살짝과" — 카드 이름을 나열할 때 쓴다(여는 맥락 안내). */
+export const gwa = (w: string): string => josa(w, '과', '와')

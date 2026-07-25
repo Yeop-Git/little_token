@@ -155,7 +155,7 @@ export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
     rarity: 'legendary',
     passive: 'doubt',
     base: { ...NO_STATS },
-    flavor: '맥락마다 코가 길어진다. 근데?',
+    flavor: '문장을 다 쓰고 나면 코가 길어진다. 근데?',
   },
   beanSprout: {
     id: 'beanSprout',

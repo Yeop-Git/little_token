@@ -11,9 +11,14 @@ import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
+import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
+import { critText, multText, wordValueLines } from '@core/wordText'
+import { comboHintHtml } from '@/ui/ComboHint'
 
 interface Opts {
   day: number
+  /** 짝 카드 안내용 플레이어 덱 — 없으면 시작 덱으로 안내한다. */
+  deck?: Record<string, Word[]>
   /** 전투에서 확정된 보상등급 — 카드 희귀도가 이 등급의 가중치로 굴려졌다. */
   grade: number
   nextField: FieldDef
@@ -25,7 +30,6 @@ const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-const pct = (b: number) => `${b >= 0 ? '+' : ''}${Math.round(b * 100)}%`
 
 function moodOf(w: Word): string {
   if (w.variance) return 'gamble'
@@ -52,12 +56,8 @@ function mainEffect(opt: RewardOption): string {
     const s = STAT_ORDER.filter((k) => opt.item!.base[k]).map((k) => `${STAT_LABEL[k]} +${opt.item!.base[k]}`)
     return s.join(' · ') || '스탯 상승'
   }
-  const w = opt.word!
-  if (w.power) return `공격 위력 ${w.power}`
-  if (w.effects?.heal) return `회복 +${w.effects.heal}`
-  if (w.effects?.guard) return `방어 +${w.effects.guard}`
-  if (w.bonus) return `배율 ${pct(w.bonus)}`
-  return w.note
+  // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
+  return opt.word!.note
 }
 
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(아이템/보상단어) 색 그라디언트 + 아이콘.
@@ -68,21 +68,8 @@ function bgHtml(opt: RewardOption): string {
   return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`
 }
 
-// 단어 고유 수치(누적 아님).
-function ownValues(w: Word): { text: string; cls: string }[] {
-  const out: { text: string; cls: string }[] = []
-  if (w.power) out.push({ text: `기본 위력 +${w.power}`, cls: 'dmg' })
-  if (w.bonus) out.push({ text: `배율 ${pct(w.bonus)}`, cls: 'buff' })
-  if (w.effects?.guard) out.push({ text: `방어 +${w.effects.guard}`, cls: 'guard' })
-  if (w.effects?.heal) out.push({ text: `회복 +${w.effects.heal}`, cls: 'heal' })
-  if (w.effects?.recoil) out.push({ text: `자해 ${w.effects.recoil}`, cls: 'self' })
-  if (w.crit) out.push({ text: `대성공 ${Math.round(w.crit * 100)}%`, cls: 'buff' })
-  if (w.fail) out.push({ text: `실패 ${Math.round(w.fail * 100)}%`, cls: 'self' })
-  if (w.variance) out.push({ text: `도박 ${Math.round(w.variance.p * 100)}%: ×${w.variance.hi} / ×${w.variance.lo}`, cls: 'buff' })
-  if (w.aoe === 'all') out.push({ text: '적 전체 적중', cls: 'dmg' })
-  if (!out.length) out.push({ text: w.note, cls: '' })
-  return out
-}
+// 단어 고유 수치(누적 아님) — 표기 규칙은 전투 체인·카드 상세와 공용이다.
+const ownValues = (w: Word) => wordValueLines(w)
 
 // 어떤 스탯의 영향을 받는지.
 function influenceNote(w: Word): string {
@@ -101,15 +88,15 @@ function reinforceDeltas(w: Word): string {
   const rows: string[] = []
   rows.push(`단계 Lv.${w.level ?? 1} → <b>Lv.${after.level}</b>`)
   if (w.power != null) rows.push(`위력 ${w.power} → <b>${after.power}</b>`)
-  if (w.bonus != null) rows.push(`배율 ${pct(w.bonus)} → <b>${pct(after.bonus!)}</b>`)
+  if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.crit != null) rows.push(`대성공 ${Math.round(w.crit * 100)}% → <b>${Math.round(after.crit! * 100)}%</b>`)
+  if (w.crit != null) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
   return `<div class="rf-deltas"><div class="rf-h">강화하면</div>${rows.map((r) => `<div class="rf-row">${r}</div>`).join('')}</div>`
 }
 
 // 우측 정보창 내용.
-function detailHtml(opt: RewardOption): string {
+function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
   if (opt.kind === 'item' && opt.item) {
     const it = opt.item
     const rows = STAT_ORDER.filter((k) => it.base[k])
@@ -131,6 +118,7 @@ function detailHtml(opt: RewardOption): string {
     <div class="wd-name">${w.text}</div>
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${w.level ?? 1}` : ' · 새 단어'}</div>
     <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+    ${comboHintHtml(w, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}
     ${opt.reinforce ? reinforceDeltas(w) : ''}
     ${influenceNote(w)}`
 }
@@ -207,7 +195,7 @@ export class RewardView {
     const dock = this.root.querySelector<HTMLElement>('#rdetail')!
     const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
     dock.className = `info-dock glass reward-dock mood-${mood}`
-    dock.innerHTML = detailHtml(opt)
+    dock.innerHTML = detailHtml(opt, this.opts.deck)
     this.root.querySelectorAll('.reward-pick').forEach((p) => p.classList.remove('detailing'))
     el.classList.add('detailing')
   }

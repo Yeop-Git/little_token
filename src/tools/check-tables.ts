@@ -12,7 +12,16 @@
 
 import { readFileSync } from 'node:fs'
 import { roleReason } from '@core/validator'
-import type { Tables, Word } from '@core/types'
+import {
+  BUDGET_TOLERANCE,
+  COMMON_QUOTA,
+  MULT_BUDGET,
+  expectedMult,
+  hasBudget,
+  verbCoefBudget,
+} from '@core/budget'
+import { numericNoteParts } from '@core/wordText'
+import { RARITY_LABEL, type Tables, type Word } from '@core/types'
 import { EARLY_WORDS, GROW_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { TABLES } from '@data/tables'
 
@@ -71,16 +80,75 @@ function checkArt(): string[] {
   return broken.map((w) => `${w.slot}/${w.text}`)
 }
 
+/**
+ * 등급 예산 검사 — 등급은 상한이 아니라 **예산**이라는 계약(`src/core/budget.ts`)을
+ * 실제 데이터로 검증한다. 셋을 본다.
+ *   ① 배율 칸(주어·수식): 기대 배율이 등급 예산 ±오차 안에 있다.
+ *   ② 동사 칸: 스탯 계수가 등급 계수(전체 적중이면 깎인 값)와 같다.
+ *   ③ 초기 덱의 노멀 정원(주어 1 · 수식 3 · 동사 3) — 노멀 쌍둥이 방지.
+ * 여기에 카드 문구(`note`)가 실제 수치를 빠뜨리지 않았는지도 함께 본다.
+ * 5슬롯 확장 데이터는 고정 위력 등 옛 규칙이 남아 있어 대상에서 뺀다(보존 자료).
+ */
+function checkBudget(): string[] {
+  const out: string[] = []
+  const early = Object.entries(EARLY_WORDS).flatMap(([slot, list]) => list.map((w) => ({ slot, w, pool: '초기' })))
+  const reward = REWARD_WORDS.map((w) => ({ slot: w.slot, w, pool: '보상' }))
+  console.log(`\n등급 예산 검사 — 노멀 ${MULT_BUDGET.common} · 희귀 ${MULT_BUDGET.rare} · 영웅 ${MULT_BUDGET.epic}`)
+
+  for (const { slot, w, pool } of [...early, ...reward]) {
+    const rarity = w.rarity ?? 'common'
+    if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
+    if (slot === 'verb' || slot === 'verb2') {
+      if (w.statMult == null) continue
+      const want = verbCoefBudget(rarity, w.aoe)
+      const off = Math.abs(w.statMult - want)
+      if (off > BUDGET_TOLERANCE) {
+        out.push(`${pool}/${w.text}: 계수 ×${w.statMult} ≠ ${RARITY_LABEL[rarity]} 예산 ×${want}`)
+        console.log(`  위반  ${pool} · ${w.text} — 계수 ×${w.statMult}, ${RARITY_LABEL[rarity]} 예산은 ×${want}`)
+      }
+      continue
+    }
+    if (slot === 'obj') continue // 목적어는 고정 위력 슬롯이라 배율 예산 대상이 아니다.
+    const got = expectedMult(w)
+    const want = MULT_BUDGET[rarity]
+    if (Math.abs(got - want) > BUDGET_TOLERANCE) {
+      out.push(`${pool}/${w.text}: 기대 배율 ${got.toFixed(3)} ≠ ${RARITY_LABEL[rarity]} 예산 ${want}`)
+      console.log(`  위반  ${pool} · ${w.text} — 기대 배율 ${got.toFixed(3)}, ${RARITY_LABEL[rarity]} 예산은 ${want}`)
+    }
+  }
+
+  // ③ 노멀 정원 — 초기 덱에 노멀이 정원보다 많으면 수치가 같은 쌍둥이가 생긴다.
+  for (const [slot, quota] of Object.entries(COMMON_QUOTA)) {
+    const commons = (EARLY_WORDS[slot] ?? []).filter((w) => (w.rarity ?? 'common') === 'common')
+    const mark = commons.length === quota ? '통과' : '위반'
+    console.log(`  ${mark}  초기 · ${slot} 노멀 ${commons.length}/${quota}장 (${commons.map((w) => w.text).join(' · ') || '없음'})`)
+    if (commons.length !== quota) out.push(`초기/${slot}: 노멀 ${commons.length}장 (정원 ${quota}장)`)
+  }
+
+  // 카드 문구가 수치를 빠뜨리면 화면과 실제가 어긋난다 — 표기도 계약이다.
+  for (const { w, pool } of [...early, ...reward]) {
+    const missing = numericNoteParts(w).filter((part) => !w.note.includes(part))
+    if (missing.length) {
+      out.push(`${pool}/${w.text}: note에 ${missing.join(' · ')} 없음`)
+      console.log(`  위반  ${pool} · ${w.text} — note "${w.note}"에 ${missing.join(' · ')}가 없다`)
+    }
+  }
+  if (!out.length) console.log('  통과  모든 카드가 등급 예산·정원·표기 계약을 지킨다')
+  return out
+}
+
 console.log('슬롯 중립 바닥 검사 (막다른 슬롯 방지)\n')
 const violations = [
   ...checkTables('초기', makeEarlyTables()),
   ...checkTables('전체', TABLES),
 ]
 const brokenArt = checkArt()
+const budget = checkBudget()
 
-if (violations.length || brokenArt.length) {
+if (violations.length || brokenArt.length || budget.length) {
   if (violations.length) console.log(`\n위반 ${violations.length}건 — 해당 슬롯에 태그 없는 중립 단어를 추가하라.`)
   if (brokenArt.length) console.log(`일러스트 위반 ${brokenArt.length}건 — assets/index.ts의 SKILL_ART에 키를 등록하라.`)
+  if (budget.length) console.log(`예산 위반 ${budget.length}건 — words.csv의 수치나 rarity를 고쳐라(기준: src/core/budget.ts).`)
   process.exit(1)
 }
-console.log('\n모든 슬롯에 중립 바닥 확보 · 일러스트 키 전부 연결됨.')
+console.log('\n모든 슬롯에 중립 바닥 확보 · 일러스트 키 전부 연결됨 · 등급 예산 일치.')

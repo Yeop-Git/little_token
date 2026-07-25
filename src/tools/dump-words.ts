@@ -5,6 +5,7 @@ import { COMBOS, CONFLICTS } from '@data/combos'
 import { EXCLAIM_SLOTS } from '@data/items'
 import { DEFAULT_TEMPLATE } from '@data/slots'
 import { RARITY_LABEL } from '@core/types'
+import { gambleText } from '@core/wordText'
 
 const L: string[] = []
 L.push('# 단어 · 관용구 데이터 표 — 5슬롯 확장 데이터\n')
@@ -26,7 +27,7 @@ for (const s of DEFAULT_TEMPLATE.slots) {
     if (w.effects?.heal) nums.push(`회복 +${w.effects.heal}`)
     if (w.effects?.recoil) nums.push(`자해 ${w.effects.recoil}`)
     if (w.effects?.evade) nums.push(`회피 +${w.effects.evade}`)
-    if (w.variance) nums.push(`도박 ${Math.round(w.variance.p*100)}%: ×${w.variance.hi}/×${w.variance.lo}`)
+    if (w.variance) nums.push(gambleText(w.variance))
     if (w.timing==='delayed') nums.push('다음 턴 발동')
     if (w.targetMode==='both') nums.push('대상 적+자신')
     if (w.aoe==='all') nums.push('전체 적중')

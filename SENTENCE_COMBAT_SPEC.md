@@ -57,14 +57,16 @@
 |---|---|---|
 | 슬롯 3칸 `subj → adv → verb` | `EARLY_TEMPLATE` | — |
 | 스탯 비례 깡수치 | `wordFlat()` | 동사 등 10개 |
-| 가산 보너스 풀 | `bonusPool` | 12개 |
+| 가산 보너스 풀 | `bonusPool` | 10개 |
 | 관용구 곱셈 | `matchCombos()` | **16개** |
 | 대성공 룰렛 | `rouletteOdds()` | crit 보유 9개 |
-| 도박(`variance`) | `resolveMultiplier()` | 4개 |
+| 도박(`variance`) | `resolveMultiplier()` | 7개 |
+| 등급 예산 계약 | `src/core/budget.ts` · `npm run check` | 노멀 1.20 · 희귀 1.60 · 영웅 2.10 |
 | 범위 공격(`aoe`) | `applyIntent()` | 1개 |
 | 지연 발동(`timing`) | `applyIntent()` | 어미 슬롯(현재 미사용) |
 | 운 배율 +2%/1 | `LUCK_MULT` | — |
 | 보상등급 → 희귀도 가중치 | `src/core/grade.ts` | — |
+| 아낀 카드 뽑기 → 보상등급 | `BattleView.finishWin()` | 남은 뽑기 1회당 +1 |
 | 반복강화 | `reinforceWord()` | — |
 | 아이템 감탄사 | `src/data/items.ts` | 아이템 2종 |
 | 아이템 패시브(규칙) | `src/core/passives.ts` | 전설 11종 |
@@ -78,7 +80,12 @@
 | `EARLY_COMBOS` | **16** | 일반 런 관용구 |
 | `WORDS` / `COMBOS` | 23단어 · 6관용구 | 5슬롯 확장용 보존 자료 (런에 미사용) |
 
-희귀도 분포(일반 런 28단어): 노멀 14 · 희귀 9 · 영웅 5 · 전설 0
+희귀도 분포(일반 런 28단어): 노멀 7 · 희귀 16 · 영웅 5 · 전설 0
+
+노멀은 **초기 덱 정원(주어 1 · 수식 3 · 동사 3)**만 남긴다. 같은 등급은 예산이 같아서
+노멀이 여러 장이면 수치가 똑같은 쌍둥이가 생기므로(`어제의 나는 = 나도 = ×1.20`),
+나머지는 예산이 큰 등급으로 올려 성향을 갈랐다. 규칙은 `src/data/csv/README.md`,
+값의 정본은 `src/core/budget.ts`, 검사는 `npm run check`다.
 
 ---
 
@@ -98,6 +105,7 @@
 | `effects.guard/heal` | `compiler.ts:129` | 동사 `kind` + `statMult`로 대체. 데이터 0개 |
 | 배수 상한(`multCap`) | `types.ts:159` · `earlyWords.ts:20` | **컴파일러가 읽지 않는다.** 배율에 천장 없음(`compiler.ts:125`) |
 | 맥락카드 등급 보너스 | `types.ts:81` | 다양성 + 반복강화로 대체 |
+| 도박 저점 표기(`×2.50 / ×1.00`) | — | `variance_lo`는 항상 1이라 "절반은 손해"로 읽혔다. `gambleText()`가 `40% 확률로 배율 ×2.50` 한 형식으로 통일 |
 
 > `multCap`은 `Tables`에 값이 남아 있으나 소비처가 없다. 실제 상한은 **없다.**
 > 남은 소비처는 `tools/dump-words.ts`의 설명 문구뿐이며, 그 문구는 현재 규칙과 다르다.
@@ -159,6 +167,22 @@ interface Word {
 
 > `power` · `effects` · `fail`은 타입에 남아 있으나 일반 런 데이터에서 쓰지 않는다(4장 참조).
 
+### 5.2-1 등급 예산 ★
+
+등급은 상한이 아니라 **예산**이다. `src/core/budget.ts`가 정본이고 `npm run check`가
+`EARLY_WORDS`·`REWARD_WORDS` 전체를 이 계약으로 검사한다.
+
+```
+배율 칸(주어·수식·어미)   기대배율 = (1 + bonus) × 도박기댓값 × (1 + 0.5 × crit)
+                          노멀 1.20 · 희귀 1.60 · 영웅 2.10  (허용 오차 ±0.05)
+동사 칸                   계수 = 노멀 ×1 · 희귀 ×1.5 · 영웅 ×2, 전체 적중이면 ×0.7
+노멀 정원                 초기 덱 subj 1 · adv 3 · verb 3
+표기                      note는 실제 수치를 전부 포함한다(numericNoteParts 검사)
+```
+
+동사는 같은 등급이면 계수가 같으므로 실질 차이는 **태그가 여는 관용구**다. 숨은 값이
+되지 않도록 카드 상세가 「여는 맥락」(`comboLeads()` · `ui/ComboHint.ts`)을 노출한다.
+
 ### 5.3 관용구 (Combo)
 
 ```ts
@@ -206,6 +230,20 @@ coherence  = Π dissonance.penalty                         ← 현재 항상 1
 multiplier = (1 + bonusPool) × comboMult × coherence      ← 상한 없음
 ```
 
+### 카드 수치 표기 ★
+
+한 카드가 화면마다 다르게 읽히지 않도록 **표기를 한 함수로 모았다**
+(`src/core/wordText.ts`). 체인·카드 상세·보상 상세가 모두 `wordValueLines()`를 쓴다.
+
+```
+깡수치  공격 ×1 / 방어 ×1 / 회복 ×1   (스탯을 알면 "공격 ×1 = 5"까지)
+배율    배율 ×1.10
+도박    40% 확률로 배율 ×2.50          (저점 ×1.00은 적지 않는다)
+확률    대성공 20%
+```
+
+"적을 공격"처럼 수치가 아닌 문구, 대성공 누락 같은 화면별 차이는 폐지했다.
+
 ### 최종 확정 (`resolveMultiplier`, BattleView가 RNG와 함께 호출)
 
 ```
@@ -244,8 +282,10 @@ failP = Σ word.fail > 0 ? max(0.05, Σ word.fail − statBias × 0.01) : 0
 ## 7. 스탯
 
 ```ts
-{ hp: 20, atk: 3, guard: 3, heal: 3, luck: 2 }   // startingPlayer()
+{ hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 }   // startingPlayer()
 ```
+
+공격·방어·회복을 같은 값으로 열어 둔다 — 어느 축으로 가도 1일차에 문장이 성립해야 한다.
 
 | 스탯 | 하는 일 |
 |---|---|
@@ -329,8 +369,8 @@ REINFORCE_STEP = { power: +2, bonus: +0.15, guard: +2, heal: +2, crit: +0.05 }
 | 빨간망토의 성냥 | `matchFire` | 배율 칸마다 보너스 +0.10 | `CompileMods.bonusEach` |
 | 성냥팔이 소녀의 망토 | `luckCloak` | 모든 동사가 운만큼 깡수치를 더 받음 | `CompileMods.verbLuck` |
 | 아기돼지 바베큐 | `bbq` | 이번 전투 처치 1마리당 배율 +5% | `CompileMods.stageMult` |
-| 피노키오의 미아핑 | `doubt` | 맥락마다 ×1.00~1.30을 따로 굴림 | `doubtMults()` |
-| 잭과 숙주나물 | `beanstalk` | 무럭무럭 카드 + 맥락마다 최대체력 성장 | `CompileMods.grow` |
+| 피노키오의 미아핑 | `doubt` | 문장을 완성하면 끝에 `…근데?`가 붙어 ×1.00~1.30 **한 번** | `compile()` · `doubtMults()` |
+| 잭과 숙주나물 | `beanstalk` | 모든 칸에 무럭무럭 카드가 섞인다(고르면 최대체력 +1) | `makeEarlyTables()` |
 
 ### 컴파일러 수정자
 
@@ -368,11 +408,25 @@ resolveMultiplier(intent, ctx, rouletteRoll, varRoll, doubtRolls)  ← 굴림은
 직전에 적용되며, `player.stats.hp`까지 올려 런 전체에 남는다.
 
 ```
-무럭무럭 카드   열려 있는 슬롯(subj·verb·punct)마다 한 장씩 · 각 +1
-맥락 성장       발동한 관용구 하나당 +1
+무럭무럭 카드   열려 있는 모든 슬롯(subj·adv·verb·punct)에 한 장씩 · 고르면 +1
 ```
 
+**고르지 않으면 자라지 않는다.** 관용구마다 조용히 붙던 성장(`CompileMods.grow`)은
+폐지했다 — 카드를 안 먹었는데 무럭무럭이 발동하는 것처럼 보였다.
+무럭무럭은 덱(단어장)에 등록되지 않는 **유령 카드**라 도감에도 남지 않는다.
+
 겹칠수록 화면 이름이 길어진다: `무럭무럭` → `무럭무럭무럭무럭`.
+
+### 「…근데?」 (피노키오의 미아핑)
+
+맥락 수와 무관하게 **문장 하나당 한 번**이다. 모든 칸을 채우면 문장 끝에
+`…근데?`가 붙고(`Intent.sentence`에 그대로 들어간다) ×1.00~×1.30을 굴린다.
+체인이 굴림 전에 범위를 먼저 보여 준다.
+
+### 겹슬롯 표기
+
+겹주어·겹동사는 같은 카드풀을 쓰므로 스텝 표시를 한 칸으로 합친다 —
+`1 주어 · 2 수식 · 3·4 동사 · 5 문장부호`.
 
 ### 배율 풀은 한 칩으로 센다 ★
 
@@ -390,6 +444,7 @@ resolveMultiplier(intent, ctx, rouletteRoll, varRoll, doubtRolls)  ← 굴림은
 ### 문장부호
 
 `punct` 슬롯은 `attach: true`라 앞 단어에 **공백 없이** 붙는다(`joinTokens`).
+덱에 들어오지 않는 유령 카드지만 3종(`!` `.` `?`)은 **당근을 얻으면 도감에 기록된다.**
 
 | 부호 | 효과 | 구현 |
 |---|---|---|
@@ -468,6 +523,9 @@ src/data/csv/dissonances.csv    ─┘
 - 주어 태그에 `enemy`가 있으면 방어를 얻지 못한다(`applyPreparation`).
 - 전투는 적 레일의 **최전방만** 참여한다. 단일 공격의 초과 피해는 다음 적에게 관통한다.
 - 기본 선공 적은 공격 후 다음 공격이 후공으로 밀리고, 마치면 선공을 되찾는다.
+- **맞대던 적이 죽어 새로 올라온 적은 그 턴에 행동하지 않는다**(`engageFront`). 뒤에서
+  기다린 턴은 공격 주기에 넣지 않고, 최전방에 선 시점부터 자기 주기를 새로 시작한다 —
+  관통으로 앞을 쓸었는데 뒤에서 온 적이 걸어 들어오며 때리는 일을 막는다.
 
 ---
 
@@ -483,6 +541,9 @@ npm run build
 ### 불변식 (`src/tools/sweep.ts`)
 
 **배율에 천장이 없으므로 캡 기반 상한·비율 검사는 폐지했다.** 최대 스파이크는 설계상 허용한다.
+
+`npm run check`는 슬롯 중립 바닥·일러스트 키에 더해 **등급 예산·노멀 정원·카드 표기**를
+검사한다(5.2-1장). 예산을 바꿀 때는 `src/core/budget.ts`와 `src/data/csv/README.md`를 함께 고친다.
 
 | # | 조건 | 최근 결과 |
 |---|---|---|

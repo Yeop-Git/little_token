@@ -30,12 +30,17 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "mind"
       ],
       "person": "first",
-      "bonus": 0.2,
+      "bonus": 0,
       "targetMode": "enemy",
-      "rarity": "common",
+      "rarity": "rare",
       "art": "1002",
-      "note": "배율 ×1.20",
-      "lore": "지난 장을 손끝으로 짚는다."
+      "note": "75% 확률로 배율 ×1.80",
+      "lore": "지난 일은 이미 정해져 있다. 그래서 자주 손에 잡힌다.",
+      "variance": {
+        "p": 0.75,
+        "hi": 1.8,
+        "lo": 1
+      }
     },
     {
       "id": "nado",
@@ -46,12 +51,17 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "echo"
       ],
       "person": "first",
-      "bonus": 0.2,
+      "bonus": 0,
       "targetMode": "enemy",
-      "rarity": "common",
+      "rarity": "rare",
       "art": "1003",
-      "note": "배율 ×1.20",
-      "lore": "누가 먼저였는지는 중요하지 않다."
+      "note": "60% 확률로 배율 ×2.00",
+      "lore": "누가 먼저였는지는 중요하지 않다.",
+      "variance": {
+        "p": 0.6,
+        "hi": 2,
+        "lo": 1
+      }
     },
     {
       "id": "oneul",
@@ -62,12 +72,17 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "now"
       ],
       "person": "first",
-      "bonus": 0.2,
+      "bonus": 0,
       "targetMode": "enemy",
-      "rarity": "common",
+      "rarity": "rare",
       "art": "1004",
-      "note": "배율 ×1.20",
-      "lore": "오늘 몫은 오늘 적는다."
+      "note": "30% 확률로 배율 ×3.00",
+      "lore": "오늘 몫은 오늘 적는다. 될 때는 크게 된다.",
+      "variance": {
+        "p": 0.3,
+        "hi": 3,
+        "lo": 1
+      }
     },
     {
       "id": "gyeop",
@@ -82,7 +97,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "targetMode": "enemy",
       "rarity": "rare",
       "art": "1005",
-      "note": "도박 40% — ×2.50 / ×1.00",
+      "note": "40% 확률로 배율 ×2.50",
       "lore": "연필 쥔 손이 떨린다. 그래서 터질 땐 크게.",
       "variance": {
         "p": 0.4,
@@ -119,7 +134,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "targetMode": "enemy",
       "rarity": "rare",
       "art": "1007",
-      "note": "도박 50% — ×2.20 / ×1.00",
+      "note": "50% 확률로 배율 ×2.20",
       "lore": "아픈 자리가 오히려 뜨겁다.",
       "variance": {
         "p": 0.5,
@@ -197,12 +212,12 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "grit"
       ],
       "stat": "guard",
-      "bonus": 0.1,
+      "bonus": 0.45,
       "crit": 0.2,
-      "rarity": "common",
+      "rarity": "rare",
       "art": "2005",
-      "note": "배율 ×1.10 · 대성공 20%",
-      "lore": "울음을 삼킨다."
+      "note": "배율 ×1.45 · 대성공 20%",
+      "lore": "울음을 삼킨 만큼 단단해진다."
     },
     {
       "id": "nunmullo",
@@ -212,12 +227,12 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "tear"
       ],
       "stat": "heal",
-      "bonus": 0,
-      "crit": 0.4,
-      "rarity": "common",
+      "bonus": 0.25,
+      "crit": 0.55,
+      "rarity": "rare",
       "art": "2006",
-      "note": "배율 ×1.00 · 대성공 40%",
-      "lore": "젖은 눈으로 쓴다."
+      "note": "배율 ×1.25 · 대성공 55%",
+      "lore": "젖은 눈으로 쓰면 가끔 크게 아문다."
     }
   ],
   "verb": [
@@ -290,10 +305,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "hold"
       ],
       "stat": "guard",
-      "statMult": 1,
+      "statMult": 1.5,
       "kind": "guard",
-      "rarity": "common",
-      "note": "방어 ×1",
+      "rarity": "rare",
+      "note": "방어 ×1.5",
       "lore": "한 뼘도 안 내준다."
     },
     {
@@ -305,10 +320,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "warm"
       ],
       "stat": "heal",
-      "statMult": 1,
+      "statMult": 1.5,
       "kind": "heal",
-      "rarity": "common",
-      "note": "회복 ×1",
+      "rarity": "rare",
+      "note": "회복 ×1.5",
       "lore": "가슴에 안는다."
     }
   ]
@@ -328,7 +343,7 @@ export const REWARD_WORDS: Word[] = [
     "targetMode": "enemy",
     "rarity": "epic",
     "art": "1008",
-    "note": "도박 50% — ×3.20 / ×1.00",
+    "note": "50% 확률로 배율 ×3.20",
     "lore": "함께라면 크게 타오른다.",
     "variance": {
       "p": 0.5,
@@ -418,7 +433,7 @@ export const REWARD_WORDS: Word[] = [
     "stat": "atk",
     "bonus": 0,
     "rarity": "epic",
-    "note": "도박 50% — ×3.20 / ×1.00",
+    "note": "50% 확률로 배율 ×3.20",
     "lore": "이래 죽으나 저래 죽으나.",
     "variance": {
       "p": 0.5,
@@ -515,7 +530,7 @@ export const WORDS: Record<string, Word[]> = {
       "targetMode": "enemy",
       "rarity": "epic",
       "art": "1008",
-      "note": "도박 50% — ×3.20 / ×1.00",
+      "note": "50% 확률로 배율 ×3.20",
       "lore": "함께라면 크게 타오른다.",
       "variance": {
         "p": 0.5,
@@ -772,7 +787,7 @@ export const WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "timing": "immediate",
       "rarity": "epic",
-      "note": "도박 50% — ×3.20 / ×1.00",
+      "note": "50% 확률로 배율 ×3.20",
       "lore": "기억이 흐릿하다… 운에 맡긴다.",
       "variance": {
         "p": 0.5,
@@ -850,6 +865,18 @@ export const GROW_WORDS: Word[] = [
     "rarity": "legendary",
     "note": "최대 체력 +1 · 배율을 받지 않는다",
     "lore": "주어부터 자란다. 이야기가 키를 잰다."
+  },
+  {
+    "id": "gr_adv",
+    "text": "무럭무럭",
+    "slot": "adv",
+    "tags": [
+      "grow"
+    ],
+    "growHp": 1,
+    "rarity": "legendary",
+    "note": "최대 체력 +1 · 배율을 받지 않는다",
+    "lore": "수식하지 않는다. 그냥 자란다."
   },
   {
     "id": "gr_verb",

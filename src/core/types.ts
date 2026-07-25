@@ -147,7 +147,7 @@ export interface Intent {
   statKey: StatName | null // 룰렛을 밀어 줄 스탯(수식이 지정). 없으면 맥락(kind)으로 결정
   /** 무럭무럭 총합 — 이 문장으로 자라는 최대 체력. 배율을 받지 않는다. */
   growHp: number
-  /** 피노키오의 미아핑이 이번 문장에서 굴릴 "근데?" 개수(= 발동한 맥락 수). */
+  /** 피노키오의 미아핑이 이번 문장에서 굴릴 "근데?" 개수(완성한 문장이면 1). */
   doubtCount: number
   /** 화면에 그대로 늘어놓을 계산 내역 — 깡수치와 배율의 출처. */
   breakdown: { flats: IntentPart[]; mults: IntentPart[] }
@@ -178,10 +178,8 @@ export interface CompileMods {
   bonusEach?: number
   /** 아기돼지 바베큐 — 이번 전투 처치 수에서 나온 배율(1이면 없음). */
   stageMult?: number
-  /** 피노키오의 미아핑 — 맥락마다 "근데?" 배율을 굴린다(굴림은 resolveMultiplier). */
+  /** 피노키오의 미아핑 — 완성한 문장 끝에 "…근데?" 한 번을 굴린다(굴림은 resolveMultiplier). */
   doubt?: boolean
-  /** 잭과 숙주나물 — 발동한 맥락마다 무럭무럭 한 장이 더 붙는다. */
-  grow?: boolean
 }
 
 export interface Tables {
