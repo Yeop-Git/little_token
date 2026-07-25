@@ -134,6 +134,13 @@ button {
   filter: blur(0);
   transform: scale(1);
 }
+/* 떠오름이 끝나면 흐림을 아예 뗀다 — blur(0)은 '필터 없음'이 아니라서, 값이 남아 있는
+   한 타이틀 화면 전체가 매 프레임 별도 표면에 한 번 더 구워진다(결과는 원본과 같다).
+   will-change는 일부러 남긴다 — 쌓임 맥락이 여기서 갈리는데, 필터까지 빠진 채로
+   그것마저 떼면 자식들의 z-index가 바깥으로 새어 나간다. */
+.title-reveal.settled {
+  filter: none;
+}
 
 /* 배경·발광·비네트를 묶어 난류 필터로 화면 전체가 일렁이게 한다(글자는 제외) */
 .title-atmos {
@@ -141,6 +148,19 @@ button {
   inset: -3%;
   background-size: cover;
   background-position: center;
+  /* 쌓임 맥락은 필터가 붙든 안 붙든 항상 여기서 닫혀 있어야 한다.
+     아래 .warping이 없을 때 filter가 사라지면서 이게 같이 풀리면, 안에 있는
+     발광(z 2)·비네트(z 4)가 바깥 형제들 사이로 새어 나가 반딧불이(z 3)와
+     좌측 스크림(z 2) 위로 올라온다. 발광의 screen 합성도 여기서 닫힌다. */
+  isolation: isolate;
+}
+/* 필터는 지글거림이 실제로 올라올 때만 건다.
+   #title-warp의 feDisplacementMap은 scale이 0인 동안 결과가 원본과 픽셀 단위로 같은데,
+   브라우저는 그걸 모르니 매 프레임 화면 전체에 feTurbulence를 새로 굽는다(CPU 래스터).
+   게다가 이 안에 발광·비네트의 무한 애니메이션이 들어 있어서 필터가 매 프레임 더러워진다.
+   시네마틱이 걷히는 1초 동안 이게 같이 돌면 그 구간이 통째로 밀린다 — TitleView가
+   지글거림을 시작시킬 때 .warping을 붙여서 그때부터 건다(보이는 결과는 그대로다). */
+.title-reveal.warping .title-atmos {
   filter: url(#title-warp);
 }
 

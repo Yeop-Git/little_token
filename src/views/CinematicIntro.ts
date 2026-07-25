@@ -51,6 +51,7 @@ const GIVE_UP_MS = 6000
 
 export class CinematicIntro {
   private el: HTMLElement
+  private stage: HTMLElement
   private video: HTMLVideoElement
   private fadeTimer = 0
   private giveUpTimer = 0
@@ -74,6 +75,7 @@ export class CinematicIntro {
         <div class="cine-glow"></div>
         <div class="cine-vignette"></div>
       </div>`
+    this.stage = this.el.querySelector('.cine-stage')!
     this.video = this.el.querySelector('video')!
     this.video.playbackRate = SPEED
     host.appendChild(this.el)
@@ -91,8 +93,8 @@ export class CinematicIntro {
     this.video.addEventListener('timeupdate', this.tick)
     // 첫 프레임이 준비돼야 검은 화면을 걷는다 — 안 그러면 흰 깜빡임이 생긴다.
     this.video.addEventListener('loadeddata', () => this.el.classList.add('playing'), { once: true })
-    // 걷힘이 실제로 끝나는 순간을 트랜지션한테 직접 듣는다(아래 onFadeEnd 참고).
-    this.el.addEventListener('transitionend', this.onFadeEnd)
+    // 떠오름·걷힘이 실제로 끝나는 순간을 트랜지션한테 직접 듣는다(아래 onTransitionEnd 참고).
+    this.el.addEventListener('transitionend', this.onTransitionEnd)
 
     this.giveUpTimer = window.setTimeout(this.finish, GIVE_UP_MS)
     void this.play()
@@ -104,7 +106,7 @@ export class CinematicIntro {
     clearTimeout(this.safetyTimer)
     clearTimeout(this.releaseTimer)
     this.video.removeEventListener('timeupdate', this.tick)
-    this.el.removeEventListener('transitionend', this.onFadeEnd)
+    this.el.removeEventListener('transitionend', this.onTransitionEnd)
     this.el.removeEventListener('click', this.skip)
     window.removeEventListener('keydown', this.skip)
     this.release()
@@ -175,14 +177,21 @@ export class CinematicIntro {
     this.fadeTimer = window.setTimeout(this.finish, FADE_FALLBACK_MS)
   }
 
-  /**
-   * 걷힘이 끝나는 순간에 맞춰 넘긴다.
-   * 트랜지션은 클래스가 붙은 프레임이 아니라 그 다음 스타일 계산부터 흐르기 시작한다.
-   * 그래서 같은 길이의 타이머로 재면 늘 한 프레임씩 먼저 터져서, 아직 다 안 걷힌 화면을
-   * 잘라내게 된다 — 마지막에 툭 튀던 게 이거다. 끝을 재는 건 트랜지션한테 맡긴다.
-   */
-  private onFadeEnd = (e: TransitionEvent) => {
-    if (e.target === this.el && e.propertyName === 'opacity') this.finish()
+  private onTransitionEnd = (e: TransitionEvent) => {
+    /**
+     * 걷힘이 끝나는 순간에 맞춰 넘긴다.
+     * 트랜지션은 클래스가 붙은 프레임이 아니라 그 다음 스타일 계산부터 흐르기 시작한다.
+     * 그래서 같은 길이의 타이머로 재면 늘 한 프레임씩 먼저 터져서, 아직 다 안 걷힌 화면을
+     * 잘라내게 된다. 끝을 재는 건 트랜지션한테 맡긴다.
+     */
+    if (e.target === this.el && e.propertyName === 'opacity') return this.finish()
+    /**
+     * 떠오름이 끝났다 — 여기서 흐림을 아예 뗀다.
+     * blur(0)은 '필터 없음'이 아니다. 값이 남아 있는 한 브라우저는 화면 전체를 별도
+     * 표면에 한 번 더 굽고 필터 패스를 태운다. 결과는 원본과 픽셀 단위로 같은데
+     * 비용만 계속 나가고, 하필 걷히는 동안 영상·타이틀이 같이 그려질 때 겹친다.
+     */
+    if (e.target === this.stage && e.propertyName === 'filter') this.stage.style.filter = 'none'
   }
 
   private finish = () => {

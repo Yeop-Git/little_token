@@ -16,6 +16,13 @@ interface Opts {
   holdUi?: boolean
 }
 
+/**
+ * 지글거림 SMIL을 시작한 뒤 실제 CSS 필터를 걸기까지 두는 시간.
+ * #title-sizzle이 scale 0에 머무는 구간(11s × 0.18 ≈ 1.98s)보다 반드시 짧아야 한다 —
+ * 늦으면 이미 0을 넘긴 값으로 필터가 붙어 배경이 툭 뒤틀린다.
+ */
+const WARP_ON_MS = 1200
+
 interface Fly {
   x: number
   y: number
@@ -34,6 +41,7 @@ export class TitleView {
   private toastTimer = 0
   private startTimer = 0
   private confirmTimer = 0
+  private warpTimer = 0
 
   constructor(
     private root: HTMLElement,
@@ -47,6 +55,7 @@ export class TitleView {
     clearTimeout(this.toastTimer)
     clearTimeout(this.startTimer)
     clearTimeout(this.confirmTimer)
+    clearTimeout(this.warpTimer)
     window.removeEventListener('resize', this.onResize)
   }
 
@@ -117,13 +126,18 @@ export class TitleView {
         }),
     )
     if (this.opts.holdUi) reveal?.classList.add('ui-held')
+    // 떠오름이 끝나면 흐림을 뗀다(위 .settled 참고). 여기서 안 떼면 시네마틱이 걷히는
+    // 동안 영상 위에 타이틀 화면 전체를 굽는 필터 패스가 하나 더 얹힌다.
+    reveal?.addEventListener('transitionend', (e) => {
+      if (e.target === reveal && e.propertyName === 'filter') reveal.classList.add('settled')
+    })
     Promise.all(preload).then(() => {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
         // 붙잡아 둔 상태에서는 아직 누를 게 없다 — 포커스도 놓아줄 때 준다.
         if (this.opts.holdUi) return
         this.focusMenu()
-        this.beginAnim('#title-sizzle')
+        this.startWarp()
       })
     })
   }
@@ -140,12 +154,27 @@ export class TitleView {
     reveal.classList.add('ready')
     reveal.classList.remove('ui-held')
     reveal.classList.add('ui-in')
-    this.beginAnim('#title-sizzle')
+    this.startWarp()
     this.focusMenu()
   }
 
   private beginAnim(sel: string) {
     this.root.querySelector<SVGAnimateElement>(sel)?.beginElement?.()
+  }
+
+  /**
+   * 배경 일렁임을 켠다 — SMIL은 지금 시작하고, CSS 필터는 조금 늦게 건다.
+   *
+   * #title-sizzle은 앞 18%(11초 중 약 2초) 동안 scale을 0에 눌러 둔다. 그 구간의
+   * 필터는 원본과 픽셀 단위로 같은 그림을 내놓으면서 화면 전체 feTurbulence 비용만
+   * 문다. 특히 시네마틱이 걷히는 동안 이게 돌면 영상·타이틀이 함께 그려지는 그 1초를
+   * 갉아먹는다. 그래서 필터 자체는 지글거림이 실제로 올라오기 직전에 붙인다.
+   * (필터가 붙는 순간 레이어가 한 번 승격되는데, 로고가 천천히 떠오르는 중이라 안 보인다.)
+   */
+  private startWarp() {
+    this.beginAnim('#title-sizzle')
+    const reveal = this.root.querySelector<HTMLElement>('.title-reveal')
+    this.warpTimer = window.setTimeout(() => reveal?.classList.add('warping'), WARP_ON_MS)
   }
 
   private focusMenu() {
