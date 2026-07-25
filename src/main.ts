@@ -32,6 +32,8 @@ import { BossCinematic } from '@views/BossCinematic'
 import { VIDEO } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
+import { CustomCursor } from '@/ui/CustomCursor'
+import { ClickScribble } from '@/ui/ClickScribble'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -51,6 +53,8 @@ let battleRequest = 0
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
 installFoilShaders()
+CustomCursor.install()
+ClickScribble.install()
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
