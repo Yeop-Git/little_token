@@ -1,13 +1,18 @@
-// 현재 단어/관용구/모순/감탄 데이터를 마크다운 표로 덤프 → WORDS.md
+// 5슬롯 확장 단어/관용구/모순/감탄 데이터를 마크다운 표로 덤프 → WORDS.md
+// 주의: 일반 런은 EARLY_WORDS(3슬롯)를 쓴다. 이 덤프는 확장용 보존 자료다.
 import { WORDS } from '@data/words'
-import { COMBOS, CONFLICTS, MULT_CAP } from '@data/combos'
+import { COMBOS, CONFLICTS } from '@data/combos'
 import { EXCLAIM_SLOTS } from '@data/items'
 import { DEFAULT_TEMPLATE } from '@data/slots'
 import { RARITY_LABEL } from '@core/types'
 
 const L: string[] = []
-L.push('# 단어 · 관용구 데이터 표 (현재 구현 기준)\n')
-L.push(`> 배수 상한(MULT_CAP) = **${MULT_CAP}**. 데미지 = (목적어위력+동사위력+공격력) × (1+보너스풀) × 관용구배수, 상한 적용.\n`)
+L.push('# 단어 · 관용구 데이터 표 — 5슬롯 확장 데이터\n')
+L.push('> ⚠ **일반 런의 단어 목록이 아니다.** 실제 런은 `EARLY_WORDS`(3슬롯 `주어→수식→동사`)를')
+L.push('> 사용하며, 이 표는 `src/data/words.ts`의 5슬롯 확장·전수검사용 보존 자료다.\n')
+L.push('> 현재 데미지 공식: `깡수치(스탯 × 계수) × (1 + 보너스풀) × 관용구배수`.')
+L.push('> **배수 상한은 없다.** 최종 배율에 도박·운(+2%/1)·룰렛(대성공 ×1.5)이 추가로 곱해진다.')
+L.push('> 실패·자해·부조화는 폐지했다. 자세한 규칙은 `SENTENCE_COMBAT_SPEC.md` 참조.\n')
 
 for (const s of DEFAULT_TEMPLATE.slots) {
   L.push(`## ${s.label} (${s.key})\n`)

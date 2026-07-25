@@ -4,6 +4,7 @@
  */
 
 import type { Word } from '@core/types'
+import type { PassiveId } from '@core/passives'
 import { WORDS } from '@data/words'
 
 export interface PlayerStats {
@@ -21,6 +22,8 @@ export interface OwnedItem {
   art: string // Icons.itemArt 키
   line: string // 감탄 문장
   stats: Partial<PlayerStats>
+  /** 규칙을 바꾸는 패시브(전설 아이템 전용). 스탯 아이템은 없다. */
+  passive?: PassiveId
 }
 
 export interface PlayerState {
@@ -35,15 +38,15 @@ export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; d
   { key: 'atk', label: '공격', icon: 'sword', desc: '공격 문장의 피해가 커진다' },
   { key: 'guard', label: '방어', icon: 'shield', desc: '방어(임시 체력) 수치가 커진다' },
   { key: 'heal', label: '회복', icon: 'cross', desc: '회복량이 커진다' },
-  { key: 'luck', label: '운', icon: 'clover', desc: '고등급 보상·도박 확률을 올린다' },
+  { key: 'luck', label: '운', icon: 'clover', desc: '보상등급의 시작·최저치를 올린다 · 도박 보정' },
 ]
 
 export function defaultPlayer(): PlayerState {
   return {
     stats: { hp: 40, atk: 3, guard: 3, heal: 3, luck: 2 },
     items: [
-      { id: 'candle', name: '몽당 양초', grade: '흔함', art: 'candle', line: '와! 정말 예뻐!', stats: { atk: 3, luck: 5 } },
-      { id: 'ribbon', name: '낡은 리본', grade: '흔함', art: 'ribbon', line: '음? 살짝 튼튼해!', stats: { guard: 3, luck: 2 } },
+      { id: 'candle', name: '몽당 양초', grade: '흔함', art: 'candle', line: '와! 정말 예뻐!', stats: { atk: 3, heal: 2, luck: 2 } },
+      { id: 'ribbon', name: '낡은 리본', grade: '흔함', art: 'ribbon', line: '음? 살짝 튼튼해!', stats: { hp: 2, guard: 4, luck: 2 } },
     ],
     deck: WORDS,
   }

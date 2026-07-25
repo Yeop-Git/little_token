@@ -13,12 +13,26 @@ import token003 from './sprites/token/token_003.png'
 import enemyMoth from './sprites/enemy_moth.png'
 import enemyRoach from './sprites/enemy_roach.png'
 import skill1001 from './sprites/skills/skill_1001.png'
+import skill1002 from './sprites/skills/skill_1002.png'
+import skill1003 from './sprites/skills/skill_1003.png'
+import skill1004 from './sprites/skills/skill_1004.png'
+import skill1005 from './sprites/skills/skill_1005.png'
+import skill1006 from './sprites/skills/skill_1006.png'
+import skill1007 from './sprites/skills/skill_1007.png'
+import skill1008 from './sprites/skills/skill_1008.png'
 import skill2001 from './sprites/skills/skill_2001.png'
 import skill2002 from './sprites/skills/skill_2002.png'
 import skill2003 from './sprites/skills/skill_2003.png'
+import skill2004 from './sprites/skills/skill_2004.png'
+import skill2005 from './sprites/skills/skill_2005.png'
+import skill2006 from './sprites/skills/skill_2006.png'
 import skill3001 from './sprites/skills/skill_3001.png'
 import skill3002 from './sprites/skills/skill_3002.png'
 import skill3003 from './sprites/skills/skill_3003.png'
+import skill3007 from './sprites/skills/skill_3007.png'
+import skill7001 from './sprites/skills/skill_7001.png'
+import skill7002 from './sprites/skills/skill_7002.png'
+import skill7003 from './sprites/skills/skill_7003.png'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
 import paperMapParade from './audio/paper-map-parade.mp3'
 import wordSelect from './audio/word-select.mp3'
@@ -50,15 +64,31 @@ export const SPRITES: Record<string, string> = {
   enemy_roach: enemyRoach,
 }
 
-// 맥락카드 일러스트 — Word.art가 이 키(1xxx 주어 · 2xxx 수식 · 3xxx 목적)를 참조.
+// 맥락카드 일러스트 — Word.art가 이 키를 참조한다.
+// 1xxx 주어 · 2xxx 수식 · 3xxx 동사 · 7xxx 문장부호. 번호는 CSV 등장 순서를 따른다.
 export const SKILL_ART: Record<string, string> = {
   '1001': skill1001,
+  '1002': skill1002,
+  '1003': skill1003,
+  '1004': skill1004,
+  '1005': skill1005,
+  '1006': skill1006,
+  '1007': skill1007,
+  '1008': skill1008,
   '2001': skill2001,
   '2002': skill2002,
   '2003': skill2003,
+  '2004': skill2004,
+  '2005': skill2005,
+  '2006': skill2006,
   '3001': skill3001,
   '3002': skill3002,
   '3003': skill3003,
+  '3007': skill3007,
+  // 문장부호(올림프의 당근) — 7001 느낌표 · 7002 온점 · 7003 물음표
+  '7001': skill7001,
+  '7002': skill7002,
+  '7003': skill7003,
 }
 
 export const FONT_URL = griunFont

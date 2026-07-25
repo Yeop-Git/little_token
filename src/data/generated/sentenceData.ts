@@ -33,6 +33,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "common",
+      "art": "1002",
       "note": "배율 ×1.20",
       "lore": "지난 장을 손끝으로 짚는다."
     },
@@ -48,6 +49,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "common",
+      "art": "1003",
       "note": "배율 ×1.20",
       "lore": "누가 먼저였는지는 중요하지 않다."
     },
@@ -63,6 +65,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.2,
       "targetMode": "enemy",
       "rarity": "common",
+      "art": "1004",
       "note": "배율 ×1.20",
       "lore": "오늘 몫은 오늘 적는다."
     },
@@ -78,6 +81,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "rare",
+      "art": "1005",
       "note": "도박 40% — ×2.50 / ×1.00",
       "lore": "연필 쥔 손이 떨린다. 그래서 터질 땐 크게.",
       "variance": {
@@ -98,6 +102,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.6,
       "targetMode": "enemy",
       "rarity": "rare",
+      "art": "1006",
       "note": "배율 ×1.60",
       "lore": "아무도 없어도 나는 남는다."
     },
@@ -113,6 +118,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "rare",
+      "art": "1007",
       "note": "도박 50% — ×2.20 / ×1.00",
       "lore": "아픈 자리가 오히려 뜨겁다.",
       "variance": {
@@ -179,6 +185,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.4,
       "crit": 0.25,
       "rarity": "rare",
+      "art": "2004",
       "note": "배율 ×1.40 · 대성공 25%",
       "lore": "앞뒤 안 가리고."
     },
@@ -193,6 +200,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0.1,
       "crit": 0.2,
       "rarity": "common",
+      "art": "2005",
       "note": "배율 ×1.10 · 대성공 20%",
       "lore": "울음을 삼킨다."
     },
@@ -207,6 +215,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "crit": 0.4,
       "rarity": "common",
+      "art": "2006",
       "note": "배율 ×1.00 · 대성공 40%",
       "lore": "젖은 눈으로 쓴다."
     }
@@ -318,6 +327,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0,
     "targetMode": "enemy",
     "rarity": "epic",
+    "art": "1008",
     "note": "도박 50% — ×3.20 / ×1.00",
     "lore": "함께라면 크게 타오른다.",
     "variance": {
@@ -504,6 +514,7 @@ export const WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "epic",
+      "art": "1008",
       "note": "도박 50% — ×3.20 / ×1.00",
       "lore": "함께라면 크게 타오른다.",
       "variance": {
@@ -783,6 +794,88 @@ export const WORDS: Record<string, Word[]> = {
     }
   ]
 }
+
+/** 문장부호 — 아이템 패시브 '올림프의 당근'이 열어 주는 슬롯 전용 풀. */
+export const PUNCT_WORDS: Word[] = [
+  {
+    "id": "pt_bang",
+    "text": "!",
+    "slot": "punct",
+    "tags": [
+      "preempt"
+    ],
+    "rarity": "legendary",
+    "art": "7001",
+    "note": "선공 상대보다 먼저 행동한다",
+    "lore": "느낌표를 찍자 손이 먼저 나갔다."
+  },
+  {
+    "id": "pt_dot",
+    "text": ".",
+    "slot": "punct",
+    "tags": [
+      "calm"
+    ],
+    "bonus": 0.1,
+    "rarity": "legendary",
+    "art": "7002",
+    "note": "배율 풀 +0.10 (안전한 한 수)",
+    "lore": "조용히 마침표를 찍는다. 그걸로 충분한 날도 있다."
+  },
+  {
+    "id": "pt_q",
+    "text": "?",
+    "slot": "punct",
+    "tags": [
+      "doubt"
+    ],
+    "crit": 0.3,
+    "rarity": "legendary",
+    "art": "7003",
+    "note": "대성공 확률 +30%",
+    "lore": "정말 이걸로 끝일까? 되묻는 순간 문장이 커진다."
+  }
+]
+
+/** 무럭무럭 — '잭과 숙주나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
+export const GROW_WORDS: Word[] = [
+  {
+    "id": "gr_subj",
+    "text": "무럭무럭",
+    "slot": "subj",
+    "tags": [
+      "grow"
+    ],
+    "growHp": 1,
+    "rarity": "legendary",
+    "note": "최대 체력 +1 · 배율을 받지 않는다",
+    "lore": "주어부터 자란다. 이야기가 키를 잰다."
+  },
+  {
+    "id": "gr_verb",
+    "text": "무럭무럭",
+    "slot": "verb",
+    "tags": [
+      "grow"
+    ],
+    "growHp": 1,
+    "rarity": "legendary",
+    "note": "최대 체력 +1 · 배율을 받지 않는다",
+    "lore": "때리지도 막지도 않는다. 그냥 자란다."
+  },
+  {
+    "id": "gr_punct",
+    "text": "무럭무럭",
+    "slot": "punct",
+    "tags": [
+      "grow"
+    ],
+    "growHp": 1,
+    "rarity": "legendary",
+    "note": "최대 체력 +1 · 배율을 받지 않는다",
+    "lore": "문장 끝에 붙어서도 자란다. 숙주는 어디서든 자란다."
+  }
+]
 
 export const EARLY_COMBOS: Combo[] = [
   {

@@ -15,6 +15,8 @@ export interface SlotDef {
   label: string // UI 탭 라벨 (주어/수식/…)
   role: SlotRole // 컴파일 규칙
   josa?: boolean // 목적어처럼 조사를 붙일지
+  /** 앞 단어에 공백 없이 붙여 쓴다(문장부호). */
+  attach?: boolean
 }
 
 // 슬롯 역할 — 수치를 어느 풀에 넣을지 결정.
@@ -68,6 +70,8 @@ export interface Word {
   bonus?: number // subject/modifier/ending: 배수 풀 기여(가산)
   crit?: number // 대성공 확률(0..1) — 수식 룰렛
   fail?: number // 실패 확률(0..1) — 수식 룰렛
+  /** 무럭무럭 — 최대 체력을 이만큼 영구히 올린다. 배율을 받지 않는 고정 수치. */
+  growHp?: number
   variance?: Variance
   effects?: WordEffects
   kind?: IntentKind // verb 전용
@@ -124,6 +128,8 @@ export interface Intent {
   targetMode: TargetMode
   aoe: AoeMode
   kind: IntentKind
+  /** 선공 상대보다 먼저 행동한다(문장부호 '!'). */
+  preempt: boolean
   base: number
   multiplier: number
   variance: Variance | null
@@ -139,6 +145,10 @@ export interface Intent {
   critP: number // 대성공 확률 합(수식 룰렛) — 스탯 보정 전 기본값
   failP: number // 실패 확률 합(수식 룰렛) — 스탯 보정 전 기본값
   statKey: StatName | null // 룰렛을 밀어 줄 스탯(수식이 지정). 없으면 맥락(kind)으로 결정
+  /** 무럭무럭 총합 — 이 문장으로 자라는 최대 체력. 배율을 받지 않는다. */
+  growHp: number
+  /** 피노키오의 미아핑이 이번 문장에서 굴릴 "근데?" 개수(= 발동한 맥락 수). */
+  doubtCount: number
   /** 화면에 그대로 늘어놓을 계산 내역 — 깡수치와 배율의 출처. */
   breakdown: { flats: IntentPart[]; mults: IntentPart[] }
 }
@@ -148,6 +158,30 @@ export interface IntentPart {
   value: number // 깡수치는 더할 값, 배율은 곱할 값
   source: 'word' | 'stat' | 'combo' | 'coherence'
   hint?: string // "공격 ×1" 처럼 어디서 나온 수치인지
+  /**
+   * 이 깡수치가 들어간 풀. 동사가 둘일 수 있어(맛동사) 한 문장 안에서
+   * 피해·방어·회복이 동시에 생기므로, 집계판이 자기 풀만 골라 쓴다.
+   */
+  lane?: 'damage' | 'guard' | 'heal'
+}
+
+/**
+ * 아이템 패시브가 컴파일에 주는 수정자. 컴파일러는 순수함수라 플레이어를 모르므로
+ * `core/passives.ts`의 `modsFor()`가 보유 아이템을 이 데이터로 바꿔 넘긴다.
+ */
+export interface CompileMods {
+  /** 백설공주의 구두 — 피해 동사가 있으면 깡수치에 한 번 가산. */
+  verbFlat?: number
+  /** 성냥팔이 소녀의 망토 — 모든 동사가 운 스탯만큼 깡수치를 더 받는다. */
+  verbLuck?: boolean
+  /** 빨간망토의 성냥 — 배율 역할 칸마다 보너스를 더 얹는다. */
+  bonusEach?: number
+  /** 아기돼지 바베큐 — 이번 전투 처치 수에서 나온 배율(1이면 없음). */
+  stageMult?: number
+  /** 피노키오의 미아핑 — 맥락마다 "근데?" 배율을 굴린다(굴림은 resolveMultiplier). */
+  doubt?: boolean
+  /** 잭과 숙주나물 — 발동한 맥락마다 무럭무럭 한 장이 더 붙는다. */
+  grow?: boolean
 }
 
 export interface Tables {

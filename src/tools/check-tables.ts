@@ -10,9 +10,10 @@
  * (부조화 소프트 감점은 차단이 아니므로 바닥을 위협하지 않는다.)
  */
 
+import { readFileSync } from 'node:fs'
 import { roleReason } from '@core/validator'
 import type { Tables, Word } from '@core/types'
-import { makeEarlyTables } from '@data/earlyWords'
+import { EARLY_WORDS, GROW_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { TABLES } from '@data/tables'
 
 // 이 태그가 하나라도 충돌 쌍에 등장하면, 앞 선택에 따라 차단될 여지가 있다.
@@ -46,14 +47,40 @@ function checkTables(name: string, t: Tables): Violation[] {
   return out
 }
 
+/**
+ * 일러스트 연결 검사 — 단어의 art 키가 실제로 등록돼 있는가.
+ * assets/index.ts는 png를 import하므로 tsx로 못 읽는다. 키만 텍스트로 뽑아 대조한다.
+ * (CSV 헤더가 깨져 art 열이 통째로 사라진 적이 있어 이 검사를 남긴다.)
+ */
+function checkArt(): string[] {
+  const src = readFileSync(new URL('../assets/index.ts', import.meta.url), 'utf8')
+  const block = src.slice(src.indexOf('export const SKILL_ART'), src.indexOf('export const FONT_URL'))
+  const keys = new Set([...block.matchAll(/'(\d+)':/g)].map((m) => m[1]))
+  const words = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...PUNCT_WORDS, ...GROW_WORDS]
+
+  const broken = words.filter((w) => w.art && !keys.has(w.art))
+  const noArt = words.filter((w) => !w.art)
+  const used = new Set(words.map((w) => w.art).filter(Boolean))
+  const unused = [...keys].filter((k) => !used.has(k))
+
+  console.log(`\n일러스트 연결 — 등록 ${keys.size}개 · 사용 ${used.size}개`)
+  for (const w of broken) console.log(`  위반  ${w.slot}/${w.text} → art '${w.art}' 미등록`)
+  if (noArt.length) console.log(`  참고  일러스트 없는 단어 ${noArt.length}개: ${noArt.map((w) => w.text).join(' · ')}`)
+  if (unused.length) console.log(`  참고  안 쓰이는 키: ${unused.join(' · ')}`)
+  if (!broken.length) console.log('  통과  깨진 art 키 없음')
+  return broken.map((w) => `${w.slot}/${w.text}`)
+}
+
 console.log('슬롯 중립 바닥 검사 (막다른 슬롯 방지)\n')
 const violations = [
   ...checkTables('초기', makeEarlyTables()),
   ...checkTables('전체', TABLES),
 ]
+const brokenArt = checkArt()
 
-if (violations.length) {
-  console.log(`\n위반 ${violations.length}건 — 해당 슬롯에 태그 없는 중립 단어를 추가하라.`)
+if (violations.length || brokenArt.length) {
+  if (violations.length) console.log(`\n위반 ${violations.length}건 — 해당 슬롯에 태그 없는 중립 단어를 추가하라.`)
+  if (brokenArt.length) console.log(`일러스트 위반 ${brokenArt.length}건 — assets/index.ts의 SKILL_ART에 키를 등록하라.`)
   process.exit(1)
 }
-console.log('\n모든 슬롯에 중립 바닥 확보 — 막다른 슬롯 없음.')
+console.log('\n모든 슬롯에 중립 바닥 확보 · 일러스트 키 전부 연결됨.')

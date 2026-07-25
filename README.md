@@ -20,7 +20,7 @@ npm install
 npm run dev          # 개발 서버 (localhost:3000)
 npm run data:generate # CSV → 타입이 있는 런타임 데이터 생성
 npm run type-check   # 타입 검사
-npm run sweep        # 밸런스 전수 검사(INV-1~4)
+npm run sweep        # 밸런스 전수 검사(INV-1~3)
 npm run build        # 프로덕션 빌드 → dist/
 ```
 씬 직접 진입: `?scene=battle` | `?scene=reward` | `?scene=item` (상단 개발 점퍼로도 이동).
@@ -36,5 +36,9 @@ tools/    sweep (전수 밸런스 검사)
 문장 슬롯은 **가변 길이**다: `data/slots.ts`의 템플릿을 바꾸면 덱/아이템이
 칸을 더하거나 뺄 수 있고, 컴파일러는 슬롯 키를 하드코딩하지 않는다.
 
-단어, 관용구, 모순과 부조화의 원본은 `src/data/csv/`에서 관리한다. CSV 수정 후
+단어와 관용구의 원본은 `src/data/csv/`에서 관리한다. CSV 수정 후
 `npm run data:generate`를 실행하며, 개발·검사·빌드 명령도 이 단계를 자동 수행한다.
+`src/data/generated/`는 생성물이므로 직접 고치지 않는다.
+
+현재 전투 규칙과 폐지된 규칙(실패·자해·부조화·고정 위력·배수 상한)은
+[`SENTENCE_COMBAT_SPEC.md`](SENTENCE_COMBAT_SPEC.md)에 정리돼 있다.

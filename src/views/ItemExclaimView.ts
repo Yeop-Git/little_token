@@ -10,21 +10,46 @@ import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   item: ItemDef
+  /** 전투에서 들고 온 보상등급 — 높을수록 행운 감탄(팅! 추가 스탯)이 잘 붙는다. */
+  grade?: number
   onDone: (result: OwnedItem) => void
 }
 
-const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
+const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
+
+// 행운 감탄이 붙일 수 있는 추가 스탯 — 체력은 2가 1점 가치라 +2.
+const BLESS_POOL: { stat: StatKey; n: number }[] = [
+  { stat: 'hp', n: 2 },
+  { stat: 'atk', n: 1 },
+  { stat: 'guard', n: 1 },
+  { stat: 'heal', n: 1 },
+  { stat: 'luck', n: 1 },
+]
+// 등급 1당 4% — 등급 10이면 선택지마다 40% 확률로 팅!이 붙는다.
+const BLESS_CHANCE_PER_GRADE = 0.04
 
 export class ItemExclaimView {
   private picks: Record<string, string | undefined> = {}
   private slotIndex = 0
   private finalizing = false
   private timers: number[] = []
+  // 행운 감탄 — 이 화면에서 추가 스탯이 붙은 단어들. 키는 `슬롯:단어id`.
+  private blessed = new Map<string, { stat: StatKey; n: number }>()
+  // 팅! 연출은 처음 드러날 때 한 번만.
+  private revealed = new Set<string>()
 
   constructor(private root: HTMLElement, private opts: Opts) {
+    // 입장 시 한 번만 굴린다 — 슬롯을 오가도 붙은 자리는 그대로다.
+    const chance = Math.min(0.4, (opts.grade ?? 0) * BLESS_CHANCE_PER_GRADE)
+    for (const slot of EXCLAIM_SLOTS)
+      for (const w of slot.words)
+        if (Math.random() < chance) {
+          this.blessed.set(`${slot.key}:${w.id}`, BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)])
+        }
     this.mount()
   }
   destroy() {
@@ -37,6 +62,8 @@ export class ItemExclaimView {
       const w = slot.words.find((x) => x.id === this.picks[slot.key])
       if (!w) continue
       for (const k of STAT_ORDER) t[k] += w.mods[k] ?? 0
+      const bless = this.blessed.get(`${slot.key}:${w.id}`)
+      if (bless) t[bless.stat] += bless.n
     }
     return t
   }
@@ -101,7 +128,8 @@ export class ItemExclaimView {
           grade: item.grade,
           art: item.art,
           line,
-          stats: { atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
+          stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
+          passive: item.passive,
         })
       }, 340),
     )
@@ -146,16 +174,28 @@ export class ItemExclaimView {
         }),
       )
 
-    // 현재 슬롯의 텍스트 선택지
+    // 현재 슬롯의 텍스트 선택지 — 행운 감탄이 붙은 칸은 금빛으로 빛나고, 첫 등장에만 팅!.
     const slot = EXCLAIM_SLOTS[this.slotIndex]
+    let freshBless = false
     this.q('#egrid').innerHTML = slot.words
       .map((w) => {
         const picked = this.picks[slot.key] === w.id
-        return `<button class="word-cell rarity-common ${picked ? 'picked' : ''}" data-id="${w.id}">
-          <span class="w">${w.text}</span><span class="n">${w.note}</span>
+        const key = `${slot.key}:${w.id}`
+        const bless = this.blessed.get(key)
+        const fresh = bless && !this.revealed.has(key)
+        if (fresh) {
+          this.revealed.add(key)
+          freshBless = true
+        }
+        const blessHtml = bless
+          ? `<span class="bless">팅! ${STAT_LABEL[bless.stat]} +${bless.n}</span>`
+          : ''
+        return `<button class="word-cell rarity-common ${picked ? 'picked' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
+          <span class="w">${w.text}</span><span class="n">${w.note}</span>${blessHtml}
         </button>`
       })
       .join('')
+    if (freshBless) GameAudio.play('wordSelect')
     this.q('#egrid')
       .querySelectorAll<HTMLElement>('.word-cell')
       .forEach((btn) =>

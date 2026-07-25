@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.log
 screenshots
+
+# Claude Code 로컬 설정(개인 권한 목록)
+.claude/settings.local.json

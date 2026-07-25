@@ -9,6 +9,7 @@ import { BACKGROUNDS, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
+import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 
 interface Opts {
@@ -21,8 +22,10 @@ interface Opts {
 }
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb: '동사', obj: '목적어', end: '어미' }
+// 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
+const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const RARITY_LABEL: Record<string, string> = { common: '흔함', rare: '희귀', epic: '영웅', legendary: '전설' }
-const STAT_ORDER: StatKey[] = ['atk', 'guard', 'heal', 'luck']
+const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 const pct = (b: number) => `${b >= 0 ? '+' : ''}${Math.round(b * 100)}%`
 
 function moodOf(w: Word): string {
@@ -34,15 +37,19 @@ function moodOf(w: Word): string {
   return 'buff'
 }
 
-// 상단 종류 라벨.
+// 상단 종류 라벨 — 단어는 문장 순서 번호를 함께 표기한다("1번 주어").
 function typeLabel(opt: RewardOption): string {
   if (opt.kind === 'item') return '아이템'
-  return SLOT_LABEL[opt.word!.slot] ?? '문장'
+  const slot = opt.word!.slot
+  const label = SLOT_LABEL[slot] ?? '문장'
+  return SLOT_NO[slot] ? `${SLOT_NO[slot]}번 ${label}` : label
 }
 
 // 하단 메인 효과 한 줄.
 function mainEffect(opt: RewardOption): string {
   if (opt.kind === 'item' && opt.item) {
+    // 전설(규칙) 아이템은 스탯이 0이다 — 대신 바뀌는 규칙을 그대로 적는다.
+    if (opt.item.passive) return PASSIVES[opt.item.passive].desc
     const s = STAT_ORDER.filter((k) => opt.item!.base[k]).map((k) => `${STAT_LABEL[k]} +${opt.item!.base[k]}`)
     return s.join(' · ') || '스탯 상승'
   }
@@ -109,11 +116,14 @@ function detailHtml(opt: RewardOption): string {
     const rows = STAT_ORDER.filter((k) => it.base[k])
       .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${it.base[k]}</span></div>`)
       .join('')
+    const p = it.passive ? PASSIVES[it.passive] : null
     return `
       <div class="wd-name">${it.name}</div>
       <div class="wd-grade">✦ 아이템 · ${it.grade}</div>
+      ${p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''}
       <div class="id-stats">${rows}</div>
-      <div class="wd-inf">감탄사를 조립해 추가 스탯이 붙는다.</div>
+      <div class="wd-inf">${p ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '감탄사를 조립해 추가 스탯이 붙는다.'}</div>
+      <div class="wd-flavor">${it.flavor}</div>
       <div class="id-art">${itemArt(it.art)}</div>`
   }
   const w = opt.word!
