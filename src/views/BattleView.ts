@@ -871,6 +871,8 @@ export class BattleView {
       }
     }
     host.innerHTML = words + extra
+    host.classList.toggle('has-sentence', anyPicked)
+    host.classList.toggle('sentence-ready', this.complete())
     this.renderMultNow(anyPicked)
   }
 
@@ -881,14 +883,9 @@ export class BattleView {
     if (!anyPicked) {
       host.innerHTML = ''
       host.className = 'mult-now'
-      host.style.removeProperty('--mult-left')
       this.multReelToken++
       return
     }
-    // 선택 단어가 늘어날 때마다 체인의 실제 오른쪽 끝을 따라가 겹치지 않게 이동한다.
-    const chain = this.q('#chain')
-    const chainRight = this.root.offsetWidth / 2 + chain.offsetWidth / 2
-    host.style.setProperty('--mult-left', `${Math.min(1400, chainRight + 24)}px`)
     const intent = compile(this.sel, this.t, this.player.stats, this.mods())
     const mult = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     // 정산판과 같은 출처(컴파일러가 쌓아 둔 깡수치)를 쓴다 — 방어·회복 문장도 0이 되지 않는다.
@@ -904,24 +901,35 @@ export class BattleView {
     void this.spinMult(host.querySelector<HTMLElement>('.mn-mult')!, mult, host)
   }
 
-  // 숫자 릴 — 무작위 값이 몇 번 튀다가 실제 값에 멈추고 팅! 하며 발광한다.
+  // 숫자 릴 — 계단식 난수 대신 이전 값에서 목표 값까지 부드럽게 롤업한다.
   private async spinMult(el: HTMLElement, target: number, host: HTMLElement) {
     const token = ++this.multReelToken
     host.classList.add('spinning')
     host.classList.remove('landed', 'hot')
-    for (let i = 0; i < 5; i++) {
-      if (token !== this.multReelToken) return
-      const jitter = Math.max(0.2, target * (0.55 + Math.random() * 0.9))
-      el.textContent = jitter.toFixed(2)
-      await sleep(48)
-    }
+    const from = Number(el.textContent) || 1
+    await this.rollMultiplierValue(el, from, target, 360, () => token === this.multReelToken)
     if (token !== this.multReelToken) return
-    el.textContent = target.toFixed(2)
     host.classList.remove('spinning')
     host.classList.add('landed')
     // 배율이 크게 붙었으면 더 뜨겁게 빛난다.
     host.classList.toggle('hot', target >= 2)
     this.timers.push(window.setTimeout(() => host.classList.remove('landed'), 620))
+  }
+
+  /** 배율 숫자를 프레임 단위로 이어서 올려 칩 단위의 끊김을 줄인다. */
+  private rollMultiplierValue(el: HTMLElement, from: number, target: number, duration: number, isCurrent = () => true): Promise<void> {
+    return new Promise((resolve) => {
+      const started = performance.now()
+      const frame = (now: number) => {
+        if (!isCurrent()) return resolve()
+        const ratio = Math.min(1, (now - started) / duration)
+        const eased = 1 - Math.pow(1 - ratio, 3)
+        el.textContent = (from + (target - from) * eased).toFixed(2)
+        if (ratio < 1) requestAnimationFrame(frame)
+        else resolve()
+      }
+      requestAnimationFrame(frame)
+    })
   }
 
   // 체인에 붙는 한 줄 설명 — 카드 상세·보상과 같은 표기 규칙(wordValueLines)을 쓴다.
@@ -1520,15 +1528,18 @@ export class BattleView {
       el.classList.add('mult-rising')
       GameAudio.playMultiplierRise()
     }
+    multBox.classList.add('rolling')
     for (const [i, m] of tally.mults.entries()) {
-      mult *= m.value
-      multBox.querySelector('b')!.textContent = mult.toFixed(2)
+      const nextMult = mult * m.value
       this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
       // 배율이 겹칠수록 판이 뜨거워진다.
       el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
+      await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 330)
+      mult = nextMult
       this.bump(multBox)
-      await sleep(235)
+      await sleep(36)
     }
+    multBox.classList.remove('rolling')
     if (hasRisingMultiplier) {
       const remainingSoundMs = Math.max(0, 930 - (performance.now() - multStarted))
       if (remainingSoundMs) await sleep(remainingSoundMs)

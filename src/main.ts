@@ -121,6 +121,12 @@ function defeatPlayer() {
 
 // 디버그 스테이지 이동 — 날짜만 바꾼 뒤 일반 전투 진입 경로를 다시 타게 해
 // 적 편성, 필드, 배율과 저장 상태가 서로 어긋나지 않게 한다.
+const DEBUG_BOSSES = [
+  { day: 5, name: '소금쟁이' },
+  { day: 10, name: '여왕벌' },
+  { day: 15, name: '장로거미' },
+] as const
+
 function jumpToStage(day: number) {
   if (!Number.isFinite(day)) return
   run.day = Math.max(1, Math.floor(day))
@@ -172,6 +178,9 @@ function mountDevCheat(active: SceneName) {
               </form>
               <div class="dev-cheat-stage-presets" aria-label="추천 스테이지">
                 ${stagePresets.map((day) => `<button type="button" data-stage-preset="${day}"${day === run.day ? ' class="on"' : ''}>${day}${day % 5 === 0 ? ' · BOSS' : ''}</button>`).join('')}
+              </div>
+              <div class="dev-cheat-bosses" aria-label="보스 바로가기">
+                ${DEBUG_BOSSES.map((boss) => `<button type="button" data-boss-day="${boss.day}"><small>${boss.day} STAGE</small><b>${boss.name}</b></button>`).join('')}
               </div>
             </div>
           </div>
@@ -257,6 +266,9 @@ function mountDevCheat(active: SceneName) {
   })
   shell.querySelectorAll<HTMLButtonElement>('[data-stage-preset]').forEach((button) =>
     button.addEventListener('click', () => jumpToStage(Number(button.dataset.stagePreset))),
+  )
+  shell.querySelectorAll<HTMLButtonElement>('[data-boss-day]').forEach((button) =>
+    button.addEventListener('click', () => jumpToStage(Number(button.dataset.bossDay))),
   )
   shell.querySelectorAll<HTMLElement>('[data-item]').forEach((button) =>
     button.addEventListener('click', () => grantItem(ALL_ITEMS[button.dataset.item!])),
