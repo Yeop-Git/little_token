@@ -6,6 +6,8 @@
 
 import type { EnemyDef } from '@core/types'
 
+export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중 : 본체 무적'
+
 export const ENEMIES: Record<string, EnemyDef> = {
   inkDevourer: {
     id: 'inkDevourer', name: '먹물 왕바퀴', boss: true,
@@ -53,10 +55,11 @@ export const ENEMIES: Record<string, EnemyDef> = {
       refillOnlyWhenEmpty: true,
       pierceWhileEscorted: true,
       backlashMaxHpRatePerUnit: 0.015,
+      focusedBacklash: { emotion: 'anger', multiplier: 2 },
       groggyEvery: 4,
       groggyDamageMult: 1.5,
     },
-    note: '전투 시작에 체력 30인 일벌 네 마리를 호위로 세우며, 한 마리라도 남아 있으면 여왕벌의 공격이 방어를 관통한다. 공격의 초과 피해는 대상 수만큼 다음 일벌로 이어지고, 관통 공격은 대상 수 제한 없이 남은 일벌을 계속 꿰뚫어 극고점에서는 네 마리를 한꺼번에 퇴치할 수 있다. 일벌 한 마리마다 여왕벌 최대 체력의 1.5%가 본체에 들어가며, 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 예정 공격이 한 턴 밀린다. 그로기가 끝난 다음 턴에는 새 일벌 네 마리를 소환해 같은 주기를 반복한다.',
+    note: `전투 시작에 체력 30인 일벌 네 마리를 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 1.5%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 예정 공격이 한 턴 밀린다. 그로기가 끝난 다음 턴에는 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,

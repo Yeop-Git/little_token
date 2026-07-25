@@ -28,26 +28,24 @@ body {
   --font: 'Griun', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
 }
 
-/* 뷰포트가 무대를 flex로 정중앙에 놓는다. 무대는 자기 크기 그대로 두고
-   scale()로만 축소 — translate+scale 순서 문제 없이 항상 레터박스 중앙. */
+/* 고정 무대는 뷰포트 중앙을 기준으로 배치한 뒤 축소한다. flex 항목을 transform하면
+   Chromium이 축소 전 높이로 교차축을 정렬해 16:9에서도 아래쪽이 비는 경우가 있다. */
 #viewport {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: radial-gradient(ellipse at center, #14101a 0%, #060509 100%);
 }
 
 .stage {
-  position: relative;
-  flex: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 1920px;
   height: 1080px;
   transform-origin: center center;
   overflow: hidden;
-  transform: scale(var(--scale, 1));
+  transform: translate(-50%, -50%) scale(var(--scale, 1));
   font-family: var(--font);
   font-size: 20px;
   line-height: 1.5;
@@ -252,12 +250,6 @@ button {
      좌측 스크림(z 2) 위로 올라온다. 발광의 screen 합성도 여기서 닫힌다. */
   isolation: isolate;
 }
-/* 필터는 지글거림이 실제로 올라올 때만 건다.
-   #title-warp의 feDisplacementMap은 scale이 0인 동안 결과가 원본과 픽셀 단위로 같은데,
-   브라우저는 그걸 모르니 매 프레임 화면 전체에 feTurbulence를 새로 굽는다(CPU 래스터).
-   게다가 이 안에 발광·비네트의 무한 애니메이션이 들어 있어서 필터가 매 프레임 더러워진다.
-   시네마틱이 걷히는 1초 동안 이게 같이 돌면 그 구간이 통째로 밀린다 — TitleView가
-   지글거림을 시작시킬 때 .warping을 붙여서 그때부터 건다(보이는 결과는 그대로다). */
 .title-reveal.warping .title-atmos {
   filter: url(#title-warp);
 }
@@ -558,14 +550,12 @@ button {
   position: absolute;
   inset: 0;
   opacity: 0;
-  filter: blur(12px);
-  transition:
-    opacity 2.6s ease,
-    filter 2.9s ease;
+  /* 1080p 동영상 전체에 실시간 blur를 걸면 등장 구간의 합성이 30fps 아래로
+     떨어진다. 검은 바탕에서의 긴 opacity 페이드만으로도 같은 진입 인상은 남는다. */
+  transition: opacity 2.6s ease;
 }
 .cine-veil.playing .cine-stage {
   opacity: 1;
-  filter: blur(0);
 }
 
 /* 영상 위에 얹는 반딧불이 — 타이틀과 같은 무리를 같은 자리에 그린다(TitleView.addFireflyLayer).
@@ -1436,6 +1426,14 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   letter-spacing: .28em;
   opacity: .76;
 }
+.boss-health-heading .boss-health-mark.escort-rule {
+  color: #ffe0a3;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: .04em;
+  opacity: 1;
+  white-space: nowrap;
+}
 .boss-health-heading .nm {
   justify-self: center;
   color: #fff4d9;
@@ -1944,7 +1942,7 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 }
 .model-shell[data-model-status='ready-3d'] .battle-model { opacity: 1; }
 .model-shell[data-model-status='ready-3d'] .battle-sprite { visibility: hidden; }
-.model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: hidden; }
+.model-shell[data-model-status='preparing-3d'] .battle-sprite { visibility: visible; }
 .actor.you > .model-shell:hover,
 .actor.you:focus-visible > .model-shell {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
@@ -2219,7 +2217,6 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 }
 #actors.slowmo {
   transform: scale(1.06);
-  filter: saturate(1.22) contrast(1.06);
 }
 /* 시간이 늘어지는 동안 주변이 가라앉으며 타격점만 남는다.
    무대(.stage-area)는 하단 350px이 잘려 있어서 딤은 씬 전체에 건다. */
@@ -2639,6 +2636,40 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   box-shadow: 1px 0 0 rgba(255, 242, 218, .62);
 }
 .boss-hp-segments i.last { border-right: 0; box-shadow: none; }
+.boss-bar-overkill {
+  position: absolute;
+  inset: -4px auto -4px 0;
+  z-index: 8;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  animation: boss-overkill-stop .58s cubic-bezier(.2, .8, .2, 1) both;
+}
+.boss-bar-overkill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 235, 152, .2) 36%, rgba(255, 103, 46, .9) 49%, transparent 54%);
+  transform: translateX(-72%);
+  animation: boss-overkill-streak .58s ease-out both;
+}
+.boss-bar-overkill.is-passed {
+  animation-name: boss-overkill-pass;
+}
+@keyframes boss-overkill-streak { 70%, 100% { transform: translateX(72%); } }
+@keyframes boss-overkill-stop {
+  0% { opacity: 0; transform: scaleX(.72); }
+  28%, 72% { opacity: 1; transform: scaleX(1.02); filter: saturate(1.4); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+@keyframes boss-overkill-pass {
+  0% { opacity: 0; transform: scale(.82); }
+  25%, 70% { opacity: 1; transform: scale(1.06); filter: brightness(1.45); }
+  100% { opacity: 0; transform: scale(1.16); }
+}
 /* 선공 적 — 이름표 위에 따로 떠 있는 붉은 발광 글씨 + 캐릭터의 붉은 맥동 발광.
    판때기(테두리·배경)는 두지 않는다. 이름표(유리판) 바깥 레이어라 뒷줄에서 이름표가
    흐려지거나 사라져도 경고는 그대로 읽힌다. 후공은 아무 표시도 없다. */
@@ -3701,7 +3732,9 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 .card-hand {
   position: absolute;
   left: 0;
-  right: 0;
+  /* 우측 드로우 덱의 실제 폭과 여백을 손패 계산에서 제외한다. 카드가 늘어나도
+     덱 밑으로 숨지 않고 확보된 레일 안에서 오른쪽 카드가 위로 겹친다. */
+  right: 250px;
   top: 0;
   height: 230px;
   perspective: 1100px;
@@ -4253,6 +4286,12 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   background-position: 100% 0;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity-color) 62%, transparent);
   animation: rare-foil-idle 5.2s ease-in-out infinite alternate;
+}
+/* 큰 보상 카드 여러 장에서 background-position과 filter를 계속 바꾸면 매 프레임
+   카드 표면이 다시 래스터링된다. 은빛은 정지 상태로 두고 호버 때만 한 번 쓸어 준다. */
+.reward-pick.rarity-rare .rp-foil {
+  animation: none;
+  background-position: 24% 0;
 }
 .word-card.rarity-epic .card-foil,
 .deck-hover-card.rarity-epic .card-foil,
@@ -5263,6 +5302,12 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   background: rgba(8, 6, 12, 0.55);
   backdrop-filter: blur(3px);
 }
+.reward-scene::before {
+  backdrop-filter: none;
+}
+.item-scene::before {
+  backdrop-filter: none;
+}
 
 .reward-stage {
   display: flex;
@@ -5366,10 +5411,81 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   flex: none;
   padding: 40px 48px 46px;
   border-radius: 28px;
-  background: var(--glass);
-  backdrop-filter: blur(16px) saturate(1.2);
+  background: rgba(20, 14, 24, .9);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
   animation: page-turn 0.7s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.reward-art-head {
+  height: 190px;
+  display: grid;
+  place-items: center;
+  margin: -18px auto 20px;
+}
+.reward-art-head img {
+  width: min(640px, 100%);
+  height: 190px;
+  object-fit: contain;
+  filter: drop-shadow(0 13px 18px rgba(0, 0, 0, .3));
+}
+.reward-complete-card {
+  position: relative;
+  width: 1080px;
+  padding: 24px 48px 30px;
+  border-radius: 28px;
+  background: rgba(20, 14, 24, .9);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 1px 0 var(--glass-hi);
+  animation: page-turn .7s cubic-bezier(.3, .9, .3, 1);
+  text-align: center;
+}
+.reward-clear-head {
+  height: 230px;
+  display: grid;
+  place-items: center;
+  margin: -8px auto 8px;
+}
+.reward-clear-head img {
+  width: min(600px, 100%);
+  height: 230px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, .36)) drop-shadow(0 0 24px rgba(255, 224, 133, .2));
+}
+.reward-summary-grid .reward-pick {
+  min-height: 330px;
+  cursor: default;
+}
+.reward-summary-grid .reward-pick:hover {
+  transform: none;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .45), inset 0 1px 0 var(--glass-hi);
+}
+.rp-received {
+  width: max-content;
+  margin: 12px auto 0;
+  padding: 6px 13px;
+  border-radius: 999px;
+  color: #fff4c9;
+  background: rgba(14, 10, 18, .58);
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 150, .4);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-shadow: 0 2px 5px #000;
+}
+.reward-continue {
+  min-width: 230px;
+  margin-top: 22px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  color: #4c3628;
+  background: linear-gradient(#fff0b6, #e7b95f);
+  box-shadow: 0 7px 0 #8d6631, 0 12px 24px rgba(0, 0, 0, .34);
+  font-size: 19px;
+  font-weight: 900;
+  transition: transform .16s ease, filter .16s ease;
+}
+.reward-continue:hover,
+.reward-continue:focus-visible {
+  transform: translateY(-3px);
+  filter: brightness(1.08);
 }
 @keyframes page-turn {
   0% { transform: perspective(1600px) rotateY(-52deg); opacity: 0; transform-origin: left center; }
@@ -5589,14 +5705,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
 .rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.rp-detail {
-  padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #fff;
-  background: rgba(8, 6, 14, 0.5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); transition: box-shadow 0.15s;
-}
-.rp-detail:hover { box-shadow: inset 0 0 0 1px var(--wglow, var(--gold)), 0 0 12px color-mix(in srgb, var(--wglow, var(--gold)) 50%, transparent); }
 .rp-take { font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 5px rgba(0, 0, 0, 0.95); }
-.reward-pick.detailing { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 45%, transparent), inset 0 1px 0 var(--glass-hi); }
 
 /* 아이템은 단어 카드의 둥근 사각 프레임과 다른 비대칭 이중 금속 프레임을 쓴다. */
 .reward-pick.is-item { border-radius: 30px 9px 30px 9px; box-shadow: 0 12px 30px rgba(0,0,0,.54), inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 7px rgba(65,43,35,.58); }
@@ -5700,31 +5809,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .discard-effect { min-height: 40px; margin: 8px 6px; font-size: 14px; font-weight: 700; line-height: 1.4; }
 .discard-action { margin: 0 auto; width: max-content; padding: 7px 13px; border-radius: 99px; background: rgba(155,61,56,.82); font-size: 13px; font-weight: 900; }
 
-/* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
-.reward-dock {
-  position: static;
-  inset: auto;
-  width: 322px;
-  flex: none;
-  align-self: stretch;
-  min-height: 468px;
-  max-height: 80vh;
-  padding: 26px 24px;
-  overflow: auto;
-}
-.reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
-.rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
-.rd-hint b { color: var(--gold); }
-.rf-deltas {
-  margin-top: 14px; padding: 12px 14px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 30%, transparent);
-}
-.rf-h { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); margin-bottom: 6px; }
-.rf-row { font-size: 15px; color: var(--ink-dim); line-height: 1.7; }
-.rf-row b { color: #fff6e2; }
-.wd-inf { margin-top: 12px; font-size: 13px; color: var(--ink-faint); line-height: 1.55; }
-
 /* ── 아이템 감탄사(재련) 뷰 — 전투와 같은 패턴 ── */
 .item-scene .iforge {
   position: relative;
@@ -5733,6 +5817,11 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   flex-direction: column;
   align-items: center;
   gap: 26px;
+}
+.item-scene .iforge .glass {
+  background: rgba(20, 14, 24, .9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 @keyframes float { 50% { transform: translateY(-10px); } }
 
@@ -7140,13 +7229,4 @@ html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: 
 }
 @media (prefers-reduced-motion: reduce) {
   .result-token { animation: none; }
-}
-
-/* 보스 조우 — 시네마틱이 걷히는 순간 보스는 **컷의 마지막 자리**에 서 있다가 자기
-   자리로 걸어 들어온다. 보스는 무대 정중앙에 서므로 출발 자리도 중앙 기준 오프셋이다.
-   실측: 컷 마지막 프레임의 사마귀 중심은 가로 74%, 전장 도착 자리는 50% —
-   1920 무대에서 오른쪽으로 465px이 그 차이다. 발끝은 컷 65% / 전장 64%로 맞아 있고,
-   프롬도 컷 31% / 전장 34%, 발끝 92%로 이미 맞는다. */
-.scene.battle[data-boss='true'] .actor.foe.boss[data-character='mantis'] {
-  --boss-entry-left: 74%;
 }

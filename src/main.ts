@@ -6,7 +6,7 @@
 
 import './style.css'
 import type { BattleView as BattleViewType } from '@views/BattleView'
-import { RewardView } from '@views/RewardView'
+import { RewardCompleteView, RewardView } from '@views/RewardView'
 import { DeckDiscardView } from '@views/DeckDiscardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
@@ -18,8 +18,8 @@ import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { floorInCycle, stageFor } from '@data/stages'
-import { genRewards, rewardGradeForDay } from '@data/rewards'
-import { newRun, registerWord, applyItemReward, type RewardPhase } from '@core/run'
+import { genRewards, type RewardOption } from '@data/rewards'
+import { newRun, registerWord, applyItemReward, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
@@ -55,6 +55,10 @@ GameAudio.installButtonSounds()
 installFoilShaders()
 CustomCursor.install()
 ClickScribble.install()
+
+if (new URLSearchParams(window.location.search).get('profile') === '1') {
+  void import('@/ui/RuntimeProfiler').then(({ startRuntimeProfiler }) => startRuntimeProfiler())
+}
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
@@ -435,7 +439,10 @@ function goTitle(withIntro = false) {
       run = saved ?? newRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
-      else if (run.reward?.day === run.day) goReward(run.reward.grade, run.reward.phase)
+      else if (run.reward?.day === run.day) {
+        if (run.reward.phase === 'complete') goRewardComplete()
+        else goReward(run.reward.grade, run.reward.phase)
+      }
       else void goBattle()
     },
   })
@@ -595,22 +602,81 @@ function goEnding(grade = startGrade(run.player.stats.luck)) {
 }
 
 function beginReward(grade: number) {
-  run.reward = { day: run.day, grade, phase: 'subject' }
+  run.reward = { day: run.day, grade, phase: 'subject', picks: [] }
   saveRun(run)
   goReward(grade, 'subject')
 }
 
-function advanceReward(grade: number, phase: RewardPhase) {
+function rewardPickRef(opt: RewardOption): RewardPickRef {
+  return {
+    kind: opt.kind,
+    id: opt.word?.id ?? opt.item!.id,
+    reinforce: opt.reinforce,
+  }
+}
+
+function rewardOptionFromRef(ref: RewardPickRef): RewardOption | null {
+  if (ref.kind === 'item') {
+    const item = ALL_ITEMS[ref.id]
+    return item
+      ? { kind: 'item', rarity: item.rarity, name: item.name, desc: '획득한 아이템', art: 'gift', item }
+      : null
+  }
+  const word = Object.values(run.player.deck).flat().find((entry) => entry.id === ref.id)
+    ?? ALL_REWARD_WORDS.find((entry) => entry.id === ref.id)
+  return word
+    ? {
+        kind: 'word',
+        rarity: word.rarity ?? 'common',
+        name: word.text,
+        desc: '획득한 단어',
+        art: 'word',
+        word,
+        reinforce: ref.reinforce,
+      }
+    : null
+}
+
+function advanceReward(grade: number, phase: RewardPhase, pick: RewardPickRef) {
+  const picks = [...(run.reward?.picks ?? []), pick]
   if (phase === 'subject') {
-    run.reward = { day: run.day, grade, phase: 'item' }
+    run.reward = { day: run.day, grade, phase: 'item', picks }
     saveRun(run)
     goReward(grade, 'item')
     return
   }
-  run.reward = null
-  run.day++
+  if (phase === 'item') {
+    run.reward = { day: run.day, grade, phase: 'verb', picks }
+    saveRun(run)
+    goReward(grade, 'verb')
+    return
+  }
+  run.reward = { day: run.day, grade, phase: 'complete', picks }
   saveRun(run)
-  goBattleWithBossIntro()
+  goRewardComplete()
+}
+
+function goRewardComplete() {
+  const reward = run.reward
+  if (!reward || reward.phase !== 'complete') {
+    goReward()
+    return
+  }
+  const picks = reward.picks.map(rewardOptionFromRef).filter((pick): pick is RewardOption => pick !== null)
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  current = new RewardCompleteView(stage, {
+    day: reward.day,
+    picks,
+    onContinue: () => {
+      run.reward = null
+      run.day++
+      saveRun(run)
+      goBattleWithBossIntro()
+    },
+  })
+  mountMeta('reward')
 }
 
 /** 교체를 마친 뒤 어디로 돌아갈지는 부르는 쪽이 정한다 — 보상 흐름과 치트가 같은 화면을 쓴다. */
@@ -632,7 +698,7 @@ function goDiscard(incoming: Word, candidates: Word[], onDone: () => void) {
 // 전투 등급에 현재 15층 사이클의 진행도를 더해 실제 희귀도 가중치를 정한다.
 function goReward(
   grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
-  phase: RewardPhase = run.reward?.phase ?? 'subject',
+  phase: RewardPhase = run.reward?.phase === 'complete' ? 'subject' : run.reward?.phase ?? 'subject',
 ) {
   battleRequest++
   reset()
@@ -640,29 +706,31 @@ function goReward(
   const options = genRewards(run.player, grade, run.day, phase)
   current = new RewardView(stage, {
     day: run.day,
-    deck: run.player.deck,
-    grade: rewardGradeForDay(grade, run.day),
     phase,
-    nextField: stageFor(run.day + 1).field,
-    nextEncounter: stageFor(run.day + 1).encounter,
     options,
     onPick: (opt) => {
+      const pick = rewardPickRef(opt)
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
         if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, () => advanceReward(grade, phase))
+          goDiscard(opt.word, result.candidates, () => advanceReward(grade, phase, pick))
         } else {
-          advanceReward(grade, phase)
+          advanceReward(grade, phase, pick)
         }
       } else if (opt.item) {
-        goItem(opt.item, grade, 'verb')
+        goItem(opt.item, grade, phase, pick)
       }
     },
   })
   mountMeta('reward')
 }
 
-function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck), nextPhase?: RewardPhase) {
+function goItem(
+  itemDef: ItemDef,
+  grade = startGrade(run.player.stats.luck),
+  rewardPhase?: RewardPhase,
+  pick?: RewardPickRef,
+) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
@@ -671,10 +739,8 @@ function goItem(itemDef: ItemDef, grade = startGrade(run.player.stats.luck), nex
     grade,
     onDone: (result) => {
       applyItemReward(run.player, result)
-      if (nextPhase) {
-        run.reward = { day: run.day, grade, phase: nextPhase }
-        saveRun(run)
-        goReward(grade, nextPhase)
+      if (rewardPhase && pick) {
+        advanceReward(grade, rewardPhase, pick)
       } else {
         run.day++
         saveRun(run)

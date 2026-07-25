@@ -65,7 +65,10 @@ export class RunResultView {
 
   private mount() {
     const { outcome, day, player, record } = this.opts
-    if (outcome === 'lost') GameAudio.playDefeatBgm()
+    if (outcome === 'lost') {
+      GameAudio.play('gameOver')
+      GameAudio.playDefeatBgm()
+    }
     const stamp = STAMP[outcome]
 
     this.root.innerHTML = `

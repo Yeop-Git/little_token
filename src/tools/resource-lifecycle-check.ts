@@ -32,9 +32,14 @@ const rules: Rule[] = [
     allowed: { 'src/views/BattleCharacterModel.ts': 1 },
   },
   {
-    label: 'WebGLRenderer 생성은 캐릭터 모델의 제한된 풀에서만 관리해야 합니다',
+    label: 'WebGLRenderer 생성은 캐릭터 모델의 공용 단일 렌더러에서만 관리해야 합니다',
     pattern: /\bnew\s+THREE\.WebGLRenderer\s*\(/g,
     allowed: { 'src/views/BattleCharacterModel.ts': 1 },
+  },
+  {
+    label: '공용 WebGL 캔버스를 배우 DOM에 직접 붙이지 않아야 합니다',
+    pattern: /\.append\(\s*this\.renderer\.domElement\s*\)/g,
+    allowed: {},
   },
   {
     label: 'DOM 복제는 카드 사용 고스트 한 곳에서만 허용합니다',

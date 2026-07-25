@@ -13,6 +13,10 @@ import backgroundDark from './backgrounds/backgroundDark.webp'
 import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
+import rewardSubject from './ui/reward_subject.webp'
+import rewardModifierItem from './ui/reward_modifier_item.webp'
+import rewardVerb from './ui/reward_verb.webp'
+import rewardClear from './ui/reward_clear.webp'
 import player001 from './sprites/player_001.webp'
 import playerModel from './models/player.glb?url'
 import tokenModel from './models/token.glb?url'
@@ -156,6 +160,7 @@ import shield from './audio/sheild.mp3'
 import cutscene from './audio/cutscene.mp3'
 import win from './audio/win.mp3'
 import hover from './audio/hover.mp3'
+import gameOver from './audio/gameover.mp3'
 
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
@@ -183,6 +188,14 @@ export const GUIDE_ART = { combat: combatGuide }
 export const TITLE = {
   bg: titleBg,
   logo: titleLogo,
+}
+
+/** 스테이지 클리어 3단계 보상 머리말과 최종 정산 원화. */
+export const REWARD_ART = {
+  subject: rewardSubject,
+  item: rewardModifierItem,
+  verb: rewardVerb,
+  clear: rewardClear,
 }
 
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상과 화면 장식.
@@ -384,4 +397,5 @@ export const AUDIO = {
   cutscene,
   win,
   hover,
+  gameOver,
 }

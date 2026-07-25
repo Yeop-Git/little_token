@@ -1,33 +1,20 @@
 /**
  * 보상 뷰 — 하루를 끝내고 일기 한 장이 넘어간다. 문장(신규/강화)·아이템 3택.
- * 스킬카드처럼 일러스트로 보여주고, 상단=종류 / 하단=메인 효과 / 자세히보기=우측 정보창.
+ * 스킬카드처럼 일러스트로 보여주고 카드 앞면에서 핵심 효과를 바로 읽는다.
  */
 
-import { emotionOrNeutral, RARITY_LABEL, type FieldDef, type Word } from '@core/types'
+import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
-import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { gradeTier } from '@core/grade'
-import { reinforceWord } from '@core/run'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
-import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
-import { critText, multText, wordValueLines } from '@core/wordText'
-import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
-import { ENEMIES } from '@data/enemies'
-import { tacticalGuideForEnemy } from '@data/tacticalCards'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   day: number
-  /** 짝 카드 안내용 플레이어 덱 — 없으면 시작 덱으로 안내한다. */
-  deck?: Record<string, Word[]>
-  /** 전투에서 확정된 보상등급 — 카드 희귀도가 이 등급의 가중치로 굴려졌다. */
-  grade: number
-  nextField: FieldDef
-  /** 내일 만날 편성 — 전리품을 고르는 데 실제로 쓸모 있는 정보는 이쪽이다. */
-  nextEncounter?: readonly string[]
   options: RewardOption[]
   phase: RewardPhase
   onPick: (opt: RewardOption) => void
@@ -37,12 +24,12 @@ const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-const PHASE_TITLE: Record<RewardPhase, string> = {
-  subject: '주어와 수식어를 고르자',
-  item: '이야기의 소품을 고르자',
-  verb: '마지막 동사를 고르자',
-}
 const PHASE_NO: Record<RewardPhase, number> = { subject: 1, item: 2, verb: 3 }
+const PHASE_ALT: Record<RewardPhase, string> = {
+  subject: '이야기의 주어를 고르자!',
+  item: '소품과 수식어를 고르자!',
+  verb: '마지막 동사를 고르자!',
+}
 
 function moodOf(w: Word): string {
   if (w.variance) return 'gamble'
@@ -93,59 +80,35 @@ function bgHtml(opt: RewardOption): string {
   return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`
 }
 
-// 단어 고유 수치(누적 아님) — 표기 규칙은 전투 체인·카드 상세와 공용이다.
-const ownValues = (w: Word) => wordValueLines(w)
-
-// 어떤 스탯의 영향을 받는지.
-function influenceNote(w: Word): string {
-  const parts: string[] = []
-  if (w.kind === 'heal' || w.effects?.heal) parts.push('회복')
-  if (w.kind === 'guard' || w.effects?.guard) parts.push('방어')
-  if (w.kind === 'attack' || w.power) parts.push('공격')
-  if (w.crit || w.fail) parts.push('룰렛(맥락 스탯+운)')
-  return parts.length ? `<div class="wd-inf">영향 스탯: ${parts.join(' · ')}</div>` : ''
-}
-
-// 강화 전→후 변동치.
-function reinforceDeltas(w: Word): string {
-  const after: Word = { ...w, tags: [...w.tags], effects: w.effects ? { ...w.effects } : undefined, variance: w.variance ? { ...w.variance } : undefined }
-  reinforceWord(after)
-  const rows: string[] = []
-  rows.push(`단계 Lv.${w.level ?? 1} → <b>Lv.${after.level}</b>`)
-  if (w.power != null) rows.push(`위력 ${w.power} → <b>${after.power}</b>`)
-  if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
-  if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
-  if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.crit != null) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
-  return `<div class="rf-deltas"><div class="rf-h">강화하면</div>${rows.map((r) => `<div class="rf-row">${r}</div>`).join('')}</div>`
-}
-
-// 우측 정보창 내용.
-function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
-  if (opt.kind === 'item' && opt.item) {
-    const it = opt.item
-    const rows = STAT_ORDER.filter((k) => it.base[k])
-      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${it.base[k]}</span></div>`)
-      .join('')
-    const p = it.passive ? PASSIVES[it.passive] : null
-    return `
-      <div class="wd-name">${it.name}</div>
-      <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[it.rarity]}</div>
-      ${p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''}
-      <div class="id-stats">${rows}</div>
-      <div class="wd-inf">${p ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '감탄사를 조립해 추가 스탯이 붙는다.'}</div>
-      <div class="wd-flavor">${it.flavor}</div>
-      <div class="id-art">${itemArt(it.art)}</div>`
-  }
-  const w = opt.word!
-  const values = ownValues(w)
+function rewardPickHtml(p: RewardOption, i: number, summary = false): string {
+  const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
+  const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
+  const badge = p.reinforce ? '▲ RANK UP' : p.kind === 'item' ? '● ITEM' : '✦ NEW'
+  const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
+  const nameLength = [...p.name.replace(/\s/g, '')].length
+  const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
   return `
-    <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(w.emotion), 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
-    <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${w.level ?? 1}` : ' · 새 단어'}</div>
-    <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
-    ${comboHintHtml(w, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}
-    ${opt.reinforce ? reinforceDeltas(w) : ''}
-    ${influenceNote(w)}`
+    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}${summary ? ' is-receipt' : ''}" data-i="${i}">
+      ${bgHtml(p)}
+      <span class="rp-tint" aria-hidden="true"></span>
+      <span class="rp-veil" aria-hidden="true"></span>
+      <span class="rp-foil" aria-hidden="true"></span>
+      <div class="rp-top">
+        <span class="rp-type">${typeLabel(p)}</span>
+        <span class="rp-tags">
+          ${emotionBadge(p)}
+          <span class="rp-rarity rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</span>
+          <span class="rp-badge">${badge}</span>
+        </span>
+      </div>
+      <div class="rp-foot">
+        <div class="rp-name">${p.name}</div>
+        <div class="rp-effect">${mainEffect(p)}</div>
+        ${summary
+          ? '<div class="rp-received">이번 보상으로 획득</div>'
+          : '<div class="rp-actions"><span class="rp-take">고르기 →</span></div>'}
+      </div>
+    </div>`
 }
 
 export class RewardView {
@@ -159,112 +122,55 @@ export class RewardView {
       <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
           <div class="reward-card">
-            <div class="reward-token" aria-hidden="true">
-              <img class="reward-token-shadow" src="${TOKEN_FACES.crown}" alt="" />
-              <img class="reward-token-main" src="${TOKEN_FACES.crown}" alt="" />
-            </div>
-            <div class="reward-head">
-              <div class="k">${opts.day}일차 클리어</div>
-              <div class="t hand">${PHASE_TITLE[opts.phase]}</div>
-              <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
-                ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
-              </div>
-              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade.toFixed(1)}</b></div>
-            </div>
-            ${this.nextUpHtml(opts)}
+            <header class="reward-art-head">
+              <img src="${REWARD_ART[opts.phase]}" alt="${PHASE_ALT[opts.phase]}" />
+              <span class="sr-only">${opts.day}일차 클리어 · 보상 ${PHASE_NO[opts.phase]}단계 / 3단계</span>
+            </header>
             <div class="reward-grid">
-              ${opts.options.map((p, i) => this.pickHtml(p, i)).join('')}
+              ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
           </div>
-          <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
-            <div class="rd-hint">카드의 <b>자세히보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
-          </aside>
         </div>
       </div>`
 
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((el) => {
       const i = Number(el.dataset.i)
       el.addEventListener('click', () => this.take(el, opts.options[i]))
-      el.querySelector<HTMLElement>('.rp-detail')?.addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        this.showDetail(opts.options[i], el)
-      })
     })
-  }
-
-  /**
-   * "내일 만날 것" 칸 — 예전에는 날씨·환경 규칙을 적었지만, 전리품을 고르는 순간에
-   * 그 정보로는 아무 결정도 못 한다. 지금은 내일 나올 벌레와 그에 맞는 공략 방향을
-   * 적는다. 카드를 고르는 손이 실제로 참고할 수 있는 값이어야 한다.
-   */
-  private nextUpHtml(opts: Opts): string {
-    const ids = opts.nextEncounter ?? []
-    const foes = ids.map((id) => ENEMIES[id]).filter(Boolean)
-    if (foes.length === 0) return ''
-    const boss = foes.find((foe) => foe.boss)
-    // 공략은 보스가 있으면 보스 기준, 없으면 가장 단단한 적 기준으로 잡는다.
-    const focus = boss ?? [...foes].sort((a, b) => b.hp - a.hp)[0]
-    const guide = tacticalGuideForEnemy(focus.id)
-    const roster = [...new Set(foes.map((foe) => foe.name))]
-      .map((name) => {
-        const count = foes.filter((foe) => foe.name === name).length
-        return `<span class="nu-foe">${name}${count > 1 ? ` ×${count}` : ''}</span>`
-      })
-      .join('')
-    return `
-      <div class="reward-next${boss ? ' is-boss' : ''}">
-        <div class="nu-head">${boss ? `내일 · <b>${boss.name}</b>와 맞선다` : '내일 만날 벌레'}</div>
-        <div class="nu-roster">${roster}</div>
-        <div class="nu-tip">${guide
-          ? `<b>${guide.title}</b> ${guide.tooltip}`
-          : `${focus.note}`}</div>
-      </div>`
-  }
-
-  private pickHtml(p: RewardOption, i: number): string {
-    const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
-    const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
-    const badge = p.reinforce ? '▲ RANK UP' : p.kind === 'item' ? '● ITEM' : '✦ NEW'
-    const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
-    const nameLength = [...p.name.replace(/\s/g, '')].length
-    const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
-    return `
-      <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}">
-        ${bgHtml(p)}
-        <span class="rp-tint" aria-hidden="true"></span>
-        <span class="rp-veil" aria-hidden="true"></span>
-        <span class="rp-foil" aria-hidden="true"></span>
-        <div class="rp-top">
-          <span class="rp-type">${typeLabel(p)}</span>
-          <span class="rp-tags">
-            ${emotionBadge(p)}
-            <span class="rp-rarity rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</span>
-            <span class="rp-badge">${badge}</span>
-          </span>
-        </div>
-        <div class="rp-foot">
-          <div class="rp-name">${p.name}</div>
-          <div class="rp-effect">${mainEffect(p)}</div>
-          <div class="rp-actions">
-            <button class="rp-detail" type="button">자세히보기</button>
-            <span class="rp-take">고르기 →</span>
-          </div>
-        </div>
-      </div>`
-  }
-
-  private showDetail(opt: RewardOption, el: HTMLElement) {
-    const dock = this.root.querySelector<HTMLElement>('#rdetail')!
-    const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
-    dock.className = `info-dock glass reward-dock mood-${mood}`
-    dock.innerHTML = detailHtml(opt, this.opts.deck)
-    this.root.querySelectorAll('.reward-pick').forEach((p) => p.classList.remove('detailing'))
-    el.classList.add('detailing')
   }
 
   private take(el: HTMLElement, opt: RewardOption) {
     el.style.transform = 'translateY(-10px) scale(1.03)'
     window.setTimeout(() => this.opts.onPick(opt), 220)
+  }
+
+  destroy() {}
+}
+
+interface SummaryOpts {
+  day: number
+  picks: RewardOption[]
+  onContinue: () => void
+}
+
+/** 세 장을 모두 고른 뒤 한 번 더 펼쳐 보는 이번 스테이지의 보상 영수증. */
+export class RewardCompleteView {
+  constructor(private root: HTMLElement, opts: SummaryOpts) {
+    this.root.innerHTML = `
+      <div class="scene reward-scene reward-complete-scene" style="background-image:url(${BACKGROUNDS.bg001})">
+        <div class="reward-complete-card">
+          <header class="reward-clear-head">
+            <img src="${REWARD_ART.clear}" alt="CLEAR! 보상" />
+            <span class="sr-only">${opts.day}일차 보상 획득 완료</span>
+          </header>
+          <div class="reward-grid reward-summary-grid">
+            ${opts.picks.map((pick, i) => rewardPickHtml(pick, i, true)).join('')}
+          </div>
+          <button class="reward-continue" type="button">다음 이야기로</button>
+        </div>
+      </div>`
+    GameAudio.play('win')
+    this.root.querySelector<HTMLButtonElement>('.reward-continue')?.addEventListener('click', opts.onContinue)
   }
 
   destroy() {}

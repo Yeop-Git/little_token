@@ -22,6 +22,7 @@ type EffectName =
   | 'cutscene'
   | 'win'
   | 'hover'
+  | 'gameOver'
 type BgmName = 'title' | 'storyEaten' | 'battlePaperPages' | 'battlePaperTaiko' | 'battleHeroicMarch' | 'bossSaltSkater' | 'bossQueenBee' | 'bossElderSpider'
 const VOLUME_KEY = 'little-token-master-volume'
 const BGM_VOLUME = 0.16
@@ -45,6 +46,7 @@ const EFFECT_VOLUME: Record<EffectName, number> = {
   cutscene: 0.52,
   win: 0.5,
   hover: 0.24,
+  gameOver: 0.54,
 }
 const BATTLE_EFFECTS = Object.keys(EFFECT_VOLUME) as EffectName[]
 const UI_EFFECTS: EffectName[] = ['button', 'cardHover', 'hover']
@@ -208,20 +210,27 @@ class GameAudioController {
         void Promise.all(this.preloadPreparedStreams())
       }
       const target = event.target
-      const interactive = target instanceof Element
-        ? target.closest<HTMLElement>('button, [role="button"]')
-        : null
-      if (!interactive || interactive.matches('.word-card, :disabled, [aria-disabled="true"]')) return
+      // 단어 카드는 종이 전용음을 따로 재생한다. 그 외에는 버튼뿐 아니라 캐릭터 상세,
+      // 컷신처럼 화면 자체가 입력면인 클릭에도 공용 마우스 피드백을 준다.
+      if (!(target instanceof Element) || target.closest('.word-card, :disabled, [aria-disabled="true"], [data-click-sound="none"]')) return
       this.play('button')
     }, true)
     // pointerenter는 버블링하지 않는다. pointerover를 위임하되 같은 버튼의 자식
     // 사이를 움직인 경우는 걸러, 버튼 하나에 hover가 한 번만 들리게 한다.
     document.addEventListener('pointerover', (event) => {
       const target = event.target
+      const card = target instanceof Element
+        ? target.closest<HTMLElement>('.word-card, .reward-pick, .discard-pick, .deck-hover-card, .draw-deck')
+        : null
+      if (card) {
+        if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return
+        this.play('cardHover')
+        return
+      }
       const interactive = target instanceof Element
         ? target.closest<HTMLElement>('button, [role="button"]')
         : null
-      if (!interactive || interactive.matches('.word-card, :disabled, [aria-disabled="true"]')) return
+      if (!interactive || interactive.matches(':disabled, [aria-disabled="true"]')) return
       if (event.relatedTarget instanceof Node && interactive.contains(event.relatedTarget)) return
       this.play('hover')
     }, true)

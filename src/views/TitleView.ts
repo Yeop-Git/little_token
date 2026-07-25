@@ -36,6 +36,7 @@ interface Fly {
   tw: number // 반짝임 위상
   twSpd: number
   hue: number
+  sprite: HTMLCanvasElement
 }
 
 export class TitleView {
@@ -81,12 +82,7 @@ export class TitleView {
                 calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
                 values="0.005 0.009;0.010 0.006;0.005 0.009" />
             </feTurbulence>
-            <!-- 지글지글(왜곡)은 0에서 시작한다. 시네마틱이 포개지는 동안엔 영상과 같은
-                 맨 화면이어야 이음매가 안 보이고, 그 뒤 아주 천천히 차오른다. -->
             <feDisplacementMap in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G">
-              <!-- 지글거림은 튀는 순간 없이 오직 서서히 배어 나오기만 한다.
-                   앞 18%는 0에 머물러 '한참 뒤에' 시작하는 느낌을 만들고,
-                   그 뒤 완만한 곡선으로 상시값(3)까지 차오른다. -->
               <animate id="title-sizzle" attributeName="scale" begin="indefinite"
                 dur="11s" values="0;0;3" keyTimes="0;0.18;1" calcMode="spline"
                 keySplines="0 0 1 1;0.65 0 0.5 1" fill="freeze" />
@@ -211,15 +207,6 @@ export class TitleView {
     this.root.querySelector<SVGAnimateElement>(sel)?.beginElement?.()
   }
 
-  /**
-   * 배경 일렁임을 켠다 — SMIL은 지금 시작하고, CSS 필터는 조금 늦게 건다.
-   *
-   * #title-sizzle은 앞 18%(11초 중 약 2초) 동안 scale을 0에 눌러 둔다. 그 구간의
-   * 필터는 원본과 픽셀 단위로 같은 그림을 내놓으면서 화면 전체 feTurbulence 비용만
-   * 문다. 특히 시네마틱이 걷히는 동안 이게 돌면 영상·타이틀이 함께 그려지는 그 1초를
-   * 갉아먹는다. 그래서 필터 자체는 지글거림이 실제로 올라오기 직전에 붙인다.
-   * (필터가 붙는 순간 레이어가 한 번 승격되는데, 로고가 천천히 떠오르는 중이라 안 보인다.)
-   */
   private startWarp() {
     this.beginAnim('#title-sizzle')
     const reveal = this.root.querySelector<HTMLElement>('.title-reveal')
@@ -294,7 +281,10 @@ export class TitleView {
   private setupFireflies(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    // 1920×1080 전면 캔버스를 DPR 2로 만들면 반딧불이 20개를 위해 매 드로우마다
+    // 4K(3840×2160) 표면 전체를 지우게 된다. 작은 방사형 발광은 1배에서도 충분히
+    // 부드럽고, 실제 무대는 대부분 축소 표시되므로 전용 표면은 DPR 1로 고정한다.
+    const dpr = 1
     let w = 0
     let h = 0
     const sizeOne = (c: HTMLCanvasElement, cx: CanvasRenderingContext2D) => {
@@ -313,16 +303,35 @@ export class TitleView {
     this.onResize = resize
     window.addEventListener('resize', resize)
 
-    const flies: Fly[] = Array.from({ length: 20 }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      r: 1.1 + Math.random() * 2.3,
-      a: Math.random() * Math.PI * 2,
-      spd: 5 + Math.random() * 11,
-      tw: Math.random() * Math.PI * 2,
-      twSpd: 0.5 + Math.random() * 1.5,
-      hue: 40 + Math.random() * 16, // 따뜻한 노랑~호박색
-    }))
+    const makeGlowSprite = (hue: number) => {
+      const sprite = document.createElement('canvas')
+      sprite.width = 64
+      sprite.height = 64
+      const spriteContext = sprite.getContext('2d')!
+      const gradient = spriteContext.createRadialGradient(32, 32, 0, 32, 32, 31)
+      gradient.addColorStop(0, `hsla(${hue}, 100%, 88%, 1)`)
+      gradient.addColorStop(0.14, `hsla(${hue}, 95%, 74%, .9)`)
+      gradient.addColorStop(0.42, `hsla(${hue}, 95%, 64%, .32)`)
+      gradient.addColorStop(1, `hsla(${hue}, 95%, 60%, 0)`)
+      spriteContext.fillStyle = gradient
+      spriteContext.fillRect(0, 0, 64, 64)
+      return sprite
+    }
+
+    const flies: Fly[] = Array.from({ length: 20 }, () => {
+      const hue = 40 + Math.random() * 16
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 1.1 + Math.random() * 2.3,
+        a: Math.random() * Math.PI * 2,
+        spd: 5 + Math.random() * 11,
+        tw: Math.random() * Math.PI * 2,
+        twSpd: 0.5 + Math.random() * 1.5,
+        hue, // 따뜻한 노랑~호박색
+        sprite: makeGlowSprite(hue),
+      }
+    })
 
     this.flyLast = performance.now()
     const tick = (now: number) => {
@@ -358,19 +367,10 @@ export class TitleView {
         for (const f of flies) {
           const glow = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(f.tw))
           const rad = f.r * (2.2 + glow * 3.2)
-          const g = cx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad)
-          g.addColorStop(0, `hsla(${f.hue}, 95%, 74%, ${0.85 * glow})`)
-          g.addColorStop(0.4, `hsla(${f.hue}, 95%, 64%, ${0.3 * glow})`)
-          g.addColorStop(1, `hsla(${f.hue}, 95%, 60%, 0)`)
-          cx.fillStyle = g
-          cx.beginPath()
-          cx.arc(f.x, f.y, rad, 0, Math.PI * 2)
-          cx.fill()
-          cx.fillStyle = `hsla(${f.hue}, 100%, 88%, ${0.9 * glow})`
-          cx.beginPath()
-          cx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2)
-          cx.fill()
+          cx.globalAlpha = glow
+          cx.drawImage(f.sprite, f.x - rad, f.y - rad, rad * 2, rad * 2)
         }
+        cx.globalAlpha = 1
         cx.globalCompositeOperation = 'source-over'
       }
       this.raf = requestAnimationFrame(tick)

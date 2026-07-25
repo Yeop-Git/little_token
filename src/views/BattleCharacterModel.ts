@@ -153,22 +153,32 @@ const SPIDER_PART_ORDER = ['leg-joy', 'leg-anger', 'leg-sorrow', 'leg-pleasure']
 const modelLoads = new Map<string, Promise<GLTF>>()
 const modelLoader = new GLTFLoader()
 const normalizedClipCache = new WeakMap<THREE.AnimationClip, Map<string, THREE.AnimationClip>>()
-// Chrome 계열의 일반적인 WebGL 컨텍스트 한계(대개 16)까지 채우지 않고,
-// 여왕벌 + 일벌 무리처럼 동시에 배우가 많은 전투에도 충분한 여유를 둔다.
-const MAX_RENDERER_CONTEXTS = 12
-const MAX_POOLED_RENDERERS = 6
-const RENDERER_POOL_IDLE_MS = 30_000
-interface PooledRenderer {
-  renderer: THREE.WebGLRenderer
-  releaseTimer: number
-  releasedAt: number
-}
-const rendererPool: PooledRenderer[] = []
-let liveRendererCount = 0
+// 모든 배우가 한 WebGL 컨텍스트를 공유한다. 배우마다 컨텍스트를 만들면 여왕벌전에서
+// 같은 텍스처·셰이더를 일곱 번 GPU에 올려 첫 출력마다 수 초씩 메인 스레드가 멎는다.
+const SHARED_RENDER_SIZE = 1024
+let sharedRenderer: THREE.WebGLRenderer | null = null
+// 출력 캔버스 DPR 1.5는 픽셀 작업량이 2.25배가 된다.
+// 카툰 셰이더의 계단은 1.25에서도 거의 보이지 않으며, 전투 중 지속 GPU 부하는
+// 1.5 대비 약 31% 줄어든다. 뒤쪽 적은 흐림·축소 연출이 있어 1배면 충분하다.
+const FOREGROUND_PIXEL_RATIO_CAP = 1.25
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
 let animationFrame = 0
 let previousFrame = 0
+let slowFramePressure = 0
+let adaptiveRenderReduction = false
+
+function updateAdaptiveRenderBudget(frameMs: number) {
+  // 일시적인 탭 전환·개발자 도구 정지는 품질 저하 근거로 삼지 않는다. 배우가 둘
+  // 이상인 실제 전투에서 24ms 초과 프레임이 누적될 때만 현재 화면을 보호한다.
+  if (activeModels.size < 2 || frameMs <= 0 || frameMs >= 100) return
+  slowFramePressure = frameMs > 24
+    ? Math.min(45, slowFramePressure + Math.max(0.5, (frameMs - 20) / 16.67))
+    : Math.max(0, slowFramePressure - 0.35)
+  if (adaptiveRenderReduction || slowFramePressure < 30) return
+  adaptiveRenderReduction = true
+  document.documentElement.dataset.modelPerformance = 'reduced'
+}
 
 function loadModel(url: string): Promise<GLTF> {
   const cached = modelLoads.get(url)
@@ -182,83 +192,42 @@ function loadModel(url: string): Promise<GLTF> {
   return pending
 }
 
-function disposeRenderer(renderer: THREE.WebGLRenderer) {
-  renderer.dispose()
-  if (!renderer.getContext().isContextLost()) renderer.forceContextLoss()
-  liveRendererCount = Math.max(0, liveRendererCount - 1)
-}
-
-function disposePooledRenderer(entry: PooledRenderer) {
-  window.clearTimeout(entry.releaseTimer)
-  const index = rendererPool.indexOf(entry)
-  if (index >= 0) rendererPool.splice(index, 1)
-  disposeRenderer(entry.renderer)
-}
-
 function acquireRenderer(): THREE.WebGLRenderer {
-  while (rendererPool.length) {
-    const pooled = rendererPool.pop()!
-    window.clearTimeout(pooled.releaseTimer)
-    if (pooled.renderer.getContext().isContextLost()) {
-      disposeRenderer(pooled.renderer)
-      continue
-    }
-    pooled.renderer.domElement.hidden = false
-    return pooled.renderer
-  }
-
-  while (liveRendererCount >= MAX_RENDERER_CONTEXTS && rendererPool.length) {
-    const leastRecentlyUsed = rendererPool[0]
-    if (leastRecentlyUsed) disposePooledRenderer(leastRecentlyUsed)
-  }
-  if (liveRendererCount >= MAX_RENDERER_CONTEXTS) {
-    throw new Error(`WebGL 컨텍스트 안전 한계(${MAX_RENDERER_CONTEXTS})에 도달했습니다.`)
-  }
-
+  if (sharedRenderer && !sharedRenderer.getContext().isContextLost()) return sharedRenderer
+  sharedRenderer?.dispose()
   const renderer = new THREE.WebGLRenderer({
     alpha: true,
     antialias: true,
     powerPreference: 'high-performance',
+    preserveDrawingBuffer: false,
   })
   renderer.setClearColor(0x000000, 0)
   renderer.outputColorSpace = THREE.SRGBColorSpace
-  renderer.domElement.className = 'battle-model'
-  renderer.domElement.setAttribute('aria-hidden', 'true')
-  liveRendererCount += 1
-  return renderer
-}
-
-function releaseRenderer(renderer: THREE.WebGLRenderer) {
-  renderer.domElement.remove()
-  if (renderer.getContext().isContextLost()) {
-    disposeRenderer(renderer)
-    return
-  }
-
-  renderer.setRenderTarget(null)
-  renderer.renderLists.dispose()
-  renderer.resetState()
-  renderer.info.reset()
-
-  const entry: PooledRenderer = {
-    renderer,
-    releaseTimer: 0,
-    releasedAt: performance.now(),
-  }
-  entry.releaseTimer = window.setTimeout(() => disposePooledRenderer(entry), RENDERER_POOL_IDLE_MS)
-  rendererPool.push(entry)
-  rendererPool.sort((a, b) => a.releasedAt - b.releasedAt)
-
-  while (rendererPool.length > MAX_POOLED_RENDERERS) {
-    const leastRecentlyUsed = rendererPool[0]
-    if (leastRecentlyUsed) disposePooledRenderer(leastRecentlyUsed)
-  }
+  renderer.autoClear = false
+  renderer.setPixelRatio(1)
+  renderer.setSize(SHARED_RENDER_SIZE, SHARED_RENDER_SIZE, false)
+  sharedRenderer = renderer
+  return sharedRenderer
 }
 
 function runAnimationFrame(now: number) {
-  const delta = previousFrame ? Math.min((now - previousFrame) / 1000, 0.1) : 0
+  const frameMs = previousFrame ? now - previousFrame : 0
+  const delta = Math.min(frameMs / 1000, 0.1)
   previousFrame = now
-  if (!document.hidden) activeModels.forEach((model) => model.render(delta, now))
+  if (!document.hidden) {
+    updateAdaptiveRenderBudget(frameMs)
+    const models = [...activeModels]
+    const budget = adaptiveRenderReduction && models.length >= 3
+      ? models.length >= 6 ? 2 : 1
+      : models.length
+    const allowed = new Set(
+      models
+        .filter((model) => model.wantsRender(now))
+        .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
+        .slice(0, budget),
+    )
+    models.forEach((model) => model.render(delta, now, allowed.has(model)))
+  }
   animationFrame = activeModels.size ? requestAnimationFrame(runAnimationFrame) : 0
   if (!animationFrame) previousFrame = 0
 }
@@ -270,10 +239,14 @@ function addToAnimationFrame(model: BattleCharacterModel) {
 
 function removeFromAnimationFrame(model: BattleCharacterModel) {
   activeModels.delete(model)
-  if (activeModels.size || !animationFrame) return
-  cancelAnimationFrame(animationFrame)
+  if (activeModels.size) return
+  if (animationFrame) cancelAnimationFrame(animationFrame)
   animationFrame = 0
   previousFrame = 0
+  slowFramePressure = 0
+  adaptiveRenderReduction = false
+  delete document.documentElement.dataset.modelPerformance
+  sharedRenderer?.renderLists.dispose()
 }
 
 /**
@@ -411,6 +384,8 @@ class BattleCharacterModel {
     20,
   )
   private readonly renderer: THREE.WebGLRenderer
+  private readonly outputCanvas: HTMLCanvasElement
+  private readonly outputContext: CanvasRenderingContext2D
   private readonly resizeObserver: ResizeObserver
   private mixer: THREE.AnimationMixer | null = null
   private actions: Partial<Record<BattleAnimation, THREE.AnimationAction>> = {}
@@ -445,12 +420,19 @@ class BattleCharacterModel {
   private requestedAnimation: BattleAnimation = 'idle'
   private pendingRenderDelta = 0
   private lastRenderedAt = 0
+  private renderedPixelRatio = 0
   private readonly brokenSpiderParts = new Set<string>()
   private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
   private spiderPartDissolves: SpiderPartDissolve[] = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = acquireRenderer()
+    this.outputCanvas = document.createElement('canvas')
+    this.outputCanvas.className = 'battle-model'
+    this.outputCanvas.setAttribute('aria-hidden', 'true')
+    const outputContext = this.outputCanvas.getContext('2d', { alpha: true })
+    if (!outputContext) throw new Error('2D 모델 출력 캔버스를 만들 수 없습니다.')
+    this.outputContext = outputContext
     // 캐릭터 중심을 바라보는 약한 하향 시점이 기본이다. 깊이가 특히 긴
     // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
     this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
@@ -470,7 +452,7 @@ class BattleCharacterModel {
     bounceLight.castShadow = false
     this.scene.add(skyFill, keyLight, bounceLight)
     this.scene.add(this.effects)
-    this.shell.append(this.renderer.domElement)
+    this.shell.append(this.outputCanvas)
     this.shell.dataset.modelInteractive = 'true'
     this.shell.addEventListener('pointerdown', this.onPointerDown)
     this.shell.addEventListener('pointermove', this.onPointerMove)
@@ -1285,17 +1267,58 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     // 풀에 있는 동안 캔버스에는 defeat의 마지막 프레임이 남는다. DOM에 다시
     // 붙이기 전에 idle 첫 자세를 즉시 그려 재스폰 섬광을 막는다.
     this.mixer?.update(0)
-    if (!this.renderer.getContext().isContextLost()) this.renderer.render(this.scene, this.camera)
+    if (!this.renderer.getContext().isContextLost()) this.renderToOutput()
   }
 
-  private resize() {
+  private isWaitingEnemy() {
+    // model-shell은 actor의 직계 자식이다. 매 프레임 closest()로 전장을 거슬러
+    // 올라가던 선택자 탐색을 피한다. 일벌처럼 별도 셸인 경우에는 전경으로 취급한다.
+    return this.shell.parentElement?.classList.contains('back') ?? false
+  }
+
+  private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
+    if (adaptiveRenderReduction) return 0.75
+    if (document.documentElement.dataset.graphics === 'low' || waitingEnemy) return 1
+    return Math.min(window.devicePixelRatio, FOREGROUND_PIXEL_RATIO_CAP)
+  }
+
+  private targetFps() {
+    const idle = this.requestedAnimation === 'idle' || this.requestedAnimation === 'idle2'
+    const waitingEnemy = this.isWaitingEnemy()
+    const boss = this.shell.parentElement?.classList.contains('boss') ?? false
+    const lowQuality = document.documentElement.dataset.graphics === 'low'
+    return adaptiveRenderReduction
+      ? waitingEnemy ? 12 : boss ? idle ? 24 : 30 : idle ? 12 : 24
+      : waitingEnemy ? 24 : lowQuality || idle ? 30 : 60
+  }
+
+  wantsRender(now: number) {
+    if (this.disposed || !this.active || !this.shell.isConnected) return false
+    if (!this.firstFrameRendered || !this.lastRenderedAt) return true
+    return now - this.lastRenderedAt >= 1000 / this.targetFps()
+  }
+
+  renderPriority(now: number) {
+    if (!this.firstFrameRendered) return 100_000
+    const idle = this.requestedAnimation === 'idle' || this.requestedAnimation === 'idle2'
+    const boss = this.shell.parentElement?.classList.contains('boss') ?? false
+    return (idle ? 0 : 10_000)
+      + (boss ? 5_000 : 0)
+      + (this.isWaitingEnemy() ? 0 : 1_000)
+      + Math.max(0, now - this.lastRenderedAt)
+  }
+
+  private resize(waitingEnemy = this.isWaitingEnemy()) {
     const width = Math.max(1, this.shell.clientWidth)
     const height = Math.max(1, this.shell.clientHeight)
-    const pixelRatio = document.documentElement.dataset.graphics === 'low'
-      ? 1
-      : Math.min(window.devicePixelRatio, 1.5)
-    this.renderer.setPixelRatio(pixelRatio)
-    this.renderer.setSize(width, height, false)
+    const pixelRatio = this.desiredPixelRatio(waitingEnemy)
+    this.renderedPixelRatio = pixelRatio
+    this.outputCanvas.dataset.pixelRatio = String(pixelRatio)
+    const targetWidth = Math.max(1, Math.round(width * pixelRatio))
+    const targetHeight = Math.max(1, Math.round(height * pixelRatio))
+    const fit = Math.min(1, SHARED_RENDER_SIZE / Math.max(targetWidth, targetHeight))
+    this.outputCanvas.width = Math.max(1, Math.round(targetWidth * fit))
+    this.outputCanvas.height = Math.max(1, Math.round(targetHeight * fit))
     const viewHeight = MODEL_VIEW_HEIGHT
     const viewWidth = viewHeight * (width / height)
     this.camera.left = -viewWidth / 2
@@ -1305,16 +1328,40 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.camera.updateProjectionMatrix()
   }
 
-  render(delta: number, now: number) {
+  /** 공용 WebGL 표면의 위쪽 일부에 그린 뒤 배우별 2D 캔버스로 즉시 복사한다. */
+  private renderToOutput() {
+    const width = this.outputCanvas.width
+    const height = this.outputCanvas.height
+    if (width < 1 || height < 1) return
+    const y = SHARED_RENDER_SIZE - height
+    this.renderer.setViewport(0, y, width, height)
+    this.renderer.setScissor(0, y, width, height)
+    this.renderer.setScissorTest(true)
+    this.renderer.clear(true, true, true)
+    this.renderer.render(this.scene, this.camera)
+    // WebGL의 위쪽 viewport는 DOM 캔버스의 y=0부터 보인다. 필요한 영역만 복사해
+    // 각 배우의 CSS transform·filter·opacity 연출은 기존 DOM 구조 그대로 유지한다.
+    this.outputContext.clearRect(0, 0, width, height)
+    this.outputContext.drawImage(this.renderer.domElement, 0, 0, width, height, 0, 0, width, height)
+  }
+
+  render(delta: number, now: number, allowDraw = true) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
     if (this.renderer.getContext().isContextLost()) {
       this.useFallbackPortrait()
       return
     }
     this.pendingRenderDelta = Math.min(0.1, this.pendingRenderDelta + delta)
-    const lowQuality = document.documentElement.dataset.graphics === 'low'
-    const waitingEnemy = !!this.shell.closest('.actor.foe.back')
-    const targetFps = lowQuality ? 30 : waitingEnemy ? 30 : 60
+    if (!allowDraw) return
+    const waitingEnemy = this.isWaitingEnemy()
+    const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
+    if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy)
+
+    // idle은 포즈 변화가 느려 30fps에서도 자연스럽다. 클릭·공격·피격·등장처럼
+    // 플레이어가 바로 보는 동작만 60fps로 올려 여러 WebGLRenderer의 유휴 드로우를
+    // 절반으로 줄인다. 뒤 레일의 축소된 적은 24fps로도 충분하다.
+    const targetFps = this.targetFps()
+    this.outputCanvas.dataset.renderFps = String(targetFps)
     if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return
 
     const frameDelta = this.pendingRenderDelta
@@ -1332,7 +1379,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       this.camera.zoom = nextZoom
       this.camera.updateProjectionMatrix()
     }
-    this.renderer.render(this.scene, this.camera)
+    this.renderToOutput()
     if (this.model && !this.firstFrameRendered) {
       // 실제 WebGL 컨텍스트에서 텍스처 업로드와 첫 드로우까지 성공한 뒤에만
       // 캔버스를 공개한다. 그 전에는 2D 초상도 함께 숨겨 교체 섬광을 막는다.
@@ -1344,15 +1391,15 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   isReadyForOutput() {
     if (this.shell.dataset.modelStatus === 'fallback-2d') return true
     return this.firstFrameRendered
-      && this.renderer.domElement.width > 0
-      && this.renderer.domElement.height > 0
+      && this.outputCanvas.width > 0
+      && this.outputCanvas.height > 0
       && !this.renderer.getContext().isContextLost()
   }
 
   useFallbackPortrait() {
     if (this.disposed) return
     this.shell.dataset.modelStatus = 'fallback-2d'
-    this.renderer.domElement.hidden = true
+    this.outputCanvas.hidden = true
     this.setActive(false)
   }
 
@@ -1398,7 +1445,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       const materials = Array.isArray(object.material) ? object.material : [object.material]
       materials.forEach((material) => material.dispose())
     })
-    releaseRenderer(this.renderer)
+    this.outputCanvas.remove()
   }
 }
 
@@ -1447,6 +1494,7 @@ export function isCharacterModelReady(actor: HTMLElement, visual: CharacterVisua
   if (!visual.model3d) return true
   const shell = modelShellFor(actor)
   if (!shell) return false
+  if (shell.dataset.modelStatus === 'fallback-2d') return true
   return mountedModels.get(shell)?.isReadyForOutput() ?? false
 }
 

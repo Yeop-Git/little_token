@@ -1428,6 +1428,126 @@ export const EARLY_COMBOS: Combo[] = [
     ],
     "mult": 1.7,
     "flavor": "아문 마음으로 다음 줄을 쓴다"
+  },
+  {
+    "id": "ec17",
+    "name": "포근한 손길",
+    "need": [
+      "warm",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "따뜻하게 감싸 다시 아문다"
+  },
+  {
+    "id": "ec18",
+    "name": "눈 깜짝할 새",
+    "need": [
+      "swift",
+      "atk"
+    ],
+    "mult": 1.5,
+    "flavor": "재빠른 손끝이 먼저 닿는다"
+  },
+  {
+    "id": "ec19",
+    "name": "광란의 일격",
+    "need": [
+      "mad",
+      "atk"
+    ],
+    "mult": 1.6,
+    "flavor": "생각할 틈 없이 몰아친다"
+  },
+  {
+    "id": "ec20",
+    "name": "물러설 곳 없이",
+    "need": [
+      "reckless",
+      "atk"
+    ],
+    "mult": 1.6,
+    "flavor": "끝까지 몰린 마음으로 내지른다"
+  },
+  {
+    "id": "ec21",
+    "name": "환한 수선",
+    "need": [
+      "bright",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "밝은 마음으로 찢어진 줄을 잇는다"
+  },
+  {
+    "id": "ec22",
+    "name": "반가운 손길",
+    "need": [
+      "greet",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "다시 만난 이야기를 다정히 고친다"
+  },
+  {
+    "id": "ec23",
+    "name": "웃으며 고치기",
+    "need": [
+      "smile",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "웃음을 잃지 않고 상처를 다듬는다"
+  },
+  {
+    "id": "ec24",
+    "name": "성난 일격",
+    "need": [
+      "rage",
+      "atk"
+    ],
+    "mult": 1.55,
+    "flavor": "거친 마음을 한 획에 싣는다"
+  },
+  {
+    "id": "ec25",
+    "name": "쓸쓸한 방패",
+    "need": [
+      "lone",
+      "grd"
+    ],
+    "mult": 1.5,
+    "flavor": "혼자 남아도 한 줄을 지킨다"
+  },
+  {
+    "id": "ec26",
+    "name": "애써 일어서기",
+    "need": [
+      "endure",
+      "mend"
+    ],
+    "mult": 1.55,
+    "flavor": "흔들리는 손으로 다시 마음을 잇는다"
+  },
+  {
+    "id": "ec27",
+    "name": "들썩이는 공격",
+    "need": [
+      "bounce",
+      "atk"
+    ],
+    "mult": 1.5,
+    "flavor": "신난 박자가 타격으로 이어진다"
+  },
+  {
+    "id": "ec28",
+    "name": "경쾌한 회복",
+    "need": [
+      "lively",
+      "mend"
+    ],
+    "mult": 1.5,
+    "flavor": "가벼운 박자로 상처를 풀어낸다"
   }
 ]
 

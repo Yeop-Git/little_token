@@ -45,7 +45,7 @@ export const CARD_HAND_CONFIG = {
   cardWidth: 158,
   cardHeight: 218,
   maxSpacing: 170,
-  minSpacing: 112,
+  minSpacing: 68,
   selectedLift: 82,
   selectedScale: 1.12,
   drawDuration: 620,
@@ -72,7 +72,11 @@ export function cardTitleStyle(text: string, illustrated = false): string {
 /** DOM과 무관한 일렬 손패 좌표 계산. 카드 묶음의 중심을 항상 화면 중앙에 맞춘다. */
 export function calculateLineTransform(index: number, count: number, availableWidth = 900): LineTransform {
   const safeCount = Math.max(1, count)
-  const desiredSpacing = CARD_HAND_CONFIG.maxSpacing
+  // 기본 3~4장은 또렷하게 펼치고, 추가 드로우로 5~6장이 되면 좌측 카드가 아래,
+  // 우측 카드가 위인 한 방향 계단처럼 겹친다.
+  const desiredSpacing = safeCount <= 4
+    ? CARD_HAND_CONFIG.maxSpacing
+    : safeCount === 5 ? 142 : 126
   const fitSpacing = safeCount === 1
     ? desiredSpacing
     : (availableWidth - CARD_HAND_CONFIG.cardWidth) / (safeCount - 1)

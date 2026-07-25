@@ -19,7 +19,6 @@ import {
 import { SPECIAL_REWARD_WORDS } from './specialWords'
 
 export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS, SPECIAL_REWARD_WORDS }
-export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
 
 const QUEEN_BEE_TACTIC: Word = {
   ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
@@ -79,6 +78,13 @@ export function growCardFor(slotKey: string): Word {
     lore: GROW_LORE[slotKey] ?? GROW_BASE.lore,
   }
 }
+
+/**
+ * 일반 보상 전설 스킬 — 기존 규칙 카드인 무럭무럭을 초반 3슬롯에 맞춰 둔다.
+ * 저장 복원도 같은 정의를 찾을 수 있도록 전체 보상 카탈로그에 포함한다.
+ */
+export const LEGENDARY_REWARD_WORDS: Word[] = ['subj', 'adv', 'verb'].map(growCardFor)
+export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORDS, ...LEGENDARY_REWARD_WORDS]
 
 /**
  * 아이템 패시브가 슬롯을 늘리면 그 칸의 단어 목록도 함께 채워야 한다.

@@ -275,6 +275,10 @@ export interface HitFx {
   weak: boolean
   /** 한 번의 타격으로 완전히 소진한 보스 체력 막 수. */
   barsBroken: number
+  /** 현재 보스 체력 막의 남은 양을 넘어선 충격. 체력바 오버킬 연출에 쓴다. */
+  barOverflow?: number
+  /** 초과 충격이 막 경계에 멈추지 않고 다음 막까지 실제로 관통했는가. */
+  barOverflowPassed?: boolean
   /** 부위 보스에서 이 타격이 시작된 다리 또는 본체. */
   partId?: string
   partName?: string
@@ -298,6 +302,8 @@ export interface ApplyResult {
   summonDamage: number
   /** 쓰러진 호위가 소환자 본체에 되돌려 준 직접 피해. */
   summonBacklashDamage: number
+  /** 지정 감정의 단일 공격으로 호위 퇴치 반동이 강화되었는가. */
+  summonFocusedBacklash: boolean
   /** 호위 전멸이 그로기와 공격 스킵을 열었는가. */
   summonGroggyTriggered: boolean
   /** 피해 없이 방어·회복 문장으로 현재 거미 다리의 약점을 맞혀 푼 봉인. */
@@ -310,6 +316,14 @@ export interface PreparationResult {
   /** 상한 적용 뒤 실제로 늘어난 방어막. */
   guardGain: number
   counterMultiplier: number
+}
+
+export interface OverkillTransferResult {
+  /** 다음 적의 체력에 직접 꽂힌 전이 피해. */
+  dealt: number
+  killed: boolean
+  /** 다음 적까지 쓰러뜨리고도 남아 뒤로 이어질 피해. */
+  overflow: number
 }
 
 /** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
@@ -342,6 +356,14 @@ interface AttackPlan {
 }
 
 const TARGET_FALLOFF = [1, 0.7, 0.5] as const
+
+/** 일반 보스에서 한 타격이 이 막 수만큼 강하면 막 경계를 넘어간다. */
+export const BOSS_MULTI_BAR_HIT_BARS = 2
+
+export function bossMultiBarDamageRequirement(enemy: Pick<EnemyInst, 'def' | 'healthBars' | 'hpPerBar' | 'parts'>): number {
+  if (!enemy.def.boss || enemy.healthBars <= 1 || enemy.parts.length > 0) return 0
+  return enemy.hpPerBar * BOSS_MULTI_BAR_HIT_BARS
+}
 
 function activePartWeak(enemy: EnemyInst, emotions: readonly Emotion[], tags: readonly string[]): boolean {
   const weakness = activeEnemyPart(enemy)?.def.weakness
@@ -418,6 +440,15 @@ function damageEnemy(
   const guardAbsorbed = pierceGuard ? 0 : Math.min(enemy.guard, raw)
   if (!pierceGuard) enemy.guard -= guardAbsorbed
   const dealt = Math.max(0, raw - guardAbsorbed)
+  const currentBarHp = enemy.def.boss && enemy.healthBars > 1
+    ? Math.max(1, enemy.hp % enemy.hpPerBar || enemy.hpPerBar)
+    : enemy.hp
+  const barOverflow = enemy.def.boss && enemy.healthBars > 1
+    ? Math.max(0, dealt - currentBarHp)
+    : 0
+  const hpBefore = enemy.hp
+  let barOverflowPassed = false
+  let appliedDamage = dealt
   const barsBefore = enemy.parts.length
     ? enemy.parts.filter((candidate) => !candidate.broken).length
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
@@ -425,7 +456,8 @@ function damageEnemy(
     // 약점만 맞힌 문장은 현재 다리를 확실히 끊는 정답이고, 약점과 이름 있는
     // 관용구까지 함께 맞힌 완벽한 맥락만 뒤 부위로 관통한다. 순차 약점 퍼즐을
     // 보존하면서도 후반 덱의 폭발적인 상한은 관용구 보상으로 남긴다.
-    let remaining = weak && comboMatched ? dealt : Math.min(dealt, part.hp)
+    barOverflowPassed = barOverflow > 0 && weak && comboMatched
+    let remaining = barOverflowPassed ? dealt : Math.min(dealt, part.hp)
     for (const candidate of enemy.parts.slice(enemy.parts.indexOf(part))) {
       if (remaining <= 0) break
       const applied = Math.min(candidate.hp, remaining)
@@ -434,16 +466,23 @@ function damageEnemy(
       if (candidate.hp <= 0) candidate.broken = true
     }
     enemy.hp = enemy.parts.reduce((sum, candidate) => sum + Math.max(0, candidate.hp), 0)
+    appliedDamage = Math.max(0, hpBefore - enemy.hp)
   } else {
-    enemy.hp -= dealt
+    const multiBarRequirement = bossMultiBarDamageRequirement(enemy)
+    barOverflowPassed = barOverflow > 0 && multiBarRequirement > 0 && dealt >= multiBarRequirement
+    // 웬만한 강타는 현재 막을 확실히 깨는 데서 멈춘다. 한 막 체력의 2배에 이른
+    // 초강타만 다음 막으로 이어져, 성장한 문장의 폭발력과 보스 패턴의 생존 시간을
+    // 함께 보존한다. 일반 적과 단일 막 보스에는 이 경계를 적용하지 않는다.
+    if (barOverflow > 0 && multiBarRequirement > 0 && !barOverflowPassed) appliedDamage = currentBarHp
+    enemy.hp -= appliedDamage
   }
   const barsAfter = enemy.parts.length
     ? enemy.parts.filter((candidate) => !candidate.broken).length
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (enemy.hp <= 0) enemy.dead = true
   const barsBroken = barsBefore - barsAfter
-  const webBurst = !!enemy.def.webPattern && dealt > 0 && barsBroken > 0
-  const webCut = !!enemy.def.webPattern && weak && dealt > 0 && !webBurst
+  const webBurst = !!enemy.def.webPattern && appliedDamage > 0 && barsBroken > 0
+  const webCut = !!enemy.def.webPattern && weak && appliedDamage > 0 && !webBurst
   if (webBurst) {
     // 다리 하나가 떨어지면 쌓인 카드 봉인을 전부 걷어 낸다.
     enemy.webTurns = brokenSpiderLegs(enemy)
@@ -453,18 +492,57 @@ function damageEnemy(
   }
   return {
     target,
-    dmg: dealt,
+    dmg: appliedDamage,
     summonShieldBlocked: false,
     guardAbsorbed,
     magicShieldBroken: false,
     magicShieldRemaining: enemy.magicShield,
     weak,
     barsBroken,
+    barOverflow,
+    barOverflowPassed,
     partId: part?.def.id,
     partName: part?.def.name,
     webCut,
     webBurst,
     tensionReduced: Math.max(0, tensionBefore - spiderWebTension(enemy)),
+  }
+}
+
+/**
+ * 오버킬 전이는 이미 앞 적을 뚫고 나온 한 줄기이므로 다음 적의 일반 방어막과
+ * 매직실드를 모두 건너뛴다. 두 실드는 소모하지 않으며, View가 전투 상태를 직접
+ * 고치지 않도록 여기서 체력 막까지 함께 동기화한다.
+ */
+export function applyOverkillTransfer(
+  state: BattleState,
+  target: number,
+  damage: number,
+): OverkillTransferResult {
+  const enemy = state.enemies[target]
+  const incoming = Math.max(0, Math.round(damage))
+  if (!enemy || enemy.dead || incoming <= 0) return { dealt: 0, killed: false, overflow: 0 }
+
+  const before = Math.max(0, enemy.hp)
+  const dealt = Math.min(before, incoming)
+  if (enemy.parts.length > 0) {
+    let remaining = dealt
+    for (const part of enemy.parts) {
+      if (remaining <= 0) break
+      const applied = Math.min(part.hp, remaining)
+      part.hp -= applied
+      remaining -= applied
+      if (part.hp <= 0) part.broken = true
+    }
+    enemy.hp = enemy.parts.reduce((sum, part) => sum + Math.max(0, part.hp), 0)
+  } else {
+    enemy.hp = Math.max(0, before - dealt)
+  }
+  enemy.dead = enemy.hp <= 0
+  return {
+    dealt,
+    killed: enemy.dead,
+    overflow: enemy.dead ? Math.max(0, incoming - before) : 0,
   }
 }
 
@@ -477,11 +555,17 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
     if (state.enemies[hit.target]?.dead && !killed.includes(hit.target)) killed.push(hit.target)
   }
 
-  // 연타는 매직실드를 벗기는 정확한 용도라 대상이 죽어도 다음 적으로 새지 않는다.
+  // 연타도 각 타격은 일반 단일 공격과 같은 오버킬 규칙을 따른다. 앞 타격으로
+  // 체력을 깎고 마지막 타격이 적을 쓰러뜨렸다면, 그 타격의 초과분을 뒷줄로 넘긴다.
   if (plan.hitCount > 1 && plan.targetCount === 1) {
     for (let i = 0; i < plan.hitCount; i++) {
       if (state.enemies[plan.target]?.dead) break
-      record(damageEnemy(state, plan.target, plan.dmg, plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched))
+      const before = state.enemies[plan.target].hp
+      const hit = damageEnemy(state, plan.target, plan.dmg, plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
+      record(hit)
+      if (hit && state.enemies[plan.target].dead) {
+        return { hits, killed, overflow: Math.max(0, hit.dmg - before) }
+      }
     }
     return { hits, killed, overflow: 0 }
   }
@@ -506,6 +590,7 @@ interface SummonDisperseResult {
   count: number
   damage: number
   backlashDamage: number
+  focusedBacklash: boolean
   groggyTriggered: boolean
   killed: boolean
 }
@@ -516,10 +601,11 @@ function disperseTargetSummons(
   dmg: number,
   targetCount: TargetCount,
   pierceGuard = false,
+  emotions: readonly Emotion[] = [],
 ): SummonDisperseResult {
   const enemy = state.enemies[target]
   if (!enemy || enemy.dead || !enemy.def.summonPattern) {
-    return { count: 0, damage: 0, backlashDamage: 0, groggyTriggered: false, killed: false }
+    return { count: 0, damage: 0, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   }
   const pattern = enemy.def.summonPattern
   const available = summonCount(enemy)
@@ -547,9 +633,17 @@ function disperseTargetSummons(
     else enemy.summonsLeft--
     dispersed++
   }
+  const focusedRule = pattern.focusedBacklash
+  const focusedBacklash = dispersed > 0
+    && targetCount === 1
+    && !pierceGuard
+    && !!focusedRule
+    && emotions.includes(focusedRule.emotion)
+  const backlashRate = (pattern.backlashMaxHpRatePerUnit ?? 0)
+    * (focusedBacklash ? focusedRule!.multiplier : 1)
   const backlashDamage = Math.min(
     enemy.hp,
-    Math.max(0, Math.round(enemy.maxHp * (pattern.backlashMaxHpRatePerUnit ?? 0) * dispersed)),
+    Math.max(0, Math.round(enemy.maxHp * backlashRate * dispersed)),
   )
   enemy.hp -= backlashDamage
   if (enemy.hp <= 0) enemy.dead = true
@@ -563,7 +657,7 @@ function disperseTargetSummons(
     enemy.groggyDamageMult = pattern.groggyDamageMult ?? 1.5
     enemy.nextAttackTurn += 1
   }
-  return { count: dispersed, damage, backlashDamage, groggyTriggered, killed: enemy.dead }
+  return { count: dispersed, damage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
 }
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
@@ -582,13 +676,13 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   }
   if (intent.timing === 'delayed') {
     state.pending = { ...plan, sentence: intent.sentence }
-    return { text: `${intent.sentence} → 다음 턴에 ${dmg} 예약`, combos: intent.combos, hits: [], selfDmg: 0, heal: 0, killed: [], overflow: 0, summonsDispersed: 0, summonDamage: 0, summonBacklashDamage: 0, summonGroggyTriggered: false, supportWebCut: null }
+    return { text: `${intent.sentence} → 다음 턴에 ${dmg} 예약`, combos: intent.combos, hits: [], selfDmg: 0, heal: 0, killed: [], overflow: 0, summonsDispersed: 0, summonDamage: 0, summonBacklashDamage: 0, summonFocusedBacklash: false, summonGroggyTriggered: false, supportWebCut: null }
   }
 
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
   const summonDisperse = dealsDamage
-    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard)
-    : { count: 0, damage: 0, backlashDamage: 0, groggyTriggered: false, killed: false }
+    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions)
+    : { count: 0, damage: 0, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   const attack = dealsDamage && !summonDisperse.killed ? resolveAttack(state, plan) : { hits: [], killed: [], overflow: 0 }
   const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
   let selfDmg = intent.recoil
@@ -606,6 +700,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     summonsDispersed: summonDisperse.count,
     summonDamage: summonDisperse.damage,
     summonBacklashDamage: summonDisperse.backlashDamage,
+    summonFocusedBacklash: summonDisperse.focusedBacklash,
     summonGroggyTriggered: summonDisperse.groggyTriggered,
     supportWebCut,
   }
@@ -615,7 +710,7 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
   const pending = state.pending
   if (!pending) return null
   state.pending = null
-  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard)
+  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard, pending.emotions)
   const attack = summonDisperse.killed ? { hits: [], killed: [], overflow: 0 } : resolveAttack(state, pending)
   return {
     text: `${pending.sentence} → 예약 발동`,
@@ -628,6 +723,7 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
     summonsDispersed: summonDisperse.count,
     summonDamage: summonDisperse.damage,
     summonBacklashDamage: summonDisperse.backlashDamage,
+    summonFocusedBacklash: summonDisperse.focusedBacklash,
     summonGroggyTriggered: summonDisperse.groggyTriggered,
     supportWebCut: null,
   }

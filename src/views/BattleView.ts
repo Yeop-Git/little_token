@@ -25,13 +25,14 @@ import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/
 import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS, tablesForEncounter } from '@data/earlyWords'
-import { ENEMIES } from '@data/enemies'
+import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
 import { tacticalGuideForEnemy } from '@data/tacticalCards'
 import {
   activeEnemyPart,
   allDead,
   aliveIdx,
   applyIntent,
+  applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
   BOSS_ATTACK_MULTIPLIER,
@@ -141,12 +142,6 @@ const ENEMY_ENTER_DELAY_MS = 260
 const PLAYER_ENTER_MS = 1120
 const FOE_WALK_MS = 2260
 /**
- * 보스가 컷의 마지막 자리에서 자기 자리까지 걸어오는 시간.
- * 실측 거리는 약 445px(중심 74% → 51%)이고, 적 등장과 같은 약 300px/초 걸음이면
- * 1.5초쯤이다 — 둘이 같은 땅을 걷는 것으로 읽혀야 한다.
- */
-const BOSS_WALK_MS = 1500
-/**
  * 뒷줄이 한 칸 당겨올 때 걷는 시간. style.css의 .actor 이동 트랜지션(0.42s)과
  * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
  */
@@ -222,7 +217,7 @@ const TOKEN_BOSS_HINTS = {
   mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 방어야! 표시된 수치만큼 반드시 방어해!!', 'warn'),
   mantisGroggy: say('실드는 깨졌지만 강공격은 취소야! 사마귀가 그로기에 빠졌어!!', 'relief'),
   mantisPunished: say('못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!', 'warn'),
-  queenBeeStart: say('일벌 넷을 모두 쓰러뜨리면 여왕벌이 휘청거려! 관통으로 빠르게 꿰뚫자 — 분노가 약점이야!!'),
+  queenBeeStart: say(`${QUEEN_ESCORT_IMMUNITY_LABEL}! 범위·관통은 넷을 빨리 쓰러뜨려 그로기, 분노 단일 공격은 본체 반동 2배야!!`),
   queenBeeDispersed: say('좋아, 프롬! 일벌이 쓰러졌어!!', 'relief'),
   elderSpiderMiss: say('약점이 아니면 그 다리에서 막혀! 지금 약점을 노려 봐!!', 'warn'),
   elderSpiderWebReady: say('거미줄이 다 조여들었어! 이번엔 꼭 약점을 노리자!!', 'warn'),
@@ -324,9 +319,14 @@ export class BattleView {
   private actionOrderSignature = ''
   private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
+  private actorsInitialized = false
   private readonly enemyPrewarmQueue: EnemyInst[] = []
   private readonly prewarmingEnemyKeys = new Set<string>()
   private enemyPrewarmActive = false
+  /** 보스전의 큰 GLB 복제·첫 GPU 업로드가 한 프레임에 몰리지 않게 직렬 준비한다. */
+  private readonly deferredModelQueue: Array<{ actor: HTMLElement; visual: CharacterVisualDef; priority: number }> = []
+  private readonly deferredModelActors = new WeakSet<HTMLElement>()
+  private deferredModelActive = false
   private destroyed = false
   /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
   private readonly debugSpawnedWords = new Map<string, Word>()
@@ -544,39 +544,6 @@ export class BattleView {
       playCharacterAnimation(foe, 'walk')
       this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), FOE_WALK_MS))
     })
-    this.walkBossToPost()
-  }
-
-  /**
-   * 보스는 조우 시네마틱이 걷힌 **그 자리**에서 시작해 자기 자리로 걸어 들어온다.
-   * 컷의 마지막 프레임과 다른 자리에 처음부터 서 있으면 컷이 걷히는 순간 껑충 뛴다.
-   * 출발 자리는 보스마다 다르다(style.css의 --boss-entry-right).
-   */
-  private walkBossToPost() {
-    const boss = this.root.querySelector<HTMLElement>('.actor.foe.boss')
-    if (!boss || !this.isBoss || boss.dataset.bossWalked) return
-    // 출발 자리는 화면 폭의 **비율**로 잡는다(style.css의 --boss-entry-left).
-    // px로 잡으면 무대 폭이 다른 화면에서 그만큼씩 어긋나 화면 밖으로 나가 버린다.
-    // 중앙 정렬은 translate(-50%)가 계속 맡고, 걷는 건 left만 움직인다.
-    const entryLeft = getComputedStyle(boss).getPropertyValue('--boss-entry-left').trim()
-    if (!entryLeft) return
-    boss.dataset.bossWalked = 'true' // 한 번만 걷는다
-    boss.dataset.bossWalking = 'true' // 걷는 중에는 updateFoe가 자리를 덮지 않는다
-    boss.style.transition = 'none'
-    boss.style.left = entryLeft
-    // 출발 자리를 확정하는 데 requestAnimationFrame을 쓰지 않는다 — 탭이 숨겨져 있으면
-    // 콜백이 아예 안 돌아서 보스가 출발 자리에 영구히 멈춘다(실측으로 그랬다).
-    // 강제 리플로우로 출발 자리를 커밋한 뒤 같은 작업 안에서 도착 자리를 준다.
-    void boss.offsetWidth
-    // 걸음 속도는 적 등장과 같게 맞춘다 — 같은 땅을 걷는 것으로 읽혀야 한다.
-    boss.style.transition = `left ${BOSS_WALK_MS}ms cubic-bezier(0.3, 0.3, 0.85, 1)`
-    boss.style.left = '50%'
-    playCharacterAnimation(boss, 'walk')
-    this.timers.push(window.setTimeout(() => {
-      playCharacterAnimation(boss, 'idle')
-      boss.style.transition = ''
-      delete boss.dataset.bossWalking
-    }, BOSS_WALK_MS + 120))
   }
 
   private mount() {
@@ -669,14 +636,12 @@ export class BattleView {
       onConfirm: (word) => {
         if (!this.busy && !this.over) this.pick(word.id)
       },
-      onHover: () => GameAudio.play('cardHover'),
       onPreview: (word) => {
         this.keepDock()
         this.renderDetail(word)
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
-    this.q('#draw-deck').addEventListener('pointerenter', () => GameAudio.play('cardHover'))
     document.addEventListener('pointerdown', this.onPointerDown, true)
     document.addEventListener('pointerup', this.onPointerUp, true)
     document.addEventListener('pointercancel', this.onPointerUp, true)
@@ -715,6 +680,59 @@ export class BattleView {
   // ── 배우 — 적은 "레일 대기열": 최전방만 선명·전투 참여, 뒷줄은 흐릿·대기 ──
   // 엘리먼트를 통째로 다시 만들지 않고 자리·수치만 갱신한다. 그래야 앞 적이 쓰러졌을 때
   // 뒷줄이 실제로 "당겨져 오는" 레일 이동과 체력바 페이드가 트랜지션으로 이어진다.
+  private queueDeferredCharacterModel(actor: HTMLElement, visual: CharacterVisualDef, priority: number) {
+    if (!visual.model3d || this.deferredModelActors.has(actor)) return
+    // 이미 첫 드로우까지 끝난 배우는 지연 큐에 태울 게 없다. 그렇다고 그냥 돌아서면
+    // 풀에서 꺼내거나 잠재웠던 모델의 idle 복귀와 재활성이 통째로 빠진다 —
+    // 되살아난 일벌이 쓰러진 자세로 멈춰 서던 이유다. 준비는 건너뛰되 복귀는 시킨다.
+    if (isCharacterModelReady(actor, visual)) {
+      mountCharacterModel(actor, visual)
+      return
+    }
+    this.deferredModelActors.add(actor)
+    this.deferredModelQueue.push({ actor, visual, priority })
+    this.deferredModelQueue.sort((a, b) => a.priority - b.priority)
+    this.drainDeferredCharacterModels()
+  }
+
+  private drainDeferredCharacterModels() {
+    if (this.destroyed || this.deferredModelActive) return
+    this.deferredModelActive = true
+    const start = window.setTimeout(() => {
+      const next = this.deferredModelQueue.shift()
+      if (!next) {
+        this.deferredModelActive = false
+        return
+      }
+      const { actor, visual } = next
+      if (!actor.isConnected || actor.hidden) {
+        this.deferredModelActors.delete(actor)
+        this.deferredModelActive = false
+        this.drainDeferredCharacterModels()
+        return
+      }
+
+      // mount 안의 GLB 복제는 동기 구간이지만 한 배우만 실행한다. 그 배우의 첫
+      // 드로우가 확인된 뒤 다음 배우를 시작해 여러 복제·텍스처 업로드가 겹치지 않는다.
+      mountCharacterModel(actor, visual)
+      let attempts = 0
+      const settle = () => {
+        if (this.destroyed || !actor.isConnected || isCharacterModelReady(actor, visual) || attempts >= 90) {
+          this.deferredModelActors.delete(actor)
+          this.deferredModelActive = false
+          this.drainDeferredCharacterModels()
+          return
+        }
+        attempts += 1
+        const retry = window.setTimeout(settle, 32)
+        this.timers.push(retry)
+      }
+      const firstCheck = window.setTimeout(settle, 32)
+      this.timers.push(firstCheck)
+    }, 0)
+    this.timers.push(start)
+  }
+
   private renderActors() {
     const host = this.q('#actors')
     const s = this.state
@@ -735,7 +753,7 @@ export class BattleView {
     mountCharacterModel(you, this.playerVisual)
     if (this.isBoss) {
       const token = this.root.querySelector<HTMLElement>('.boss-token')
-      if (token) mountCharacterModel(token, CHARACTER_VISUALS.token)
+      if (token) this.queueDeferredCharacterModel(token, CHARACTER_VISUALS.token, 1)
     }
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
@@ -747,9 +765,19 @@ export class BattleView {
       if (!el) {
         el = this.acquireFoe(i, e)
         host.append(el)
+        if (this.actorsInitialized && !this.isBoss) {
+          // 대기 숫자에서 새로 드러난 적도 한 칸 뒤에 실제로 서 있던 것처럼 시작한다.
+          // 출발 좌표를 먼저 확정해야 updateFoe의 right 전환과 walk 동작이 함께 보인다.
+          const stage = currentFieldStage()
+          el.style.left = 'auto'
+          el.style.right = `${stage.railRight - MAX_VISIBLE_ENEMIES * stage.railGap}px`
+          el.dataset.rank = String(MAX_VISIBLE_ENEMIES)
+          void el.offsetWidth
+        }
       }
       this.updateFoe(el, e, rank)
     })
+    this.actorsInitialized = true
     this.queueWaitingEnemyModels(alive.slice(MAX_VISIBLE_ENEMIES))
     this.renderEnemyOverflow(host, hiddenWaiting)
     this.renderStats()
@@ -915,7 +943,8 @@ export class BattleView {
     image.alt = enemy.def.name
     const modelShell = el.querySelector<HTMLElement>(':scope > .model-shell')!
     if (!visual.model3d) modelShell.dataset.modelStatus = 'fallback-2d'
-    mountCharacterModel(el, visual)
+    if (this.isBoss) this.queueDeferredCharacterModel(el, visual, 0)
+    else mountCharacterModel(el, visual)
     return el
   }
 
@@ -1137,7 +1166,7 @@ export class BattleView {
     if (boss.def.id === 'elderSpider') {
       const weak = activeEnemyPart(boss)?.def.weakness?.label
       return say(weak
-        ? `거미줄은 방패를 넘어 와! 다리마다 약점이 다르니까 — 첫째 다리는 「${weak}」 감정이야!!`
+        ? `첫 공격은 마력실드가 막아! 연타로 벗긴 뒤 「${weak}」 감정으로 첫째 다리를 노려 — 거미줄은 방패도 넘어 와!!`
         : '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!')
     }
     return null
@@ -1304,7 +1333,7 @@ export class BattleView {
         nameplate?.setAttribute('aria-label', `일벌 체력 ${hp} / ${maxHp}`)
         if (hpText) hpText.textContent = `${hp}/${maxHp}`
         if (fill) fill.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`
-        mountCharacterModel(worker, CHARACTER_VISUALS.workerBee)
+        this.queueDeferredCharacterModel(worker, CHARACTER_VISUALS.workerBee, 2)
       } else {
         suspendCharacterModel(worker)
       }
@@ -1323,8 +1352,7 @@ export class BattleView {
       // 개별 translate 속성은 공격·피격의 transform 애니메이션과 서로 덮어쓰지 않는다.
       el.style.right = 'auto'
       el.style.translate = '-50% 0'
-      // 조우 시네마틱에서 걸어 들어오는 중이면 그 이동(left)을 덮지 않는다.
-      if (!el.dataset.bossWalking) el.style.left = '50%'
+      el.style.left = '50%'
     } else {
       el.style.left = 'auto'
       el.style.right = `${st.railRight - rank * st.railGap}px`
@@ -1505,7 +1533,16 @@ export class BattleView {
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
     // 보스 상단 HUD는 체력바와 약점만 갱신한다. 선공은 배우 옆 공용 경고 표식이
     // 실제 initiativePhase가 first일 때만 맡고, 패턴/단계/방어 텍스트는 출력하지 않는다.
-    if (bossHud) return
+    if (bossHud) {
+      const mark = plate.querySelector<HTMLElement>('.boss-health-mark')
+      const escortedQueen = e.def.id === 'queenBee' && summonCount(e) > 0
+      if (mark) {
+        mark.textContent = escortedQueen ? QUEEN_ESCORT_IMMUNITY_LABEL : 'BOSS'
+        mark.toggleAttribute('aria-hidden', !escortedQueen)
+        mark.classList.toggle('escort-rule', escortedQueen)
+      }
+      return
+    }
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다.
     traits.hidden = true
@@ -2795,7 +2832,7 @@ export class BattleView {
       // 원격의 새 일벌 피해 표시를 쓰되, 강타에서는 기다리지 않는다 — 일벌이 흩어지는
       // 것과 검기가 뻗는 건 같은 순간에 벌어져야 한다. 기다리면 정지 뒤에 텀이 하나 더 생긴다.
       const dispersal = this.playSummonDispersal(
-        this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonGroggyTriggered,
+        this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered,
       )
       if (!heavy) await dispersal
       this.log(`문장이 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
@@ -2858,10 +2895,11 @@ export class BattleView {
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
             this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
+            if ((hit.barOverflow ?? 0) > 0) this.playBossBarOverkill(hit.target, hit.barOverflow ?? 0, !!hit.barOverflowPassed)
           }
         }
         if (result.summonDamage > 0) {
-          await this.playSummonDispersal(result.hits[0]?.target ?? this.target, result.summonsDispersed, result.summonDamage, result.summonBacklashDamage, result.summonGroggyTriggered)
+          await this.playSummonDispersal(result.hits[0]?.target ?? this.target, result.summonsDispersed, result.summonDamage, result.summonBacklashDamage, result.summonFocusedBacklash, result.summonGroggyTriggered)
           this.log(`예약 문장이 일벌에게 ${result.summonDamage} 피해${result.summonsDispersed > 0 ? ` · ${result.summonsDispersed}마리 퇴치` : ''}.`)
         }
         this.log(result.text)
@@ -2964,7 +3002,7 @@ export class BattleView {
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
     await this.strike(res, sweep, heavy)
     if (res.summonDamage > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonGroggyTriggered)
+      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered)
       this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
@@ -2986,6 +3024,8 @@ export class BattleView {
         summonShieldBlocked?: boolean
         weak?: boolean
         barsBroken?: number
+        barOverflow?: number
+        barOverflowPassed?: boolean
         partId?: string
         partName?: string
         webCut?: boolean
@@ -3035,7 +3075,7 @@ export class BattleView {
     ).length
     for (const h of res.hits) {
       if (h.summonShieldBlocked) {
-        this.popAt(h.target, '일벌 호위 · 본체 무적', 'guard big')
+        this.popAt(h.target, QUEEN_ESCORT_IMMUNITY_LABEL, 'guard big')
         continue
       }
       if (h.magicShieldBroken) {
@@ -3054,6 +3094,7 @@ export class BattleView {
         this.hitOne(el)
       }
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
+      if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
@@ -3135,6 +3176,19 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => actor?.classList.remove('leg-dissolving'), 820))
   }
 
+  /** 막을 넘긴 충격을 상단 보스 체력바 안에서 직접 읽히게 한다. */
+  private playBossBarOverkill(enemyIdx: number, amount: number, passed: boolean) {
+    if (amount <= 0 || !this.state.enemies[enemyIdx]?.def.boss) return
+    const bar = this.root.querySelector<HTMLElement>('#boss-health-hud .hpbar.foe')
+    if (!bar) return
+    bar.querySelector('.boss-bar-overkill')?.remove()
+    const fx = document.createElement('span')
+    fx.className = `boss-bar-overkill ${passed ? 'is-passed' : 'is-stopped'}`
+    fx.setAttribute('aria-hidden', 'true')
+    bar.append(fx)
+    this.timers.push(window.setTimeout(() => fx.remove(), 700))
+  }
+
   private playSpiderWebCut(enemyIdx: number, _reduced: number) {
     const scene = this.q<HTMLElement>('.scene.battle')
     const released = this.cardHand.releaseSealed(1)
@@ -3204,6 +3258,11 @@ export class BattleView {
     this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard')
     if (removed) this.spawnCrystalShards(hpbar)
     await sleep(removed ? 360 : 180)
+    const enemy = this.state.enemies[target]
+    if (removed && enemy?.def.id === 'elderSpider') {
+      const weak = activeEnemyPart(enemy)?.def.weakness?.label
+      if (weak) this.showBossTokenHint(say(`마력실드가 깨졌어! 이제 「${weak}」 감정으로 현재 다리를 노려!!`, 'relief'))
+    }
   }
 
   private spawnCrystalShards(hpbar: HTMLElement) {
@@ -3538,9 +3597,9 @@ export class BattleView {
       // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
       const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
       await sleep(beamMs > 0 ? beamMs : gap)
-      const e = this.state.enemies[front]
-      const before = e.hp
-      e.hp -= overflow
+      // 오버킬 전이는 일반 방어막과 매직실드를 소모하지 않고 체력에 직접 꽂힌다.
+      // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
+      const transfer = applyOverkillTransfer(this.state, front, overflow)
       GameAudio.playSwordHit(this.swordHitCount++)
       // 깊고 화려한 관통 — 콤보에 따라 블라스트/불꽃/흔들림이 커진다.
       ember.classList.add('stab')
@@ -3560,8 +3619,7 @@ export class BattleView {
       // 맞은 다음에 레일이 움직인다 — 검기가 꽂힌 자리에서 쓰러지고, 그 뒤에 당겨온다.
       if (heavy) this.renderActors()
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
-      if (e.hp <= 0) {
-        e.dead = true
+      if (transfer.killed) {
         killedCount++
         this.noteCombo(combo)
         if (heavy) {
@@ -3571,7 +3629,7 @@ export class BattleView {
         } else {
           await this.playDeath(front, combo, sweep)
         }
-        overflow = overflow - before
+        overflow = transfer.overflow
       } else {
         overflow = 0
         await sleep(sweep ? 160 : heavy ? 90 : 320)
@@ -3825,7 +3883,14 @@ export class BattleView {
     }
   }
 
-  private async playSummonDispersal(enemyIdx: number, count: number, damage: number, backlashDamage = 0, groggyTriggered = false) {
+  private async playSummonDispersal(
+    enemyIdx: number,
+    count: number,
+    damage: number,
+    backlashDamage = 0,
+    focusedBacklash = false,
+    groggyTriggered = false,
+  ) {
     const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
       `.actor.foe[data-i="${enemyIdx}"] .queen-worker:not([hidden])`,
     )]
@@ -3843,8 +3908,8 @@ export class BattleView {
     this.popAt(enemyIdx, count > 0 ? `일벌 ${damage} 피해 · ${count}마리 퇴치` : `일벌 ${damage} 피해`, count > 0 ? 'guard big' : 'dmg')
     await sleep(count > 0 ? 300 : 160)
     if (backlashDamage > 0) {
-      this.popAt(enemyIdx, `본체 ${backlashDamage}`, 'dmg big')
-      this.log(`쓰러진 일벌이 여왕벌 본체에 ${backlashDamage} 피해를 되돌렸다.`)
+      this.popAt(enemyIdx, focusedBacklash ? `분노 집중! 본체 ${backlashDamage}` : `본체 ${backlashDamage}`, 'dmg big')
+      this.log(`${focusedBacklash ? '분노 단일 공격으로 반동이 2배가 되어, 쓰러진' : '쓰러진'} 일벌이 여왕벌 본체에 ${backlashDamage} 피해를 되돌렸다.`)
     }
     if (groggyTriggered) {
       this.popAt(enemyIdx, '일벌 4마리 퇴치! 그로기+공격 스킵!', 'buff big')

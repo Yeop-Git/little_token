@@ -288,6 +288,11 @@ export interface EnemyDef {
     pierceWhileEscorted?: boolean
     /** 호위 하나를 흩뜨릴 때 소환자 최대 체력에서 직접 깎는 비율. */
     backlashMaxHpRatePerUnit?: number
+    /** 지정 감정의 단일 비관통 공격으로 호위를 쓰러뜨렸을 때 반동 피해 배율. */
+    focusedBacklash?: {
+      emotion: Emotion
+      multiplier: number
+    }
     /** 누적해서 이만큼 퇴치할 때마다 소환자가 그로기되고 다음 공격을 한 턴 미룬다. */
     groggyEvery?: number
     /** 호위 전멸로 열린 현재 턴의 받는 피해 배율. */

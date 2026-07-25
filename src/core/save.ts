@@ -133,6 +133,10 @@ export function loadRun(): RunState | null {
       parsed.reward = null
       migrated = true
     }
+    if (parsed.reward && !Array.isArray(parsed.reward.picks)) {
+      parsed.reward.picks = []
+      migrated = true
+    }
     // 결과 화면 기록 도입 전 저장된 런은 빈 기록으로 시작한다 — 지난 판을 소급해
     // 셈할 방법은 없으니 0에서 이어 적는다.
     if (!parsed.record || typeof parsed.record !== "object") {

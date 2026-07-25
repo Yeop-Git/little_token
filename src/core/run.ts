@@ -68,10 +68,18 @@ export interface RunCombatState {
 
 export type RewardPhase = 'subject' | 'item' | 'verb'
 
+/** 보상 완료 화면을 새로고침해도 방금 고른 세 장을 복원하기 위한 최소 참조값. */
+export interface RewardPickRef {
+  kind: 'word' | 'item'
+  id: string
+  reinforce?: boolean
+}
+
 export interface PendingReward {
   day: number
   grade: number
-  phase: RewardPhase
+  phase: RewardPhase | 'complete'
+  picks: RewardPickRef[]
 }
 
 export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
@@ -125,10 +133,11 @@ function cloneWord(w: Word): Word {
 }
 
 // 반복강화 — 중복 단어를 먹으면 단계가 오르고 핵심 수치가 강해진다.
-const REINFORCE_STEP = { power: 2, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25 }
+const REINFORCE_STEP = { power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25 }
 export function reinforceWord(w: Word): void {
   w.level = (w.level ?? 1) + 1
   if (w.power != null) w.power += REINFORCE_STEP.power
+  if (w.statMult != null) w.statMult = Math.round((w.statMult + REINFORCE_STEP.statMult) * 100) / 100
   if (w.bonus != null) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
   if (w.effects?.guard) w.effects.guard += REINFORCE_STEP.guard
   if (w.effects?.heal) w.effects.heal += REINFORCE_STEP.heal

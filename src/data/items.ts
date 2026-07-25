@@ -66,7 +66,8 @@ export const ITEMS: Record<string, ItemDef> = {
 
 /**
  * 전설 아이템 — 스탯이 0이고 규칙만 바꾼다.
- * 확률에 맡기면 5분 시연에서 대부분 못 보므로 특정 날짜에 확정 지급한다(rewards.ts).
+ * 초반에는 잠겨 있고 층이 오를수록 등장 확률이 높아진다. 15층 사이클마다
+ * 한 번은 선택할 수 있도록 특정 후반 날짜에 확정 후보를 둔다(rewards.ts).
  */
 export const LEGENDARY_ITEMS: Record<string, ItemDef> = {
   echoChime: {
