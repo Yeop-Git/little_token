@@ -426,9 +426,20 @@ export class BattleView {
     this.enemyPool.set(key, pool)
   }
 
+  /**
+   * 적 변종은 별도의 3D/상세 캐릭터 매니페스트를 강제하지 않는다. 같은 벌레
+   * 스프라이트를 쓰는 변종은 원형의 검증된 2D 표현을 재사용해야 전투 HUD
+   * 렌더가 중간에 멈추지 않는다.
+   */
+  private visualForEnemy(enemy: EnemyInst): CharacterVisualDef {
+    const direct = CHARACTER_VISUALS[enemy.def.id as CharacterVisualDef['id']]
+    if (direct) return direct
+    return enemy.def.sprite === 'enemy_roach' ? CHARACTER_VISUALS.roach : CHARACTER_VISUALS.moth
+  }
+
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
     const key = enemy.def.id
-    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
+    const visual = this.visualForEnemy(enemy)
     const pool = this.enemyPool.get(key)
     let pooled: HTMLElement | undefined
     // 준비 중인 WebGL 인스턴스를 풀에서 성급히 꺼내면 빈 캔버스나 2D 초상이
@@ -484,7 +495,7 @@ export class BattleView {
     const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
       key: `enemy-${front}`,
       name: enemy!.def.name,
-      portrait: CHARACTER_VISUALS[enemy!.def.id as 'moth' | 'roach'].portrait2d,
+      portrait: this.visualForEnemy(enemy!).portrait2d,
       side: 'enemy',
       timing,
       note,
@@ -522,7 +533,7 @@ export class BattleView {
       entries.push({
         key: `enemy-${i}`,
         name: waiting.def.name,
-        portrait: CHARACTER_VISUALS[waiting.def.id as 'moth' | 'roach'].portrait2d,
+        portrait: this.visualForEnemy(waiting).portrait2d,
         side: 'enemy',
         timing: 'waiting',
         note: '레일 대기',
@@ -595,7 +606,7 @@ export class BattleView {
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
-    const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
+    const visual = this.visualForEnemy(e)
     const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor foe" data-i="${i}" data-character="${visual.id}"
