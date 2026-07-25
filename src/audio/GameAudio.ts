@@ -13,15 +13,16 @@ type EffectName =
   | 'resonanceSorrow'
   | 'resonancePleasure'
   | 'contextBonus'
-type BgmName = 'title' | 'battleStoryEatingBugs' | 'battlePaperPages' | 'battlePaperTaiko' | 'bossSaltSkater' | 'bossQueenBee' | 'bossElderSpider'
+type BgmName = 'title' | 'storyEaten' | 'battlePaperPages' | 'battlePaperTaiko' | 'battleHeroicMarch' | 'bossSaltSkater' | 'bossQueenBee' | 'bossElderSpider'
 const VOLUME_KEY = 'little-token-master-volume'
 const BGM_VOLUME = 0.16
 
 const BGM_TRACK: Record<BgmName, string> = {
   title: AUDIO.bgm,
-  battleStoryEatingBugs: AUDIO.battleStoryEatingBugs,
+  storyEaten: AUDIO.battleStoryEatingBugs,
   battlePaperPages: AUDIO.battlePaperPages,
   battlePaperTaiko: AUDIO.battlePaperTaiko,
+  battleHeroicMarch: AUDIO.battleHeroicMarch,
   bossSaltSkater: AUDIO.bossSaltSkaterBgm,
   bossQueenBee: AUDIO.bossQueenBeeBgm,
   bossElderSpider: AUDIO.bossElderSpiderBgm,
@@ -89,7 +90,7 @@ class GameAudioController {
       queenBee: 'bossQueenBee',
       elderSpider: 'bossElderSpider',
     }
-    const normalTracks: BgmName[] = ['battleStoryEatingBugs', 'battlePaperPages', 'battlePaperTaiko']
+    const normalTracks: BgmName[] = ['battlePaperPages', 'battlePaperTaiko', 'battleHeroicMarch']
     this.startBgm(bossTrack[bossId ?? ''] ?? normalTracks[(Math.max(1, day) - 1) % normalTracks.length])
   }
 
@@ -99,6 +100,10 @@ class GameAudioController {
     )
     const effect = resonant ? RESONANCE_EFFECT[resonant] : undefined
     if (effect) this.play(effect)
+  }
+
+  playDefeatBgm() {
+    this.startBgm('storyEaten')
   }
 
   installButtonSounds() {
@@ -120,6 +125,13 @@ class GameAudioController {
     }
     const source = this.effects[effect] ?? this.createEffect(effect)
     const voice = source.cloneNode() as HTMLAudioElement
+    if (effect === 'resonanceAnger') {
+      // 레퀴엠식 "빠밤"의 첫 두 화음만 남겨, 다음 문장 조립을 가리지 않게 한다.
+      window.setTimeout(() => {
+        voice.pause()
+        voice.currentTime = 0
+      }, 1250)
+    }
     if (effect === 'pencil') {
       if (this.pencilStopTimer != null) window.clearTimeout(this.pencilStopTimer)
       this.pencilVoice?.pause()

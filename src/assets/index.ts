@@ -78,6 +78,7 @@ import button from './audio/button.mp3'
 import battleStoryEatingBugs from './audio/battle-story-eating-bugs.mp3'
 import battlePaperPages from './audio/battle-paper-pages.mp3'
 import battlePaperTaiko from './audio/battle-paper-taiko.mp3'
+import battleHeroicMarch from './audio/battle-heroic-march.mp3'
 import bossSaltSkaterBgm from './audio/boss-salt-skater.mp3'
 import bossQueenBeeBgm from './audio/boss-queen-bee.mp3'
 import bossElderSpiderBgm from './audio/boss-elder-spider.mp3'
@@ -221,6 +222,7 @@ export const AUDIO = {
   battleStoryEatingBugs,
   battlePaperPages,
   battlePaperTaiko,
+  battleHeroicMarch,
   bossSaltSkaterBgm,
   bossQueenBeeBgm,
   bossElderSpiderBgm,
