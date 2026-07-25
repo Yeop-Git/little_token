@@ -5614,10 +5614,13 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   pointer-events: none;
 }
 
+/* 이동 길이는 달리는 동작(440ms)의 배수로 맞춘다.
+   예전엔 3.6초를 미끄러지는데 동작은 앞 0.44초뿐이라, 나머지 3.1초는 idle 자세로
+   얼음판을 타는 것처럼 보였다. 이제 1.32초 = 세 걸음 동안만 이동한다. */
 .scene.battle.is-enemies-arriving .actor.foe {
   transition:
-    transform 3.6s cubic-bezier(0.22, 0.6, 0.3, 1),
-    opacity 2.6s ease;
+    transform 1.32s cubic-bezier(0.28, 0.62, 0.36, 1),
+    opacity 0.8s ease;
   pointer-events: none;
 }
 

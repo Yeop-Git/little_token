@@ -3,6 +3,11 @@ import { MODELS, SPRITES, TOKEN_FACES } from '@/assets'
 export interface CharacterAnimationDef {
   idle: string
   attack: string
+  /**
+   * 걸어오는 동작. 전장에 등장할 때만 쓰고, 도착하면 idle로 돌아온다.
+   * GLB에는 진작 들어 있었는데 여기 연결이 없어서 안 쓰이고 있었다.
+   */
+  walk?: string
   /** 보스의 2/3 이하 체력 구간에서 사용하는 더 강한 공격 클립. */
   attack2?: string
   /** 보스의 1/3 이하 체력 구간에서 사용하는 가장 강한 공격 클립. */
@@ -63,6 +68,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.player,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       heal: 'Armature|heal|BaseLayer',
       // 새 GLB의 실제 클립명이 sheld로 저장되어 있어 의미상의 shield와 명시적으로 연결한다.
@@ -110,6 +116,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_termite,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       durationsMs: { attack: 440, defeat: 560 },
@@ -127,6 +134,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_moth,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       // 긴 원본 클립을 기존 타격·사망 연출 타이밍에 맞추되 포즈 전환은
@@ -150,6 +158,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_flea,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       durationsMs: { attack: 440, defeat: 560 },
@@ -167,6 +176,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_roach,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       durationsMs: {
@@ -188,6 +198,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_pillbug,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       durationsMs: { attack: 440, defeat: 560 },
@@ -205,6 +216,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.enemy_mosquito,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
       durationsMs: { attack: 440, defeat: 560 },
@@ -232,6 +244,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.boss_queen_bee,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack1|BaseLayer',
       attack2: 'Armature|attack2|BaseLayer',
       attack3: 'Armature|attack3|BaseLayer',

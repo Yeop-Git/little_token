@@ -4,8 +4,9 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
 
-export type BattleAnimation = 'idle' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
-type OneShotAnimation = Exclude<BattleAnimation, 'idle'>
+export type BattleAnimation = 'idle' | 'walk' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
+/** 한 번만 재생하고 끝나는 동작. idle과 walk는 계속 도는 클립이라 여기 안 든다. */
+type OneShotAnimation = Exclude<BattleAnimation, 'idle' | 'walk'>
 const MODEL_VIEW_HEIGHT = 3.6
 // 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
 const MODEL_FIT_HEIGHT = 2.78
@@ -985,13 +986,15 @@ outgoingLight *= uBattleExposure;`)
     if (animation !== 'idle') this.shell.dataset.modelLastAction = animation
     const next = this.actions[animation]
     if (!next) return 0
-    if (next === this.current && animation === 'idle') return 0
+    if (next === this.current && (animation === 'idle' || animation === 'walk')) return 0
 
     if (animation === 'heal' || animation === 'shield') this.startEffect(animation)
     else if (animation !== 'idle') this.stopEffect()
 
     next.reset().enabled = true
-    if (animation !== 'idle') {
+    // walk는 idle과 같이 계속 도는 클립이다 — 도착할 때까지 반복해야 걸어오는 것으로 보인다.
+    const loops = animation === 'idle' || animation === 'walk'
+    if (!loops) {
       const desiredMs = this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
       const playbackRate = this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1
       const desiredSeconds = desiredMs ? desiredMs / 1000 : next.getClip().duration / playbackRate
