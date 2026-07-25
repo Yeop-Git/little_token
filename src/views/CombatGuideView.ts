@@ -1,4 +1,5 @@
 import { EMOTION_ICON } from '@core/types'
+import { GUIDE_ART } from '@/assets'
 
 interface Opts {
   onBack: () => void
@@ -33,6 +34,10 @@ export class CombatGuideView {
             <h2>1. 문장 완성</h2>
             <p><b>첫 조각 → 이어 붙이기 → 마무리</b> 세 장을 고른다. 앞 카드의 출구 기호와 다음 카드의 입구 기호가 맞으면 연결 배율이 오른다.</p>
           </section>
+          <figure class="guide-figure">
+            <img src="${GUIDE_ART.combat}" alt="세 장의 카드 연결, 감정 공명, 방어막과 매직실드, 다중 대상 공격을 보여 주는 그림일기 전투 안내 그림">
+            <figcaption>카드를 이어 문장을 만들고, 감정을 맞춰 더 크게 공격한다.</figcaption>
+          </figure>
           <section class="guide-grid">
             <div class="guide-block">
               <h2>2. 감정 공명</h2>

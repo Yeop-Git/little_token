@@ -86,7 +86,7 @@ export class TitleView {
         <div class="title-darken" aria-hidden="true"></div>
       </main>`
 
-    this.root.querySelectorAll<HTMLButtonElement>('.tmenu-btn').forEach((btn) => {
+    this.root.querySelectorAll<HTMLButtonElement>('.tmenu-btn, .tmenu-link').forEach((btn) => {
       btn.addEventListener('click', () => this.onAct(btn.dataset.act ?? ''))
     })
 

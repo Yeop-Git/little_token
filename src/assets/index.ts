@@ -5,6 +5,7 @@
 
 import bg001 from './backgrounds/bg_001.webp'
 import backgroundDark from './backgrounds/backgroundDark.png'
+import combatGuide from './backgrounds/combat_guide.png'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import player001 from './sprites/player_001.webp'
@@ -54,6 +55,8 @@ export const TITLE = {
   bg: titleBg,
   logo: titleLogo,
 }
+
+export const GUIDE_ART = { combat: combatGuide }
 
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상
 export const TOKEN_FACES = {
