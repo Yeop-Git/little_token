@@ -90,20 +90,20 @@ export const EARLY_WORDS: Record<string, Word[]> = {
     },
     {
       "id": "gyeop",
-      "text": "겁먹은 나는",
+      "text": "이를 악문 나는",
       "slot": "subj",
       "tags": [
         "self",
-        "fear"
+        "grit"
       ],
-      "emotion": "sorrow",
+      "emotion": "anger",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "rare",
       "art": "1005",
       "note": "40% 확률로 배율 ×2.50",
-      "lore": "연필 쥔 손이 떨린다. 그래서 터질 땐 크게.",
+      "lore": "분한 마음을 꾹 삼키고 연필을 쥔다.",
       "variance": {
         "p": 0.4,
         "hi": 2.5,
@@ -112,11 +112,11 @@ export const EARLY_WORDS: Record<string, Word[]> = {
     },
     {
       "id": "naman",
-      "text": "나만은",
+      "text": "불끈 선 나는",
       "slot": "subj",
       "tags": [
         "self",
-        "solo"
+        "force"
       ],
       "emotion": "anger",
       "person": "first",
@@ -125,7 +125,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "rarity": "rare",
       "art": "1006",
       "note": "배율 ×1.60",
-      "lore": "아무도 없어도 나는 남는다."
+      "lore": "화난 발끝이 먼저 앞으로 나간다."
     },
     {
       "id": "dachin",
@@ -135,7 +135,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "hurt"
       ],
-      "emotion": "anger",
+      "emotion": "sorrow",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -169,10 +169,10 @@ export const EARLY_WORDS: Record<string, Word[]> = {
     },
     {
       "id": "dandanhi",
-      "text": "단단히",
+      "text": "다정히",
       "slot": "adv",
       "tags": [
-        "solid"
+        "warm"
       ],
       "emotion": "joy",
       "stat": "guard",
@@ -181,7 +181,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "rarity": "common",
       "art": "2002",
       "note": "배율 ×1.10 · 대성공 20%",
-      "lore": "이를 악문다."
+      "lore": "다친 줄을 살며시 쓸어 준다."
     },
     {
       "id": "saljjak",
@@ -206,7 +206,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "rush"
       ],
-      "emotion": "sorrow",
+      "emotion": "anger",
       "stat": "atk",
       "bonus": 0.4,
       "crit": 0.25,
@@ -220,7 +220,8 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "text": "꾹 참고",
       "slot": "adv",
       "tags": [
-        "grit"
+        "grit",
+        "solid"
       ],
       "emotion": "sorrow",
       "stat": "guard",
@@ -238,7 +239,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "tear"
       ],
-      "emotion": "joy",
+      "emotion": "sorrow",
       "stat": "heal",
       "bonus": 0.25,
       "crit": 0.55,
@@ -299,19 +300,19 @@ export const EARLY_WORDS: Record<string, Word[]> = {
     },
     {
       "id": "huryeo",
-      "text": "후려쳤다",
+      "text": "춤추듯 피했다",
       "slot": "verb",
       "tags": [
-        "atk",
-        "swing"
+        "grd",
+        "dance"
       ],
       "emotion": "pleasure",
-      "stat": "atk",
+      "stat": "guard",
       "statMult": 1.5,
-      "kind": "attack",
+      "kind": "guard",
       "rarity": "rare",
-      "note": "공격 ×1.5",
-      "lore": "크게 휘두른다."
+      "note": "방어 ×1.5",
+      "lore": "발끝이 먼저 종이 위를 미끄러진다."
     },
     {
       "id": "jikyeot",
@@ -331,19 +332,19 @@ export const EARLY_WORDS: Record<string, Word[]> = {
     },
     {
       "id": "pumeot",
-      "text": "품었다",
+      "text": "웅크렸다",
       "slot": "verb",
       "tags": [
-        "mend",
+        "grd",
         "warm"
       ],
-      "emotion": "pleasure",
-      "stat": "heal",
+      "emotion": "sorrow",
+      "stat": "guard",
       "statMult": 1.5,
-      "kind": "heal",
+      "kind": "guard",
       "rarity": "rare",
-      "note": "회복 ×1.5",
-      "lore": "가슴에 안는다."
+      "note": "방어 ×1.5",
+      "lore": "작아진 마음을 품고 숨을 고른다."
     }
   ]
 }
@@ -370,6 +371,201 @@ export const REWARD_WORDS: Word[] = [
       "hi": 3.2,
       "lo": 1
     }
+  },
+  {
+    "id": "utneun",
+    "text": "환하게 웃는 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "bright"
+    ],
+    "emotion": "joy",
+    "person": "first",
+    "bonus": 0.35,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.35",
+    "lore": "웃음이 빈 칸까지 환하게 번진다."
+  },
+  {
+    "id": "ttatteutan",
+    "text": "따뜻한 우리는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "both",
+      "warm"
+    ],
+    "emotion": "joy",
+    "person": "first",
+    "bonus": 0.25,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.25",
+    "lore": "서로의 공책을 꼭 잡아 준다."
+  },
+  {
+    "id": "andohan",
+    "text": "안도한 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "calm"
+    ],
+    "emotion": "joy",
+    "person": "first",
+    "bonus": 0.3,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.30",
+    "lore": "끝난 줄을 보며 가볍게 숨을 쉰다."
+  },
+  {
+    "id": "hwanan",
+    "text": "화가 난 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "anger"
+    ],
+    "emotion": "anger",
+    "person": "first",
+    "bonus": 0.5,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.50",
+    "lore": "구겨진 페이지를 펴며 씩씩거린다."
+  },
+  {
+    "id": "matseo",
+    "text": "맞서 선 우리는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "both",
+      "force"
+    ],
+    "emotion": "anger",
+    "person": "first",
+    "bonus": 0.4,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.40",
+    "lore": "같은 줄에서 벌레를 마주 본다."
+  },
+  {
+    "id": "kkeutkkaji",
+    "text": "끝까지 남은 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "grit"
+    ],
+    "emotion": "anger",
+    "person": "first",
+    "bonus": 0.45,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.45",
+    "lore": "마지막 한 줄까지 지우지 않는다."
+  },
+  {
+    "id": "ulmeogin",
+    "text": "울먹이는 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "tear"
+    ],
+    "emotion": "sorrow",
+    "person": "first",
+    "bonus": 0.25,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.25",
+    "lore": "젖은 글씨를 보며 잠깐 멈춘다."
+  },
+  {
+    "id": "hollo",
+    "text": "홀로 남은 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "solo"
+    ],
+    "emotion": "sorrow",
+    "person": "first",
+    "bonus": 0.35,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.35",
+    "lore": "빈자리에도 내 이야기는 남는다."
+  },
+  {
+    "id": "gogae",
+    "text": "고개 숙인 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "mind"
+    ],
+    "emotion": "sorrow",
+    "person": "first",
+    "bonus": 0.2,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.20",
+    "lore": "어제의 줄을 다시 읽어 본다."
+  },
+  {
+    "id": "deultteun",
+    "text": "들뜬 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "play"
+    ],
+    "emotion": "pleasure",
+    "person": "first",
+    "bonus": 0.35,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.35",
+    "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
+  },
+  {
+    "id": "sinnan",
+    "text": "신난 우리는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "both",
+      "play"
+    ],
+    "emotion": "pleasure",
+    "person": "first",
+    "bonus": 0.45,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.45",
+    "lore": "함께 쓰는 줄이 통통 튄다."
+  },
+  {
+    "id": "jangnan",
+    "text": "장난스런 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "play"
+    ],
+    "emotion": "pleasure",
+    "person": "first",
+    "bonus": 0.25,
+    "targetMode": "enemy",
+    "rarity": "rare",
+    "note": "배율 ×1.25",
+    "lore": "여백에 작은 낙서를 남긴다."
   },
   {
     "id": "jaeppalli",
@@ -403,11 +599,27 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "naedeonjyeot",
-    "text": "내던졌다",
+    "text": "고쳐냈다",
+    "slot": "verb",
+    "tags": [
+      "mend",
+      "play"
+    ],
+    "emotion": "pleasure",
+    "stat": "heal",
+    "statMult": 1.5,
+    "kind": "heal",
+    "rarity": "rare",
+    "note": "회복 ×1.5",
+    "lore": "삐뚤어진 줄도 신나게 다시 고친다."
+  },
+  {
+    "id": "ureojyeot",
+    "text": "흘려보냈다",
     "slot": "verb",
     "tags": [
       "atk",
-      "hurl"
+      "drift"
     ],
     "emotion": "sorrow",
     "stat": "atk",
@@ -415,23 +627,7 @@ export const REWARD_WORDS: Word[] = [
     "kind": "attack",
     "rarity": "rare",
     "note": "공격 ×1.5",
-    "lore": "있는 힘껏 내던진다."
-  },
-  {
-    "id": "ureojyeot",
-    "text": "웅크렸다",
-    "slot": "verb",
-    "tags": [
-      "grd",
-      "mend"
-    ],
-    "emotion": "sorrow",
-    "stat": "guard",
-    "statMult": 1.5,
-    "kind": "guard",
-    "rarity": "rare",
-    "note": "방어 ×1.5",
-    "lore": "몸을 말아 지킨다."
+    "lore": "젖은 잉크를 멀리 흘려보낸다."
   },
   {
     "id": "michin",
@@ -468,37 +664,154 @@ export const REWARD_WORDS: Word[] = [
     }
   },
   {
-    "id": "baksal",
-    "text": "박살냈다",
-    "slot": "verb",
+    "id": "hwanhage",
+    "text": "환하게",
+    "slot": "adv",
     "tags": [
-      "atk",
-      "smash"
+      "bright"
+    ],
+    "emotion": "joy",
+    "stat": "luck",
+    "bonus": 0.3,
+    "crit": 0.25,
+    "rarity": "rare",
+    "note": "배율 ×1.30 · 대성공 25%",
+    "lore": "빛나는 줄을 따라 손이 가벼워진다."
+  },
+  {
+    "id": "pogeunhage",
+    "text": "포근하게",
+    "slot": "adv",
+    "tags": [
+      "warm"
+    ],
+    "emotion": "joy",
+    "stat": "heal",
+    "bonus": 0.25,
+    "crit": 0.3,
+    "rarity": "rare",
+    "note": "배율 ×1.25 · 대성공 30%",
+    "lore": "종이를 덮듯 마음을 감싼다."
+  },
+  {
+    "id": "bangeopge",
+    "text": "반갑게",
+    "slot": "adv",
+    "tags": [
+      "greet"
+    ],
+    "emotion": "joy",
+    "stat": "luck",
+    "bonus": 0.2,
+    "crit": 0.3,
+    "rarity": "rare",
+    "note": "배율 ×1.20 · 대성공 30%",
+    "lore": "새 페이지를 만나듯 반긴다."
+  },
+  {
+    "id": "useumyeo",
+    "text": "웃으며",
+    "slot": "adv",
+    "tags": [
+      "smile"
+    ],
+    "emotion": "joy",
+    "stat": "heal",
+    "bonus": 0.2,
+    "crit": 0.3,
+    "rarity": "rare",
+    "note": "배율 ×1.20 · 대성공 30%",
+    "lore": "입꼬리를 올리고 다음 줄을 쓴다."
+  },
+  {
+    "id": "geochilge",
+    "text": "거칠게",
+    "slot": "adv",
+    "tags": [
+      "rage"
     ],
     "emotion": "anger",
     "stat": "atk",
-    "statMult": 2,
-    "kind": "attack",
-    "rarity": "epic",
-    "note": "공격 ×2",
-    "lore": "산산조각 낸다."
+    "bonus": 0.45,
+    "crit": 0.2,
+    "rarity": "rare",
+    "note": "배율 ×1.45 · 대성공 20%",
+    "lore": "연필심이 종이를 세게 긁는다."
   },
   {
-    "id": "hwissda",
-    "text": "휩쓸어버렸다",
-    "slot": "verb",
+    "id": "sseulsseulhi",
+    "text": "쓸쓸히",
+    "slot": "adv",
     "tags": [
-      "atk",
-      "wide"
+      "lone"
     ],
-    "emotion": "joy",
+    "emotion": "sorrow",
+    "stat": "guard",
+    "bonus": 0.3,
+    "crit": 0.25,
+    "rarity": "rare",
+    "note": "배율 ×1.30 · 대성공 25%",
+    "lore": "빈 여백이 유난히 넓어 보인다."
+  },
+  {
+    "id": "aesseo",
+    "text": "애써",
+    "slot": "adv",
+    "tags": [
+      "endure"
+    ],
+    "emotion": "sorrow",
+    "stat": "heal",
+    "bonus": 0.35,
+    "crit": 0.2,
+    "rarity": "rare",
+    "note": "배율 ×1.35 · 대성공 20%",
+    "lore": "흔들리는 손을 애써 붙잡는다."
+  },
+  {
+    "id": "sinnage",
+    "text": "신나게",
+    "slot": "adv",
+    "tags": [
+      "play"
+    ],
+    "emotion": "pleasure",
     "stat": "atk",
-    "statMult": 1.4,
-    "kind": "attack",
-    "aoe": "all",
-    "rarity": "epic",
-    "note": "공격 ×1.4 · 전체 적중",
-    "lore": "페이지 끝에서 끝까지 쓸어버린다."
+    "bonus": 0.4,
+    "crit": 0.25,
+    "rarity": "rare",
+    "note": "배율 ×1.40 · 대성공 25%",
+    "lore": "낙서가 통통 튀며 앞으로 달린다."
+  },
+  {
+    "id": "deulsseogimyeo",
+    "text": "들썩이며",
+    "slot": "adv",
+    "tags": [
+      "bounce"
+    ],
+    "emotion": "pleasure",
+    "stat": "luck",
+    "bonus": 0.3,
+    "crit": 0.3,
+    "rarity": "rare",
+    "note": "배율 ×1.30 · 대성공 30%",
+    "lore": "어깨가 들썩여 글씨도 춤춘다."
+  },
+  {
+    "id": "gyeongkwaehage",
+    "text": "경쾌하게",
+    "slot": "adv",
+    "tags": [
+      "lively"
+    ],
+    "emotion": "pleasure",
+    "stat": "heal",
+    "bonus": 0.25,
+    "crit": 0.3,
+    "rarity": "rare",
+    "note": "배율 ×1.25 · 대성공 30%",
+    "lore": "가벼운 박자에 상처도 풀린다."
   }
 ]
 
@@ -1055,13 +1368,13 @@ export const EARLY_COMBOS: Combo[] = [
   },
   {
     "id": "ec10",
-    "name": "겁먹고도 한 발",
+    "name": "이를 악물고 한 발",
     "need": [
-      "fear",
+      "grit",
       "solid"
     ],
     "mult": 1.5,
-    "flavor": "떨면서도 물러서지 않았다"
+    "flavor": "분한 마음을 삼키고도 물러서지 않았다"
   },
   {
     "id": "ec11",
@@ -1095,33 +1408,33 @@ export const EARLY_COMBOS: Combo[] = [
   },
   {
     "id": "ec14",
-    "name": "크게 휘둘러",
+    "name": "빙글 돌아",
     "need": [
-      "swing",
+      "dance",
       "force"
     ],
     "mult": 1.55,
-    "flavor": "온몸으로 후려친다"
+    "flavor": "발끝까지 힘을 실어 몸을 피한다"
   },
   {
     "id": "ec15",
-    "name": "폭주",
+    "name": "신난 불꽃",
     "need": [
-      "mad",
+      "play",
       "atk"
     ],
     "mult": 1.6,
-    "flavor": "눈이 뒤집힌다"
+    "flavor": "들뜬 손끝에서 불꽃이 튄다"
   },
   {
     "id": "ec16",
-    "name": "전력 강타",
+    "name": "다시 일어서기",
     "need": [
-      "force",
-      "smash"
+      "grit",
+      "mend"
     ],
     "mult": 1.7,
-    "flavor": "온 힘을 실은 일격"
+    "flavor": "아문 마음으로 다음 줄을 쓴다"
   }
 ]
 
