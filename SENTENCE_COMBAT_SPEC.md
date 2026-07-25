@@ -35,7 +35,7 @@
 ## 2. 아키텍처
 
 ```
-[BattleView]        손패 카드 · 드래그 발동 · 연출        src/views/BattleView.ts
+[BattleView]        손패 카드 · 클릭 발동 · 연출          src/views/BattleView.ts
    ↓ Selection
 [validator]         모순 판정 → 비활성 카드              src/core/validator.ts
    ↓

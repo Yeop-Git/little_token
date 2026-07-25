@@ -11,7 +11,6 @@ import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
-import { PASSIVES } from '@core/passives'
 import { makeEarlyTables } from '@data/earlyWords'
 import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
@@ -55,45 +54,108 @@ function grantItem(def: ItemDef) {
   else goBattle()
 }
 
-// 개발/검수용 씬 점퍼 + 아이템 서랍.
+// 좌상단 모서리를 다섯 번 누르면 열리는 개발용 채팅 패널.
 function mountDev(active: SceneName) {
-  const b = (id: SceneName, label: string) => `<button data-scene="${id}" class="${id === active ? 'on' : ''}">${label}</button>`
   const owned = new Set(run.player.items.map((it) => it.id))
-  const chip = (def: ItemDef) =>
-    `<button class="dev-item${def.passive ? ' is-passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
-      <b>${def.name}</b><span>${def.passive ? PASSIVES[def.passive].desc : '스탯 아이템'}</span>
-    </button>`
+  const shell = document.createElement('div')
+  shell.className = 'dev-chat-shell'
+  shell.innerHTML = `
+    <button class="dev-corner" type="button" aria-label="개발 패널 열기"></button>
+    <section class="dev-chat" aria-label="개발 채팅" aria-hidden="true">
+      <header><span>DEV CHAT</span><b>${active.toUpperCase()}</b><button type="button" data-close aria-label="닫기">×</button></header>
+      <div class="dev-chat-log" aria-live="polite"></div>
+      <div class="dev-chat-scenes">
+        ${(['title', 'intro', 'battle', 'reward', 'item'] as SceneName[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${scene}</button>`).join('')}
+      </div>
+      <form><span>›</span><input name="command" autocomplete="off" spellcheck="false" placeholder="help 또는 명령어 입력" aria-label="개발 명령어" /></form>
+    </section>`
 
-  const bar = document.createElement('div')
-  bar.className = 'dev-jump'
-  bar.innerHTML =
-    b('title', '타이틀') +
-    b('intro', '인트로') +
-    b('battle', '전투') +
-    b('reward', '보상') +
-    b('item', '감탄') +
-    `<button class="dev-grant" data-grant="1">아이템 ▾</button>
-     <div class="dev-drawer" id="devdrawer">
-       <div class="dev-drawer-head">디버그 지급 — 누르면 바로 획득</div>
-       <div class="dev-drawer-grid">${Object.values(ALL_ITEMS).map(chip).join('')}</div>
-     </div>`
+  const panel = shell.querySelector<HTMLElement>('.dev-chat')!
+  const log = shell.querySelector<HTMLElement>('.dev-chat-log')!
+  const input = shell.querySelector<HTMLInputElement>('input')!
+  const say = (text: string, kind: 'system' | 'user' = 'system') => {
+    const line = document.createElement('p')
+    const sender = document.createElement('span')
+    line.className = kind
+    sender.textContent = kind === 'user' ? 'YOU' : 'DEV'
+    line.append(sender, document.createTextNode(text))
+    log.append(line)
+    log.scrollTop = log.scrollHeight
+  }
+  const open = () => {
+    panel.classList.add('open')
+    panel.setAttribute('aria-hidden', 'false')
+    say('연결됨. help로 명령어를 확인하세요.')
+    window.setTimeout(() => input.focus(), 0)
+  }
+  const close = () => {
+    panel.classList.remove('open')
+    panel.setAttribute('aria-hidden', 'true')
+  }
+  const goScene = (scene: SceneName) => {
+    if (scene === 'title') goTitle()
+    else if (scene === 'intro') goBattle(true)
+    else if (scene === 'battle') goBattle()
+    else if (scene === 'reward') goReward()
+    else goItem(ITEMS.candle)
+  }
+  const execute = (raw: string) => {
+    const command = raw.trim()
+    if (!command) return
+    say(command, 'user')
+    const [verb = '', ...args] = command.split(/\s+/)
+    const lower = verb.toLowerCase().replace(/^\//, '')
+    if (lower === 'help' || lower === '도움') {
+      say('scene [title|intro|battle|reward|item] · item [이름 또는 id] · clear · close')
+      return
+    }
+    if (lower === 'clear') {
+      log.innerHTML = ''
+      return
+    }
+    if (lower === 'close' || lower === '닫기') {
+      close()
+      return
+    }
+    if (lower === 'scene' || lower === '씬') {
+      const scene = args[0]?.toLowerCase() as SceneName
+      if (['title', 'intro', 'battle', 'reward', 'item'].includes(scene)) goScene(scene)
+      else say('알 수 없는 씬입니다.')
+      return
+    }
+    if (lower === 'item' || lower === '아이템') {
+      const query = args.join(' ').toLowerCase()
+      const def = Object.values(ALL_ITEMS).find((item) => item.id.toLowerCase() === query || item.name.toLowerCase() === query)
+      if (!def) say('아이템을 찾지 못했습니다.')
+      else if (owned.has(def.id)) say(`${def.name}: 이미 보유 중입니다.`)
+      else grantItem(def)
+      return
+    }
+    if (['title', 'intro', 'battle', 'reward', 'item'].includes(lower)) {
+      goScene(lower as SceneName)
+      return
+    }
+    say('알 수 없는 명령입니다. help를 입력하세요.')
+  }
 
-  bar.querySelectorAll<HTMLElement>('button[data-scene]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      const s = btn.dataset.scene as SceneName
-      if (s === 'title') goTitle()
-      else if (s === 'intro') goBattle(true)
-      else if (s === 'battle') goBattle()
-      else if (s === 'reward') goReward()
-      else goItem(ITEMS.candle)
-    }),
+  let cornerClicks = 0
+  shell.querySelector<HTMLElement>('.dev-corner')!.addEventListener('click', () => {
+    cornerClicks++
+    if (cornerClicks < 5) return
+    cornerClicks = 0
+    if (panel.classList.contains('open')) close()
+    else open()
+  })
+  shell.querySelector<HTMLElement>('[data-close]')!.addEventListener('click', close)
+  shell.querySelectorAll<HTMLElement>('[data-scene]').forEach((button) =>
+    button.addEventListener('click', () => goScene(button.dataset.scene as SceneName)),
   )
-  const drawer = bar.querySelector<HTMLElement>('#devdrawer')!
-  bar.querySelector<HTMLElement>('[data-grant]')!.addEventListener('click', () => drawer.classList.toggle('open'))
-  bar.querySelectorAll<HTMLElement>('.dev-item').forEach((btn) =>
-    btn.addEventListener('click', () => grantItem(ALL_ITEMS[btn.dataset.item!])),
-  )
-  stage.appendChild(bar)
+  shell.querySelector('form')!.addEventListener('submit', (event) => {
+    event.preventDefault()
+    execute(input.value)
+    input.value = ''
+  })
+  stage.appendChild(shell)
 }
 
 function mountVersion() {
@@ -129,7 +191,7 @@ function goTitle() {
       goBattle(!saved)
     },
   })
-  mountVersion()
+  mountMeta('title')
 }
 
 function goBattle(intro = false) {

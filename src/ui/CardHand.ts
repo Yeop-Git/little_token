@@ -53,7 +53,6 @@ interface SlotHandState {
 interface CardHandOptions {
   handRoot: HTMLElement
   deckButton: HTMLButtonElement
-  dropZone: HTMLElement
   onConfirm: (word: Word) => void
   onPreview: (word: Word) => void
   onPreviewEnd: () => void
@@ -66,15 +65,6 @@ export class CardHand {
   private slotKey = ''
   private selectedId: string | null = null
   private drawingId: string | null = null
-  private draggingId: string | null = null
-  private suppressClickId: string | null = null
-  private dragGhost: HTMLElement | null = null
-  private dragOrigin = { x: 0, y: 0 }
-  private dragPointerOffset = { x: 0, y: 0 }
-  private dragDestination: { x: number; y: number } | null = null
-  private lastDragX = 0
-  private dragAccepted = false
-  private drawQueue = 0
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
@@ -82,34 +72,16 @@ export class CardHand {
   private epoch = 0
   private conflictOf: ConflictResolver = () => null
   private destroyed = false
-  private readonly battlefield: HTMLElement
   private readonly stage: HTMLElement
   private readonly wordZone: HTMLElement | null
 
   private readonly onResize = () => this.render()
-  private readonly onOutsidePointer = (event: PointerEvent) => {
-    if (!this.opts.handRoot.contains(event.target as Node) && !this.opts.dropZone.contains(event.target as Node)) {
-      this.select(null)
-    }
-  }
 
   constructor(private readonly opts: CardHandOptions) {
-    this.battlefield = this.opts.handRoot.closest('.scene')?.querySelector<HTMLElement>('.stage-area')
-      ?? this.opts.handRoot.parentElement!
     this.stage = this.opts.handRoot.closest<HTMLElement>('.stage') ?? this.opts.handRoot.parentElement!
     this.wordZone = this.opts.handRoot.closest<HTMLElement>('.word-zone')
-    this.opts.dropZone.setAttribute('aria-hidden', 'true')
-    this.opts.dropZone.setAttribute('tabindex', '-1')
-    this.opts.deckButton.addEventListener('click', () => this.enqueueDraw())
-    this.battlefield.addEventListener('dragover', (event) => {
-      if (!this.draggingId) return
-      event.preventDefault()
-      this.moveDragGhost(event.clientX, event.clientY)
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-    })
-    this.battlefield.addEventListener('drop', (event) => this.dropCard(event))
+    this.opts.deckButton.addEventListener('click', () => void this.drawOne())
     window.addEventListener('resize', this.onResize)
-    document.addEventListener('pointerdown', this.onOutsidePointer)
   }
 
   resetTurn() {
@@ -118,10 +90,6 @@ export class CardHand {
     this.slotKey = ''
     this.selectedId = null
     this.drawingId = null
-    this.draggingId = null
-    this.removeDragGhost()
-    this.clearDragFeedback()
-    this.drawQueue = 0
     this.processing = false
   }
 
@@ -129,7 +97,6 @@ export class CardHand {
     const changed = this.slotKey !== slotKey
     if (changed) {
       this.epoch++
-      this.drawQueue = 0
       this.drawingId = null
       this.processing = false
       this.slotKey = slotKey
@@ -161,10 +128,7 @@ export class CardHand {
   destroy() {
     this.destroyed = true
     this.epoch++
-    this.removeDragGhost()
-    this.clearDragFeedback()
     window.removeEventListener('resize', this.onResize)
-    document.removeEventListener('pointerdown', this.onOutsidePointer)
   }
 
   private makeInstance(slotKey: string, word: Word): CardInstance {
@@ -185,44 +149,32 @@ export class CardHand {
     return this.states.get(this.slotKey)
   }
 
-  private enqueueDraw() {
+  private async drawOne() {
     const state = this.currentState()
-    if (!state || this.destroyed) return
-    const reserved = state.hand.length + this.drawQueue
-    // 예산·손패 상한·남은 덱 중 하나라도 막히면 거절(흔들기).
-    if (this.drawsLeft <= 0 || reserved >= CARD_HAND_CONFIG.maxHand || this.drawQueue >= state.deck.length) {
+    if (!state || this.destroyed || this.processing) return
+    if (this.drawsLeft <= 0 || state.hand.length >= CARD_HAND_CONFIG.maxHand || state.deck.length === 0) {
       this.opts.deckButton.animate(
         [{ transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' }, { transform: 'translateX(0)' }],
         { duration: 180 },
       )
       return
     }
-    this.drawsLeft--
-    this.drawQueue++
-    this.updateDeckButton(state)
-    if (!this.processing) void this.processDrawQueue(this.epoch)
-  }
 
-  private async processDrawQueue(epoch: number) {
+    const epoch = this.epoch
+    const next = state.deck.shift()!
+    this.drawsLeft--
     this.processing = true
-    while (this.drawQueue > 0 && epoch === this.epoch && !this.destroyed) {
-      const state = this.currentState()
-      if (!state || state.hand.length >= CARD_HAND_CONFIG.maxHand || state.deck.length === 0) break
-      this.drawQueue--
-      const next = state.deck.shift()!
-      state.hand.push(next)
-      this.drawingId = next.instanceId
-      this.render()
+    state.hand.push(next)
+    this.drawingId = next.instanceId
+    this.render()
+    try {
       await this.animateDraw(next.instanceId, epoch)
-      if (epoch !== this.epoch) return
-      this.drawingId = null
-      this.render()
-    }
-    if (epoch === this.epoch) {
-      this.drawQueue = 0
-      this.processing = false
-      this.drawingId = null
-      this.render()
+    } finally {
+      if (epoch === this.epoch) {
+        this.processing = false
+        this.drawingId = null
+        this.render()
+      }
     }
   }
 
@@ -282,16 +234,8 @@ export class CardHand {
           if (selected) this.opts.onPreview(selected.word)
         } else this.opts.onPreviewEnd()
       })
-      // 클릭 = 바로 문장에 넣기. 드래그는 그대로 두되, 굳이 끌지 않아도 되게.
-      button.addEventListener('click', () => {
-        if (this.suppressClickId === card.instanceId) {
-          this.suppressClickId = null
-          return
-        }
-        this.commit(card, button)
-      })
-      button.addEventListener('dragstart', (event) => this.beginDrag(event, button, card))
-      button.addEventListener('dragend', () => this.endDrag(button))
+      // 카드는 클릭(키보드는 Enter/Space)으로만 발동한다.
+      button.addEventListener('click', () => this.commit(card, button))
       button.addEventListener('pointerdown', () => button.classList.add('pressing'))
       ;['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
         button.addEventListener(type, () => button.classList.remove('pressing'))
@@ -312,7 +256,6 @@ export class CardHand {
       }
     })
     this.updateDeckButton(state)
-    this.updateDropZone(state)
   }
 
   private cardHtml(card: CardInstance, index: number, count: number, availableWidth: number): string {
@@ -345,7 +288,6 @@ export class CardHand {
         </span>`
     return `<button class="word-card mood-${this.moodOf(card.word)}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
-      draggable="${!blocked && !isDrawing}"
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
@@ -374,23 +316,11 @@ export class CardHand {
     return '✦'
   }
 
-  private select(instanceId: string | null) {
-    this.selectedId = instanceId
-    const state = this.currentState()
-    const selected = state?.hand.find((item) => item.instanceId === instanceId)
-    if (selected) this.opts.onPreview(selected.word)
-    else this.opts.onPreviewEnd()
-    this.render()
-    if (instanceId) {
-      requestAnimationFrame(() => this.opts.handRoot.querySelector<HTMLElement>(`[data-instance-id="${instanceId}"]`)?.focus())
-    }
-  }
-
-  // 카드를 문장에 넣는 단 하나의 경로 — 클릭·키보드·드롭이 전부 여기로 모인다.
+  // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.
   // 게임 진행(onConfirm)은 즉시 일어나고, 카드가 부풀어 빨려드는 연출은 뒤에서 따로 논다.
   // 이렇게 분리해야 연출이 입력을 삼키지 않는다(예전엔 190ms 동안 클릭이 먹혔다).
   private commit(card: CardInstance, button?: HTMLButtonElement) {
-    if (this.destroyed || this.draggingId) return
+    if (this.destroyed) return
     // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
     if (button && !button.isConnected) return
     if (this.drawingId === card.instanceId) return
@@ -409,8 +339,8 @@ export class CardHand {
   private playCommitFx(button: HTMLButtonElement) {
     const ghost = this.spawnCommitGhost(button)
     // 좌표는 숫자로 계산한다(키프레임 안의 calc()는 브라우저가 거부할 수 있다).
-    const x = parseFloat(ghost.style.getPropertyValue('--drag-x')) || 0
-    const y = parseFloat(ghost.style.getPropertyValue('--drag-y')) || 0
+    const x = parseFloat(ghost.style.getPropertyValue('--commit-x')) || 0
+    const y = parseFloat(ghost.style.getPropertyValue('--commit-y')) || 0
     const at = (dy: number, s: number) => `translate3d(${x.toFixed(1)}px, ${(y + dy).toFixed(1)}px, 0) scale(${s})`
     ghost.animate(
       [
@@ -438,204 +368,27 @@ export class CardHand {
     const scaleX = stageRect.width / this.stage.offsetWidth || 1
     const scaleY = stageRect.height / this.stage.offsetHeight || 1
     const ghost = button.cloneNode(true) as HTMLElement
-    ghost.classList.remove('selected', 'dragging', 'committing')
-    ghost.classList.add('drag-ghost', 'commit-ghost')
+    ghost.classList.remove('selected', 'committing')
+    ghost.classList.add('commit-ghost')
     ghost.removeAttribute('data-instance-id')
-    ghost.removeAttribute('draggable')
     ghost.setAttribute('aria-hidden', 'true')
-    ghost.style.setProperty('--drag-x', `${((rect.left - stageRect.left) / scaleX).toFixed(1)}px`)
-    ghost.style.setProperty('--drag-y', `${((rect.top - stageRect.top) / scaleY).toFixed(1)}px`)
-    ghost.style.setProperty('--drag-tilt', '0deg')
+    ghost.style.setProperty('--commit-x', `${((rect.left - stageRect.left) / scaleX).toFixed(1)}px`)
+    ghost.style.setProperty('--commit-y', `${((rect.top - stageRect.top) / scaleY).toFixed(1)}px`)
     this.stage.append(ghost)
     return ghost
   }
 
-  private beginDrag(event: DragEvent, button: HTMLButtonElement, card: CardInstance) {
-    if (button.disabled || this.drawingId === card.instanceId) {
-      event.preventDefault()
-      return
-    }
-    this.draggingId = card.instanceId
-    this.dragAccepted = false
-    button.classList.remove('pressing')
-    this.selectedId = card.instanceId
-    this.opts.handRoot.querySelectorAll('.word-card.selected').forEach((item) => {
-      item.classList.remove('selected')
-      item.setAttribute('aria-pressed', 'false')
-    })
-    button.classList.add('selected')
-    this.createDragGhost(button, event.clientX, event.clientY)
-    this.battlefield.classList.add('card-drag-target')
-    this.wordZone?.classList.add('card-drag-origin')
-    this.wordZone?.querySelector('.slot-step .step.active')?.classList.add('receiving')
-    requestAnimationFrame(() => button.classList.add('dragging'))
-    button.setAttribute('aria-pressed', 'true')
-    this.opts.onPreview(card.word)
-    this.updateDropZone(this.currentState())
-    event.dataTransfer?.setData('text/plain', card.instanceId)
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
-      const transparentDragImage = document.createElement('canvas')
-      transparentDragImage.width = 1
-      transparentDragImage.height = 1
-      event.dataTransfer.setDragImage(transparentDragImage, 0, 0)
-    }
-  }
-
-  private endDrag(button: HTMLButtonElement) {
-    this.suppressClickId = button.dataset.instanceId ?? this.draggingId
-    this.draggingId = null
-    button.classList.remove('dragging')
-    this.clearDragFeedback()
-    void this.settleDragGhost(this.dragAccepted)
-    this.render()
-  }
-
-  private dropCard(event: DragEvent) {
-    event.preventDefault()
-    const instanceId = event.dataTransfer?.getData('text/plain') || this.draggingId
-    const state = this.currentState()
-    const card = state?.hand.find((item) => item.instanceId === instanceId)
-    if (!card || this.conflictOf(card.word)) return
-    this.dragAccepted = true
-    this.draggingId = null
-    // 드래그는 고스트(settleDragGhost)가 따로 있으니 커밋 연출은 붙이지 않는다.
-    this.commit(card)
-  }
-
-  private stagePoint(clientX: number, clientY: number) {
-    const rect = this.stage.getBoundingClientRect()
-    const scaleX = rect.width / this.stage.offsetWidth || 1
-    const scaleY = rect.height / this.stage.offsetHeight || 1
-    return {
-      x: (clientX - rect.left) / scaleX,
-      y: (clientY - rect.top) / scaleY,
-    }
-  }
-
-  private createDragGhost(button: HTMLButtonElement, clientX: number, clientY: number) {
-    this.removeDragGhost()
-    const stageRect = this.stage.getBoundingClientRect()
-    const buttonRect = button.getBoundingClientRect()
-    const scaleX = stageRect.width / this.stage.offsetWidth || 1
-    const scaleY = stageRect.height / this.stage.offsetHeight || 1
-    const pointer = this.stagePoint(clientX, clientY)
-    this.dragOrigin = {
-      x: (buttonRect.left - stageRect.left) / scaleX,
-      y: (buttonRect.top - stageRect.top) / scaleY,
-    }
-    this.dragPointerOffset = {
-      x: pointer.x - this.dragOrigin.x,
-      y: pointer.y - this.dragOrigin.y,
-    }
-    this.lastDragX = pointer.x
-    const activeStep = this.opts.handRoot.closest('.word-zone')?.querySelector<HTMLElement>('.slot-step .step.active')
-    if (activeStep) {
-      const rect = activeStep.getBoundingClientRect()
-      const target = this.stagePoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
-      this.dragDestination = {
-        x: target.x - CARD_HAND_CONFIG.cardWidth / 2,
-        y: target.y - CARD_HAND_CONFIG.cardHeight / 2,
-      }
-    } else {
-      this.dragDestination = null
-    }
-
-    const ghost = button.cloneNode(true) as HTMLElement
-    ghost.classList.remove('selected', 'dragging')
-    ghost.classList.add('drag-ghost')
-    ghost.removeAttribute('data-instance-id')
-    ghost.removeAttribute('draggable')
-    ghost.setAttribute('aria-hidden', 'true')
-    ghost.style.setProperty('--drag-x', `${this.dragOrigin.x}px`)
-    ghost.style.setProperty('--drag-y', `${this.dragOrigin.y}px`)
-    ghost.style.setProperty('--drag-tilt', '0deg')
-    this.stage.append(ghost)
-    this.dragGhost = ghost
-  }
-
-  private moveDragGhost(clientX: number, clientY: number) {
-    if (!this.dragGhost) return
-    const point = this.stagePoint(clientX, clientY)
-    const tilt = Math.max(-5, Math.min(5, (point.x - this.lastDragX) * 0.22))
-    this.lastDragX = point.x
-    this.dragGhost.style.setProperty('--drag-x', `${point.x - this.dragPointerOffset.x}px`)
-    this.dragGhost.style.setProperty('--drag-y', `${point.y - this.dragPointerOffset.y}px`)
-    this.dragGhost.style.setProperty('--drag-tilt', `${tilt.toFixed(2)}deg`)
-    this.battlefield.style.setProperty('--drag-cue-x', `${point.x}px`)
-    this.battlefield.style.setProperty('--drag-cue-y', `${point.y}px`)
-  }
-
-  private async settleDragGhost(accepted: boolean) {
-    const ghost = this.dragGhost
-    if (!ghost) return
-    this.dragGhost = null
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduced) {
-      ghost.remove()
-      return
-    }
-
-    const current = getComputedStyle(ghost).transform
-    let destination = `translate3d(${this.dragOrigin.x}px, ${this.dragOrigin.y}px, 0) scale(1)`
-    if (accepted && this.dragDestination) {
-      destination = `translate3d(${this.dragDestination.x}px, ${this.dragDestination.y}px, 0) scale(.28) rotate(-2deg)`
-    }
-
-    const animation = ghost.animate(
-      accepted
-        ? [
-            { transform: current, opacity: 0.98, filter: 'brightness(1)' },
-            { transform: destination, opacity: 0, filter: 'brightness(1.45)' },
-          ]
-        : [
-            { transform: current, opacity: 0.98 },
-            { transform: destination, opacity: 0.72 },
-          ],
-      {
-        duration: accepted ? 260 : 220,
-        easing: accepted ? 'cubic-bezier(.2,.82,.22,1)' : 'cubic-bezier(.34,1.2,.5,1)',
-      },
-    )
-    await animation.finished.catch(() => undefined)
-    ghost.remove()
-    this.dragAccepted = false
-  }
-
-  private removeDragGhost() {
-    this.dragGhost?.remove()
-    this.dragGhost = null
-  }
-
-  private clearDragFeedback() {
-    this.battlefield.classList.remove('card-drag-target')
-    this.battlefield.style.removeProperty('--drag-cue-x')
-    this.battlefield.style.removeProperty('--drag-cue-y')
-    this.wordZone?.classList.remove('card-drag-origin')
-    this.wordZone?.querySelector('.slot-step .step.receiving')?.classList.remove('receiving')
-  }
-
   // 덱 버튼 — 이번 스테이지에 남은 추가 드로우 횟수를 보여준다(덱 장수가 아니다).
   private updateDeckButton(state: SlotHandState) {
-    const pileLeft = Math.max(0, state.deck.length - this.drawQueue)
-    const full = state.hand.length + this.drawQueue >= CARD_HAND_CONFIG.maxHand
+    const pileLeft = state.deck.length
+    const full = state.hand.length >= CARD_HAND_CONFIG.maxHand
     const spent = this.drawsLeft <= 0
-    const disabled = full || spent || pileLeft === 0
+    const disabled = this.processing || full || spent || pileLeft === 0
     const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
     this.opts.deckButton.disabled = disabled
     this.opts.deckButton.setAttribute('aria-label', disabled ? `카드 뽑기 불가: ${note}` : `카드 뽑기, ${note}`)
-    this.opts.deckButton.innerHTML = `<span class="deck-stack" aria-hidden="true"><i></i><i></i><b>그림일기</b></span><span class="deck-copy"><b>카드 뽑기</b><small>${note}</small></span>`
-  }
-
-  private updateDropZone(state: SlotHandState | undefined) {
-    if (!state) return
-    const selected = state.hand.find((item) => item.instanceId === this.selectedId)
-    const disabled = !selected || !!this.conflictOf(selected.word) || this.drawingId === selected?.instanceId
-    this.opts.dropZone.classList.toggle('disabled', disabled)
-    this.opts.dropZone.setAttribute('aria-disabled', String(disabled))
-    this.opts.dropZone.innerHTML = selected
-      ? `<b>「${selected.word.text}」</b><span>여기에 놓아 발동</span>`
-      : '<b>문장에 넣기</b><span>카드를 여기로 끌어 놓기</span>'
+    const overlayNote = note.replace('회 남음', '회남음')
+    this.opts.deckButton.innerHTML = `<span class="deck-stack" aria-hidden="true"><i></i><i></i><span class="deck-overlay"><b>카드 뽑기</b><small>(${overlayNote})</small></span></span>`
   }
 
   private handleCardKey(event: KeyboardEvent, button: HTMLButtonElement, hand: CardInstance[]) {

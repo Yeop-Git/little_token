@@ -1,7 +1,7 @@
 /**
  * 전투 뷰 v4 — 배경 일러스트 위 쉐이더틱 UI.
  *  · 상단: 완성 중인 문장(체인) 그림자 강조
- *  · 중앙 하단: 단어를 가로 배치(효과별 무드 색). 전부 채우면 자동 완성(반짝 후 발동)
+ *  · 중앙 하단: 단어를 가로 배치하고 클릭으로 발동. 전부 채우면 자동 완성(반짝 후 발동)
  *  · 되돌리기: 하단 중앙 회색 연한 글자, 한 단계씩 되돌림
  *  · 좌측: 스탯표 + 단어장(전체 덱 오버레이) 버튼
  *  · 우측: 정보 패널 — "해당 단어"만의 효과/수치(누적 아님) 또는 가방 아이템 정보
@@ -205,13 +205,18 @@ export class BattleView {
         <div class="weather-wash"></div>
 
         <div class="hud-top">
-          <div class="hud-date" id="f-date"></div>
+          <div class="hud-left">
+            <div class="hud-weather"><span id="f-weather"></span></div>
+            <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
+          </div>
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
-          <div class="hud-weather"><span id="f-weather"></span></div>
-        </div>
-        <div class="top-badges">
-          <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
-          <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+          <div class="hud-status">
+            <div class="top-badges">
+              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+              <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+            </div>
+            <div class="effect-log" id="log"></div>
+          </div>
         </div>
 
         <div class="stage-area" id="pbox">
@@ -221,16 +226,11 @@ export class BattleView {
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
           <button class="backpack" id="bag" title="가방">${icon('backpack')}<span>가방</span></button>
-          <div class="effect-log" id="log"></div>
         </div>
 
         <div class="word-zone">
           <div class="pane-stack">
             <div class="pane words">
-              <div class="card-drop-zone disabled" id="card-drop-zone" role="button" tabindex="0"
-                aria-label="카드를 이곳으로 드래그해 단어 확정" aria-disabled="true">
-                <b>문장에 넣기</b><span>카드를 여기로 끌어 놓기</span>
-              </div>
               <div class="card-table" aria-label="단어 카드 선택 영역">
                 <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
                 <button class="draw-deck" id="draw-deck" type="button"></button>
@@ -266,7 +266,6 @@ export class BattleView {
     this.cardHand = new CardHand({
       handRoot: this.q('#card-hand'),
       deckButton: this.q<HTMLButtonElement>('#draw-deck'),
-      dropZone: this.q('#card-drop-zone'),
       onConfirm: (word) => {
         if (!this.busy && !this.over) this.pick(word.id)
       },
