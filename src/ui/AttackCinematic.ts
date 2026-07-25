@@ -75,27 +75,50 @@ export class AttackCinematic {
    * 겹치면 패널이 두 번 밀려 들어오는 꼴이 된다.
    */
   async play(cut: AttackCut): Promise<void> {
-    if (this.playing) return
+    if (!this.open(cut)) return
+    await this.wait(IN_MS + this.holdMsFor(cut))
+    await this.close()
+  }
+
+  /**
+   * 패널만 밀어 넣고 바로 반환한다 — 물러날 시점은 부르는 쪽이 정한다.
+   * 강타 연출은 프롬이 검을 들어올린 채 멈춘 동안 이 패널을 겹쳐 틀고,
+   * 내리치기 시작할 때 close()로 치운다. 컷과 칼질이 한 절정에 모여야 한다.
+   * @returns 이번에 열렸는지 — 이미 재생 중이면 false.
+   */
+  open(cut: AttackCut): boolean {
+    if (this.playing) return false
     this.playing = true
     const video = this.videos[cut]
     this.el.dataset.cut = cut
     video.currentTime = 0
-
-    // 컷 길이를 알면 끝자락을 남기고 끊는다. 아직 모르면 최대치로 잡는다.
-    const dur = Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : Infinity
-    const hold = Math.max(600, Math.min(HOLD_MS, dur - END_LEAD_MS))
-
+    this.el.classList.remove('is-out')
     this.el.classList.add('is-in')
     void video.play().catch(() => {}) // 못 틀어도 패널 자체는 지나가게 둔다
+    return true
+  }
 
-    await this.wait(IN_MS + hold)
-    // 한창일 때 멈춘 그림을 그대로 들고 물러난다.
-    video.pause()
+  /** 한창일 때 멈춘 그림을 그대로 들고 물러난다. 다 치워질 때까지 기다린다. */
+  async close(): Promise<void> {
+    if (!this.playing) return
+    for (const v of Object.values(this.videos)) v.pause()
     this.el.classList.remove('is-in')
     this.el.classList.add('is-out')
     await this.wait(OUT_MS)
     this.el.classList.remove('is-out')
     this.playing = false
+  }
+
+  /** 들어온 뒤 얼마나 붙들고 있을지. 컷이 짧으면 끝자락을 남기고 끊는다. */
+  holdMsFor(cut: AttackCut): number {
+    const video = this.videos[cut]
+    const dur = Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : Infinity
+    return Math.max(600, Math.min(HOLD_MS, dur - END_LEAD_MS))
+  }
+
+  /** 패널이 밀려 들어오는 데 걸리는 시간 — 강타 연출이 정점 정지 길이를 맞출 때 본다. */
+  get enterMs(): number {
+    return IN_MS
   }
 
   private wait(ms: number) {

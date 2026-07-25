@@ -17,6 +17,13 @@ export interface CharacterAnimationDef {
   victory1?: string
   victory2?: string
   defeat?: string
+  /**
+   * 강타 연출이 attack 클립을 쪼개 쓰는 마디 — 원본 클립 길이 대비 비율이다.
+   *   raise   손이 가장 높이 올라간 정점. 여기서 클립을 멈춰 세운다
+   *   impact  가장 빠르게 내려꽂는 순간. 히트스탑을 넣을 프레임
+   * 눈대중이 아니라 `npm run clip:beats`로 손 본의 월드 궤적을 실측해 뽑는다.
+   */
+  attackBeats?: { raise: number; impact: number }
   /** 원본 클립 길이와 무관하게 화면 연출에 맞출 단발 동작별 재생 시간. */
   durationsMs?: Partial<Record<'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
@@ -76,6 +83,8 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       victory1: 'Armature|victory1|BaseLayer',
       victory2: 'Armature|victory2|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
+      // 원본 attack 2417ms 중 손이 가장 높은 순간 667ms, 가장 빠르게 내려꽂는 순간 850ms.
+      attackBeats: { raise: 0.28, impact: 0.35 },
       durationsMs: {
         attack: 440,
         heal: 900,

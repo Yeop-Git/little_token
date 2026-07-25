@@ -352,6 +352,9 @@ class BattleCharacterModel {
       this.mixer = new THREE.AnimationMixer(model)
       this.actions = {
         idle: this.actionFor(gltf, 'idle'),
+        // walk가 여기 빠져 있으면 play('walk')가 조용히 아무것도 하지 않는다 —
+        // 매니페스트와 GLB에 클립이 다 있는데도 등장·레일 이동이 idle로 끌려오던 이유다.
+        walk: this.actionFor(gltf, 'walk'),
         attack: this.actionFor(gltf, 'attack'),
         attack2: this.actionFor(gltf, 'attack2'),
         attack3: this.actionFor(gltf, 'attack3'),
@@ -978,7 +981,16 @@ outgoingLight *= uBattleExposure;`)
     event.stopImmediatePropagation()
   }
 
-  play(animation: BattleAnimation): number {
+  /** 지금 요청되어 있는 동작. 진행 중인 연출을 덮지 않고 걷기를 끼워 넣을 때 본다. */
+  get animation(): BattleAnimation {
+    return this.requestedAnimation
+  }
+
+  /**
+   * @param stretchMs 이번 한 번만 쓸 재생 시간. 매니페스트의 기본 길이를 덮는다 —
+   *   강타 연출은 같은 attack 클립을 느리게 늘려 예비 동작을 읽히게 한다.
+   */
+  play(animation: BattleAnimation, stretchMs?: number): number {
     if (animation !== this.requestedAnimation) this.companionActionElapsed = 0
     this.requestedAnimation = animation
     this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
@@ -994,10 +1006,10 @@ outgoingLight *= uBattleExposure;`)
     next.reset().enabled = true
     // walk는 idle과 같이 계속 도는 클립이다 — 도착할 때까지 반복해야 걸어오는 것으로 보인다.
     const loops = animation === 'idle' || animation === 'walk'
+    const oneShotMs = stretchMs ?? this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
     if (!loops) {
-      const desiredMs = this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
       const playbackRate = this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1
-      const desiredSeconds = desiredMs ? desiredMs / 1000 : next.getClip().duration / playbackRate
+      const desiredSeconds = oneShotMs ? oneShotMs / 1000 : next.getClip().duration / playbackRate
       next.setLoop(THREE.LoopOnce, 1)
       next.clampWhenFinished = true
       next.setEffectiveTimeScale(next.getClip().duration / desiredSeconds)
@@ -1011,7 +1023,7 @@ outgoingLight *= uBattleExposure;`)
     this.current = next
     return animation === 'idle'
       ? 0
-      : (this.visual.animations?.durationsMs?.[animation as OneShotAnimation]
+      : (oneShotMs
         ?? next.getClip().duration * 1000 / (this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1))
   }
 
@@ -1186,11 +1198,23 @@ export function suspendCharacterModel(actor: HTMLElement) {
   if (shell) mountedModels.get(shell)?.setActive(false)
 }
 
-export function playCharacterAnimation(actor: HTMLElement | null, animation: BattleAnimation): number {
+export function playCharacterAnimation(
+  actor: HTMLElement | null,
+  animation: BattleAnimation,
+  stretchMs?: number,
+): number {
   if (!actor) return 0
   const shell = actor.querySelector<HTMLElement>('.model-shell')
   if (!shell) return 0
-  return mountedModels.get(shell)?.play(animation) ?? 0
+  return mountedModels.get(shell)?.play(animation, stretchMs) ?? 0
+}
+
+/** 지금 이 배우가 재생 중인 동작. 모델이 아직 없으면 null. */
+export function characterAnimationOf(actor: HTMLElement | null): BattleAnimation | null {
+  if (!actor) return null
+  const shell = actor.querySelector<HTMLElement>('.model-shell')
+  if (!shell) return null
+  return mountedModels.get(shell)?.animation ?? null
 }
 
 export function freezeCharacterAnimation(actor: HTMLElement | null, frozen: boolean) {

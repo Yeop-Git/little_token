@@ -61,7 +61,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
-import { AttackCinematic, attackCutFor, PUMP_RATIO } from '@/ui/AttackCinematic'
+import { AttackCinematic, attackCutFor, PUMP_MULT, PUMP_RATIO, type AttackCut } from '@/ui/AttackCinematic'
 import {
   currentFieldLight,
   currentFieldStage,
@@ -70,6 +70,7 @@ import {
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
+  characterAnimationOf,
   destroyCharacterModels,
   freezeCharacterAnimation,
   isCharacterModelReady,
@@ -115,11 +116,50 @@ const MAX_VISIBLE_ENEMIES = 3
 const ENEMY_ENTER_AFTER_SWAP_MS = 1500
 /** 첫 판처럼 갈릴 배경이 없으면 한 박자만 두고 바로 들어온다. */
 const ENEMY_ENTER_DELAY_MS = 260
-/** 프롬이 달려 들어오는 시간. 어택 클립(440ms)보다 살짝 길게 잡아 착지가 묻히지 않게 한다. */
-const PLAYER_ENTER_MS = 560
-/** 적이 걸어 들어오는 시간. style.css의 .is-enemies-arriving 이동 길이와 같아야 한다. */
-const FOE_WALK_MS = 1320
+/**
+ * 프롬·적이 걷는 시간. 이동 자체는 style.css가 맡는다(프롬 1초 / 적 2.1초).
+ * 여기에 딱 맞추지 않고 한 뼘씩 넘겨 둔다 — 도착하는 프레임에 동작이 끊기면
+ * 발이 땅에 닿는 순간 자세가 튀어서, 마지막 걸음이 잦아들며 idle로 넘어가게 한다.
+ */
+const PLAYER_ENTER_MS = 1120
+const FOE_WALK_MS = 2260
+/**
+ * 뒷줄이 한 칸 당겨올 때 걷는 시간. style.css의 .actor 이동 트랜지션(0.42s)과
+ * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
+ */
+const RAIL_ADVANCE_WALK_MS = 420
 const MAX_ACTION_ORDER_ENEMIES = 3
+
+// ── 강타 한 방의 마디 ──
+// 평소 attack은 440ms로 눌러 쓰지만(원본 2417ms) 강타에서만 늘려서 예비 동작을 보여 준다.
+// 늘린 길이 안에서 정점과 타격 프레임은 매니페스트의 attackBeats 비율로 잡는다.
+/** 강타에서 attack 클립을 늘려 쓸 길이. 정점까지 약 390ms, 정점에서 타격까지 약 100ms. */
+const HEAVY_SWING_MS = 1400
+/** 칼을 들어올린 채 멈춰 있는 시간. 이 위로 액션 컷이 밀려 들어온다. */
+const HEAVY_HOLD_MS = 460
+/**
+ * 컷이 물러난 뒤 한 박자 — 패널의 나가는 곡선이 뒤로 몰려 있어(cubic-bezier(0.7,0,0.84,0))
+ * 트랜지션이 끝나고도 화면 끝을 스치며 나간다. 실측으로 260ms 뒤에도 10%밖에 안 빠졌다.
+ */
+const HEAVY_PANEL_CLEAR_MS = 200
+/** 돌진을 타격보다 이만큼 먼저 출발시킨다 — 0.44초 돌진의 42%(185ms)가 타격에 겹치게. */
+const HEAVY_LUNGE_LEAD_MS = 80
+/**
+ * 섬광이 다 피어날 시간. 정지 화면에 붙들 그림이 없으면 정지가 공백으로 읽힌다.
+ * 48ms로 잡았을 때는 겉겹(링·프리즘·베인 사선)이 아직 10~20%밖에 안 자라서
+ * 정지 프레임에 흰 점 하나만 남았다(실측). 겹들이 절정에 닿는 지점까지 기다린다.
+ */
+const HEAVY_FLASH_BLOOM_MS = 120
+/** 강타의 정지는 평소보다 이만큼 더 길게 — 다만 120ms를 넘기면 멈춘 게 아니라 버벅인 것으로 읽힌다. */
+const HEAVY_HIT_STOP_BONUS_MS = 26
+/** 검기가 적 하나를 지나쳐 다음 적에게 닿기까지. style.css의 .slash-beam 이동과 같아야 한다. */
+const SLASH_BEAM_MS = 260
+/**
+ * 이 배율이면 연출이 최대로 화려해진다. 문턱은 PUMP_MULT(×2) —
+ * 그 사이를 0~1로 펴서 겹·크기·정지 길이·흔들림에 전부 태운다.
+ * 초반 덱으로도 ×5는 나오고 ×8은 잘 쌓은 후반 문장이라 여기를 천장으로 잡았다.
+ */
+const HEAVY_MULT_CEILING = 8
 const TOKEN_BOSS_LINES = [
   '어떡하지...! 도와줘, 프롬!!',
   '프롬, 저 녀석 너무 커...!',
@@ -213,6 +253,10 @@ export class BattleView {
   private pointerDown = false
   private phaseLabel = '주어 선택'
   private playerPreempting = false
+  /** 강타의 정점에서 칼을 붙들고 있는 상태 — 메아리는 이 예비 동작을 다시 밟지 않는다. */
+  private heavyHeld = false
+  /** 이번 강타에 실린 배율 — 이펙트의 화려함이 여기서 나온다. */
+  private heavyMult = 0
   private actionOrderSignature = ''
   private readonly enemyPool = new Map<string, HTMLElement[]>()
   /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
@@ -616,6 +660,10 @@ export class BattleView {
     el.getAnimations().forEach((animation) => animation.cancel())
     // 사망 애니메이션은 forwards라 dying/fast가 남으면 재사용한 적도 opacity 0이 된다.
     el.classList.remove(...TRANSIENT_ACTOR_CLASSES)
+    // 풀에 남은 자리 번호를 지운다 — 다음에 꺼내 쓸 적이 남의 자리에서
+    // 당겨온 것으로 오해해 등장하면서 걸어 버린다.
+    delete el.dataset.rank
+    delete el.dataset.walkUntil
     suspendCharacterModel(el)
     el.remove()
     if (!key) return
@@ -992,6 +1040,11 @@ export class BattleView {
     el.style.opacity = `${1 - depth * 0.58}`
     el.style.setProperty('--model-scale', `${1 - depth * st.railShrink}`)
     el.style.setProperty('--model-blur', `${depth * 1.5}px`)
+    // 앞줄이 쓰러져 자리가 한 칸 당겨지면 걸어서 옮긴다. 이 자리 이동은 CSS
+    // 트랜지션이라, 동작을 안 바꾸면 선 자세 그대로 얼음판을 타듯 끌려온다.
+    const previousRank = el.dataset.rank
+    el.dataset.rank = String(rank)
+    if (previousRank != null && rank < Number(previousRank)) this.walkFoeForward(el)
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
@@ -1019,6 +1072,24 @@ export class BattleView {
     }
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
+  }
+
+  /**
+   * 한 칸 당겨오는 동안만 walk를 끼워 넣고 도착하면 idle로 돌린다.
+   * 공격·사망 같은 동작 중이면 손대지 않는다 — 그쪽 연출이 중간에 끊긴다.
+   * 관통으로 여러 칸이 연달아 당겨질 때는 마지막 걸음의 도착 시각까지 계속 걷는다.
+   */
+  private walkFoeForward(foe: HTMLElement) {
+    const playing = characterAnimationOf(foe)
+    if (playing !== 'idle' && playing !== 'walk') return
+    const arriveAt = performance.now() + RAIL_ADVANCE_WALK_MS
+    foe.dataset.walkUntil = String(arriveAt)
+    playCharacterAnimation(foe, 'walk')
+    this.timers.push(window.setTimeout(() => {
+      if (Number(foe.dataset.walkUntil) !== arriveAt) return // 그 사이에 또 당겨졌다
+      delete foe.dataset.walkUntil
+      if (characterAnimationOf(foe) === 'walk') playCharacterAnimation(foe, 'idle')
+    }, RAIL_ADVANCE_WALK_MS))
   }
 
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
@@ -2201,19 +2272,24 @@ export class BattleView {
     // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
     this.setPhase('본인 캐릭터 행동')
 
-    // 액션 컷 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
+    // 강타 등급 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
     // 문턱은 판 크기 비율이라(encounterHp) 층이 올라도 희소성이 그대로 유지된다.
+    // pump는 정점 정지·히트스탑·타격점까지, wipe는 거기에 검기 관통까지 붙는다.
+    let heavy: AttackCut | null = null
     if (dealsDamage) {
       const alive = aliveIdx(this.state)
       const wipesAll =
         alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
-      const cut = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
-      if (cut) await this.attackCine?.play(cut)
+      heavy = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
+      this.heavyMult = heavy ? mult : 0
     }
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
     const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.aoe === 'all') >= 2
-    if (sweep) await this.slowmoWindup()
+    // 강타는 액션 컷을 칼질 안으로 끌어들인다 — 예전엔 패널이 먼저 다 지나간 다음에
+    // 휘둘러서 절정이 두 번으로 갈렸다. 강타가 아니면 예전 그대로 슬로우만 건다.
+    if (heavy) await this.heavyWindup(heavy)
+    else if (sweep) await this.slowmoWindup()
 
     // 실제 본행동 발동 + 꽂힘 연출
     const res = applyIntent(this.state, intent, mult, this.target)
@@ -2221,7 +2297,7 @@ export class BattleView {
       !hit.weak && this.state.enemies[hit.target]?.def.id === 'elderSpider',
     )
     this.releaseTally()
-    await this.strike(res, sweep)
+    await this.strike(res, sweep, heavy)
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
     if (res.summonsDispersed > 0) {
       await this.playSummonDispersal(this.target, res.summonsDispersed)
@@ -2235,7 +2311,9 @@ export class BattleView {
         (intent.penalties.length ? ` · 어긋남 ×${intent.coherence.toFixed(2)}` : ''),
       tally.total > 0 ? tally : undefined,
     )
-    this.renderActors()
+    // 검기가 뒷줄로 날아갈 판이면 여기서 레일을 당기지 않는다. 미리 당기면 다음 적이
+    // 이미 앞자리에 와 있어서, 검기가 출발점 위로 날아가는 꼴이 된다(실측으로 그랬다).
+    if (!(heavy && res.overflow > 0)) this.renderActors()
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
     let kills = res.killed.length
@@ -2244,12 +2322,12 @@ export class BattleView {
       return
     }
 
-    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
+    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy)
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
     // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
     if (resolved.outcome === 'crit' && hasPassive(this.player, 'echo') && !allDead(this.state)) {
-      kills += await this.echoStrike(intent, mult, sweep)
+      kills += await this.echoStrike(intent, mult, sweep, heavy)
     }
 
     // 맞대던 적이 죽었으면 새 최전방을 여기서 맞댄다 — 행동 순서 표시도 같은 상태를 읽는다.
@@ -2363,7 +2441,12 @@ export class BattleView {
    * 배율을 다시 굴리지 않으므로 대성공 ×1.5가 두 번 그대로 들어간다.
    * 반환값은 이번 재발동으로 늘어난 처치 수(오버킬 등급에 합산).
    */
-  private async echoStrike(intent: Intent, mult: number, sweep: boolean): Promise<number> {
+  private async echoStrike(
+    intent: Intent,
+    mult: number,
+    sweep: boolean,
+    heavy: AttackCut | null = null,
+  ): Promise<number> {
     // 살아 있는 적으로 조준을 옮긴다 — 원래 대상이 이미 쓰러졌을 수 있다.
     if (this.state.enemies[this.target]?.dead) this.target = aliveIdx(this.state)[0] ?? this.target
 
@@ -2375,7 +2458,9 @@ export class BattleView {
     await sleep(420)
 
     const res = applyIntent(this.state, intent, mult, this.target)
-    await this.strike(res, sweep)
+    // 메아리는 예비 동작을 다시 밟지 않는다 — 칼을 두 번 들어올리면 늘어진다.
+    // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
+    await this.strike(res, sweep, heavy)
     if (res.summonsDispersed > 0) {
       await this.playSummonDispersal(this.target, res.summonsDispersed)
       this.log(`메아리가 일벌 ${res.summonsDispersed}마리를 더 흩어 냈다.`)
@@ -2384,7 +2469,7 @@ export class BattleView {
     this.renderActors()
 
     let kills = res.killed.length
-    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep)
+    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy)
     return kills
   }
 
@@ -2410,20 +2495,35 @@ export class BattleView {
       killed: number[]
     },
     sweep = false,
+    heavy: AttackCut | null = null,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
     const attacking = res.hits.length > 0
-    if (attacking) {
+    if (heavy && attacking && this.heavyHeld) {
+      // 이미 칼을 들어올린 채 멈춰 있다. 돌진을 먼저 출발시켜 내리치는 프레임에
+      // 적과 딱 붙게 만든 뒤(0.44초 중 42%가 최대) 붙들고 있던 클립을 놓는다.
+      // heavy-lunge는 접점에서 한 박자 버티는 돌진이다 — 정지 프레임이 붙는 순간에
+      // 프롬이 이미 물러나고 있으면 "맞부딪친 채로 멈춘" 그림이 안 된다.
+      you.classList.add('lunge', 'heavy-lunge')
+      await sleep(HEAVY_LUNGE_LEAD_MS)
+      await sleep(this.heavyRelease(you))
+    } else if (attacking) {
       GameAudio.play('paperAttack')
       playCharacterAnimation(you, 'attack')
       you.classList.add('lunge')
+      await sleep(sweep ? 120 : 170)
+    } else {
+      await sleep(40)
     }
-    await sleep(attacking ? (sweep ? 120 : 170) : 40)
     // 꽂히는 순간 늘어졌던 시간이 풀리고 레일이 고속 모드로 전환된다.
+    // 강타는 여기서 확대를 풀지 않는다 — 프레임 정지가 풀리는 순간에 같이 터져야
+    // "팡" 하고 뒤로 물러나는 것으로 읽힌다. 여기서 풀면 정지 전에 이미 축소가 끝난다.
     if (sweep) {
-      this.endSlowmo()
+      if (!heavy) {
+        this.endSlowmo()
+        this.shakeStage(1)
+      }
       this.q('#actors').classList.add('rail-rush')
-      this.shakeStage(1)
     }
 
     for (const h of res.hits) {
@@ -2433,7 +2533,9 @@ export class BattleView {
       }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
       if (el) {
-        SquareBurst.playOn(el, 'damage', { spread: 120 })
+        // 강타는 접점의 섬광을 먼저 피운다 — 정지 프레임에 붙들 그림이 있어야 한다.
+        if (heavy) this.flashImpact(el, this.encounterHp > 0 ? h.dmg / this.encounterHp : 0)
+        SquareBurst.playOn(el, 'damage', { spread: heavy ? 190 : 120 })
         this.hitOne(el)
       }
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
@@ -2447,11 +2549,22 @@ export class BattleView {
       .filter((actor): actor is HTMLElement => !!actor)
     if (hitTargets.length > 0) {
       const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
-      await this.attackHitStop(you, stopMs)
+      if (heavy) {
+        // 섬광이 피어날 한 프레임을 준 다음 화면째로 끊는다. 정지가 풀리는 순간
+        // 흔들림과 함께 확대가 풀려서 "팡" 하고 뒤로 물러나는 것처럼 보인다.
+        // 배율이 높을수록 더 오래 끊고 더 세게 흔든다 — 잘 쌓은 문장의 몫이다.
+        const tier = this.heavyTier()
+        await sleep(HEAVY_FLASH_BLOOM_MS)
+        await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
+        this.shakeStage(1 + tier * 0.7)
+        this.endSlowmo()
+      } else {
+        await this.attackHitStop(you, stopMs)
+      }
     }
     if (attacking) {
       await sleep(250)
-      you.classList.remove('lunge')
+      you.classList.remove('lunge', 'heavy-lunge')
     }
     // 회복/자해 수치도 플레이어에게 각각 날아가 꽂힌다. 방어는 준비 단계에서 처리한다.
     if (res.selfDmg) await this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
@@ -2609,17 +2722,154 @@ export class BattleView {
   }
 
   // 쓸어담기 직전 — 화면이 타격점 쪽으로 빨려들며 시간이 늘어진다.
-  private async slowmoWindup() {
-    const actors = this.q('#actors')
-    const front = this.root.querySelector<HTMLElement>(`#actors .actor.foe[data-i="${this.target}"]`)
-    if (front) {
-      const box = this.q('#pbox')
-      const x = this.toStage(front.getBoundingClientRect()).x
-      const pct = `${((x / box.offsetWidth) * 100).toFixed(1)}%`
-      actors.style.setProperty('--zoom-x', pct)
-      this.q('.scene.battle').style.setProperty('--zoom-x', pct) // 씬 전체 딤도 같은 초점을 쓴다
+  /**
+   * 강타의 예비 동작 — 달라붙기 전에 화면이 조여들고, 프롬이 칼을 들어올린 채 멈춘다.
+   *
+   * attack 클립은 원본 2417ms인데 평소엔 440ms(5.5배속)로 눌러 쓴다. 스물여섯 프레임에
+   * 휘두르고 끝나니 예비 동작이 물리적으로 없다. 강타에서만 클립을 HEAVY_SWING_MS로
+   * 늘려 정점(매니페스트 attackBeats.raise)에서 mixer를 얼린다.
+   *
+   * 얼어 있는 동안 액션 컷 패널을 겹쳐 튼다 — 예전엔 이 패널이 다 지나간 **다음에**
+   * 휘둘러서, 가장 짜릿해야 할 두 순간이 서로 남처럼 떨어져 있었다.
+   */
+  private async heavyWindup(cut: AttackCut) {
+    if (this.motionOff()) {
+      // 연출을 끄면 확대·정지 없이 컷만 한 번 지나가고 곧바로 꽂힌다.
+      await this.attackCine?.play(cut)
+      return
     }
-    actors.classList.add('slowmo')
+    const you = this.q<HTMLElement>('.actor.you')
+    const scene = this.q('.scene.battle')
+    this.focusStageOn(this.target)
+    scene.classList.add('heavy-windup')
+    this.q('#actors').classList.add('slowmo')
+    scene.classList.add('slowmo-veil')
+
+    const swing = playCharacterAnimation(you, 'attack', HEAVY_SWING_MS) || HEAVY_SWING_MS
+    const beats = this.playerVisual.animations?.attackBeats
+    // 실측 마디가 없는 모델은 절반쯤을 정점으로 본다 — 대개 그 근처에서 팔이 가장 높다.
+    await sleep(swing * (beats?.raise ?? 0.45))
+    freezeCharacterAnimation(you, true)
+    you.classList.add('blade-charge')
+    this.heavyHeld = true
+    GameAudio.play('paperAttack')
+
+    // 칼을 든 채 멈춘 이 정지 화면 위로 컷이 밀려 들어온다.
+    const opened = this.attackCine?.open(cut) ?? false
+    await sleep(opened ? (this.attackCine?.enterMs ?? 0) + HEAVY_HOLD_MS : HEAVY_HOLD_MS)
+
+    // 내리치기 전에 패널을 확실히 치운다. 컷은 화면 왼쪽 900px을 채우는 풀 일러스트라
+    // 프롬이 서 있는 자리와 타격점을 통째로 덮는다 — 붙어 있는 채로 내리치면 가장
+    // 보여줘야 할 순간이 그림 뒤에서 벌어진다.
+    await this.attackCine?.close()
+    await sleep(HEAVY_PANEL_CLEAR_MS)
+  }
+
+  /**
+   * 정점에서 붙들고 있던 칼을 놓는다 — 컷이 빠져나간 빈 화면에 내리친다.
+   * 돌진(0.44초 중 42%가 최대)은 타격 프레임에 딱 붙도록 조금 먼저 출발시킨다.
+   * @returns 타격이 꽂히기까지 남은 시간(ms)
+   */
+  private heavyRelease(you: HTMLElement): number {
+    you.classList.remove('blade-charge')
+    this.heavyHeld = false
+    if (this.motionOff()) return 0
+    const beats = this.playerVisual.animations?.attackBeats
+    const raise = beats?.raise ?? 0.45
+    const impact = beats?.impact ?? 0.55
+    freezeCharacterAnimation(you, false)
+    return Math.max(60, HEAVY_SWING_MS * (impact - raise))
+  }
+
+  /**
+   * 칼이 몸에 닿는 지점에 터지는 섬광. 여태 타격점이라는 개념이 없어서 — 폭발은 적
+   * 엘리먼트 전체에, 숫자는 발밑에 떴다 — 몇이 꽂혔는지만 읽히고 어디를 맞았는지는
+   * 안 보였다. 돌진해 온 프롬과 적 실루엣이 만나는 앞면에 찍는다.
+   */
+  private flashImpact(foe: HTMLElement, power: number) {
+    if (this.motionOff()) return
+    const shell = foe.querySelector<HTMLElement>('.model-shell') ?? foe
+    const rect = shell.getBoundingClientRect()
+    const { x, y } = this.toStageCenter(rect)
+    const tier = this.heavyTier()
+    const step = this.heavyTierStep()
+    const flash = document.createElement('div')
+    flash.className = 'impact-flash'
+    flash.dataset.tier = String(step)
+    // 프롬이 오른쪽으로 파고들어 때리므로 접점은 적 실루엣의 왼쪽 앞면이다.
+    flash.style.left = `${x - rect.width * 0.22}px`
+    flash.style.top = `${y}px`
+    // 크기는 이 판을 얼마나 깎았는지(power)와 배율 등급(tier)을 함께 태운다.
+    flash.style.setProperty('--power', (0.9 + power * 0.7 + tier * 0.8).toFixed(2))
+    flash.style.setProperty('--tier', tier.toFixed(2))
+    // 겹: 흰 심 → 프리즘 굴절 → 충격 링 → 베인 사선. 등급이 오르면 교차 베기가 하나 더 붙는다.
+    flash.innerHTML = '<i class="if-core"></i><i class="if-prism"></i><i class="if-ring"></i>'
+      + '<i class="if-slash"></i>'
+      + (step >= 2 ? '<i class="if-slash alt"></i>' : '')
+      + (step >= 3 ? '<i class="if-ring late"></i><i class="if-shards"></i>' : '')
+    this.q('#pbox').appendChild(flash)
+    this.timers.push(window.setTimeout(() => flash.remove(), 900))
+  }
+
+  /**
+   * 씬 전체 프레임 정지. 지금까지의 히트스탑은 **때린 사람만** 얼렸다 — 맞는 적은
+   * 계속 흔들리고 숫자도 계속 떠올라서, 정지가 정지로 안 읽혔다. 3D 클립과 CSS
+   * 애니메이션을 같은 순간에 통째로 붙들어야 한 프레임이 끊긴 것처럼 보인다.
+   */
+  private async sceneHitStop(ms: number) {
+    if (this.motionOff()) return
+    const scene = this.q('.scene.battle')
+    const actors = [...this.root.querySelectorAll<HTMLElement>('.actor, .boss-token')]
+    // 방금 붙인 애니메이션은 첫 프레임을 커밋하기 전까지 pending이라 playState가 아직
+    // 'running'이 아니다. running만 잡으면 정작 붙들어야 할 타격점 섬광이 정지 중에도
+    // 계속 피어난다(실측으로 그랬다).
+    const running = scene.getAnimations({ subtree: true })
+      .filter((a) => a.playState === 'running' || a.pending)
+    actors.forEach((actor) => freezeCharacterAnimation(actor, true))
+    running.forEach((animation) => animation.pause())
+    scene.classList.add('hit-stop')
+    await sleep(ms)
+    scene.classList.remove('hit-stop')
+    running.forEach((animation) => {
+      if (animation.playState === 'paused') animation.play()
+    })
+    actors.forEach((actor) => freezeCharacterAnimation(actor, false))
+  }
+
+  /** 슬로우·딤·확대가 한 점을 보게 초점을 맞춘다. */
+  private focusStageOn(enemyIdx: number) {
+    const front = this.root.querySelector<HTMLElement>(`#actors .actor.foe[data-i="${enemyIdx}"]`)
+    if (!front) return
+    const box = this.q('#pbox')
+    const x = this.toStage(front.getBoundingClientRect()).x
+    const pct = `${((x / box.offsetWidth) * 100).toFixed(1)}%`
+    this.q('#actors').style.setProperty('--zoom-x', pct)
+    this.q('.scene.battle').style.setProperty('--zoom-x', pct) // 씬 전체 딤도 같은 초점을 쓴다
+  }
+
+  /**
+   * 배율이 곧 화려함이다 — 문턱(×2)에서 0, 압도적인 문장(×8)에서 1.
+   * 잘 쌓은 문장에 더 큰 연출을 돌려주는 게 이 게임의 보상 구조다.
+   */
+  private heavyTier(): number {
+    return Math.min(1, Math.max(0, (this.heavyMult - PUMP_MULT) / (HEAVY_MULT_CEILING - PUMP_MULT)))
+  }
+
+  /** 단계별로 갈리는 겹(프리즘 링·교차 베기·잔상 수)을 CSS에 넘길 등급. */
+  private heavyTierStep(): 1 | 2 | 3 {
+    const tier = this.heavyTier()
+    return tier >= 0.66 ? 3 : tier >= 0.33 ? 2 : 1
+  }
+
+  /** 저사양이나 동작 최소화 설정에서는 확대·정지·흔들림을 건너뛴다. */
+  private motionOff(): boolean {
+    return document.documentElement.dataset.graphics === 'low'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  }
+
+  private async slowmoWindup() {
+    this.focusStageOn(this.target)
+    this.q('#actors').classList.add('slowmo')
     // 딤은 씬 전체에 건다 — 무대(.stage-area)에 걸면 하단 350px에서 잘린다.
     this.q('.scene.battle').classList.add('slowmo-veil')
     await sleep(340)
@@ -2628,6 +2878,7 @@ export class BattleView {
   private endSlowmo() {
     this.q('#actors').classList.remove('slowmo')
     this.q('.scene.battle').classList.remove('slowmo-veil')
+    this.q('.scene.battle').classList.remove('heavy-windup')
   }
 
   // 불꽃 파편 — 지정 배우 근처에서 사방으로 튀며 사그라든다.
@@ -2686,22 +2937,32 @@ export class BattleView {
 
   // 오버플로우 — 초과 피해가 꼬챙이처럼 다음 적을 깊게 관통한다(빠바바박).
   // 한 마리씩 쓰러질수록 콤보가 오르고 불꽃·흔들림·배지가 점점 화려해진다.
+  // 강타에서는 그 초과 피해가 검기가 되어 레일을 훑고 뒤로 빠져나간다.
   // 반환값: 관통으로 추가 처치한 수(보상등급 오버킬 집계용).
-  private async resolveOverflow(overflow: number, sweep = false): Promise<number> {
+  private async resolveOverflow(overflow: number, sweep = false, heavy: AttackCut | null = null): Promise<number> {
     const actors = this.q('#actors')
     if (sweep) actors.classList.add('rail-rush')
     let combo = 1 // strike의 첫 처치가 콤보 1. 관통마다 +1.
     let killedCount = 0
+    // 검기는 방금 베인 자리에서 다음 적으로 이어져야 한 줄기로 읽힌다.
+    let lastHit = this.root.querySelector<HTMLElement>(`#actors .actor.foe[data-i="${this.target}"]`)
     while (overflow > 0 && !allDead(this.state)) {
-      this.renderActors() // 다음 적이 최전방으로 당겨온다
       const front = frontIdx(this.state)
       if (front < 0) break
       combo++
+      // 검기는 레일 **뒤로** 뻗는 한 줄기다. 그래서 당겨오기 전, 적이 아직 자기 자리에
+      // 서 있는 동안 그 자리로 날아가 꽂힌다. 예전 흐름(당겨온 뒤에 꽂기)에서는 궤적이
+      // 오히려 플레이어 쪽으로 되돌아와서 "뒤로 관통한다"가 거꾸로 읽혔다.
+      if (!heavy) this.renderActors() // 다음 적이 최전방으로 당겨온다
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${front}"]`)
       const ember = this.showEmber(overflow, combo)
+      const power = this.encounterHp > 0 ? overflow / this.encounterHp : 0
+      const beamMs = heavy ? this.launchSlashBeam(lastHit, el, power) : 0
       // 콤보가 오를수록 대기가 짧아져 관통이 빨라진다(빠·바·바·박).
       // 쓸어담기 중이면 아예 고속도로 — 죽고 당겨오고가 끊김 없이 이어진다.
-      await sleep(sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66))
+      // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
+      const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
+      await sleep(beamMs > 0 ? Math.max(140, beamMs) : gap)
       const e = this.state.enemies[front]
       const before = e.hp
       e.hp -= overflow
@@ -2709,27 +2970,99 @@ export class BattleView {
       ember.classList.add('stab')
       this.showComboBadge(combo)
       if (el) {
+        if (heavy) this.flashImpact(el, power)
         SquareBurst.playOn(el, 'damage', { spread: 120 + combo * 46 })
         this.hitOne(el)
         this.spawnSparks(el, 6 + combo * 4)
+        lastHit = el
       }
       this.shakeStage(Math.min(1, combo / 5))
       this.popAt(front, `${overflow}`, 'dmg big')
       this.timers.push(window.setTimeout(() => ember.remove(), 220))
+      // 맞은 다음에 레일이 움직인다 — 검기가 꽂힌 자리에서 쓰러지고, 그 뒤에 당겨온다.
+      if (heavy) this.renderActors()
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
       if (e.hp <= 0) {
         e.dead = true
         killedCount++
-        await this.playDeath(front, combo, sweep)
+        // 강타의 관통은 검기가 지나가는 한 줄기다 — 시체마다 560ms를 기다리면
+        // 그 줄기가 공중에서 멈춘 것처럼 끊긴다. 짧게 끝내고 다음으로 이어 준다.
+        await this.playDeath(front, combo, sweep || !!heavy)
         overflow = overflow - before
       } else {
         overflow = 0
-        await sleep(sweep ? 160 : 320)
+        await sleep(sweep || heavy ? 160 : 320)
       }
     }
     this.renderActors()
+    // 다 훑은 검기는 멈추지 않고 레일 뒤 화면 밖으로 주르륵 빠져나간다.
+    if (heavy) this.launchSlashBeam(lastHit, null, 0.4)
     if (sweep) this.timers.push(window.setTimeout(() => actors.classList.remove('rail-rush'), 460))
     return killedCount
+  }
+
+  /**
+   * 검기 — 초과 피해가 한 줄기 궤적이 되어 레일을 훑는다. 여태 초과 피해는 숫자가
+   * 360px 찔러 들어가는 그림이라, 몇이 넘쳤는지는 읽혀도 그게 뒷줄까지 뻗는 한 방이라는
+   * 건 안 보였다. 받을 적이 없으면 레일 뒤 화면 밖으로 빠져나간다.
+   *
+   * 조준은 목표의 **지금** 위치다 — 레일이 당겨오는 중이면 도착 지점과 조금 어긋나지만,
+   * 당겨오는 거리(약 245px)가 적 실루엣(280px)보다 짧아서 몸통 안에는 들어간다.
+   * @returns 날아가는 데 걸리는 시간(ms). 연출이 꺼져 있으면 0.
+   */
+  private launchSlashBeam(from: HTMLElement | null, to: HTMLElement | null, power: number): number {
+    if (this.motionOff()) return 0
+    const box = this.q('#pbox')
+    const stage = currentFieldStage()
+    // 앞줄이 쓰러진 자리 — 그 적의 엘리먼트는 이미 풀로 돌아갔을 수 있어서 자리로 잡는다.
+    // .actor는 오른쪽 기준으로 놓이므로 중심은 (무대 너비 - right - 실루엣 절반)이다.
+    const frontSlot = { x: box.offsetWidth - stage.railRight - 140, y: box.offsetHeight * 0.52 }
+    // 쓰러진 적은 풀로 돌아가 DOM에서 떨어진다. 떨어진 노드의 rect는 전부 0이라 그대로
+    // 쓰면 검기가 화면 좌상단 구석에서 출발한다(실측으로 그랬다).
+    const centerOf = (el: HTMLElement | null) => {
+      if (!el?.isConnected) return null
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0 ? this.toStageCenter(rect) : null
+    }
+    const start = centerOf(from) ?? frontSlot
+    // 다음 적에게 정확히 날아간다. 이때 그 적은 아직 당겨지지 않고 자기 자리(레일 뒤)에
+    // 서 있어야 한다 — 그래서 관통 전에는 레일을 다시 그리지 않는다(resolveOverflow 참고).
+    const aim = centerOf(to)
+    const end = aim ? { x: aim.x, y: aim.y - 18 } : { x: box.offsetWidth + 360, y: start.y - 30 }
+    const tier = this.heavyTier()
+    const step = this.heavyTierStep()
+    const beam = document.createElement('div')
+    beam.className = 'slash-beam'
+    beam.dataset.tier = String(step)
+    beam.style.left = `${start.x}px`
+    beam.style.top = `${start.y}px`
+    beam.style.setProperty('--power', (0.85 + power + tier * 0.6).toFixed(2))
+    beam.style.setProperty('--tier', tier.toFixed(2))
+    // 잔상 겹은 등급에 따라 늘어난다 — 날 하나만 날아가면 그냥 막대로 읽힌다.
+    // 잔상 → 번짐 → 구운 날 → 앞날 순으로 쌓아 뒤에서 앞으로 두꺼워진다.
+    const trails = 2 + Math.round(tier * 3)
+    beam.innerHTML = Array.from({ length: trails }, (_, i) =>
+      `<i class="sb-trail" style="--i:${i}"></i>`).join('')
+      + '<i class="sb-bloom"></i><i class="sb-blade"></i><i class="sb-edge"></i>'
+      + (step >= 2 ? '<i class="sb-spiral"></i>' : '')
+      + (step >= 3 ? '<i class="sb-motes"></i>' : '')
+    box.appendChild(beam)
+
+    // 배율이 높으면 조금 더 길게 뻗는다 — 궤적이 화면에 남는 시간도 등급이다.
+    const travel = Math.round((to ? SLASH_BEAM_MS : SLASH_BEAM_MS * 1.7) * (1 + tier * 0.25))
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    beam.animate(
+      [
+        // 첫 프레임부터 보이게 둔다 — 0에서 시작하면 발사 순간이 빈 화면으로 지나간다.
+        { transform: 'translate(-50%, -50%) scaleX(0.5)', opacity: 0.75 },
+        { transform: `translate(calc(-50% + ${(dx * 0.3).toFixed(0)}px), calc(-50% + ${(dy * 0.3).toFixed(0)}px)) scaleX(1.18)`, opacity: 1, offset: 0.28 },
+        { transform: `translate(calc(-50% + ${dx.toFixed(0)}px), calc(-50% + ${dy.toFixed(0)}px)) scaleX(0.92)`, opacity: to ? 1 : 0 },
+      ],
+      { duration: travel, easing: to ? 'cubic-bezier(0.2, 0.8, 0.3, 1)' : 'cubic-bezier(0.3, 0.5, 0.7, 1)', fill: 'forwards' },
+    )
+    this.timers.push(window.setTimeout(() => beam.remove(), travel + 200))
+    return travel
   }
 
   // 보상등급 배지 — 현재 등급 숫자와, 그 등급이면 노려볼 만한 희귀도의 색.

@@ -1735,11 +1735,13 @@ button {
   width: 176px;
   height: 22px;
 }
-/* 프롬 등장 — 왼쪽 밖에서 달려 들어와 자기 자리에 선다.
-   모델 쪽은 어택 클립(달려나가는 동작)이 함께 돌아가므로 여기서는 이동만 맡는다.
-   배경마다 서는 높이가 달라서, 이게 없으면 판이 바뀔 때마다 다른 자리에 순간이동한다. */
+/* 프롬 등장 — 왼쪽 밖에서 걸어 들어와 자기 자리에 선다. 모델 쪽은 walk 클립이
+   함께 돌아가므로 여기서는 이동만 맡는다.
+   배경마다 서는 높이가 달라서, 이게 없으면 판이 바뀔 때마다 다른 자리에 순간이동한다.
+   300px를 1초에 — 적과 같은 걸음 속도(약 300px/초)다. 둘이 같이 들어오는데
+   한쪽만 빠르면 같은 땅을 걷는 것으로 안 읽힌다. */
 .actor.you.is-entering {
-  animation: player-enter 0.56s cubic-bezier(0.16, 0.9, 0.28, 1) both;
+  animation: player-enter 1s cubic-bezier(0.3, 0.3, 0.85, 1) both;
 }
 @keyframes player-enter {
   from { transform: translateX(-300px); opacity: 0; }
@@ -1937,6 +1939,263 @@ button {
   animation: slowmo-veil 0.34s ease forwards;
 }
 @keyframes slowmo-veil { from { opacity: 0; } to { opacity: 1; } }
+/* ── 강타 한 방 ── 확대 → 칼 들어올린 채 정지 → 내리침 → 프레임 정지 → 팡 ── */
+
+/* 예비 동작 동안은 평소 슬로우보다 한 겹 더 조여든다. 확대가 풀리는 순간이
+   곧 "팡" 하고 뒤로 물러나는 순간이라, 여기서 더 당겨 놔야 대비가 산다. */
+.scene.battle.heavy-windup #actors {
+  transform: scale(1.11);
+  transition: transform 0.42s cubic-bezier(0.3, 0.8, 0.4, 1), filter 0.42s ease;
+}
+.scene.battle.heavy-windup.slowmo-veil::before {
+  background: radial-gradient(circle 540px at var(--zoom-x, 70%) 52%, transparent 20%, rgba(4, 2, 8, 0.8) 100%);
+}
+
+/* 칼을 들어올린 채 멈춘 동안 날에 힘이 모인다. 프롬은 실제로 검을 들고 있어서
+   ::before는 날을 따라 서는 빛, ::after는 그 위로 감기는 프리즘 굴절을 맡는다.
+   손 위치는 클립 실측값(정점에서 손 높이 1.257 / 모델 높이 2.78 ≈ 45%)에서 잡았다.
+   눈으로 보고 미세 조정할 값이라 좌표를 변수로 빼 둔다. */
+.actor.you.blade-charge {
+  --blade-x: 62%;
+  --blade-y: 30%;
+}
+.actor.you.blade-charge .model-shell::before,
+.actor.you.blade-charge .model-shell::after {
+  content: '';
+  position: absolute;
+  left: var(--blade-x);
+  top: var(--blade-y);
+  z-index: 4;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+/* 날 — 아래는 투명하고 끝으로 갈수록 하얗게 선다. */
+.actor.you.blade-charge .model-shell::before {
+  width: 17px;
+  height: 210px;
+  background: linear-gradient(to top, rgba(255, 240, 190, 0) 0%, rgba(255, 236, 170, 0.9) 34%,
+    #fff 74%, rgba(255, 255, 255, 0) 100%);
+  filter: drop-shadow(0 0 16px rgba(255, 206, 108, 0.95)) drop-shadow(0 0 40px rgba(255, 132, 44, 0.75));
+  animation: blade-edge 0.46s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+/* 감기는 굴절 — 카드 호일의 무지개가 날 주위를 한 바퀴 돈다. */
+.actor.you.blade-charge .model-shell::after {
+  width: 120px;
+  height: 240px;
+  margin-left: -52px;
+  border-radius: 50%;
+  background: conic-gradient(from 12deg at 50% 52%,
+    rgba(255, 148, 196, 0.5), rgba(255, 232, 150, 0.62), rgba(168, 255, 226, 0.44),
+    rgba(150, 206, 255, 0.46), rgba(205, 158, 255, 0.5), rgba(255, 148, 196, 0.5));
+  /* 카드 호일은 어두운 카드 위라 color-dodge가 맞지만, 여기는 햇빛 든 전장 위다 —
+     color-dodge를 걸면 청록으로 날아가 버린다(실측으로 그랬다). screen으로 얹는다. */
+  mix-blend-mode: screen;
+  filter: blur(11px) saturate(1.25);
+  animation: blade-halo 1.1s ease-in-out infinite alternate, blade-edge 0.46s ease-out both;
+}
+@keyframes blade-edge {
+  from { opacity: 0; transform: rotate(-34deg) scaleY(0.18); }
+  60% { opacity: 1; transform: rotate(-26deg) scaleY(1.1); }
+  to { opacity: 1; transform: rotate(-28deg) scaleY(1); }
+}
+@keyframes blade-halo {
+  from { opacity: 0.5; transform: rotate(-28deg) scale(0.94); }
+  to { opacity: 0.95; transform: rotate(-16deg) scale(1.06); }
+}
+
+/* 프레임 정지 — 정지 자체는 JS가 클립과 애니메이션을 붙들어서 만든다. 여기서는
+   그 한 프레임에 대비를 한 겹 올려, 멈춘 것이 버벅인 게 아니라 의도임을 알린다.
+   필터를 트리 전체에 걸면 무거우니 값싼 겹 하나만 덮는다. */
+.scene.battle.hit-stop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: rgba(255, 250, 235, 0.17);
+  mix-blend-mode: overlay;
+}
+
+/* ── 타격점과 검기 ──
+   전설 카드 호일의 언어를 그대로 가져온다 — 회전하는 conic 굴절 + color-dodge +
+   blur/saturate. 흰 심 하나만 번쩍이면 값싸 보이고, 이 게임에서 "귀한 것"은
+   프리즘으로 표현되어 왔다. 겹 수와 크기는 배율 등급(--tier, data-tier)이 정한다.
+
+   프리즘 색은 카드 호일과 같은 다섯 색을 돌려 쓴다. */
+.impact-flash,
+.slash-beam {
+  /* 카드 호일과 같은 다섯 색이되 밝은 전장 위에 얹을 것이라 한 단계 밝게 잡는다. */
+  --prism: rgba(255, 138, 198, 0.66), rgba(255, 230, 140, 0.7), rgba(150, 255, 226, 0.62),
+    rgba(140, 202, 255, 0.66), rgba(202, 152, 255, 0.66), rgba(255, 138, 198, 0.66);
+  position: absolute;
+  pointer-events: none;
+  z-index: 95;
+}
+.impact-flash > i,
+.slash-beam > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* 타격점 — 칼이 몸에 닿은 그 자리. 정지 프레임에 붙들릴 그림이라 48ms 안에 피어야 한다. */
+.impact-flash {
+  width: calc(84px * var(--power, 1));
+  height: calc(84px * var(--power, 1));
+  transform: translate(-50%, -50%);
+}
+/* 접점 — 미리 구운 폭발 스프라이트. 백열 심·프리즘 링·십자 섬광이 한 장에 들어 있어
+   런타임 blur가 필요 없다. 커지는 동안 필터를 다시 굽지 않으니 끊기지도 않는다. */
+.impact-flash .if-core {
+  inset: -22%;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20240%20240'%3E%3Cdefs%3E%3CradialGradient%20id='c'%3E%3Cstop%20offset='0'%20stop-color='%23ffffff'/%3E%3Cstop%20offset='0.28'%20stop-color='%23fff8e2'/%3E%3Cstop%20offset='0.52'%20stop-color='%23ffc669'%20stop-opacity='0.8'/%3E%3Cstop%20offset='0.76'%20stop-color='%23ff7d24'%20stop-opacity='0.38'/%3E%3Cstop%20offset='1'%20stop-color='%23ff6a12'%20stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient%20id='r'%20x1='0'%20x2='1'%20y1='0'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ff8ac6'%20stop-opacity='0.9'/%3E%3Cstop%20offset='0.3'%20stop-color='%23ca98ff'%20stop-opacity='0.85'/%3E%3Cstop%20offset='0.55'%20stop-color='%238ccaff'%20stop-opacity='0.9'/%3E%3Cstop%20offset='0.8'%20stop-color='%2396ffe2'%20stop-opacity='0.85'/%3E%3Cstop%20offset='1'%20stop-color='%23ffe68c'%20stop-opacity='0.9'/%3E%3C/linearGradient%3E%3Cfilter%20id='bl'%20x='-40%25'%20y='-40%25'%20width='180%25'%20height='180%25'%3E%3CfeGaussianBlur%20stdDeviation='9'/%3E%3C/filter%3E%3Cfilter%20id='bs'%20x='-30%25'%20y='-30%25'%20width='160%25'%20height='160%25'%3E%3CfeGaussianBlur%20stdDeviation='2.4'/%3E%3C/filter%3E%3C/defs%3E%3Ccircle%20cx='120'%20cy='120'%20r='98'%20fill='url(%23c)'%20filter='url(%23bl)'/%3E%3Ccircle%20cx='120'%20cy='120'%20r='64'%20fill='none'%20stroke='url(%23r)'%20stroke-width='12'%20opacity='0.9'%20filter='url(%23bs)'/%3E%3Ccircle%20cx='120'%20cy='120'%20r='36'%20fill='url(%23c)'/%3E%3C!--%20섬광%20십자는%20내리친%20궤적과%20같은%20사선으로%20눕힌다.%20수직으로%20세우면%20베인%20방향이%20안%20읽힌다.%20--%3E%3Cg%20filter='url(%23bs)'%20fill='%23ffffff'%20transform='rotate(-38%20120%20120)'%3E%3Cpolygon%20points='0,120%20108,131%20240,120%20108,109'/%3E%3Cpolygon%20points='120,26%20130,112%20120,214%20110,112'%20opacity='0.62'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat;
+  animation: if-core 0.32s cubic-bezier(0.12, 0.86, 0.28, 1) forwards;
+}
+/* 한 겹 더 크고 옅게 — 같은 이미지로 번짐만 키운다. */
+.impact-flash .if-prism {
+  inset: -70%;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20240%20240'%3E%3Cdefs%3E%3CradialGradient%20id='c'%3E%3Cstop%20offset='0'%20stop-color='%23ffffff'/%3E%3Cstop%20offset='0.28'%20stop-color='%23fff8e2'/%3E%3Cstop%20offset='0.52'%20stop-color='%23ffc669'%20stop-opacity='0.8'/%3E%3Cstop%20offset='0.76'%20stop-color='%23ff7d24'%20stop-opacity='0.38'/%3E%3Cstop%20offset='1'%20stop-color='%23ff6a12'%20stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient%20id='r'%20x1='0'%20x2='1'%20y1='0'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ff8ac6'%20stop-opacity='0.9'/%3E%3Cstop%20offset='0.3'%20stop-color='%23ca98ff'%20stop-opacity='0.85'/%3E%3Cstop%20offset='0.55'%20stop-color='%238ccaff'%20stop-opacity='0.9'/%3E%3Cstop%20offset='0.8'%20stop-color='%2396ffe2'%20stop-opacity='0.85'/%3E%3Cstop%20offset='1'%20stop-color='%23ffe68c'%20stop-opacity='0.9'/%3E%3C/linearGradient%3E%3Cfilter%20id='bl'%20x='-40%25'%20y='-40%25'%20width='180%25'%20height='180%25'%3E%3CfeGaussianBlur%20stdDeviation='9'/%3E%3C/filter%3E%3Cfilter%20id='bs'%20x='-30%25'%20y='-30%25'%20width='160%25'%20height='160%25'%3E%3CfeGaussianBlur%20stdDeviation='2.4'/%3E%3C/filter%3E%3C/defs%3E%3Ccircle%20cx='120'%20cy='120'%20r='98'%20fill='url(%23c)'%20filter='url(%23bl)'/%3E%3Ccircle%20cx='120'%20cy='120'%20r='64'%20fill='none'%20stroke='url(%23r)'%20stroke-width='12'%20opacity='0.9'%20filter='url(%23bs)'/%3E%3Ccircle%20cx='120'%20cy='120'%20r='36'%20fill='url(%23c)'/%3E%3C!--%20섬광%20십자는%20내리친%20궤적과%20같은%20사선으로%20눕힌다.%20수직으로%20세우면%20베인%20방향이%20안%20읽힌다.%20--%3E%3Cg%20filter='url(%23bs)'%20fill='%23ffffff'%20transform='rotate(-38%20120%20120)'%3E%3Cpolygon%20points='0,120%20108,131%20240,120%20108,109'/%3E%3Cpolygon%20points='120,26%20130,112%20120,214%20110,112'%20opacity='0.62'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat;
+  opacity: calc(0.4 + 0.35 * var(--tier, 0));
+  animation: if-prism 0.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+/* 충격 링 — 얇은 테두리 하나가 빠르게 커지며 사라진다. 크기의 기준점이 된다. */
+.impact-flash .if-ring {
+  border-radius: 50%;
+  border: calc(2px + 2px * var(--tier, 0)) solid rgba(255, 248, 226, 0.9);
+  box-shadow: 0 0 18px rgba(255, 214, 130, 0.7), inset 0 0 14px rgba(255, 226, 160, 0.5);
+  animation: if-ring 0.44s cubic-bezier(0.16, 0.9, 0.3, 1) forwards;
+}
+.impact-flash .if-ring.late { animation-delay: 0.1s; opacity: 0.7; }
+/* 베인 사선 — 내리친 궤적과 같은 방향. 등급이 오르면 교차로 한 번 더 그인다. */
+.impact-flash .if-slash {
+  inset: 42% -110%;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 246, 214, 0.5) 26%,
+    #fff 50%, rgba(255, 214, 140, 0.6) 70%, transparent 100%);
+  filter: blur(0.5px) drop-shadow(0 0 14px rgba(255, 226, 150, 0.9));
+  animation: if-slash 0.36s cubic-bezier(0.1, 0.9, 0.3, 1) forwards;
+}
+.impact-flash .if-slash.alt { animation-name: if-slash-alt; animation-delay: 0.05s; }
+/* 파편 — 최고 등급에서만. 접점에서 빛 조각이 사방으로 튄다. */
+.impact-flash .if-shards {
+  inset: -60%;
+  background:
+    radial-gradient(circle at 12% 24%, rgba(255, 255, 255, 0.95) 0 2px, transparent 4px),
+    radial-gradient(circle at 84% 18%, rgba(255, 226, 112, 0.95) 0 2px, transparent 4px),
+    radial-gradient(circle at 22% 82%, rgba(109, 255, 218, 0.9) 0 2px, transparent 4px),
+    radial-gradient(circle at 78% 76%, rgba(103, 188, 255, 0.9) 0 2px, transparent 4px),
+    radial-gradient(circle at 50% 8%, rgba(255, 103, 187, 0.9) 0 2px, transparent 4px);
+  animation: if-shards 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes if-core {
+  0% { opacity: 0.95; transform: scale(0.34); }
+  30% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes if-prism {
+  0% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  26% { opacity: 0.95; transform: scale(1.15) rotate(70deg); }
+  100% { opacity: 0; transform: scale(2.1) rotate(190deg); }
+}
+@keyframes if-ring {
+  0% { opacity: 0.9; transform: scale(0.28); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+@keyframes if-slash {
+  0% { opacity: 0; transform: rotate(-38deg) scaleX(0.3); }
+  24% { opacity: 1; transform: rotate(-38deg) scaleX(1.05); }
+  100% { opacity: 0; transform: rotate(-38deg) scaleX(1.3); }
+}
+@keyframes if-slash-alt {
+  0% { opacity: 0; transform: rotate(28deg) scaleX(0.3); }
+  24% { opacity: 0.9; transform: rotate(28deg) scaleX(0.9); }
+  100% { opacity: 0; transform: rotate(28deg) scaleX(1.2); }
+}
+@keyframes if-shards {
+  0% { opacity: 0; transform: scale(0.3); }
+  30% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+
+/* 검기 — 넘친 피해가 한 줄기가 되어 레일을 훑고 화면 밖으로 빠져나간다.
+   이동은 JS가 목표 좌표를 재서 WAAPI로 준다(거리가 매번 다르다). 겉모습은
+   흰 심 + 프리즘 굴절 + 뒤로 끌리는 잔상 여러 겹으로, 하얀 막대가 아니라
+   빛이 지나간 자리로 읽히게 만든다. */
+/* 날아가는 동안은 합성 비용이 곧 프레임이다. 움직이는 겹에는 blur()도, 혼합 모드도,
+   무한 회전도 걸지 않는다 — 큰 conic 그라디언트를 매 프레임 다시 굽는 순간 끊긴다
+   (실측으로 검기가 날아갈 때 눈에 보이게 끊겼다). 부드러움은 그라디언트 자체의
+   완만한 색 정지로 만들고, 애니메이션은 transform/opacity만 건드린다. */
+/* 날은 **미리 구운 스프라이트**다. SVG 안에서 feGaussianBlur까지 끝내 두면 브라우저가
+   디코딩할 때 한 번만 래스터화하고, 그 뒤로는 그냥 이미지라 매 프레임 비용이 없다.
+   그래서 런타임 filter/혼합 모드 없이도 두껍고 깊은 발광을 낼 수 있다 —
+   CSS 그라디언트로 흉내 내던 시절엔 얇고 창백했다.
+   굽는 원본은 scripts로 관리하지 않고 여기 데이터 URI로 박아 둔다(에셋 파이프라인을
+   타지 않아야 CSS 하나만 고쳐도 색을 바꿀 수 있다). */
+.slash-beam {
+  --blade: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20480%20160'%3E%3Cdefs%3E%3ClinearGradient%20id='b'%20x1='0'%20x2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ff8f34'%20stop-opacity='0'/%3E%3Cstop%20offset='0.2'%20stop-color='%23ffab4d'%20stop-opacity='0.5'/%3E%3Cstop%20offset='0.5'%20stop-color='%23ffe3a4'%20stop-opacity='0.9'/%3E%3Cstop%20offset='0.78'%20stop-color='%23ffffff'/%3E%3Cstop%20offset='0.94'%20stop-color='%23fff7e0'/%3E%3Cstop%20offset='1'%20stop-color='%23ffffff'%20stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient%20id='p'%20x1='0'%20x2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ff8ac6'%20stop-opacity='0'/%3E%3Cstop%20offset='0.26'%20stop-color='%23ca98ff'%20stop-opacity='0.8'/%3E%3Cstop%20offset='0.5'%20stop-color='%238ccaff'%20stop-opacity='0.85'/%3E%3Cstop%20offset='0.72'%20stop-color='%2396ffe2'%20stop-opacity='0.85'/%3E%3Cstop%20offset='0.9'%20stop-color='%23ffe68c'%20stop-opacity='0.9'/%3E%3Cstop%20offset='1'%20stop-color='%23ffffff'%20stop-opacity='0'/%3E%3C/linearGradient%3E%3Cfilter%20id='g'%20x='-25%25'%20y='-70%25'%20width='150%25'%20height='240%25'%3E%3CfeGaussianBlur%20stdDeviation='15'/%3E%3C/filter%3E%3Cfilter%20id='s'%20x='-12%25'%20y='-45%25'%20width='124%25'%20height='190%25'%3E%3CfeGaussianBlur%20stdDeviation='4'/%3E%3C/filter%3E%3Cfilter%20id='t'%20x='-10%25'%20y='-40%25'%20width='120%25'%20height='180%25'%3E%3CfeGaussianBlur%20stdDeviation='1.6'/%3E%3C/filter%3E%3C/defs%3E%3Cpath%20d='M8%20104%20C%20148%2020%20320%200%20472%2036%20C%20340%2066%20178%2098%208%20104%20Z'%20fill='%23ff6f14'%20opacity='0.85'%20filter='url(%23g)'/%3E%3Cpath%20d='M14%20100%20C%20150%2026%20320%206%20464%2038%20C%20340%2062%20180%2092%2014%20100%20Z'%20fill='url(%23b)'%20filter='url(%23s)'/%3E%3Cpath%20d='M20%2096%20C%20152%2030%20320%2010%20462%2038%20C%20330%2028%20168%2050%2020%2096%20Z'%20fill='url(%23p)'%20opacity='0.85'%20filter='url(%23t)'/%3E%3Cpath%20d='M66%2092%20C%20176%2046%20320%2028%20438%2044%20C%20332%2058%20192%2080%2066%2092%20Z'%20fill='%23ffffff'%20opacity='0.9'%20filter='url(%23t)'/%3E%3Cpath%20d='M116%2086%20C%20214%2056%20330%2042%20424%2050%20C%20330%2056%20222%2070%20116%2086%20Z'%20fill='%23ffffff'/%3E%3C/svg%3E");
+  --blade-tail: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20480%20160'%3E%3Cdefs%3E%3ClinearGradient%20id='a'%20x1='0'%20x2='1'%3E%3Cstop%20offset='0'%20stop-color='%23ffb968'%20stop-opacity='0'/%3E%3Cstop%20offset='0.4'%20stop-color='%23ffd88f'%20stop-opacity='0.62'/%3E%3Cstop%20offset='0.82'%20stop-color='%23fffaf0'%20stop-opacity='0.92'/%3E%3Cstop%20offset='1'%20stop-color='%23ffffff'%20stop-opacity='0'/%3E%3C/linearGradient%3E%3Cfilter%20id='f'%20x='-14%25'%20y='-50%25'%20width='128%25'%20height='200%25'%3E%3CfeGaussianBlur%20stdDeviation='7'/%3E%3C/filter%3E%3C/defs%3E%3Cpath%20d='M14%20100%20C%20150%2026%20320%206%20464%2038%20C%20340%2062%20180%2092%2014%20100%20Z'%20fill='url(%23a)'%20filter='url(%23f)'/%3E%3C/svg%3E");
+  /* 적 실루엣이 280px다 — 검기가 그보다 작으면 스쳤다는 느낌이 나서, 기본이 두 배쯤
+     되게 잡고 최고 등급에서는 레일을 통째로 가로지르게 둔다. */
+  width: calc(640px + 500px * var(--tier, 0));
+  height: calc(96px + 76px * var(--tier, 0));
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+  contain: layout style paint;
+}
+.slash-beam > i {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+/* 구운 날 그대로. 앞이 두껍고 뒤로 얇아지며, 백열 심과 프리즘 띠가 안에 들어 있다. */
+.slash-beam .sb-blade { background-image: var(--blade); }
+/* 한 겹 더 크게 깔아 번짐을 키운다 — 같은 이미지라 디코딩 비용은 한 번뿐이다. */
+.slash-beam .sb-bloom {
+  inset: -55% -12%;
+  background-image: var(--blade);
+  opacity: calc(0.34 + 0.3 * var(--tier, 0));
+}
+/* 잔상 — 옅게 구운 같은 실루엣을 뒤로 밀어 겹친다. --i가 커질수록 멀고 흐리다. */
+.slash-beam .sb-trail {
+  background-image: var(--blade-tail);
+  transform: translateX(calc(-13% * (var(--i) + 1))) scaleY(calc(1 - 0.13 * (var(--i) + 1)));
+  opacity: calc(0.5 - 0.07 * var(--i));
+}
+/* 앞날의 충격 — 뾰족한 앞머리에 흰 점 하나. 방향이 읽힌다. */
+.slash-beam .sb-edge {
+  inset: 26% -4% 26% 76%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255, 244, 214, 0.92) 34%,
+    rgba(255, 168, 72, 0.42) 62%, transparent 76%);
+}
+/* 나선 — 등급 2 이상. 날을 따라 빛이 비스듬히 감긴 결. 정적인 그림이라 공짜다. */
+.slash-beam .sb-spiral {
+  background-image: repeating-linear-gradient(74deg,
+    rgba(255, 255, 255, 0.5) 0 3px, transparent 3px 14px);
+  -webkit-mask-image: var(--blade-tail);
+  mask-image: var(--blade-tail);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  opacity: 0.75;
+}
+/* 흩날리는 빛가루 — 최고 등급에서만 궤적 위에 남는다. */
+.slash-beam .sb-motes {
+  inset: -40% -10%;
+  background:
+    radial-gradient(circle at 18% 38%, rgba(255, 255, 255, 0.9) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 46% 66%, rgba(255, 226, 112, 0.85) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 68% 30%, rgba(150, 255, 226, 0.8) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 86% 58%, rgba(202, 152, 255, 0.8) 0 1.5px, transparent 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actor.you.blade-charge .model-shell::after,
+  .impact-flash,
+  .slash-beam { animation: none; display: none; }
+  .scene.battle.heavy-windup #actors { transform: none; }
+}
+
 /* 꽂히는 순간 레일이 고속도로가 된다 — 뒷줄이 파바바박 당겨온다 */
 #actors.rail-rush .actor {
   transition: transform 0.14s ease, opacity 0.12s ease, right 0.17s cubic-bezier(0.2, 1.5, 0.35, 1);
@@ -2612,6 +2871,15 @@ button {
 @keyframes lunge-you {
   0% { transform: translateX(0); }
   42% { transform: translateX(300px) scale(1.06); }
+  100% { transform: translateX(0); }
+}
+/* 강타의 돌진 — 접점에서 한 박자 버틴다. 프레임 정지가 붙는 순간(타격 +120ms)에
+   이미 물러나고 있으면 "맞부딪친 채로 멈춘" 그림이 안 된다. */
+.actor.you.lunge.heavy-lunge { animation: lunge-you-heavy 0.66s cubic-bezier(0.45, 0, 0.3, 1); }
+@keyframes lunge-you-heavy {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(300px) scale(1.07); }
+  56% { transform: translateX(306px) scale(1.06); }
   100% { transform: translateX(0); }
 }
 .actor.foe.lunge { animation: lunge-foe 0.44s cubic-bezier(0.5, 0, 0.25, 1); z-index: 10; }
@@ -5614,12 +5882,15 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   pointer-events: none;
 }
 
-/* 이동 길이는 달리는 동작(440ms)의 배수로 맞춘다.
-   예전엔 3.6초를 미끄러지는데 동작은 앞 0.44초뿐이라, 나머지 3.1초는 idle 자세로
-   얼음판을 타는 것처럼 보였다. 이제 1.32초 = 세 걸음 동안만 이동한다. */
+/* 620px를 걸어 들어오는 속도 — walk 클립의 한 걸음 주기가 약 1초라, 이동을
+   2.1초로 늘려 걸음마다 대략 150px씩 나아가는 셈으로 맞췄다. 1.32초는 걸음보다
+   이동이 빨라서 발이 땅에서 겉돌았다.
+   가감속도 함께 고친다 — 예전 곡선은 앞에서 2.3배로 튀어나가고 뒤 40%는 거의
+   제자리라, 도착 직전에 걷는 동작만 남고 이동은 멈춘 것처럼 보였다. 이제 거의
+   일정한 속도로 걸어와 마지막 한 뼘에서만 자리에 잦아든다. */
 .scene.battle.is-enemies-arriving .actor.foe {
   transition:
-    transform 1.32s cubic-bezier(0.28, 0.62, 0.36, 1),
+    transform 2.1s cubic-bezier(0.3, 0.3, 0.85, 1),
     opacity 0.8s ease;
   pointer-events: none;
 }

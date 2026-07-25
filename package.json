@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.4.31",
+  "version": "0.5.4",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "scripts": {
@@ -9,13 +9,15 @@
     "predev": "npm run assets:optimize",
     "prebuild": "npm run assets:optimize",
     "data:generate": "tsx scripts/generate-sentence-data.ts",
+    "clip:beats": "tsx scripts/clip-beats.ts",
     "dev": "npm run data:generate && vite",
     "build": "npm run data:generate && npm run assets:check && tsc && vite build",
     "preview": "vite preview",
     "type-check": "npm run data:generate && tsc --noEmit",
     "sweep": "npm run data:generate && tsx src/tools/sweep.ts",
     "check": "npm run data:generate && tsx src/tools/check-tables.ts",
-    "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts"
+    "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts",
+    "sprites:bake": "node scripts/bake-slash-sprites.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
