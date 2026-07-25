@@ -34,22 +34,38 @@ export interface FieldLight {
   skyColor: number
   groundColor: number
   intensity: number
+  /**
+   * 화면에서의 광원 자리(0~1). 여기에 인공 태양 한 겹을 얹어 실제로 밝게 만든다.
+   * 3D 주광의 방향도 이 값에서 나왔으므로 빛이 오는 쪽과 화면이 밝은 쪽이 일치한다.
+   */
+  sunX: number
+  sunY: number
+  /** 태양 빛무리의 세기. 어두운 배경일수록 조금 더 준다. */
+  sunStrength: number
+  /**
+   * 3D 모델에 거는 색 보정의 목표 색상각(도).
+   * 모델 캔버스에 sepia로 색을 한 갈래로 모은 뒤 이 각도로 돌려 배경의 주광색에 맞춘다.
+   * sepia의 결과가 대략 40도라, 실제 회전량은 (이 값 - 40)이다.
+   * 배경 자체에는 거의 안 걸고 모델에만 세게 거는 이유는, 배경은 이미 그 색으로 그려져
+   * 있고 겉도는 건 렌더된 3D 쪽이기 때문이다.
+   */
+  gradeHue: number
 }
 
 /** FIELD_BACKGROUNDS와 같은 순서. 마지막은 보스방(bg006). */
 const LIGHTS: FieldLight[] = [
   // bg001 광원(0.41, 0.39) · 하이라이트 #e4d692 · 그늘 #262636 — 따뜻한 한낮
-  { key: [-1.9, 5.6, 5], keyColor: 0xe4d692, bounce: [2.6, -1.2, -2], bounceColor: 0x262636, skyColor: 0xffeec6, groundColor: 0x3a3a4e, intensity: 1.42 },
+  { key: [-1.9, 5.6, 5], keyColor: 0xe4d692, bounce: [2.6, -1.2, -2], bounceColor: 0x262636, skyColor: 0xffeec6, groundColor: 0x3a3a4e, intensity: 1.78, sunX: 0.405, sunY: 0.388, sunStrength: 0.5, gradeHue: 45 },
   // bg002 광원(0.47, 0.32) · 하이라이트 #c9d7ae · 그늘 #0c2843 — 서늘한 풀빛
-  { key: [-0.5, 6.4, 5], keyColor: 0xc9d7ae, bounce: [1.6, -1.4, -2], bounceColor: 0x0c2843, skyColor: 0xdcecc8, groundColor: 0x1c3c58, intensity: 1.3 },
+  { key: [-0.5, 6.4, 5], keyColor: 0xc9d7ae, bounce: [1.6, -1.4, -2], bounceColor: 0x0c2843, skyColor: 0xdcecc8, groundColor: 0x1c3c58, intensity: 1.66, sunX: 0.467, sunY: 0.319, sunStrength: 0.58, gradeHue: 79 },
   // bg003 광원(0.42, 0.27) · 하이라이트 #738c91 · 그늘 #101821 — 흐린 하늘
-  { key: [-1.7, 7.2, 4.4], keyColor: 0x9fb6ba, bounce: [2.2, -1, -2], bounceColor: 0x101821, skyColor: 0xa8bfc4, groundColor: 0x1a242e, intensity: 1.12 },
+  { key: [-1.7, 7.2, 4.4], keyColor: 0x9fb6ba, bounce: [2.2, -1, -2], bounceColor: 0x101821, skyColor: 0xa8bfc4, groundColor: 0x1a242e, intensity: 1.52, sunX: 0.422, sunY: 0.270, sunStrength: 0.66, gradeHue: 189 },
   // bg004 광원(0.42, 0.37) · 하이라이트 #c17ebe · 그늘 #110448 — 보랏빛 마법
-  { key: [-1.8, 5.8, 4.8], keyColor: 0xd79ad2, bounce: [2.4, -1.2, -2], bounceColor: 0x110448, skyColor: 0xc9a4dd, groundColor: 0x241452, intensity: 1.26 },
+  { key: [-1.8, 5.8, 4.8], keyColor: 0xd79ad2, bounce: [2.4, -1.2, -2], bounceColor: 0x110448, skyColor: 0xc9a4dd, groundColor: 0x241452, intensity: 1.62, sunX: 0.420, sunY: 0.372, sunStrength: 0.62, gradeHue: 305 },
   // bg005 광원(0.29, 0.31) · 하이라이트 #fbb258 · 그늘 #41282b — 노을. 가장 치우친 빛
-  { key: [-4.2, 6, 4.2], keyColor: 0xfbb258, bounce: [3.4, -1, -2], bounceColor: 0x41282b, skyColor: 0xffd39a, groundColor: 0x53373a, intensity: 1.5 },
+  { key: [-4.2, 6, 4.2], keyColor: 0xfbb258, bounce: [3.4, -1, -2], bounceColor: 0x41282b, skyColor: 0xffd39a, groundColor: 0x53373a, intensity: 1.86, sunX: 0.285, sunY: 0.306, sunStrength: 0.54, gradeHue: 30 },
   // bg006 광원(0.56, 0.69) · 하이라이트 #445f6f · 그늘 #091123 — 보스방. 아래에서 치는 차가운 빛
-  { key: [1.1, -2.4, 4.6], keyColor: 0x6f97ad, bounce: [-1.6, 3, -2], bounceColor: 0x091123, skyColor: 0x2a3a52, groundColor: 0x0d1626, intensity: 1.18 },
+  { key: [1.1, -2.4, 4.6], keyColor: 0x6f97ad, bounce: [-1.6, 3, -2], bounceColor: 0x091123, skyColor: 0x2a3a52, groundColor: 0x0d1626, intensity: 1.44, sunX: 0.555, sunY: 0.686, sunStrength: 0.6, gradeHue: 202 },
 ]
 
 /** 방금 쓴 배경 — 다음 판에서 이전 그림으로 깔리고, 뽑기에서는 제외된다. */
@@ -107,6 +123,11 @@ export interface FieldStage {
   railRise: number
   /** 뒷줄이 작아지는 정도. 길이 깊을수록 크게 준다. */
   railShrink: number
+  /**
+   * 프롬의 가로 자리(왼쪽 여백, 기본 290). 서는 쪽과 보는 방향은 절대 안 바뀌고,
+   * 그림의 구조물을 피해 한 뼘 정도만 밀고 당기는 용도다.
+   */
+  playerLeft?: number
 }
 
 /**
@@ -135,7 +156,7 @@ const STAGES: FieldStage[] = [
   // bg004 — 측정이 유일하게 못 미더운 배경이다. 경계 후보 1순위(0.611)는 세기가 약했고
   // 2순위 0.722를 골랐는데, 둘 다 실제 바닥이 아니라 중간 구조물의 경계였다.
   // 그 값으로 잡으니 눈에 확연히 떠 보여서 다른 배경과 같은 높이로 되돌렸다.
-  { bottom: -56, railRight: 840, railGap: 250, railRise: 22, railShrink: 0.3 },
+  { bottom: -112, railRight: 840, railGap: 250, railRise: 22, railShrink: 0.3, playerLeft: 230 },
   // bg005 바닥 0.867 — 가장 낮은 바닥. 그만큼 배우도 가장 아래로 내린다.
   // 빛이 왼쪽에서 오므로 적은 조금 더 오른쪽 깊이에 둔다.
   { bottom: -84, railRight: 920, railGap: 240, railRise: 26, railShrink: 0.3 },
