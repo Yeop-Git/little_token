@@ -3,15 +3,19 @@ import { MODELS, SPRITES, TOKEN_FACES } from '@/assets'
 export interface CharacterAnimationDef {
   idle: string
   attack: string
+  /** 보스의 2/3 이하 체력 구간에서 사용하는 더 강한 공격 클립. */
+  attack2?: string
+  /** 보스의 1/3 이하 체력 구간에서 사용하는 가장 강한 공격 클립. */
+  attack3?: string
   heal?: string
   shield?: string
   victory1?: string
   victory2?: string
   defeat?: string
   /** 원본 클립 길이와 무관하게 화면 연출에 맞출 단발 동작별 재생 시간. */
-  durationsMs?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  durationsMs?: Partial<Record<'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
-  playbackRates?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  playbackRates?: Partial<Record<'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** idle 끝 자세를 첫 자세로 점진 보간할 루프 연결 구간. */
   idleLoopBlendMs?: number
   /** 원본 idle 끝에서 잘라낼 불필요한 꼬리 구간. */
@@ -21,7 +25,7 @@ export interface CharacterAnimationDef {
 }
 
 export interface CharacterVisualDef {
-  id: 'player' | 'token' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'saltSkater' | 'queenBee' | 'elderSpider'
+  id: 'player' | 'token' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'mantis' | 'queenBee' | 'elderSpider'
   name: string
   model3d: string | null
   animations: CharacterAnimationDef | null
@@ -212,15 +216,15 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     title: '방어막 틈을 찌르는 침',
     description: '긴 침을 밀어 넣어 방어막 뒤의 체력을 바로 갉아 낸다.',
   },
-  saltSkater: {
-    id: 'saltSkater',
-    name: '소금쟁이',
+  mantis: {
+    id: 'mantis',
+    name: '사마귀',
     model3d: null,
     animations: null,
     modelYaw: BOSS_MODEL_YAW,
-    portrait2d: SPRITES.boss_salt_skater,
-    title: '먹물 웅덩이를 가르는 왕관',
-    description: '검은 물 위를 글씨처럼 스쳐 지나가며, 소금빛 종이 왕관으로 문장을 긁어낸다.',
+    portrait2d: SPRITES.boss_mantis,
+    title: '문장을 재단하는 큰낫',
+    description: '평범한 낫질 뒤 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청이며 빈틈을 보인다.',
   },
   queenBee: {
     id: 'queenBee',
@@ -229,8 +233,10 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     animations: {
       idle: 'Armature|idle|BaseLayer',
       attack: 'Armature|attack1|BaseLayer',
+      attack2: 'Armature|attack2|BaseLayer',
+      attack3: 'Armature|attack3|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
-      durationsMs: { attack: 440, defeat: 560 },
+      durationsMs: { attack: 440, attack2: 440, attack3: 440, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: BOSS_MODEL_YAW,

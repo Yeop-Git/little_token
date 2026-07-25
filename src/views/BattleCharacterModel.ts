@@ -3,32 +3,37 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 
-export type BattleAnimation = 'idle' | 'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
+export type BattleAnimation = 'idle' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 type OneShotAnimation = Exclude<BattleAnimation, 'idle'>
 const MODEL_VIEW_HEIGHT = 3.6
 // 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
 const MODEL_FIT_HEIGHT = 2.78
 const COMPANION_FIT_HEIGHT = 0.72
 const TRANSITION_SECONDS = 0.18
-const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'heal', 'shield'])
+const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'attack2', 'attack3', 'heal', 'shield'])
 
 type BattleWeather = 'sunny' | 'rain' | 'night'
 
 interface BattleAtmosphere {
   skyTint: THREE.Color
   groundTint: THREE.Color
+  skyLight: THREE.Color
+  keyLight: THREE.Color
   skyMix: number
   groundMix: number
+  skyLightIntensity: number
+  keyLightIntensity: number
+  keyLightPosition: readonly [number, number, number]
+  emissiveIntensity: number
   exposure: number
 }
 
 /**
- * 명암 경계가 너무 단순한 2단 셀 셰이딩 대신, 일러스트의 붓질처럼 면이
- * 네 단계로 나뉘게 한다. 자체광으로 원본 텍스처 색을 보존하므로 어두운
- * 면도 검게 꺼지지 않고 배경 안에서 재질 디테일만 드러난다.
+ * 배경 일러스트처럼 명부·중간톤·암부가 또렷한 3단 카툰 명암을 만든다.
+ * 가장 어두운 단계도 완전한 검정으로 닫지 않아 원본 텍스처 디테일은 남긴다.
  */
 function makeBattleToonGradient(): THREE.DataTexture {
-  const values = [118, 166, 211, 255]
+  const values = [92, 174, 255]
   const data = new Uint8Array(values.flatMap((value) => [value, value, value, 255]))
   const texture = new THREE.DataTexture(data, values.length, 1, THREE.RGBAFormat)
   texture.minFilter = THREE.NearestFilter
@@ -49,24 +54,47 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
   sunny: {
     skyTint: new THREE.Color(0xfff0c2),
     groundTint: new THREE.Color(0x53665f),
+    skyLight: new THREE.Color(0xffe9bd),
+    keyLight: new THREE.Color(0xffedc7),
     skyMix: 0.07,
     groundMix: 0.28,
-    exposure: 0.94,
+    skyLightIntensity: 0.56,
+    keyLightIntensity: 1.5,
+    keyLightPosition: [-3.5, 6, 5],
+    emissiveIntensity: 0.38,
+    exposure: 0.96,
   },
   rain: {
     skyTint: new THREE.Color(0xaec8d0),
     groundTint: new THREE.Color(0x405665),
+    skyLight: new THREE.Color(0xb8d0d7),
+    keyLight: new THREE.Color(0xd7e4df),
     skyMix: 0.12,
     groundMix: 0.36,
-    exposure: 0.88,
+    skyLightIntensity: 0.4,
+    keyLightIntensity: 1.02,
+    keyLightPosition: [-1.5, 7, 4],
+    emissiveIntensity: 0.28,
+    exposure: 0.84,
   },
   night: {
     skyTint: new THREE.Color(0x8998c4),
     groundTint: new THREE.Color(0x252c4d),
+    skyLight: new THREE.Color(0x7188bd),
+    keyLight: new THREE.Color(0xffc879),
     skyMix: 0.17,
     groundMix: 0.46,
-    exposure: 0.8,
+    skyLightIntensity: 0.24,
+    keyLightIntensity: 0.82,
+    keyLightPosition: [-4, 3.2, 5.5],
+    emissiveIntensity: 0.14,
+    exposure: 0.7,
   },
+}
+
+function battleWeatherOf(shell: HTMLElement): BattleWeather {
+  const weather = shell.closest<HTMLElement>('.battle')?.dataset.weather as BattleWeather | undefined
+  return weather && weather in BATTLE_ATMOSPHERES ? weather : 'sunny'
 }
 
 interface PlusParticle {
@@ -276,11 +304,16 @@ class BattleCharacterModel {
     // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
     this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
     this.camera.lookAt(0, visual.cameraTargetY ?? 1.45, 0)
-    // 그림자를 만들지 않는 공용 카툰 조명. 따뜻한 하늘빛과 청록 지면빛은
-    // 배경의 팔레트를 따라가고, 사선 주광은 모델의 접힌 면만 얕게 구분한다.
-    const skyFill = new THREE.HemisphereLight(0xffe9bd, 0x40555a, 0.58)
-    const keyLight = new THREE.DirectionalLight(0xffedc7, 1.42)
-    keyLight.position.set(-3.5, 6, 5)
+    // 배경의 날씨별 광원 배치를 그대로 캐릭터에 옮긴다. 배경 중앙의 밝은
+    // 하늘을 향한 좌상단 주광과 지면색 반사광만 사용하며 투영 그림자는 없다.
+    const atmosphere = BATTLE_ATMOSPHERES[battleWeatherOf(shell)]
+    const skyFill = new THREE.HemisphereLight(
+      atmosphere.skyLight,
+      atmosphere.groundTint,
+      atmosphere.skyLightIntensity,
+    )
+    const keyLight = new THREE.DirectionalLight(atmosphere.keyLight, atmosphere.keyLightIntensity)
+    keyLight.position.set(...atmosphere.keyLightPosition)
     keyLight.castShadow = false
     this.scene.add(skyFill, keyLight)
     this.scene.add(this.effects)
@@ -307,7 +340,7 @@ class BattleCharacterModel {
 
       const model = cloneSkeleton(gltf.scene)
       model.rotation.y = this.visual.modelYaw ?? 0
-      this.useUnlitMaterials(model)
+      this.useBattleMaterials(model)
       const fittedBounds = this.fitModel(model)
       this.scene.add(model)
       this.model = model
@@ -316,6 +349,8 @@ class BattleCharacterModel {
       this.actions = {
         idle: this.actionFor(gltf, 'idle'),
         attack: this.actionFor(gltf, 'attack'),
+        attack2: this.actionFor(gltf, 'attack2'),
+        attack3: this.actionFor(gltf, 'attack3'),
         heal: this.actionFor(gltf, 'heal'),
         shield: this.actionFor(gltf, 'shield'),
         victory1: this.actionFor(gltf, 'victory1'),
@@ -340,7 +375,7 @@ class BattleCharacterModel {
 
       const model = cloneSkeleton(gltf.scene)
       model.rotation.y = companion.modelYaw ?? 0
-      this.useUnlitMaterials(model)
+      this.useBattleMaterials(model)
       model.updateMatrixWorld(true)
       const bounds = new THREE.Box3().setFromObject(model)
       const size = bounds.getSize(new THREE.Vector3())
@@ -485,9 +520,9 @@ class BattleCharacterModel {
       : undefined
   }
 
-  private useUnlitMaterials(model: THREE.Object3D) {
-    const weather = this.shell.closest<HTMLElement>('.battle')?.dataset.weather as BattleWeather | undefined
-    const atmosphere = BATTLE_ATMOSPHERES[weather ?? 'sunny'] ?? BATTLE_ATMOSPHERES.sunny
+  private useBattleMaterials(model: THREE.Object3D) {
+    const weather = battleWeatherOf(this.shell)
+    const atmosphere = BATTLE_ATMOSPHERES[weather]
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const originals = Array.isArray(object.material) ? object.material : [object.material]
@@ -507,7 +542,7 @@ class BattleCharacterModel {
           bumpScale: source.bumpScale,
           emissive: baseColor,
           emissiveMap: source.map ?? null,
-          emissiveIntensity: 0.5,
+          emissiveIntensity: atmosphere.emissiveIntensity,
           gradientMap: BATTLE_TOON_GRADIENT,
           transparent: material.transparent,
           opacity: material.opacity,
@@ -516,7 +551,7 @@ class BattleCharacterModel {
           vertexColors: source.vertexColors,
           toneMapped: false,
         })
-        this.applyBattleAtmosphere(toon, atmosphere, weather ?? 'sunny')
+        this.applyBattleAtmosphere(toon, atmosphere, weather)
         return toon
       })
       object.material = Array.isArray(object.material) ? replacements : replacements[0]

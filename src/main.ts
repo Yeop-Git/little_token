@@ -19,7 +19,7 @@ import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
 import { startGrade } from '@core/grade'
-import { clearAllRecords, clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
+import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
 import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -128,7 +128,7 @@ function defeatPlayer() {
 // 디버그 스테이지 이동 — 날짜만 바꾼 뒤 일반 전투 진입 경로를 다시 타게 해
 // 적 편성, 필드, 배율과 저장 상태가 서로 어긋나지 않게 한다.
 const DEBUG_BOSSES = [
-  { day: 5, name: '소금쟁이' },
+  { day: 5, name: '사마귀' },
   { day: 10, name: '여왕벌' },
   { day: 15, name: '장로거미' },
 ] as const
@@ -354,8 +354,8 @@ function reset() {
 }
 
 function startNewRunBattle() {
-  const intro = !hasSeenTutorial()
-  void goBattle(intro, intro ? markTutorialSeen : undefined)
+  // 새 런의 첫 장면은 이전 튜토리얼 열람 기록과 무관하게 항상 다시 보여 준다.
+  void goBattle(true, markTutorialSeen)
 }
 
 function resetAllRecordsAndStart() {
@@ -384,7 +384,8 @@ function goTitle(withIntro = false) {
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
-      startNewRunBattle()
+      if (fresh || !saved) startNewRunBattle()
+      else void goBattle()
     },
   })
   current = title

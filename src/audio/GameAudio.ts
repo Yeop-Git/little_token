@@ -87,7 +87,7 @@ class GameAudioController {
 
   playBattleBgm(day: number, bossId?: string) {
     const bossTrack: Record<string, BgmName> = {
-      saltSkater: 'bossSaltSkater',
+      mantis: 'bossSaltSkater',
       queenBee: 'bossQueenBee',
       elderSpider: 'bossElderSpider',
     }
