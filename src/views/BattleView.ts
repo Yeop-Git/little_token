@@ -115,6 +115,10 @@ const MAX_VISIBLE_ENEMIES = 3
 const ENEMY_ENTER_AFTER_SWAP_MS = 1500
 /** 첫 판처럼 갈릴 배경이 없으면 한 박자만 두고 바로 들어온다. */
 const ENEMY_ENTER_DELAY_MS = 260
+/** 프롬이 달려 들어오는 시간. 어택 클립(440ms)보다 살짝 길게 잡아 착지가 묻히지 않게 한다. */
+const PLAYER_ENTER_MS = 560
+/** 적이 한 마리씩 걸음을 떼는 시차. 동시에 움직이면 한 덩어리로 몰려오는 것처럼 보인다. */
+const FOE_ENTER_STAGGER_MS = 220
 const MAX_ACTION_ORDER_ENEMIES = 3
 const TOKEN_BOSS_LINES = [
   '어떡하지...! 도와줘, 프롬!!',
@@ -275,6 +279,23 @@ export class BattleView {
     // 배경이 바뀌는 판에서만 와이프를 기다린다. 첫 판은 갈릴 배경이 없으니 바로 들어온다.
     const wait = this.bg.prev ? ENEMY_ENTER_AFTER_SWAP_MS : ENEMY_ENTER_DELAY_MS
     this.timers.push(window.setTimeout(() => this.releaseEnemies(scene), wait))
+    this.timers.push(window.setTimeout(() => this.enterPlayer(), wait))
+  }
+
+  /**
+   * 프롬도 자기 자리로 들어온다 — 배경마다 서는 높이가 달라서, 가만히 있으면
+   * 판이 바뀔 때마다 다른 자리에 순간이동해 있는 꼴이 된다.
+   *
+   * 걷기 클립은 없지만 **어택 클립 앞부분이 달려나가는 동작**이라 그걸 그대로 쓴다.
+   * 끝나면 알아서 idle로 돌아오므로(RETURN_TO_IDLE) 따로 끊을 필요도 없다.
+   * 달려 들어와 한 번 휘두르고 자세를 잡는 셈이라 전투 시작으로도 읽힌다.
+   */
+  private enterPlayer() {
+    const you = this.root.querySelector<HTMLElement>('.actor.you')
+    if (!you) return
+    you.classList.add('is-entering')
+    playCharacterAnimation(you, 'attack')
+    this.timers.push(window.setTimeout(() => you.classList.remove('is-entering'), PLAYER_ENTER_MS))
   }
 
   destroy() {
@@ -379,6 +400,14 @@ export class BattleView {
     scene.classList.add('is-enemies-arriving')
     requestAnimationFrame(() => scene.classList.remove('is-intro-hold'))
     this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
+    // 적도 그냥 미끄러져 오면 얼음판 위를 타는 것처럼 보인다. 프롬과 같은 수를 쓴다 —
+    // 어택 클립 앞부분의 달려나가는 동작을 등장에 얹는다.
+    // 앞줄부터 한 마리씩 시차를 둬야 한 덩어리로 몰려오지 않고 줄지어 들어온다.
+    this.root.querySelectorAll<HTMLElement>('.actor.foe').forEach((foe, i) => {
+      this.timers.push(
+        window.setTimeout(() => playCharacterAnimation(foe, 'attack'), i * FOE_ENTER_STAGGER_MS),
+      )
+    })
   }
 
   private mount() {
