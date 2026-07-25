@@ -387,6 +387,10 @@ function goTitle(withIntro = false) {
     // 걷히는 동안엔 타이틀 배경도 같이 세운다 — 두 화면이 동시에 그려지는 유일한
     // 구간이라, 여기서 도는 건 전부 두 배로 비싸다(TitleView.freezeAmbient 참고).
     onFadeStart: () => title.freezeAmbient(),
+    // 영상 끝자락에 반딧불이를 영상 위에도 얹는다. 타이틀과 같은 무리를 그리므로
+    // 겹이 바뀌는 순간에도 자리가 안 튄다(TitleView.addFireflyLayer 참고).
+    onFireflyLayer: (canvas) => title.addFireflyLayer(canvas),
+    onFireflyLayerDone: (canvas) => title.removeFireflyLayer(canvas),
     onDone: () => {
       // 얼린 걸 푸는 것도 한 덩어리 작업이다(애니메이션 여섯 개 재개 + 캔버스 루프 재시작).
       // 걷힘이 끝나는 프레임 바로 옆에 두면 그 순간이 걸리므로 조용한 틈으로 보낸다.

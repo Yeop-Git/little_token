@@ -18,6 +18,13 @@ interface Opts {
    * 걷힘이 끝나면 onDone에서 도로 풀어 주면 된다.
    */
   onFadeStart?: () => void
+  /**
+   * 영상 끝자락에 반딧불이를 영상 위에도 얹어 달라는 신호.
+   * 타이틀과 **같은 무리**를 받아야 겹이 바뀌는 순간 자리가 안 튄다.
+   */
+  onFireflyLayer?: (canvas: HTMLCanvasElement) => void
+  /** 덮개가 사라질 때 그 겹을 도로 거둔다. */
+  onFireflyLayerDone?: (canvas: HTMLCanvasElement) => void
 }
 
 /**
@@ -57,6 +64,11 @@ const RELEASE_DELAY_MS = 3000
  */
 const FADE_LEAD_SEC = 0.15
 /**
+ * 반딧불이를 영상 위에 띄우기 시작하는 시점(컷 몇 초 전, 실제 시간).
+ * 아래 CSS의 페이드 길이보다 넉넉해야 다 배어 나온 뒤에 화면이 넘어간다.
+ */
+const FIREFLY_LEAD_SEC = 3.2
+/**
  * 늘어지는 구간만 살짝 빨리 넘긴다(초는 영상 원본 시간 기준).
  * 요정이 같은 자리에 떠 있기만 하는 대목이라 화면이 거의 안 바뀐다 —
  * 그래서 속도를 올려도 빨라진 티는 안 나고 체류감만 걷힌다.
@@ -68,6 +80,7 @@ const GIVE_UP_MS = 6000
 export class CinematicIntro {
   private el: HTMLElement
   private stage: HTMLElement
+  private fireflies: HTMLCanvasElement
   private video: HTMLVideoElement
   private fadeTimer = 0
   private giveUpTimer = 0
@@ -76,6 +89,7 @@ export class CinematicIntro {
   private leaveTimer = 0
   private fading = false
   private leaving = false
+  private fliesShown = false
   private finished = false
   private released = false
 
@@ -92,15 +106,17 @@ export class CinematicIntro {
         </video>
         <div class="cine-glow"></div>
         <div class="cine-vignette"></div>
+        <canvas class="cine-fireflies" aria-hidden="true"></canvas>
       </div>`
     this.stage = this.el.querySelector('.cine-stage')!
+    this.fireflies = this.el.querySelector('canvas')!
     this.video = this.el.querySelector('video')!
     this.video.playbackRate = SPEED
     host.appendChild(this.el)
 
     // 아무 입력이나 들어오면 건너뛴다 — 두 번째부터는 기다리고 싶지 않다.
     this.el.addEventListener('click', this.skip)
-    window.addEventListener('keydown', this.skip)
+    window.addEventListener('keydown', this.onKey)
 
     // 재생이 끝나도 바로 걷어내지 않는다 — 페이드는 영상이 끝나는 순간 딱 끝나도록
     // 잡혀 있어서, 여기서 finish를 부르면 남은 페이드가 잘려 화면이 툭 튄다.
@@ -127,7 +143,9 @@ export class CinematicIntro {
     this.video.removeEventListener('timeupdate', this.tick)
     this.el.removeEventListener('transitionend', this.onTransitionEnd)
     this.el.removeEventListener('click', this.skip)
-    window.removeEventListener('keydown', this.skip)
+    window.removeEventListener('keydown', this.onKey)
+    // 덮개가 사라지면 이 겹도 같이 사라진다 — 계속 그리게 두면 헛일이다.
+    this.opts.onFireflyLayerDone?.(this.fireflies)
     this.release()
     this.el.remove()
   }
@@ -182,7 +200,34 @@ export class CinematicIntro {
     const inTrim = currentTime >= TRIM.from && currentTime < TRIM.to
     const rate = inTrim ? SPEED * TRIM.boost : SPEED
     if (this.video.playbackRate !== rate) this.video.playbackRate = rate
+    if (duration - currentTime <= FIREFLY_LEAD_SEC * SPEED) this.showFireflies()
     if (duration - currentTime <= FADE_LEAD_SEC * SPEED) this.beginFade()
+  }
+
+  /**
+   * 영상이 끝나기 전에 반딧불이를 미리 띄운다.
+   * 걷힌 다음에 켜면 없던 것들이 한꺼번에 생겨서 티가 확 난다. 영상 끝자락부터
+   * 천천히 배어 나오면 화면이 넘어갈 즈음엔 이미 거기 있던 것처럼 보인다.
+   * 타이틀과 같은 무리를 그리므로 겹이 바뀌어도 자리가 안 튄다.
+   */
+  private showFireflies = () => {
+    if (this.fliesShown) return
+    this.fliesShown = true
+    this.opts.onFireflyLayer?.(this.fireflies)
+    this.el.classList.add('fireflies')
+  }
+
+  /**
+   * 키로 건너뛰기 — 다만 브라우저에게 말을 거는 키는 빼야 한다.
+   * 예전엔 keydown이면 무조건 건너뛰어서, 전체화면(F11)을 누르는 순간 시네마틱이
+   * 같이 날아갔다. 창 모드를 바꾸려던 것뿐인데 영상을 잃는다.
+   * 기능키와 조합키(Ctrl/Alt/Meta), 조합용 수식키 자체는 '넘겨 달라'는 뜻이 아니다.
+   */
+  private onKey = (e: KeyboardEvent) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return
+    if (/^F\d{1,2}$/.test(e.key)) return
+    if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) return
+    this.skip()
   }
 
   private skip = () => this.beginFade()
@@ -217,6 +262,13 @@ export class CinematicIntro {
     // 필터 표면이 살아남는다. 끄려다 오히려 켜 두는 셈이 된다.
     this.stage.style.transition = 'none'
     this.stage.style.filter = 'none'
+    // 반딧불이 겹의 페이드는 컷보다 먼저 끝나도록 잡아 뒀지만, 재생이 밀리거나
+    // 건너뛰기가 들어오면 걷히는 중에 남을 수 있다. 얼린 화면에 움직이는 게 하나라도
+    // 끼면 다시 컴포지터 밖으로 밀려나므로 여기서 확실히 끝점에 앉힌다.
+    if (this.fliesShown) {
+      this.fireflies.style.transition = 'none'
+      this.fireflies.style.opacity = '1'
+    }
     this.el.classList.add('frozen')
     this.opts.onFadeStart?.()
 

@@ -49,6 +49,9 @@ export class TitleView {
   /** 얼렸다 풀 때 같은 루프를 이어 돌리려고 들고 있는다(freezeAmbient/thawAmbient). */
   private flyTick: ((now: number) => void) | null = null
   private flyLast = 0
+  /** 같은 반딧불이 무리를 그려 줄 캔버스들(시네마틱이 영상 위에 한 겹 더 얹는다). */
+  private flyTargets: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }[] = []
+  private flySize: ((c: HTMLCanvasElement, cx: CanvasRenderingContext2D) => void) | null = null
 
   constructor(
     private root: HTMLElement,
@@ -184,6 +187,23 @@ export class TitleView {
     this.raf = 0
   }
 
+  /**
+   * 반딧불이를 그릴 캔버스를 하나 더 받는다 — 시네마틱이 영상 위에 얹는 겹이다.
+   * 무리는 공유하므로 두 캔버스의 반딧불이는 언제나 같은 자리에 있고, 그래서
+   * 영상이 걷히며 겹이 바뀌어도 티가 안 난다.
+   */
+  addFireflyLayer(canvas: HTMLCanvasElement) {
+    if (!this.flySize || this.flyTargets.some((t) => t.canvas === canvas)) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    this.flySize(canvas, ctx)
+    this.flyTargets.push({ canvas, ctx })
+  }
+
+  removeFireflyLayer(canvas: HTMLCanvasElement) {
+    this.flyTargets = this.flyTargets.filter((t) => t.canvas !== canvas)
+  }
+
   /** 걷힘이 끝나면 도로 풀어 준다. */
   thawAmbient() {
     this.root.closest('#stage')?.classList.remove('cine-crossfade')
@@ -269,20 +289,32 @@ export class TitleView {
     this.startTimer = window.setTimeout(() => this.opts.onStart(fresh), 560)
   }
 
-  // 은은한 반딧불이 — 불규칙하게 배회하며 반짝인다. 가산 합성으로 부드럽게 발광.
+  /**
+   * 은은한 반딧불이 — 불규칙하게 배회하며 반짝인다. 가산 합성으로 부드럽게 발광.
+   *
+   * 그리는 곳이 여럿일 수 있다. 시네마틱이 걷힐 때, 영상 위에도 같은 반딧불이를 얹으려면
+   * **같은 무리를 같은 자리에** 그려야 한다 — 캔버스를 따로 돌리면 두 무리가 서로 다른
+   * 자리에 떠서 겹치는 순간 개수가 두 배로 보이거나 툭 옮겨 앉는다.
+   * 그래서 무리는 하나만 두고 그리기 대상만 늘린다(addFireflyLayer).
+   */
   private setupFireflies(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     let w = 0
     let h = 0
+    const sizeOne = (c: HTMLCanvasElement, cx: CanvasRenderingContext2D) => {
+      c.width = Math.max(1, Math.round(w * dpr))
+      c.height = Math.max(1, Math.round(h * dpr))
+      cx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
     const resize = () => {
       w = canvas.clientWidth
       h = canvas.clientHeight
-      canvas.width = Math.max(1, Math.round(w * dpr))
-      canvas.height = Math.max(1, Math.round(h * dpr))
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      for (const t of this.flyTargets) sizeOne(t.canvas, t.ctx)
     }
+    this.flyTargets = [{ canvas, ctx }]
+    this.flySize = sizeOne
     resize()
     this.onResize = resize
     window.addEventListener('resize', resize)
@@ -302,8 +334,7 @@ export class TitleView {
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - this.flyLast) / 1000)
       this.flyLast = now
-      ctx.clearRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
+      // 자리 계산은 한 번, 그리기는 등록된 캔버스마다.
       for (const f of flies) {
         f.a += (Math.random() - 0.5) * 0.7 // 불규칙 배회
         f.x += Math.cos(f.a) * f.spd * dt
@@ -313,22 +344,28 @@ export class TitleView {
         if (f.y < -12) f.y = h + 12
         else if (f.y > h + 12) f.y = -12
         f.tw += f.twSpd * dt
-        const glow = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(f.tw))
-        const rad = f.r * (2.2 + glow * 3.2)
-        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad)
-        g.addColorStop(0, `hsla(${f.hue}, 95%, 74%, ${0.85 * glow})`)
-        g.addColorStop(0.4, `hsla(${f.hue}, 95%, 64%, ${0.3 * glow})`)
-        g.addColorStop(1, `hsla(${f.hue}, 95%, 60%, 0)`)
-        ctx.fillStyle = g
-        ctx.beginPath()
-        ctx.arc(f.x, f.y, rad, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = `hsla(${f.hue}, 100%, 88%, ${0.9 * glow})`
-        ctx.beginPath()
-        ctx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2)
-        ctx.fill()
       }
-      ctx.globalCompositeOperation = 'source-over'
+      for (const { ctx: cx } of this.flyTargets) {
+        cx.clearRect(0, 0, w, h)
+        cx.globalCompositeOperation = 'lighter'
+        for (const f of flies) {
+          const glow = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(f.tw))
+          const rad = f.r * (2.2 + glow * 3.2)
+          const g = cx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad)
+          g.addColorStop(0, `hsla(${f.hue}, 95%, 74%, ${0.85 * glow})`)
+          g.addColorStop(0.4, `hsla(${f.hue}, 95%, 64%, ${0.3 * glow})`)
+          g.addColorStop(1, `hsla(${f.hue}, 95%, 60%, 0)`)
+          cx.fillStyle = g
+          cx.beginPath()
+          cx.arc(f.x, f.y, rad, 0, Math.PI * 2)
+          cx.fill()
+          cx.fillStyle = `hsla(${f.hue}, 100%, 88%, ${0.9 * glow})`
+          cx.beginPath()
+          cx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2)
+          cx.fill()
+        }
+        cx.globalCompositeOperation = 'source-over'
+      }
       this.raf = requestAnimationFrame(tick)
     }
     this.flyTick = tick
