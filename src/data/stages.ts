@@ -12,16 +12,31 @@ import { FIELDS } from './fields'
 // 레일에 한 번에 세울 수 있는 최대 마릿수.
 export const MAX_ENCOUNTER = 8
 
+/** 첫 세 보스는 날짜로 고정하고, 15일 이후의 5일 단위 전투는 장로거미가 다시 지킨다. */
+export const BOSS_BY_DAY: Record<number, string> = {
+  5: 'saltSkater',
+  10: 'queenBee',
+  15: 'elderSpider',
+}
+
+export function bossForDay(day: number): string | null {
+  if (day <= 0 || day % 5 !== 0) return null
+  return BOSS_BY_DAY[day] ?? 'elderSpider'
+}
+
 export interface Stage {
   day: number
   field: FieldDef
   encounter: string[] // 적 id 목록(2~8)
   hpMult: number
   atkMult: number
+  isBoss: boolean
 }
 
 export function stageFor(day: number): Stage {
   const field = FIELDS[(day - 1) % FIELDS.length] // 맑음 → 비 → 밤 순환
+  const boss = bossForDay(day)
+  const isBoss = boss != null
   // 이중 레벨 곡선 — 마릿수도 늘고(2→8) 개체 체력도 오른다.
   // 둘이 동시에 뚫리면 "웬만한 콤보"로는 필드가 안 비고, 진짜 잭팟만 올클을 낸다.
   // 그래도 개체 하나하나는 계속 물어서(한 방에 여럿 관통) 파바바박 손맛은 남긴다.
@@ -29,6 +44,8 @@ export function stageFor(day: number): Stage {
   const hpMult = 1 + (day - 1) * 0.26
   // 압력은 뒤로 갈수록 가팔라진다(초반은 완만, 후반에 조여든다).
   const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1) * (field.enemyAtkMult ?? 1)
+  if (boss) return { day, field, encounter: [boss], hpMult, atkMult, isBoss }
+
   const encounter: string[] = []
   // 날이 갈수록 단단한 바퀴벌레 비중이 는다.
   for (let i = 0; i < count; i++) {
@@ -36,5 +53,5 @@ export function stageFor(day: number): Stage {
     else if (day >= 3 && i % 4 === 2) encounter.push('armoredRoach')
     else encounter.push(i % 3 === 2 ? 'roach' : 'moth')
   }
-  return { day, field, encounter, hpMult, atkMult }
+  return { day, field, encounter, hpMult, atkMult, isBoss }
 }

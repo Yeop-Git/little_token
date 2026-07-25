@@ -225,6 +225,8 @@ export interface Tables {
 export interface EnemyDef {
   id: string
   name: string
+  /** 일반 적 편성 대신 단독으로 등장하는 날의 우두머리 여부. */
+  boss?: boolean
   hp: number
   atk: number // 기본 반격 피해
   every: number // n턴마다 공격

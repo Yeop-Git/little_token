@@ -7,6 +7,30 @@
 import type { EnemyDef } from '@core/types'
 
 export const ENEMIES: Record<string, EnemyDef> = {
+  inkDevourer: {
+    id: 'inkDevourer', name: '먹물 왕바퀴', boss: true,
+    hp: 26, atk: 7, every: 2, initiative: 'first',
+    sprite: 'enemy_roach', guard: 8, magicShield: 1, weakEmotion: 'pleasure',
+    note: '페이지를 통째로 갉아먹는 우두머리. 일반 방어와 매직실드를 모두 두르고 즐거움에 약하다.',
+  },
+  saltSkater: {
+    id: 'saltSkater', name: '소금쟁이', boss: true,
+    hp: 38, atk: 8, every: 2, initiative: 'first',
+    sprite: 'boss_salt_skater', guard: 8, weakEmotion: 'sorrow',
+    note: '먹물 웅덩이 위를 미끄러지며 일기의 줄을 지운다. 단단한 종이 왕관은 슬픈 문장에 젖는다.',
+  },
+  queenBee: {
+    id: 'queenBee', name: '여왕벌', boss: true,
+    hp: 52, atk: 10, every: 2, initiative: 'second',
+    sprite: 'boss_queen_bee', magicShield: 2, weakEmotion: 'anger',
+    note: '찢어진 페이지로 벌집 왕관을 짓고 달콤한 잉크를 모은다. 분노가 밀랍 보호막을 부순다.',
+  },
+  elderSpider: {
+    id: 'elderSpider', name: '장로거미', boss: true,
+    hp: 70, atk: 12, every: 2, initiative: 'first',
+    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, weakEmotion: 'pleasure',
+    note: '낡은 일기장을 거미줄로 꿰매며 이야기를 다른 결말로 고친다. 즐거운 한 줄이 거미줄을 흔든다.',
+  },
   armoredRoach: {
     id: 'armoredRoach', name: '갑각 바퀴', hp: 12, atk: 6, every: 2, initiative: 'first',
     sprite: 'enemy_roach', guard: 7, weakEmotion: 'anger',

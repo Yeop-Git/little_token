@@ -331,12 +331,14 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
   if (request !== battleRequest) return
   reset()
   const st = stageFor(run.day)
+  GameAudio.playBattleBgm(run.day, st.isBoss ? st.encounter[0] : undefined)
   stage.setAttribute('data-theme', st.field.theme)
   current = new BattleView(stage, {
     field: st.field,
     encounter: st.encounter,
     hpMult: st.hpMult,
     atkMult: st.atkMult,
+    isBoss: st.isBoss,
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
     onWin: (grade) => goReward(grade),

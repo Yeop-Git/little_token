@@ -878,6 +878,30 @@ button {
   z-index: 3;
 }
 
+.boss-ribbon {
+  position: absolute;
+  top: 116px;
+  left: 50%;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  min-width: 300px;
+  padding: 8px 24px 10px;
+  color: #ffe5b5;
+  text-align: center;
+  transform: translateX(-50%) rotate(-1deg);
+  background: linear-gradient(100deg, rgba(72, 20, 31, .88), rgba(145, 51, 35, .92), rgba(72, 20, 31, .88));
+  border: 2px solid rgba(255, 205, 132, .74);
+  box-shadow: 0 8px 22px rgba(24, 3, 12, .46), inset 0 1px rgba(255,255,255,.28);
+  clip-path: polygon(4% 0, 96% 0, 100% 22%, 97% 50%, 100% 78%, 96% 100%, 4% 100%, 0 78%, 3% 50%, 0 22%);
+  pointer-events: none;
+}
+.boss-ribbon span { font-size: 12px; font-weight: 900; letter-spacing: .2em; opacity: .78; }
+.boss-ribbon b { font-size: 21px; letter-spacing: .04em; text-shadow: 0 2px 0 rgba(48, 7, 13, .7); }
+.actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.16)); }
+.actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
+.actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
+
 /* 배우 */
 .actor {
   position: absolute;

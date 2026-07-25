@@ -17,6 +17,9 @@ import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
 import enemyRoach from './sprites/enemy_roach.webp'
+import bossSaltSkater from './sprites/boss_salt_skater.webp'
+import bossQueenBee from './sprites/boss_queen_bee.webp'
+import bossElderSpider from './sprites/boss_elder_spider.webp'
 import skill1001 from './sprites/skills/skill_1001.webp'
 import skill1002 from './sprites/skills/skill_1002.webp'
 import skill1003 from './sprites/skills/skill_1003.webp'
@@ -64,6 +67,17 @@ import paper from './audio/paper.mp3'
 import cardHover from './audio/cardhover.mp3'
 import pencil from './audio/pencil.mp3'
 import button from './audio/button.mp3'
+import battleStoryEatingBugs from './audio/battle-story-eating-bugs.mp3'
+import battlePaperPages from './audio/battle-paper-pages.mp3'
+import battlePaperTaiko from './audio/battle-paper-taiko.mp3'
+import bossSaltSkaterBgm from './audio/boss-salt-skater.mp3'
+import bossQueenBeeBgm from './audio/boss-queen-bee.mp3'
+import bossElderSpiderBgm from './audio/boss-elder-spider.mp3'
+import resonanceJoy from './audio/resonance-joy.mp3'
+import resonanceAnger from './audio/resonance-anger.mp3'
+import resonanceSorrow from './audio/resonance-sorrow.mp3'
+import resonancePleasure from './audio/resonance-pleasure.mp3'
+import contextBonus from './audio/context-bonus.mp3'
 
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
@@ -91,6 +105,9 @@ export const SPRITES: Record<string, string> = {
   player_001: player001,
   enemy_moth: enemyMoth,
   enemy_roach: enemyRoach,
+  boss_salt_skater: bossSaltSkater,
+  boss_queen_bee: bossQueenBee,
+  boss_elder_spider: bossElderSpider,
 }
 
 // 전장용 GLB. 상세 카드에는 계속 대응되는 SPRITES 초상을 사용한다.
@@ -181,4 +198,15 @@ export const AUDIO = {
   cardHover,
   pencil,
   button,
+  battleStoryEatingBugs,
+  battlePaperPages,
+  battlePaperTaiko,
+  bossSaltSkaterBgm,
+  bossQueenBeeBgm,
+  bossElderSpiderBgm,
+  resonanceJoy,
+  resonanceAnger,
+  resonanceSorrow,
+  resonancePleasure,
+  contextBonus,
 }

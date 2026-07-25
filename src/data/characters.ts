@@ -19,7 +19,7 @@ export interface CharacterAnimationDef {
 }
 
 export interface CharacterVisualDef {
-  id: 'player' | 'moth' | 'roach'
+  id: 'player' | 'moth' | 'roach' | 'saltSkater' | 'queenBee' | 'elderSpider'
   name: string
   model3d: string | null
   animations: CharacterAnimationDef | null
@@ -110,5 +110,32 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     portrait2d: SPRITES.enemy_roach,
     title: '문장 사이의 단단한 얼룩',
     description: '두꺼운 껍질로 버티며 일기장 깊숙한 곳까지 파고든다.',
+  },
+  saltSkater: {
+    id: 'saltSkater',
+    name: '소금쟁이',
+    model3d: null,
+    animations: null,
+    portrait2d: SPRITES.boss_salt_skater,
+    title: '먹물 웅덩이를 가르는 왕관',
+    description: '검은 물 위를 글씨처럼 스쳐 지나가며, 소금빛 종이 왕관으로 문장을 긁어낸다.',
+  },
+  queenBee: {
+    id: 'queenBee',
+    name: '여왕벌',
+    model3d: null,
+    animations: null,
+    portrait2d: SPRITES.boss_queen_bee,
+    title: '찢어진 종이의 벌집 여왕',
+    description: '달콤한 잉크와 밀랍으로 빈 칸을 벌집처럼 막아 버린다.',
+  },
+  elderSpider: {
+    id: 'elderSpider',
+    name: '장로거미',
+    model3d: null,
+    animations: null,
+    portrait2d: SPRITES.boss_elder_spider,
+    title: '결말을 꿰매는 오래된 편집자',
+    description: '낡은 일기장과 거미줄로 이야기를 억지로 다른 결말에 묶어 둔다.',
   },
 }

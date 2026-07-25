@@ -72,6 +72,7 @@ interface Opts {
   tables?: Tables
   hpMult?: number
   atkMult?: number
+  isBoss?: boolean
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
   intro?: boolean
   /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
@@ -123,6 +124,7 @@ export class BattleView {
   private onLose: () => void
   private onHome?: () => void
   private onIntroComplete?: () => void
+  private isBoss = false
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
@@ -158,6 +160,7 @@ export class BattleView {
     this.onLose = opts.onLose
     this.onHome = opts.onHome
     this.onIntroComplete = opts.onIntroComplete
+    this.isBoss = !!opts.isBoss
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -264,7 +267,7 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}" style="background-image:url(${BACKGROUNDS.battleDark})">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
         <div class="vignette"></div>
         <div class="weather-wash"></div>
 
@@ -291,6 +294,7 @@ export class BattleView {
         </div>
 
         <div class="stage-area" id="pbox">
+          ${this.isBoss ? `<div class="boss-ribbon" role="status"><span>위험한 낙서</span><b>보스전 · ${this.state.enemies[0]?.def.name ?? '보스'}</b></div>` : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
@@ -643,7 +647,7 @@ export class BattleView {
     const visual = this.visualForEnemy(e)
     const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
-      <div class="actor foe" data-i="${i}" data-character="${visual.id}"
+      <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}"
         role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
         <div class="nameplate glass">
           <div class="row">
@@ -1562,8 +1566,11 @@ export class BattleView {
     this.q('#flash').classList.add('go')
     await sleep(150)
 
+    if (intent.emotionResonance > 1) GameAudio.playResonance(intent.emotions)
+
     // 맥락(관용구) 발동 배너
     if (intent.combos.length) {
+      GameAudio.play('contextBonus')
       const combos = matchCombos(this.sel, this.t.combos, order)
       const comboMult = combos.reduce((m, c) => m * c.mult, 1)
       const el = this.q('#combo')
