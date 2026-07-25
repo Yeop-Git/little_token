@@ -11,6 +11,7 @@ import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   day: number
@@ -168,6 +169,7 @@ export class RewardCompleteView {
           <button class="reward-continue" type="button">다음 이야기로</button>
         </div>
       </div>`
+    GameAudio.play('win')
     this.root.querySelector<HTMLButtonElement>('.reward-continue')?.addEventListener('click', opts.onContinue)
   }
 

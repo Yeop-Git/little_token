@@ -3724,7 +3724,6 @@ export class BattleView {
     this.over = true
     this.setPhase('전투 승리')
     const victoryStartedAt = performance.now()
-    GameAudio.play('win')
     const victory = Math.random() < 0.5 ? 'victory1' : 'victory2'
     playCharacterAnimation(this.q<HTMLElement>('.actor.you'), victory)
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
