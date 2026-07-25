@@ -94,7 +94,8 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   beanstalk: {
     id: 'beanstalk',
     name: '무럭무럭',
-    desc: '모든 칸에 무럭무럭 카드가 유령처럼 섞인다 · 고르면 최대 체력 +1',
+    // 뒤의 수치는 words.csv의 grow_hp와 같아야 한다(무럭무럭 네 장 모두 같은 값).
+    desc: '모든 칸에 무럭무럭 카드가 유령처럼 섞인다 · 고르면 최대 체력 +2',
   },
 }
 

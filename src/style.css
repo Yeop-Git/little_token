@@ -155,7 +155,9 @@ button {
 }
 
 /* 쉐이더 느낌의 은은한 발광 — 너무 눈부시지 않게 */
-.title-glow {
+/* 시네마틱도 같은 발광을 쓴다 — 톤이 맞고, 겹칠 때 이음매가 안 보인다. */
+.title-glow,
+.cine-glow {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -188,7 +190,8 @@ button {
 
 /* 화면 가장자리 비네트 */
 /* 사이드 비네트 — 강한 구석 어둠이 난류 필터로 일렁인다 */
-.title-vignette {
+.title-vignette,
+.cine-vignette {
   position: absolute;
   inset: -4%;
   z-index: 4;
@@ -419,6 +422,79 @@ button {
 .guide-back-bottom { position: static; display: block; margin: 20px auto 0; }
 @media (max-width: 900px) { .guide-scene { padding: 28px; }.guide-paper { padding: 38px; }.guide-grid { grid-template-columns: 1fr; }.guide-steps { grid-template-columns: 1fr; }.guide-head { padding-right: 0; }.guide-back-top { position: static; margin-top: 16px; } }
 
+/* ── 오프닝 시네마틱 ──
+   타이틀 위에 덮여 있다가 영상이 끝나기 전에 흐려지며 걷힌다. 영상의 마지막 장면과
+   아래 타이틀 배경이 같은 그림이라, 걷히는 동안 두 화면이 포개져 컷이 안 보인다. */
+.cine-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 60; /* 타이틀 암전(30)보다 위 — 부팅 검은 화면이 그대로 이어진다 */
+  background: #05040a;
+  overflow: hidden;
+  cursor: pointer;
+}
+/* 검은 화면에서 천천히 떠오른다 — 게임을 켜자마자 훅 들어오지 않게 넉넉히 준다.
+   타이틀 등장(.title-reveal)과 같은 언어를 써서 흐릿하게 풀리며 밝아진다. */
+.cine-stage {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  filter: blur(12px);
+  transition:
+    opacity 2.6s ease,
+    filter 2.9s ease;
+}
+.cine-veil.playing .cine-stage {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.cine-video {
+  position: absolute;
+  /* 타이틀 배경(.title-atmos)과 같은 화각으로 깔아야 겹칠 때 어긋나지 않는다. */
+  inset: -3%;
+  width: 106%;
+  height: 106%;
+  object-fit: cover;
+  object-position: center;
+  /* 게임 톤에 맞춘 아주 옅은 비비드 — 타이틀 일러스트의 채도와 눈높이를 맞춘다. */
+  filter: saturate(1.08) contrast(1.04);
+}
+
+/* 영상은 16:9, 타이틀 배경(1920×986)은 더 넓은 그림이라 같은 cover라도 화각이 다르다.
+   재생 중엔 영상 본래 화각을 보여주고, 걷히는 동안 타이틀 화각(×1.10)으로 밀어 넣어
+   겹치는 순간의 두 그림이 포개지게 한다. 값은 마지막 프레임과 배경의 픽셀 차이를
+   최소화해 구한 것이라 눈대중이 아니다. */
+.cine-veil.leaving .cine-video {
+  transform: scale(1.1);
+  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 시네마틱으로 들어온 타이틀은 배경만 먼저 드러내고 제목·메뉴는 붙잡아 둔다.
+   (.ready 규칙보다 뒤에 와야 이긴다 — 같은 특이도라 순서로 결정된다) */
+.title-reveal.ui-held .title-logo-wrap,
+.title-reveal.ui-held .title-menu {
+  animation: none;
+  opacity: 0;
+}
+/* 놓아줄 때 — 배경이 한 번 일렁이고(SVG 필터) 그 위로 제목·메뉴가 천천히 떠오른다. */
+.title-reveal.ui-in .title-logo-wrap { animation: logo-enter 2.1s ease-out both; }
+.title-reveal.ui-in .title-logo { animation: logo-breathe 4.6s ease-in-out 2.3s infinite; }
+.title-reveal.ui-in .title-menu { animation: menu-in 1.2s ease-out 0.8s both; }
+
+/* 걷히기 — 흐려짐 없이 불투명도만 빠진다. 마지막에 화면이 뿌예지면 아래 타이틀까지
+   덩달아 흐려 보여서 '같은 그림이 포개진다'는 느낌이 오히려 죽는다.
+   불투명도는 0.01 단위 100단계로 끊어 옛날 필름 디졸브 질감을 준다(컴포지터 처리라 공짜).
+   배율만 매끄럽게 남겨 타이틀 화각으로 밀어 넣는다. */
+.cine-veil.leaving {
+  opacity: 0;
+  transform: scale(1.02);
+  transition:
+    opacity 1.8s steps(100, end),
+    transform 1.9s ease;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .title-reveal { filter: none; transform: none; transition: opacity 0.4s ease; }
   .title-reveal.ready .title-logo-wrap { animation: none; opacity: 1; }
@@ -426,6 +502,7 @@ button {
   .title-reveal.ready .title-logo,
   .title-glow,
   .title-vignette { animation: none; }
+  .cine-veil.leaving { transform: none; transition: opacity 0.5s ease; }
 }
 
 /* 유리 패널 유틸 — 테두리 없이 blur + 그림자 + 안쪽 하이라이트로 영역 분리 */

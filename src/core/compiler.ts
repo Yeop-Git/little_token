@@ -75,11 +75,13 @@ export function comboLeads(w: Word, combos: Combo[]): ComboLead[] {
 }
 
 // 완성 문장 토큰 배열(빈 슬롯은 '____'). josa 슬롯만 조사 부착.
+// 다만 무럭무럭은 문장 성분이 아니라 그냥 자라는 카드다. 목적어 칸에서 "무럭무럭을"이
+// 되면 여러 칸에 겹쳤을 때의 말맛("무럭무럭 무럭무럭 무럭무럭")이 죽으므로 그대로 둔다.
 export function sentenceTokens(sel: Selection, t: Tables): string[] {
   return t.template.slots.map((s) => {
     const w = sel[s.key]
     if (!w) return '____'
-    return s.josa ? eul(w.text) : w.text
+    return s.josa && !w.growHp ? eul(w.text) : w.text
   })
 }
 
@@ -132,6 +134,14 @@ export function compile(
     const w = sel[key]
     if (!w) continue
     const role = roleOf(t, key)
+    // 무럭무럭은 문장에 아무 기여도 하지 않고 자라기만 한다 — 카드 문구 그대로
+    // 배율도 깡수치도 받지 않는다. 어느 칸에나 들어가므로 여기서 끊지 않으면
+    // 칸 역할에 붙는 아이템 효과(백설공주의 구두·빨간망토의 성냥·성냥팔이 망토)를
+    // 그대로 받아 "자라면서 때리는" 카드가 된다.
+    if (w.growHp) {
+      growHp += w.growHp
+      continue
+    }
     if (role === 'object' || role === 'verb') {
       // 동사의 깡수치는 스탯에서 나온다 — 공격이면 위력, 방어/회복이면 그쪽 수치로.
       const flat = wordFlat(w, stats, mods)
@@ -151,7 +161,6 @@ export function compile(
       bonusPool += bonus
       if (bonus) bonusFrom.push(w.text)
     }
-    growHp += w.growHp || 0
     critP += w.crit || 0
     failP += w.fail || 0
     // 룰렛을 밀어 줄 스탯은 수식이 지정한다(단단히=방어, 힘껏=공격 …).

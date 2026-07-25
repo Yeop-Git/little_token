@@ -327,6 +327,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "statMult": 1.5,
       "kind": "guard",
       "rarity": "rare",
+      "art": "3005",
       "note": "방어 ×1.5",
       "lore": "한 뼘도 안 내준다."
     },
@@ -343,6 +344,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "statMult": 1.5,
       "kind": "guard",
       "rarity": "rare",
+      "art": "3008",
       "note": "방어 ×1.5",
       "lore": "작아진 마음을 품고 숨을 고른다."
     }
@@ -579,6 +581,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.5,
     "crit": 0.15,
     "rarity": "rare",
+    "art": "2007",
     "note": "배율 ×1.50 · 대성공 15%",
     "lore": "숨 돌릴 틈 없이."
   },
@@ -594,6 +597,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.3,
     "crit": 0.45,
     "rarity": "rare",
+    "art": "2008",
     "note": "배율 ×1.30 · 대성공 45%",
     "lore": "안 하려 했는데, 손이 먼저 나갔다."
   },
@@ -641,6 +645,7 @@ export const REWARD_WORDS: Word[] = [
     "bonus": 0.7,
     "crit": 0.45,
     "rarity": "epic",
+    "art": "2009",
     "note": "배율 ×1.70 · 대성공 45%",
     "lore": "종이가 타는 냄새. 멈출 수 없다."
   },
@@ -655,6 +660,7 @@ export const REWARD_WORDS: Word[] = [
     "stat": "atk",
     "bonus": 0,
     "rarity": "epic",
+    "art": "2010",
     "note": "50% 확률로 배율 ×3.20",
     "lore": "이래 죽으나 저래 죽으나.",
     "variance": {
@@ -1222,56 +1228,18 @@ export const PUNCT_WORDS: Word[] = [
 /** 무럭무럭 — '잭과 숙주나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
 export const GROW_WORDS: Word[] = [
   {
-    "id": "gr_subj",
+    "id": "gr",
     "text": "무럭무럭",
-    "slot": "subj",
+    "slot": "*",
     "tags": [
       "grow"
     ],
     "emotion": "neutral",
-    "growHp": 1,
+    "growHp": 2,
     "rarity": "legendary",
-    "note": "최대 체력 +1 · 배율을 받지 않는다",
-    "lore": "주어부터 자란다. 이야기가 키를 잰다."
-  },
-  {
-    "id": "gr_adv",
-    "text": "무럭무럭",
-    "slot": "adv",
-    "tags": [
-      "grow"
-    ],
-    "emotion": "neutral",
-    "growHp": 1,
-    "rarity": "legendary",
-    "note": "최대 체력 +1 · 배율을 받지 않는다",
-    "lore": "수식하지 않는다. 그냥 자란다."
-  },
-  {
-    "id": "gr_verb",
-    "text": "무럭무럭",
-    "slot": "verb",
-    "tags": [
-      "grow"
-    ],
-    "emotion": "neutral",
-    "growHp": 1,
-    "rarity": "legendary",
-    "note": "최대 체력 +1 · 배율을 받지 않는다",
-    "lore": "때리지도 막지도 않는다. 그냥 자란다."
-  },
-  {
-    "id": "gr_punct",
-    "text": "무럭무럭",
-    "slot": "punct",
-    "tags": [
-      "grow"
-    ],
-    "emotion": "neutral",
-    "growHp": 1,
-    "rarity": "legendary",
-    "note": "최대 체력 +1 · 배율을 받지 않는다",
-    "lore": "문장 끝에 붙어서도 자란다. 숙주는 어디서든 자란다."
+    "art": "9001",
+    "note": "최대 체력 +2 · 배율을 받지 않는다",
+    "lore": "그냥 자란다. 아무것도 하지 않고, 자라기만 한다."
   }
 ]
 

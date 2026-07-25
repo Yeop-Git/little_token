@@ -9,6 +9,11 @@ interface Opts {
   onExit?: () => void
   /** 이어할 런이 있으면 메뉴가 이어하기/새로하기로 갈린다. */
   hasSave?: boolean
+  /**
+   * 배경만 먼저 드러내고 제목·메뉴는 붙잡아 둔다(오프닝 시네마틱용).
+   * 영상이 배경으로 포개진 걸 플레이어가 알아본 뒤에 revealUi()로 놓아준다.
+   */
+  holdUi?: boolean
 }
 
 interface Fly {
@@ -55,7 +60,16 @@ export class TitleView {
                 calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
                 values="0.005 0.009;0.010 0.006;0.005 0.009" />
             </feTurbulence>
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G" />
+            <!-- 지글지글(왜곡)은 0에서 시작한다. 시네마틱이 포개지는 동안엔 영상과 같은
+                 맨 화면이어야 이음매가 안 보이고, 그 뒤 아주 천천히 차오른다. -->
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G">
+              <!-- 지글거림은 튀는 순간 없이 오직 서서히 배어 나오기만 한다.
+                   앞 18%는 0에 머물러 '한참 뒤에' 시작하는 느낌을 만들고,
+                   그 뒤 완만한 곡선으로 상시값(3)까지 차오른다. -->
+              <animate id="title-sizzle" attributeName="scale" begin="indefinite"
+                dur="11s" values="0;0;3" keyTimes="0;0.18;1" calcMode="spline"
+                keySplines="0 0 1 1;0.65 0 0.5 1" fill="freeze" />
+            </feDisplacementMap>
           </filter>
         </svg>
         <div class="title-reveal">
@@ -102,12 +116,40 @@ export class TitleView {
           im.src = src
         }),
     )
+    if (this.opts.holdUi) reveal?.classList.add('ui-held')
     Promise.all(preload).then(() => {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
-        this.root.querySelector<HTMLButtonElement>('[data-act="continue"]')?.focus()
+        // 붙잡아 둔 상태에서는 아직 누를 게 없다 — 포커스도 놓아줄 때 준다.
+        if (this.opts.holdUi) return
+        this.focusMenu()
+        this.beginAnim('#title-sizzle')
       })
     })
+  }
+
+  /**
+   * 붙잡아 둔 제목·메뉴를 놓아준다. 배경이 한 번 일렁이고 그 위로 떠오른다.
+   * 시네마틱이 배경으로 다 포개진 뒤에 불린다.
+   */
+  revealUi() {
+    const reveal = this.root.querySelector<HTMLElement>('.title-reveal')
+    if (!reveal?.classList.contains('ui-held')) return
+    // 배경 페이드인이 아직이면(이미지가 늦거나 rAF가 묶였을 때) 여기서 확실히 켠다 —
+    // 놓아줬는데 화면이 까맣게 남는 상황은 없어야 한다.
+    reveal.classList.add('ready')
+    reveal.classList.remove('ui-held')
+    reveal.classList.add('ui-in')
+    this.beginAnim('#title-sizzle')
+    this.focusMenu()
+  }
+
+  private beginAnim(sel: string) {
+    this.root.querySelector<SVGAnimateElement>(sel)?.beginElement?.()
+  }
+
+  private focusMenu() {
+    this.root.querySelector<HTMLButtonElement>('[data-act="continue"]')?.focus()
   }
 
   private onAct(act: string) {

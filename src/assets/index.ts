@@ -31,13 +31,19 @@ import skill2003 from './sprites/skills/skill_2003.webp'
 import skill2004 from './sprites/skills/skill_2004.webp'
 import skill2005 from './sprites/skills/skill_2005.webp'
 import skill2006 from './sprites/skills/skill_2006.webp'
+import skill2007 from './sprites/skills/skill_2007.webp'
+import skill2008 from './sprites/skills/skill_2008.webp'
+import skill2009 from './sprites/skills/skill_2009.webp'
+import skill2010 from './sprites/skills/skill_2010.webp'
 import skill3001 from './sprites/skills/skill_3001.webp'
 import skill3002 from './sprites/skills/skill_3002.webp'
 import skill3003 from './sprites/skills/skill_3003.webp'
-import skill3007 from './sprites/skills/skill_3007.webp'
+import skill3005 from './sprites/skills/skill_3005.webp'
+import skill3008 from './sprites/skills/skill_3008.webp'
 import skill7001 from './sprites/skills/skill_7001.webp'
 import skill7002 from './sprites/skills/skill_7002.webp'
 import skill7003 from './sprites/skills/skill_7003.webp'
+import skill9001 from './sprites/skills/skill_9001.webp'
 import itemSnack from './sprites/items/item_001.webp'
 import itemChime from './sprites/items/item_002.webp'
 import itemMirror from './sprites/items/item_003.webp'
@@ -49,6 +55,7 @@ import itemCloak from './sprites/items/item_008.webp'
 import itemBbq from './sprites/items/item_009.webp'
 import itemPino from './sprites/items/item_010.webp'
 import itemBeanstalk from './sprites/items/item_011.webp'
+import cinematic from './video/cinematic.webm'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
 import paperMapParade from './audio/paper-map-parade.mp3'
 import sentenceComplete from './audio/sentence-complete.mp3'
@@ -94,7 +101,7 @@ export const MODELS: Record<string, string> = {
 }
 
 // 맥락카드 일러스트 — Word.art가 이 키를 참조한다.
-// 1xxx 주어 · 2xxx 수식 · 3xxx 동사 · 7xxx 문장부호. 번호는 CSV 등장 순서를 따른다.
+// 1xxx 주어 · 2xxx 수식 · 3xxx 동사 · 7xxx 문장부호 · 9xxx 성장. 번호는 CSV 등장 순서를 따른다.
 export const SKILL_ART: Record<string, string> = {
   '1001': skill1001,
   '1002': skill1002,
@@ -110,15 +117,36 @@ export const SKILL_ART: Record<string, string> = {
   '2004': skill2004,
   '2005': skill2005,
   '2006': skill2006,
+  '2007': skill2007,
+  '2008': skill2008,
+  '2009': skill2009,
+  '2010': skill2010,
   '3001': skill3001,
   '3002': skill3002,
   '3003': skill3003,
-  '3007': skill3007,
+  '3005': skill3005,
+  // 3008은 '웅크렸다'용으로 그린 그림 — 카드 리뉴얼로 그 단어가 pumeot으로 옮겨가
+  // 번호는 그대로 두고 옮겨 붙였다.
+  '3008': skill3008,
   // 문장부호(올림프의 당근) — 7001 느낌표 · 7002 온점 · 7003 물음표
   '7001': skill7001,
   '7002': skill7002,
   '7003': skill7003,
+  // 무럭무럭 — 네 슬롯이 같은 카드라 일러스트도 한 장을 공유한다.
+  '9001': skill9001,
 }
+
+/**
+ * 임시폐기 일러스트 — 감정 카드 리뉴얼로 대상 단어가 사라져 갈 곳을 잃은 그림들.
+ * 파일은 `sprites/skills/n00X.webp`로 남겨 두고 여기 등록하지 않는다(빌드에서 빠진다).
+ * 나중에 뜻이 맞는 카드가 생기면 번호를 새로 받아 되살리면 된다.
+ *
+ *   n001 ← 3004  후려쳤다 — 크게 휘두르는 공격
+ *   n002 ← 3006  품었다   — 가슴에 안는 회복
+ *   n003 ← 3007  내던졌다 — 돌을 던져 벽을 부수는 공격
+ *   n004 ← 3009  박살냈다 — 산산조각 내는 공격
+ *   n005 ← 3010  휩쓸어버렸다 — 페이지 끝에서 끝까지 쓰는 전체 공격
+ */
 
 /**
  * 아이템 일러스트 — ItemDef.art가 이 키를 참조한다.
@@ -136,6 +164,11 @@ export const ITEM_ART: Record<string, string> = {
   bbq: itemBbq, // 아기돼지 바베큐
   pino: itemPino, // 피노키오의 미아핑
   beanstalk: itemBeanstalk, // 잭과 숙주나물
+}
+
+// 영상 — 오프닝 시네마틱. 어택 컷은 전투 연출에 붙일 때 함께 등록한다.
+export const VIDEO = {
+  cinematic,
 }
 
 export const FONT_URL = griunFont

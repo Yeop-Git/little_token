@@ -23,7 +23,7 @@ import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { EARLY_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import {
   allDead,
@@ -198,7 +198,9 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     const compatibleSlot = key === 'subj2' ? 'subj' : key === 'verb2' ? 'verb' : key
     const slotLabel = this.t.template.slots[this.slotIndex]?.label ?? key
-    if (word.slot !== compatibleSlot) return `현재 ${slotLabel} 칸에는 ${compatibleSlot} 카드만 생성할 수 있습니다.`
+    // 무럭무럭은 칸을 가리지 않는다 — 현재 칸 이름표를 달아 찍어 준다.
+    if (word.slot === ANY_SLOT) word = growCardFor(key)
+    else if (word.slot !== compatibleSlot) return `현재 ${slotLabel} 칸에는 ${compatibleSlot} 카드만 생성할 수 있습니다.`
 
     const result: DebugCardSpawnResult = await this.cardHand.debugSpawn(word)
     if (result === 'spawned') {
@@ -1724,7 +1726,8 @@ export class BattleView {
     this.player.stats.hp += n
     this.state.playerMax += n
     this.state.playerHp += n
-    const label = '무럭'.repeat(Math.min(n * 2, 8)) + (n * 2 > 8 ? '…' : '')
+    // 카드 한 장이 +2라 자란 만큼 그대로 반복하면 한 장은 "무럭무럭"으로 읽힌다.
+    const label = '무럭'.repeat(Math.min(n, 8)) + (n > 8 ? '…' : '')
     this.popPlayer(`${label} 최대체력+${n}`, 'heal')
     this.log(`${label} — 최대 체력이 ${n} 자랐다.`)
     this.renderStats()

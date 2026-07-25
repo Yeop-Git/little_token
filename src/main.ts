@@ -25,14 +25,18 @@ import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } 
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
+import { CinematicIntro } from '@views/CinematicIntro'
 import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
+/** 시네마틱이 걷힌 뒤 제목·메뉴를 올리기까지 두는 시간. */
+const TITLE_UI_HOLD_MS = 1500
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
+let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
@@ -264,6 +268,8 @@ function mountMeta(active: SceneName) {
 function reset() {
   current?.destroy?.()
   devCheatCleanup?.()
+  cinematicCleanup?.()
+  cinematicCleanup = null
   stage.innerHTML = ''
 }
 
@@ -272,12 +278,18 @@ function startNewRunBattle() {
   void goBattle(intro, intro ? markTutorialSeen : undefined)
 }
 
-function goTitle() {
+/**
+ * 첫 부팅에서만 오프닝 시네마틱을 얹는다. 타이틀을 먼저 다 그려 둔 위에 덮고,
+ * 영상이 끝나기 전에 걷히게 해서 마지막 장면이 타이틀 배경으로 포개지게 한다.
+ * '홈으로'처럼 다시 타이틀에 올 때는 틀지 않는다 — 매번 보면 지겹다.
+ */
+function goTitle(withIntro = false) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  current = new TitleView(stage, {
+  const title = new TitleView(stage, {
     hasSave: !!loadRun(),
+    holdUi: withIntro,
     onSettings: () => openSettingsModal(stage),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
@@ -288,7 +300,21 @@ function goTitle() {
       startNewRunBattle()
     },
   })
+  current = title
   mountMeta('title')
+  if (!withIntro) return
+  // 영상이 배경으로 다 포개진 뒤 잠깐 둔다 — 방금 본 장면이 타이틀이 됐다는 걸
+  // 알아볼 시간을 주고 나서 제목과 메뉴를 올린다.
+  let holdTimer = 0
+  const intro = new CinematicIntro(stage, {
+    onDone: () => {
+      holdTimer = window.setTimeout(() => title.revealUi(), TITLE_UI_HOLD_MS)
+    },
+  })
+  cinematicCleanup = () => {
+    clearTimeout(holdTimer)
+    intro.destroy()
+  }
 }
 
 function goCombatGuide() {
@@ -318,7 +344,8 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
       clearRun()
       goDefeat()
     },
-    onHome: goTitle,
+    onHome: () => goTitle(), // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
+
     intro,
     onIntroComplete,
   })
@@ -379,7 +406,7 @@ function goDefeat() {
       saveRun(run)
       startNewRunBattle()
     },
-    onTitle: goTitle,
+    onTitle: () => goTitle(),
   })
   mountMeta('defeat')
 }
@@ -397,4 +424,5 @@ else if (start === 'item') goItem(ITEMS.candle)
 else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
-else goTitle()
+// 부팅으로 들어온 타이틀에서만 오프닝 시네마틱을 튼다(?scene=title이면 검수용이라 건너뛴다).
+else goTitle(!params.get('scene'))
