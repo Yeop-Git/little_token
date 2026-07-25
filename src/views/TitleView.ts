@@ -146,9 +146,8 @@ export class TitleView {
       requestAnimationFrame(() => {
         reveal?.classList.add('ready')
         this.settleTimer = window.setTimeout(settle, SETTLE_FALLBACK_MS)
-        // 붙잡아 둔 상태에서는 아직 누를 게 없다 — 포커스도 놓아줄 때 준다.
+        // 붙잡아 둔 상태에서는 아직 보여 줄 게 없다 — 일렁임도 놓아줄 때 시작한다.
         if (this.opts.holdUi) return
-        this.focusMenu()
         this.startWarp()
       })
     })
@@ -171,7 +170,6 @@ export class TitleView {
     clearTimeout(this.settleTimer)
     this.settleTimer = window.setTimeout(() => reveal.classList.add('settled'), SETTLE_FALLBACK_MS)
     this.startWarp()
-    this.focusMenu()
   }
 
   /**
@@ -214,9 +212,17 @@ export class TitleView {
     this.warpTimer = window.setTimeout(() => reveal?.classList.add('warping'), WARP_ON_MS)
   }
 
-  private focusMenu() {
-    this.root.querySelector<HTMLButtonElement>('[data-act="continue"]')?.focus()
-  }
+  /*
+   * 예전엔 여기서 이어하기에 포커스를 줬는데(focusMenu), 화면이 뜨자마자 그 버튼만
+   * 호버된 것처럼 보였다. 첫 로드라 아직 사용자 입력이 없으면 브라우저는 프로그램적
+   * 포커스에도 :focus-visible을 켜고, 아래 스타일은 :focus-visible에 호버와 똑같은
+   * 대우(오른쪽으로 밀고 확대 + ✦ 표식)를 주면서 outline까지 지워 놨다.
+   * 그래서 '포커스 표시'가 아니라 '마우스가 얹힌 상태'로 읽혔다.
+   *
+   * 방향키 메뉴 이동 같은 게 없어서 미리 포커스를 줘도 얻는 게 없다. 그냥 주지 않는다.
+   * 키보드 사용자는 Tab으로 들어오고, 그때는 :focus-visible이 제대로 켜져 어디에 있는지
+   * 분명히 보인다.
+   */
 
   private onAct(act: string) {
     if (act === 'continue') return this.start(false)
