@@ -274,6 +274,12 @@ class FoilShaderRenderer {
     const time = reduced ? 2.75 : now / 1000
     for (const [host, surface] of this.surfaces) {
       if (!host.isConnected) {
+        // 캔버스도 함께 걷어 낸다. 손패 카드는 DOM 노드를 풀에 넣었다가 그대로 다시
+        // 붙이므로, 여기서 캔버스를 남겨 두면 다시 붙을 때 scan이 두 번째 캔버스를
+        // 덧붙인다. .card-foil이 overflow:hidden이라 먼저 붙은 **멈춘** 캔버스가
+        // 자리를 차지하고 새로 그리는 캔버스는 그 아래로 밀려 잘린다 — 포일이
+        // 얼어붙은 것처럼 보이던 원인이다.
+        surface.canvas.remove()
         this.surfaces.delete(host)
         continue
       }
@@ -322,6 +328,9 @@ class FoilShaderRenderer {
         existing.kind = kind
         return
       }
+      // 이미 붙어 있던 캔버스가 있으면 그걸 되쓴다. 한 host에 캔버스가 둘이 되면
+      // overflow:hidden 안에서 뒤엣것이 잘려 나가 그림이 멈춘 것처럼 보인다.
+      host.querySelectorAll('.foil-shader-canvas').forEach((stale) => stale.remove())
       const canvas = document.createElement('canvas')
       canvas.className = 'foil-shader-canvas'
       canvas.setAttribute('aria-hidden', 'true')

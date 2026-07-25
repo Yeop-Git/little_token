@@ -521,7 +521,10 @@ export class CardHand {
 
   private releaseRenderedCards() {
     this.opts.handRoot.querySelectorAll<HTMLButtonElement>(':scope > .word-card').forEach((button) => {
-      button.getAnimations().forEach((animation) => animation.cancel())
+      // 안쪽까지 훑는다. 뽑기 뒤집기(.card-inner)나 이동 보간이 남은 채로 카드가
+      // 풀에 들어가면, 다음에 빌려 쓸 때 그 애니메이션이 이어져 뒷면이 보이거나
+      // 엉뚱한 자리에서 시작한다. CSS 애니메이션은 다시 붙을 때 처음부터 돈다.
+      button.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
       button.classList.remove('pressing', 'selected', 'drawing', 'sealed', 'blocked', 'web-catching')
       button.remove()
       const key = button.dataset.poolKey

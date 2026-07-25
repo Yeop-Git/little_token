@@ -1067,26 +1067,54 @@ button {
 .relic-icon svg { width: 80%; height: 80%; object-fit: contain; }
 .relic-icon.rarity-rare { color: #a7d8ff; border-color: rgba(129, 193, 255, .65); }
 .relic-icon.rarity-legendary { color: #ffe28a; border-color: rgba(255, 206, 86, .82); box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .08), 0 0 14px rgba(255, 188, 64, .24); }
+/* ── 아이콘 호버 툴팁 (공용) ──
+   아이템·적 상태·플레이어 스탯이 같은 쪽지를 쓴다. 처음 하는 사람이 한 줄만 읽고
+   무슨 뜻인지 알아야 하는 자리라, 작은 글씨로 규칙을 빼곡히 적지 않는다.
+   글자는 크게, 상자는 글자만큼만(줄바꿈은 wrap이 알아서), 테두리는 금빛에 바탕은
+   비쳐 보이게 둔다. 위치와 등장 transform만 각자 정한다. */
+.relic-icon::after,
+.hud-stat::after,
+.enemy-intel-icon::after {
+  z-index: 120;
+  box-sizing: border-box;
+  width: max-content;
+  /* 무대 가장자리에 붙은 아이콘은 자기 자리에 맞춰 좁아진다(--tip-max는 JS가 잰다).
+     가운데 정렬이라 좁히지 않으면 그대로 무대 밖으로 밀려 잘린다 — 줄이 한 줄
+     늘어나는 쪽이 글자가 잘려 못 읽는 것보다 낫다. */
+  max-width: var(--tip-max, 440px);
+  padding: 11px 16px;
+  border: 1px solid rgba(255, 209, 128, .78);
+  border-radius: 14px;
+  color: #fff6e2;
+  background: rgba(20, 13, 27, .62);
+  -webkit-backdrop-filter: blur(9px) saturate(1.1);
+  backdrop-filter: blur(9px) saturate(1.1);
+  box-shadow: 0 0 18px rgba(255, 188, 92, .16), 0 10px 26px rgba(0, 0, 0, .55);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.4;
+  /* 툴팁 문구는 `제목\n설명` 두 줄로 들어온다 — 줄바꿈은 살리고 접기는 그대로 둔다. */
+  white-space: pre-line;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .14s ease, transform .14s ease;
+}
+/* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
+html[data-graphics='low'] .relic-icon::after,
+html[data-graphics='low'] .hud-stat::after,
+html[data-graphics='low'] .enemy-intel-icon::after {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(20, 13, 27, .93);
+}
+
 .relic-icon::after {
   content: attr(data-tooltip);
   position: absolute;
   left: 0;
   top: calc(100% + 9px);
-  z-index: 120;
-  width: max-content;
-  max-width: 250px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  color: #fff3d4;
-  background: rgba(16, 11, 21, .96);
-  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .2), 0 8px 18px rgba(0, 0, 0, .5);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity .14s ease, transform .14s ease;
 }
 .relic-icon:hover,
 .relic-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.16); }
@@ -1154,14 +1182,19 @@ button {
   letter-spacing: .08em;
   white-space: nowrap;
 }
+/* 칸을 고정하지 않는다 — 체력이 세 자리(1200/1200)가 되는 순간 숫자가 알약 밖으로
+   삐져나왔다. 아이콘+숫자만큼만 넓어지고, 짧을 때의 균형은 min-width가 잡는다. */
 .hud-stat {
   position: relative;
-  width: 56px;
+  flex: none;
+  width: auto;
+  min-width: 56px;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
+  padding: 0 11px;
   border-radius: 18px;
   color: var(--gold-hi);
   background: rgba(255, 255, 255, .035);
@@ -1169,7 +1202,8 @@ button {
   cursor: help;
   transition: color .14s ease, background .14s ease, transform .14s ease;
 }
-.hud-stat:first-child { width: 78px; }
+/* 체력은 `현재/최대` 두 수라 다른 칸보다 처음부터 넓게 잡아 둔다. */
+.hud-stat:first-child { min-width: 78px; }
 .hud-stat:hover, .hud-stat:focus-visible {
   color: #fff6de;
   background: rgba(255, 255, 255, .1);
@@ -1183,21 +1217,7 @@ button {
   position: absolute;
   top: calc(100% + 9px);
   left: 50%;
-  z-index: 120;
-  width: max-content;
-  max-width: 260px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  color: #fff3d4;
-  background: rgba(16, 11, 21, .96);
-  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .2), 0 8px 18px rgba(0, 0, 0, .5);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
   transform: translate(-50%, -4px);
-  transition: opacity .14s ease, transform .14s ease;
 }
 .hud-stat:hover::after, .hud-stat:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 .hud-passive { width: 44px; color: var(--gold); font-size: 21px; }
@@ -2548,21 +2568,7 @@ button {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
-  z-index: 120;
-  width: max-content;
-  max-width: 250px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  color: #fff3d4;
-  background: rgba(16, 11, 21, .97);
-  box-shadow: inset 0 0 0 1px rgba(255, 218, 148, .22), 0 8px 18px rgba(0, 0, 0, .56);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
   transform: translate(-50%, 4px);
-  transition: opacity .14s ease, transform .14s ease;
 }
 .enemy-intel-icon:hover,
 .enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
@@ -3051,11 +3057,14 @@ button {
   33% { transform: translate(calc(-50% - 4px), calc(-50% + 3px)) scale(var(--tally-fit)); }
   66% { transform: translate(calc(-50% + 4px), calc(-50% - 2px)) scale(var(--tally-fit)); }
 }
-/* 화염 — 2단계부터 상자 뒤에서 피어오르고 3단계에서 활활 탄다 */
-.tally[data-fever='2'] .tally-box,
-.tally[data-fever='3'] .tally-box { position: relative; }
-.tally[data-fever='2'] .tally-box::after,
-.tally[data-fever='3'] .tally-box::after {
+/* 화염 — 2단계부터 상자 뒤에서 피어오르고 3단계에서 활활 탄다.
+   불은 상자가 아니라 상자를 감싼 껍데기(.tally-cell)에 붙인다. 상자에 직접 붙이면
+   bump/settle의 transform이 그 순간 상자를 쌓임 맥락으로 만들어, z-index:-1인 불이
+   상자 안쪽으로 갇혀 매번 깜빡 사라졌다. 껍데기는 애니메이션을 받지 않으므로
+   불은 항상 상자 바깥의 같은 겹에서 탄다. */
+.tally-cell { position: relative; }
+.tally[data-fever='2'] .tally-cell::after,
+.tally[data-fever='3'] .tally-cell::after {
   content: '';
   position: absolute;
   inset: -26% -14% -46%;
@@ -3069,7 +3078,7 @@ button {
   opacity: .78;
   animation: fever-flame 0.6s ease-in-out infinite alternate;
 }
-.tally[data-fever='3'] .tally-box::after {
+.tally[data-fever='3'] .tally-cell::after {
   inset: -44% -22% -66%;
   animation-duration: 0.45s;
 }
@@ -3080,8 +3089,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .tally[data-fever] .tally-slots,
   .tally[data-fever='3'],
-  .tally[data-fever='2'] .tally-box::after,
-  .tally[data-fever='3'] .tally-box::after { animation: none; }
+  .tally[data-fever='2'] .tally-cell::after,
+  .tally[data-fever='3'] .tally-cell::after { animation: none; }
 }
 
 /* 준비 효과·선공이 지나가는 동안 총합은 한쪽에 물러나 대기한다(다시 계산하지 않는다) */
@@ -3092,11 +3101,13 @@ button {
 }
 .tally.parked .tally-feed { opacity: 0.45; }
 .tally.out { opacity: 0; transform: translate(-50%, -58%) scale(calc(1.06 * var(--tally-fit))); }
-.tally-slots { display: flex; width: 100%; max-width: 100%; align-items: center; justify-content: center; gap: 10px; }
+/* 내용만큼만 넓어진다 — 자릿수가 늘면 상자가 커지고, 무대를 넘기는 건 잘라내는 게
+   아니라 fitTallyToStage가 판 전체를 줄여서 막는다. 100%로 묶어 두면 큰 수치가
+   상자 안에서 잘려 나갔다. */
+.tally-slots { display: flex; width: max-content; max-width: none; align-items: center; justify-content: center; gap: 10px; }
 .tally-box {
   box-sizing: border-box;
-  width: min(190px, 34vw);
-  min-width: 0;
+  min-width: min(190px, 34vw);
   padding: 10px 20px 12px;
   border-radius: 16px;
   text-align: center;
@@ -3110,7 +3121,9 @@ button {
   letter-spacing: 3px;
   color: var(--ink-faint);
 }
-.tally-box b { display: block; margin-top: 2px; overflow: hidden; font-size: clamp(32px, 3.2vw, 52px); font-weight: 900; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+/* overflow를 잠그지 않는다 — 자르는 순간 숫자에 걸린 발광이 글자 상자 모서리에서
+   싹둑 끊긴다. 자릿수는 상자가 넓어져 받고, 판이 무대를 넘기면 --tally-fit이 줄인다. */
+.tally-box b { display: block; margin-top: 2px; overflow: visible; font-size: clamp(32px, 3.2vw, 52px); font-weight: 900; line-height: 1.05; white-space: nowrap; }
 .tally-box.base b { color: #9fd8ff; text-shadow: 0 0 22px rgba(120, 190, 255, 0.6); }
 /* 배율은 겹칠수록 뜨거워진다 */
 .tally-box.mult b {
@@ -3138,7 +3151,9 @@ button {
   align-items: center;
   gap: 9px;
   height: 0;
-  overflow: hidden;
+  /* 접힘은 height로만 한다. 잘라내면 가로줄의 발광(box-shadow 10px)이 24px짜리 칸
+     위아래에서 끊긴다. 접혀 있을 때는 opacity가 0이라 밖으로 새지 않는다. */
+  overflow: visible;
   color: #ffd27a;
   font-size: 12px;
   font-weight: 900;
@@ -3198,9 +3213,11 @@ button {
 .tally.compact .tally-chip.crit { font-size: 14px; }
 .tally.compact .tally-phase { font-size: 11px; }
 .tally.compact .tally-phase i { width: 38px; }
+/* 이 판에서 가장 크게 타는 숫자다. 상자를 씌워 자르면 0 0 130px짜리 화염 발광이
+   글자 상자 모서리에서 그대로 잘려 사각형 자국이 남는다. 폭 제한도 자름도 두지 않고,
+   무대를 넘길 위험은 fitTallyToStage가 판 전체를 줄여서 막는다. */
 .tally-total {
-  max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   font-size: clamp(68px, 6vw, 92px);
   font-weight: 900;
   line-height: 1;
@@ -3958,7 +3975,8 @@ button {
 .card-emotion .emotion-face {
   width: 32px;
   height: 32px;
-  /* 원본 감정 이미지가 캔버스 상·하단에 닿으며 생기는 평평한 절단면만 숨긴다. */
+  /* 네모난 얼굴을 동그란 배지 안에 맞춰 담는다. (예전엔 원본 웹프 위아래에 박혀
+     있던 불투명한 검은 띠를 가리는 용도도 겸했는데, 그 띠는 에셋에서 지웠다.) */
   clip-path: circle(47% at 50% 50%);
 }
 .card-emotion .emotion-symbol { width: 30px; height: 30px; font-size: 22px; }
@@ -6355,6 +6373,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 
 .intro-word-chip {
+  position: relative;
   pointer-events: auto;
   padding: 15px 30px;
   border-radius: 17px;
@@ -6415,6 +6434,39 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
       inset 0 0 0 1.5px rgba(255, 226, 160, 0.85),
       0 0 30px rgba(255, 206, 118, 0.5),
       0 12px 28px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* 이 런의 첫 선택 — 칩 위에서 큰 화살표가 발광하며 내려찍는다. 맥동하는 금빛만으로는
+   "눌러야 하는 것"인 줄 모르고 지나치는 사람이 있다. 한 번 누르면 스크립트가
+   data-hint를 떼므로 다음 칩부터는 붙지 않는다. */
+.intro-word-chip[data-hint]::before {
+  content: '▼';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 2;
+  pointer-events: none;
+  font-size: 58px;
+  line-height: 1;
+  color: #ffdc93;
+  text-shadow:
+    0 0 20px rgba(255, 200, 100, 0.95),
+    0 0 46px rgba(255, 168, 58, 0.7),
+    0 6px 14px rgba(0, 0, 0, 0.55);
+  animation: intro-hint-arrow 1s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+}
+
+@keyframes intro-hint-arrow {
+  0%, 100% { transform: translate(-50%, -12px) scale(0.94); opacity: 0.32; }
+  50% { transform: translate(-50%, 7px) scale(1.06); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-word-chip[data-hint]::before {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }
 
@@ -6702,13 +6754,14 @@ html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: 
 .atk-cine {
   position: absolute;
   left: 0;
-  top: 0;
   z-index: 98;
   /* 위아래를 꽉 채운 풀 일러스트. 원본이 1080×1080 정사각이라 높이를 무대에 맞추고
      너비는 비율로 따라오게 둔다 — 16:9로 잡으면 위아래가 잘리고, 4:3으로 잡으면
-     좌우에 빈 띠가 생겨 오른쪽 흐림이 그림에 안 걸린다. */
-  top: 9%;
-  height: 82%;
+     좌우에 빈 띠가 생겨 오른쪽 흐림이 그림에 안 걸린다.
+     무대 높이를 통째로 덮어야 위아래 모서리가 화면 밖으로 나가 경계가 안 보인다.
+     안쪽으로 접어 두면 그 접힌 선이 곧 판때기 테두리로 읽힌다. */
+  top: 0;
+  height: 100%;
   width: auto;
   aspect-ratio: 1 / 1;
   pointer-events: none;
@@ -6731,31 +6784,25 @@ html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: 
   transition: transform 0.26s cubic-bezier(0.7, 0, 0.84, 0), opacity 0.26s ease-in;
 }
 /* 오른쪽 끝은 자르지 않고 풀어 준다 — 화면 안쪽으로 스며들 듯 사라져야 패널이
-   덧붙은 판때기처럼 안 보인다. 마스크로 알파를 빼므로 그림자도 같이 옅어진다. */
+   덧붙은 판때기처럼 안 보인다.
+   예전엔 어두운 그라데이션을 덮어 흐리는 척했는데, 그건 그림을 검게 칠할 뿐이라
+   밝은 배경 위에서는 검은 띠가 그대로 드러났다. 이제 알파를 실제로 빼는 마스크를
+   쓴다 — 정적인 선형 그라데이션 하나라 합성 비용도 프레임마다 늘지 않는다.
+   테두리(border-radius)와 드리운 그림자는 뺀다. 그 둘이 곧 "덧댄 판때기"의 정체였다. */
 .atk-cine-frame {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  border-radius: 6px 0 0 6px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
-  /* Video masking is expensive during large multiplier hits. Keep the same soft edge
-     with a lightweight overlay instead of compositing a full-size video mask. */
-}
-.atk-cine-frame::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent 52%, rgba(10, 7, 16, .16) 72%, rgba(10, 7, 16, .82) 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0 46%, rgba(0, 0, 0, .88) 64%, rgba(0, 0, 0, .42) 82%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 46%, rgba(0, 0, 0, .88) 64%, rgba(0, 0, 0, .42) 82%, transparent 100%);
 }
 .atk-cine-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  /* 잘라내지 않고 다 담는다 — 위아래가 잘리면 연출의 핵심이 사라진다. */
-  object-fit: contain;
+  /* 원본과 틀이 같은 정사각이라 contain·cover가 같은 그림이 된다. cover로 두면
+     원본 비율이 조금 어긋나도 위아래에 빈 띠가 생기지 않는다 — 그 띠가 곧 경계다. */
+  object-fit: cover;
   opacity: 0;
 }
 /* 지금 트는 컷만 보인다 — 둘 다 붙여 두고 골라 켜야 미리 받아 둔 게 헛되지 않는다 */

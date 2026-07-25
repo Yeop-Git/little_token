@@ -200,6 +200,19 @@ const TOKEN_BOSS_LINES = [
  * `warn`은 스스로 사라지지 않는다. 큰낫이 올라간 걸 알려 놓고 카드를 고르는 사이에
  * 말풍선이 꺼지면 경고를 본 의미가 없다.
  */
+/**
+ * 아이콘 호버 쪽지 한 장 — 첫 줄은 "무엇인지", 둘째 줄은 "그래서 어떻게 되는지".
+ * 처음 하는 사람이 규칙 용어를 몰라도 둘째 줄만 읽고 행동을 정할 수 있어야 한다.
+ * 개행은 CSS(white-space: pre-line)가 살린다.
+ */
+const tip = (title: string, detail: string): string => `${title}\n${detail}`
+
+const clampNumber = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+/** 적 상태 아이콘 툴팁이 무대 모서리에서 띄울 여백과, 좁아질 수 있는 한계. */
+const INTEL_TIP_EDGE_PAD = 14
+const INTEL_TIP_MIN_W = 210
+const INTEL_TIP_MAX_W = 440
+
 export type TokenTone = 'calm' | 'warn' | 'relief'
 export interface TokenLine { text: string; tone: TokenTone }
 const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
@@ -638,6 +651,13 @@ export class BattleView {
     // 액션 컷은 화면 밖에 붙여 두고 지금부터 받아 둔다 — 터질 때 받기 시작하면
     // 가장 짜릿해야 할 순간에 검은 사각형이 먼저 뜬다.
     this.attackCine = new AttackCinematic(this.q<HTMLElement>('.scene.battle'))
+
+    // 툴팁이 떠오르기 직전에 자리를 한 번 더 잰다 — 적이 걸어 들어오는 중에 그려진
+    // 아이콘은 그때의 위치로 폭이 잡혀 있어서, 자리를 잡은 뒤와 어긋난다.
+    this.q<HTMLElement>('.scene.battle').addEventListener('pointerover', (event) => {
+      const host = (event.target as Element | null)?.closest<HTMLElement>('.enemy-intel')
+      if (host) this.fitIntelTooltips(host)
+    })
 
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
@@ -1400,39 +1420,62 @@ export class BattleView {
     }
 
     if (weak?.kind === 'emotion') {
-      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), `약점 · ${weak.label} 감정 피해 ×1.5`)
+      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), tip(`약점 · ${weak.label}`, `${weak.label} 카드로 때리면 피해 1.5배`))
     } else if (weak) {
-      add('weak', '<b>!</b>', `약점 · ${weak.label} 태그 피해 ×1.5`)
+      add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
     }
     if (attackStep) {
       const detail = attackStep.damageScale === 0
-        ? '피해 없음 · 다음 공격 준비'
+        ? '이번엔 안 때리고 다음 공격을 준비한다'
         : attackStep.damageScale != null && attackStep.damageScale !== 1
-          ? `위력 ${Math.round(attackStep.damageScale * 100)}%`
+          ? `평소 위력의 ${Math.round(attackStep.damageScale * 100)}%로 때린다`
           : attackStep.bonusAtk > 0
-            ? `공격 +${attackStep.bonusAtk}`
-            : '기본 위력'
-      add('attack', icon('sword'), `다음 행동 · ${attackStep.name} · ${detail}`)
+            ? `평소보다 ${attackStep.bonusAtk} 세게 때린다`
+            : '평소 위력으로 때린다'
+      add('attack', icon('sword'), tip(`다음 행동 · ${attackStep.name}`, detail))
     }
     if (e.def.boss) {
       const stage = bossAttackStage(e)
-      add(`stage stage-${stage}`, `<b>${stage}</b>`, `공격 단계 ${stage} · 위력 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)}`)
+      add(`stage stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
     }
-    if (e.guard > 0) add('guard', icon('shield'), `방어 ${e.guard} · 다음 피해부터 먼저 흡수`)
-    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, `마법실드 ${e.magicShield} · 공격 ${e.magicShield}회를 완전히 차단`)
-    if (e.def.pierceGuard) add('pierce', icon('sword'), '관통 · 방어를 무시하고 체력에 피해')
+    if (e.guard > 0) add('guard', icon('shield'), tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
+    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
+    if (e.def.pierceGuard) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
     if (summonPattern) add(
       `summon${summons >= (summonPattern.releaseAt ?? Infinity) ? ' ready' : ''}`,
       icon('jar'),
-      `${summonPattern.name} ${summons}/${summonPattern.max} · 공격력 +${summons * (summonPattern.attackBonusPerUnit ?? 0)}`,
+      tip(`${summonPattern.name} ${summons}/${summonPattern.max}`, `부하가 늘수록 세진다 (지금 공격 +${summons * (summonPattern.attackBonusPerUnit ?? 0)})`),
     )
-    if (e.def.webPattern) add(`web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`, '<b>✣</b>', `거미줄 봉인 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards} · 현재 다리 약점 공격 또는 약점 속성 방어·회복으로 봉인 해제`)
-    if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', `그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}`)
+    if (e.def.webPattern) add(
+      `web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`,
+      '<b>✣</b>',
+      tip(`거미줄 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards}`, '드러난 다리를 때리거나 약점 감정으로 막고 회복하면 풀린다'),
+    )
+    if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', tip('그로기', `지금 주는 피해가 ${e.groggyDamageMult.toFixed(1)}배가 된다`))
     const tacticalGuide = tacticalGuideForEnemy(e.def.id)
-    if (tacticalGuide) add('tactic', '<b>✦</b>', `${tacticalGuide.title} · ${tacticalGuide.tooltip}`)
+    if (tacticalGuide) add('tactic', '<b>✦</b>', tip(tacticalGuide.title, tacticalGuide.tooltip))
 
     host.hidden = icons.length === 0
     host.innerHTML = icons.join('')
+    this.fitIntelTooltips(host)
+  }
+
+  /**
+   * 상태 아이콘 툴팁은 아이콘 위에 가운데로 서므로, 무대 가장자리에 붙은 적일수록
+   * 그대로 두면 절반이 화면 밖으로 나간다. 남은 자리의 두 배를 최대 폭으로 줘서
+   * 가장자리에서는 좁고 길게, 가운데에서는 넓고 짧게 서게 한다.
+   * 적이 걸어 들어오는 동안에도 다시 재도록 호버 시점에 한 번 더 부른다.
+   */
+  private fitIntelTooltips(host: HTMLElement) {
+    const stageRect = this.root.getBoundingClientRect()
+    const scale = stageRect.width / Math.max(1, this.root.offsetWidth) || 1
+    const stageWidth = this.root.offsetWidth
+    host.querySelectorAll<HTMLElement>('.enemy-intel-icon').forEach((el) => {
+      const rect = el.getBoundingClientRect()
+      const centerX = (rect.left + rect.width / 2 - stageRect.left) / scale
+      const room = Math.min(centerX, stageWidth - centerX) - INTEL_TIP_EDGE_PAD
+      el.style.setProperty('--tip-max', `${Math.round(clampNumber(room * 2, INTEL_TIP_MIN_W, INTEL_TIP_MAX_W))}px`)
+    })
   }
 
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
@@ -2001,7 +2044,7 @@ export class BattleView {
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
-          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${m.label} · ${m.desc}" title="${m.label}: ${value} — ${m.desc}">
+          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}" title="${m.label}: ${value} — ${m.desc}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
       </div>`
@@ -2018,13 +2061,15 @@ export class BattleView {
       return
     }
     strip.hidden = false
+    // 첫 줄은 이름, 둘째 줄은 이게 나에게 뭘 해 주는지. 규칙 아이템은 패시브 설명이
+    // 곧 그 효과라 그대로 쓰고, 스탯 아이템은 올려 준 수치만 늘어놓는다.
     const tooltipFor = (item: (typeof this.player.items)[number]) => {
       const passive = item.passive ? PASSIVES[item.passive] : null
       const stats = STAT_ORDER
         .filter((key) => item.stats[key])
         .map((key) => `${STAT_LABEL[key]} +${item.stats[key]}`)
         .join(' · ')
-      return `${item.name} — ${passive ? `${passive.name}: ${passive.desc}` : stats || item.line}`
+      return tip(item.name, passive ? passive.desc : stats || item.line)
     }
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
@@ -2379,9 +2424,9 @@ export class BattleView {
     const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : '깡 점수'
     el.innerHTML = `
       <div class="tally-slots">
-        <div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div>
+        <div class="tally-cell"><div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div></div>
         <div class="tally-x">×</div>
-        <div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div>
+        <div class="tally-cell"><div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div></div>
       </div>
       <div class="tally-feed tally-flat-feed"></div>
       <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
@@ -2493,7 +2538,13 @@ export class BattleView {
     const stage = this.q('#pbox')
     const safeWidth = Math.max(340, Math.min(680, stage.clientWidth - 420))
     const safeHeight = Math.max(250, Math.round(stage.clientHeight * 0.62))
-    const width = el.offsetWidth
+    // 집계판의 폭은 CSS로 고정돼 있어 offsetWidth만 재면 내용이 아무리 넘쳐도 항상
+    // 같은 값이 나온다. 상자와 총합은 이제 자르지 않고 내용만큼 넓어지므로, 실제로
+    // 무대를 밀어내는 건 이 자식들의 폭이다 — 가장 넓은 쪽을 기준으로 줄인다.
+    const width = Math.max(
+      el.offsetWidth,
+      ...[...el.children].map((child) => (child as HTMLElement).offsetWidth),
+    )
     const height = el.offsetHeight
     if (width <= 0 || height <= 0) return
     const feverScale = [1, 1.05, 1.1, 1.16][Number(el.dataset.fever ?? 0)] ?? 1.16

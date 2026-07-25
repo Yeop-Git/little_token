@@ -501,8 +501,10 @@ function goBattleWithBossIntro() {
   saveRun(run)
   new BossCinematic({
     src,
-    // 마지막 프레임이 화면을 붙들고 있는 사이에 전장을 세운다.
-    onCurtainReady: () => void goBattle(),
+    // 마지막 프레임이 화면을 붙들고 있는 사이에 전장을 세운다. Promise를 그대로
+    // 돌려줘야 컷이 전장 준비를 끝까지 기다린다 — 안 기다리면 컷이 걷힌 자리에
+    // 아직 살아 있는 전리품 화면이 다시 보였다가 뒤늦게 전장으로 갈린다.
+    onCurtainReady: () => goBattle(),
     onDone: () => {},
   })
 }

@@ -15,8 +15,13 @@ import { acquireVideo, releaseVideo } from '@/ui/ResourceLibrary'
 interface Opts {
   /** 재생할 webm. */
   src: string
-  /** 영상이 끝나 마지막 프레임을 붙든 시점에 호출한다 — 여기서 보스전을 세운다. */
-  onCurtainReady: () => void
+  /**
+   * 영상이 끝나 마지막 프레임을 붙든 시점에 호출한다 — 여기서 보스전을 세운다.
+   * Promise를 돌려주면 그게 끝날 때까지 마지막 프레임을 붙들고 기다린다. 전장 준비는
+   * 리소스 로딩을 포함해 몇 백 ms가 걸리므로, 기다리지 않으면 커튼이 먼저 걷혀
+   * 아직 살아 있는 전리품 화면이 잠깐 다시 드러난 뒤에야 전장이 뜬다.
+   */
+  onCurtainReady: () => void | Promise<void>
   /** 영상까지 완전히 걷혀 전장만 남은 시점. */
   onDone: () => void
 }
@@ -97,13 +102,22 @@ export class BossCinematic {
   /**
    * 마지막 프레임을 붙든 채 전장을 세우고, 영상만 걷어 낸다.
    * 영상이 먼저 사라지고 나서 전장을 세우면 검은 화면이 한 번 번뜩인다.
+   *
+   * 전장이 **다 세워질 때까지** 붙들고 기다린다. 준비를 기다리지 않고 걷으면
+   * 그 아래에는 아직 전리품 화면이 남아 있어, 컷이 끝난 뒤에 전리품이 한 번 더
+   * 스쳐 지나가고 나서야 다음 층이 뜬다(순서가 뒤집혀 보이는 원인).
    */
   private async raiseCurtain() {
     if (this.finished) return
     this.finished = true
     this.video.pause() // 마지막 그림이 그대로 남는다
     this.el.classList.add('is-holding')
-    this.opts.onCurtainReady()
+    // 전장 준비가 실패해도 컷은 반드시 걷어야 한다 — 여기서 멈추면 검은 화면에 갇힌다.
+    try {
+      await this.opts.onCurtainReady()
+    } catch {
+      /* 준비 실패는 아래 걷기로 넘긴다 */
+    }
     await this.wait(CURTAIN_HOLD_MS)
     this.el.classList.add('is-revealing')
     GameAudio.play('paperAttack')

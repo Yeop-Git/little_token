@@ -66,6 +66,11 @@ export class IntroDialogue {
   private advanceNow: (() => void) | null = null
   private advanceForce: (() => void) | null = null
   private currentPortrait: Portrait | null = null
+  /**
+   * 첫 단어 칩에만 "여길 눌러" 화살표를 띄웠는지. 발광만으로는 이게 눌러야 하는
+   * 물건인 줄 모르고 넘어가는 사람이 있어서, 처음 한 번만 크게 손가락질한다.
+   */
+  private hintedFirstChoice = false
   // SKIP — 남은 스크립트를 버리고 곧장 finish()로 점프한다.
   private skipped = false
   private finishStarted = false
@@ -268,6 +273,11 @@ export class IntroDialogue {
       chip.textContent = word
       chip.disabled = true
       chip.style.setProperty('--chip-delay', `${i * 90}ms`)
+      // 이 런에서 처음 마주하는 선택 — 칩 위에 큰 화살표가 점멸하며 내려찍는다.
+      if (i === 0 && !this.hintedFirstChoice) {
+        chip.dataset.hint = 'first'
+        this.hintedFirstChoice = true
+      }
       this.choiceEl.appendChild(chip)
       window.setTimeout(() => chip.classList.remove('is-entering'), 60 + i * 90)
       return chip
@@ -285,6 +295,7 @@ export class IntroDialogue {
           chip.disabled = true
           chip.classList.remove('is-next')
           chip.classList.add('is-done')
+          delete chip.dataset.hint // 한 번 눌렀으면 손가락질은 그만둔다
           const text = picked === 0 ? chip.textContent ?? '' : ` ${chip.textContent ?? ''}`
           picked++
           await this.typeText(text)
