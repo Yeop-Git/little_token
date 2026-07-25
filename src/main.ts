@@ -9,6 +9,7 @@ import { BattleView } from '@views/BattleView'
 import { RewardView } from '@views/RewardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
+import { CombatGuideView } from '@views/CombatGuideView'
 import { DefeatView } from '@views/DefeatView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
@@ -250,6 +251,7 @@ function goTitle() {
   current = new TitleView(stage, {
     hasSave: !!loadRun(),
     onSettings: () => openSettingsModal(stage),
+    onGuide: goCombatGuide,
     onStart: (fresh) => {
       if (fresh) clearRun()
       const saved = fresh ? null : loadRun()
@@ -260,6 +262,14 @@ function goTitle() {
       startNewRunBattle()
     },
   })
+  mountMeta('title')
+}
+
+function goCombatGuide() {
+  battleRequest++
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  current = new CombatGuideView(stage, { onBack: goTitle })
   mountMeta('title')
 }
 

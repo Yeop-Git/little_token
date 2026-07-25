@@ -367,6 +367,46 @@ button {
 }
 .title-scene.starting .title-darken { opacity: 0.94; }
 
+/* 타이틀에서 여는 전투 설명 — 실제 전장 위 오버레이가 아닌 독립 그림일기 페이지. */
+.guide-scene {
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 56px;
+  color: #493427;
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255, 218, 126, .34), transparent 22%),
+    linear-gradient(135deg, #342642, #171b31 62%, #263b40);
+}
+.guide-paper {
+  width: min(1120px, 100%);
+  min-height: 760px;
+  padding: 54px 64px;
+  border: 3px solid rgba(97, 62, 44, .52);
+  border-radius: 24px 9px 26px 12px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, .48), inset 0 0 0 4px rgba(255, 249, 222, .52);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 37px, rgba(112, 76, 55, .11) 38px 39px),
+    linear-gradient(100deg, rgba(255,255,255,.64), transparent 40%),
+    #f2e3c5;
+}
+.guide-head { position: relative; padding-right: 220px; margin-bottom: 28px; }
+.guide-head p { margin: 0 0 7px; color: #a05f43; font-weight: 900; letter-spacing: .13em; }
+.guide-head h1 { margin: 0; font-size: 43px; line-height: 1.1; }
+.guide-back { position: absolute; right: 0; top: 4px; padding: 11px 16px; border: 2px solid #82604b; border-radius: 14px 5px 14px 5px; color: #4b3428; background: rgba(255,250,230,.74); font: inherit; font-weight: 900; cursor: pointer; }
+.guide-back:hover, .guide-back:focus-visible { color: #fff; background: #a86649; outline: 3px solid rgba(255, 202, 111, .7); outline-offset: 3px; }
+.guide-block { padding: 20px 24px; border: 2px dashed rgba(115, 74, 53, .4); border-radius: 18px 7px 18px 7px; background: rgba(255, 252, 234, .44); }
+.guide-block h2 { margin: 0 0 10px; font-size: 22px; color: #7c4934; }
+.guide-block p { margin: 0; font-size: 17px; line-height: 1.72; }
+.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+.guide-grid .guide-block h2 + p { margin-bottom: 22px; }
+.guide-emotions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0; margin: 0 0 16px; list-style: none; }
+.guide-emotion { display: grid; gap: 2px; padding: 8px 10px; border-radius: 11px; background: rgba(255,255,255,.55); }
+.guide-emotion b { font-size: 16px; }.guide-emotion span { font-size: 12px; color: #765b4b; }
+.guide-emotion.joy b { color: #9c7512; }.guide-emotion.anger b { color: #bd5540; }.guide-emotion.sorrow b { color: #427aa7; }.guide-emotion.pleasure b { color: #6c8b3d; }
+.guide-footer-note { margin-top: 18px; }
+@media (max-width: 900px) { .guide-scene { padding: 28px; }.guide-paper { padding: 38px; }.guide-grid { grid-template-columns: 1fr; }.guide-head { padding-right: 0; }.guide-back { position: static; margin-top: 16px; } }
+
 @media (prefers-reduced-motion: reduce) {
   .title-reveal { filter: none; transform: none; transition: opacity 0.4s ease; }
   .title-reveal.ready .title-logo-wrap { animation: none; opacity: 1; }

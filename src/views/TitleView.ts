@@ -1,12 +1,11 @@
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 
-const COMBAT_SPEC_URL = new URL('../../SENTENCE_COMBAT_SPEC.md', import.meta.url).href
-
 interface Opts {
   /** fresh=true면 이어하던 런을 버리고 처음부터 시작한다. */
   onStart: (fresh: boolean) => void
   onSettings?: () => void
+  onGuide?: () => void
   onExit?: () => void
   /** 이어할 런이 있으면 메뉴가 이어하기/새로하기로 갈린다. */
   hasSave?: boolean
@@ -80,7 +79,7 @@ export class TitleView {
             <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
             <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
           </nav>
-          <a class="tmenu-link" href="${COMBAT_SPEC_URL}" target="_blank" rel="noopener">전투 시스템 설명</a>
+          <button class="tmenu-link" type="button" data-act="guide">전투 시스템 설명</button>
           <div class="title-toast" id="title-toast" aria-live="polite"></div>
           <div class="title-loadmask" aria-hidden="true"></div>
         </div>
@@ -114,6 +113,7 @@ export class TitleView {
   private onAct(act: string) {
     if (act === 'continue') return this.start(false)
     if (act === 'fresh') return this.askFresh()
+    if (act === 'guide') return this.opts.onGuide?.()
     if (act === 'settings') return this.opts.onSettings ? this.opts.onSettings() : this.toast('설정은 곧 추가돼요')
     if (act === 'exit') {
       if (this.opts.onExit) return this.opts.onExit()

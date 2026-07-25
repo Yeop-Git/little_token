@@ -38,7 +38,7 @@ export type AoeMode = 'single' | 'all' // 범위: 단일 vs 전체 적
 /** 희·노·애·락과, 감정 설계를 하지 않은 카드의 무감정 상태. */
 export type Emotion = 'joy' | 'anger' | 'sorrow' | 'pleasure' | 'neutral'
 export const EMOTION_LABEL: Record<Emotion, string> = {
-  joy: '희', anger: '노', sorrow: '애', pleasure: '락', neutral: '무감정',
+  joy: '기쁨', anger: '분노', sorrow: '슬픔', pleasure: '즐거움', neutral: '무감정',
 }
 export const EMOTION_ICON: Record<Emotion, string> = {
   joy: '☀', anger: '✦', sorrow: '☂', pleasure: '♪', neutral: '·',
