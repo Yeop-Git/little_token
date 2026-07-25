@@ -1,6 +1,7 @@
 import type { RunState } from './run'
 
 const SAVE_KEY = 'little-token.run.v1'
+const TUTORIAL_KEY = 'little-token.tutorial-seen.v1'
 
 function isRunState(value: unknown): value is RunState {
   if (!value || typeof value !== 'object') return false
@@ -38,7 +39,23 @@ export function saveRun(run: RunState): void {
   }
 }
 
-// 새로하기 — 이전 런을 지운다. 지워야 오프닝 다이얼로그가 다시 흐른다.
+// 새로하기와 패배는 진행 중인 런만 지운다. 튜토리얼 완료 기록은 유지한다.
+export function hasSeenTutorial(): boolean {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function markTutorialSeen(): void {
+  try {
+    localStorage.setItem(TUTORIAL_KEY, '1')
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
 export function clearRun(): void {
   try {
     localStorage.removeItem(SAVE_KEY)

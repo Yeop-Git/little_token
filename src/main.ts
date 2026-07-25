@@ -17,7 +17,7 @@ import { stageFor } from '@data/stages'
 import { genRewards } from '@data/rewards'
 import { newRun, registerWord, applyItemReward } from '@core/run'
 import { startGrade } from '@core/grade'
-import { clearRun, loadRun, saveRun } from '@core/save'
+import { clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -235,6 +235,12 @@ function reset() {
   stage.innerHTML = ''
 }
 
+function startNewRunBattle() {
+  const intro = !hasSeenTutorial()
+  if (intro) markTutorialSeen()
+  void goBattle(intro)
+}
+
 function goTitle() {
   battleRequest++
   reset()
@@ -247,8 +253,9 @@ function goTitle() {
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
-      // 새 런 첫 진입에만 토큰의 오프닝 다이얼로그가 흐른다.
-      goBattle(!saved)
+      // Existing runs predate the persistent tutorial flag, so do not replay their intro.
+      if (saved) markTutorialSeen()
+      startNewRunBattle()
     },
   })
   mountMeta('title')
@@ -330,7 +337,7 @@ function goDefeat() {
     onNewRun: () => {
       run = newRun()
       saveRun(run)
-      void goBattle(true)
+      startNewRunBattle()
     },
     onTitle: goTitle,
   })
