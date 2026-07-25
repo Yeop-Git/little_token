@@ -15,3 +15,7 @@
 *.webp binary
 *.woff2 binary
 *.mp3 binary
+
+# 발표 자료 — 변환 금지.
+*.pptx binary
+*.jpg binary
