@@ -1097,8 +1097,6 @@ button {
   width: 100%;
   transform: translateX(-50%);
 }
-.boss-health-hud .shieldbar { margin-top: 7px; }
-
 /* 좌하단 플레이어 체력 위에서 토큰 GLB가 불안하게 부산을 떤다. */
 .boss-token {
   position: absolute;
@@ -1612,42 +1610,6 @@ button {
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ── 보호막 게이지 ──
-   체력 바 바로 아래 같은 축으로 깔아 "얼마나 더 버티나"를 한눈에 읽게 한다.
-   숫자 칩만 있을 때는 깎이는 게 안 보여서 한 대 더 쳐야 하는지 판단이 안 됐다. */
-.shieldbar {
-  position: relative;
-  height: 11px;
-  margin-top: 4px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.42);
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 3px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1.5px rgba(255, 210, 122, 0.34);
-}
-.shieldbar[hidden] { display: none; }
-.shieldbar > .fill {
-  position: absolute;
-  inset: 0;
-  right: auto;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #ffe6ae, var(--shield) 58%, #d99f3e);
-  box-shadow: 0 0 10px rgba(255, 210, 122, 0.6);
-  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.shieldbar > .val {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #2a1c07;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
-}
-
 /* 매직실드 — 천상의 보호막처럼 캐릭터를 감싸는 황금막과 체력바 위 결정층을
    같은 상태에서 켠다. 체력과 별개로 한 타격을 통째로 지운다는 점이 즉시 읽힌다. */
 .spellshield-overlay {
@@ -1717,15 +1679,15 @@ button {
   background: linear-gradient(180deg, var(--hp-you-hi), var(--hp-you));
   box-shadow: 0 0 12px rgba(143, 214, 106, 0.6);
 }
-/* 방어막 — 리그 오브 레전드처럼 현재 체력 위에 얹혀 다 까이기 전까지 붙어 있는
-   파란 한 겹. 폭이 0이면 감춰지고, 값이 생기면 부드럽게 늘어난다. */
-.hpbar.you > .shield {
+/* 일반 방어막 — 진영과 무관하게 현재 체력 뒤에 붙는 파란 추가 체력 한 겹.
+   폭이 0이면 감춰지고, 값이 생기면 부드럽게 늘어난다. */
+.hpbar > .shield {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   width: 0;
-  /* 왼쪽은 초록 체력과 맞닿으므로 각지게, 오른쪽만 캡슐 끝처럼 둥글게 */
+  /* 왼쪽은 체력과 맞닿으므로 각지게, 오른쪽만 캡슐 끝처럼 둥글게 */
   border-radius: 0 12px 12px 0;
   background: linear-gradient(180deg, var(--shield-hp-hi), var(--shield-hp));
   box-shadow:
@@ -1736,14 +1698,14 @@ button {
   transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1), width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.25s ease;
 }
-.hpbar.you > .shield.on { opacity: 0.94; }
-/* 실드가 붙으면 초록 체력의 오른쪽 끝을 각지게 해 파란 실드와 이음새 없이 맞닿게 한다 */
-.hpbar.you:has(.shield.on) > .fill {
+.hpbar > .shield.on { opacity: 0.94; }
+/* 실드가 붙으면 체력의 오른쪽 끝을 각지게 해 파란 실드와 이음새 없이 맞닿게 한다 */
+.hpbar:has(.shield.on) > .fill {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
-/* 초록 체력과 파란 방어막의 경계를 또렷하게 나누는 왼쪽 밝은 모서리 */
-.hpbar.you > .shield::before {
+/* 체력과 파란 방어막의 경계를 또렷하게 나누는 왼쪽 밝은 모서리 */
+.hpbar > .shield::before {
   content: '';
   position: absolute;
   top: 2px;
@@ -1755,7 +1717,7 @@ button {
   box-shadow: 0 0 8px rgba(150, 210, 255, 0.9);
 }
 /* 유리 표면 하이라이트 — .fill 과 같은 결로 이어 붙는다 */
-.hpbar.you > .shield::after {
+.hpbar > .shield::after {
   content: '';
   position: absolute;
   top: 3px;

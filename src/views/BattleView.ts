@@ -673,11 +673,11 @@ export class BattleView {
         <div class="hp-row">
           <div class="hpbar foe">
             <div class="fill"></div>
+            <div class="shield"></div>
             <div class="boss-hp-segments" hidden></div>
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
         </div>
-        <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
         <div class="enemy-traits"></div>
       </section>`
   }
@@ -717,28 +717,20 @@ export class BattleView {
     const s = this.state
     el.querySelector<HTMLElement>('.hpn')!.innerHTML =
       `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
-    // 실드(방어)는 리그 오브 레전드처럼 초록 체력을 덮지 않고, 그 뒤에 파란 막으로
-    // 이어 붙는다. 실드가 붙는 만큼 바의 전체 척도를 (최대체력 + 실드)로 늘려 초록은
-    // 그대로 초록으로 두고 추가분만 파랗게 표기한다.
-    const hp = Math.max(0, s.playerHp)
-    const guard = Math.max(0, s.guard)
-    const total = Math.max(1, s.playerMax + guard)
+    this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+  }
+
+  /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
+  private paintGuardedHpBar(bar: HTMLElement, currentHp: number, maxHp: number, currentGuard: number) {
+    const hp = Math.max(0, currentHp)
+    const guard = Math.max(0, currentGuard)
+    const total = Math.max(1, maxHp + guard)
     const hpPct = hp / total
-    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width = `${hpPct * 100}%`
-    const shield = el.querySelector<HTMLElement>('.hpbar.you > .shield')!
+    bar.querySelector<HTMLElement>(':scope > .fill')!.style.width = `${hpPct * 100}%`
+    const shield = bar.querySelector<HTMLElement>(':scope > .shield')!
     shield.style.left = `${hpPct * 100}%`
     shield.style.width = `${(guard / total) * 100}%`
     shield.classList.toggle('on', guard > 0)
-  }
-
-  /** 적 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
-  private paintShield(bar: HTMLElement, value: number, max: number) {
-    const on = value > 0
-    bar.hidden = !on
-    if (!on) return
-    bar.querySelector<HTMLElement>('.fill')!.style.width =
-      `${Math.min(100, (value / Math.max(1, max)) * 100)}%`
-    bar.querySelector<HTMLElement>('.val')!.textContent = `◈ ${value}`
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
@@ -755,11 +747,11 @@ export class BattleView {
           <div class="hp-row">
             <div class="hpbar foe">
               <div class="fill"></div>
+              <div class="shield"></div>
               <div class="boss-hp-segments" hidden></div>
               <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
             </div>
           </div>
-          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
           <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -805,8 +797,7 @@ export class BattleView {
       ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
       : `${Math.max(0, e.hp)}/${e.maxHp}`
     const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
-    hpbar.querySelector<HTMLElement>(':scope > .fill')!.style.width =
-      `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    this.paintGuardedHpBar(hpbar, e.hp, e.maxHp, e.guard)
     hpbar.setAttribute('aria-label', bossHud
       ? `보스 체력 ${Math.max(0, e.hp)} / ${e.maxHp}`
       : e.healthBars > 1
@@ -823,8 +814,6 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
-    // 방어막은 남은 양을 게이지로 — 깎이는 게 보여야 "한 대 더 치면 뚫린다"가 읽힌다.
-    this.paintShield(plate.querySelector<HTMLElement>('.shieldbar')!, e.guard, e.def.guard ?? e.guard)
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
     traits.innerHTML = [
@@ -833,7 +822,6 @@ export class BattleView {
       e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
       e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
     ].join('')
-    // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
   }
 
   private bindActor(actor: HTMLElement) {

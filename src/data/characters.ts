@@ -14,6 +14,8 @@ export interface CharacterAnimationDef {
   playbackRates?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** idle 끝 자세를 첫 자세로 점진 보간할 루프 연결 구간. */
   idleLoopBlendMs?: number
+  /** 원본 idle 끝에서 잘라낼 불필요한 꼬리 구간. */
+  idleEndTrimMs?: number
   /** 승리 동작 중 스테이지 전환 전에 보여 줄 하이라이트 길이. */
   victoryHighlightMs?: number
 }
@@ -164,6 +166,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
         attack: 440,
         defeat: 560,
       },
+      idleEndTrimMs: 250,
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: ENEMY_MODEL_YAW,

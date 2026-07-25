@@ -113,10 +113,10 @@ export interface PreparationResult {
 
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
   const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
-  // 남은 방어막은 피해로 모두 소모되거나 새 방어막으로 교체될 때까지 유지한다.
+  // 남은 방어막은 피해로 흡수한 만큼만 줄고, 새 방어는 그 위에 누적한다.
   // 방어가 없는 문장을 준비했다는 이유만으로 기존 방어막을 지우지 않는다.
   if (guardGain > 0) {
-    state.guard = guardGain
+    state.guard += guardGain
     state.counterMultiplier = intent.counterMultiplier
   }
   return { guardGain, counterMultiplier: state.counterMultiplier }

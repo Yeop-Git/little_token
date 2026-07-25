@@ -102,13 +102,15 @@ function removeFromAnimationFrame(model: BattleCharacterModel) {
 
 /**
  * 일부 DCC/엔진에서 내보낸 클립은 첫 키가 0초보다 늦어서 반복할 때 잠깐
- * 첫 자세에 멈춘 것처럼 보인다. 시간을 0초 기준으로 옮기고, idle의 마지막
- * 구간을 첫 자세로 점진 보간해 루프 경계에서도 포즈가 튀지 않게 한다.
+ * 첫 자세에 멈춘 것처럼 보인다. 시간을 0초 기준으로 옮기고, 캐릭터별로
+ * 불필요한 끝 구간을 덜어낸 뒤 idle의 마지막 구간을 첫 자세로 점진 보간해
+ * 루프 경계에서도 포즈가 튀지 않게 한다.
  */
 function normalizedClip(
   source: THREE.AnimationClip,
   seamlessLoop: boolean,
   loopBlendSeconds = 0,
+  endTrimSeconds = 0,
 ): THREE.AnimationClip {
   const clip = source.clone()
   const firstTime = clip.tracks.reduce((earliest, track) => {
@@ -125,6 +127,33 @@ function normalizedClip(
   }
 
   clip.resetDuration()
+
+  if (seamlessLoop && endTrimSeconds > 0) {
+    const trimmedEndTime = Math.max(0, clip.duration - endTrimSeconds)
+    clip.tracks.forEach((track) => {
+      const valueSize = track.getValueSize()
+      const interpolatingTrack = track as typeof track & {
+        createInterpolant: (result: Float32Array) => { evaluate: (time: number) => ArrayLike<number> }
+      }
+      const endValue = Array.from(
+        interpolatingTrack.createInterpolant(new Float32Array(valueSize)).evaluate(trimmedEndTime),
+      )
+      let keptKeyCount = track.times.length
+      while (keptKeyCount > 0 && track.times[keptKeyCount - 1] > trimmedEndTime) keptKeyCount -= 1
+
+      const times = Array.from(track.times.slice(0, keptKeyCount))
+      const values = Array.from(track.values.slice(0, keptKeyCount * valueSize))
+      const hasEndKey = Math.abs((times[times.length - 1] ?? -1) - trimmedEndTime) < 0.00001
+      if (hasEndKey) values.splice(values.length - valueSize, valueSize, ...endValue)
+      else {
+        times.push(trimmedEndTime)
+        values.push(...endValue)
+      }
+      track.times = new Float32Array(times)
+      track.values = new Float32Array(values)
+    })
+    clip.resetDuration()
+  }
 
   if (seamlessLoop) {
     clip.tracks.forEach((track) => {
@@ -448,6 +477,7 @@ class BattleCharacterModel {
         clip,
         animation === 'idle',
         (this.visual.animations?.idleLoopBlendMs ?? 0) / 1000,
+        (this.visual.animations?.idleEndTrimMs ?? 0) / 1000,
       ))
       : undefined
   }
