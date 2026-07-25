@@ -18,10 +18,10 @@ function cloneDeck(d: Record<string, Word[]>): Record<string, Word[]> {
   return out
 }
 
-// 낮은 시작 스탯 — 공격 2~5·체력 10~20 대역, 아이템으로 성장.
+// 시작 스탯 — 세 행동(공격·방어·회복)을 같은 값으로 열어 두고 아이템으로 성장한다.
 export function startingPlayer(): PlayerState {
   return {
-    stats: { hp: 20, atk: 3, guard: 3, heal: 3, luck: 2 },
+    stats: { hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 },
     items: [],
     deck: cloneDeck(EARLY_WORDS),
   }

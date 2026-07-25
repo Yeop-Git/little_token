@@ -7,7 +7,7 @@
  */
 
 import { eul } from './josa'
-import { DOUBT_RANGE } from './passives'
+import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import type { Combo, CompileMods, Intent, IntentPart, Selection, StatBlock, StatName, Tables, Word } from './types'
 
 export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
@@ -104,6 +104,9 @@ export function compile(
 ): Intent {
   const order = t.template.slots.map((s) => s.key)
   const combos = matchCombos(sel, t.combos, order)
+  // 피노키오의 미아핑 — 문장을 끝까지 완성했을 때만 끝에 "…근데?"가 붙는다.
+  const complete = order.length > 0 && order.every((k) => !!sel[k])
+  const doubting = !!mods.doubt && complete
 
   // base = object/verb 깡수치 합, bonusPool = subject/modifier/ending bonus 합.
   let base = 0
@@ -189,9 +192,6 @@ export function compile(
   const comboMult = combos.reduce((m, c) => m * c.mult, 1)
   for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: '완벽한 맥락' })
 
-  // 잭과 숙주나물 — 맥락이 터질 때마다 무럭무럭이 한 장씩 더 붙는다.
-  if (mods.grow) growHp += combos.length
-
   // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
   const allTags = order.flatMap((k) => (sel[k] ? sel[k]!.tags : []))
   let coherence = 1
@@ -215,8 +215,10 @@ export function compile(
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
     order.reduce((n, key) => n + (sel[key]?.effects?.[k] || 0), 0)
 
+  const sentence = joinTokens(sentenceTokens(sel, t), t)
+
   return {
-    sentence: joinTokens(sentenceTokens(sel, t), t),
+    sentence: doubting ? `${sentence} ${DOUBT_SUFFIX}` : sentence,
     targetMode,
     aoe,
     kind,
@@ -237,7 +239,8 @@ export function compile(
     failP,
     statKey,
     growHp,
-    doubtCount: mods.doubt ? combos.length : 0,
+    // 맥락 수와 무관하게 문장 하나당 한 번 — 항상 붙는 고정 맥락이다.
+    doubtCount: doubting ? 1 : 0,
     breakdown: { flats, mults },
   }
 }

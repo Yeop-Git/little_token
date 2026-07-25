@@ -14,6 +14,8 @@ export interface EnemyInst {
   dead: boolean
   initiativePhase: 'first' | 'second'
   nextAttackTurn: number
+  /** 레일 최전방으로 올라와 플레이어와 맞댄 적인가. 뒤에서 대기하는 동안은 false. */
+  engaged: boolean
 }
 
 export interface BattleState {
@@ -35,7 +37,32 @@ export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1): EnemyInst {
     dead: false,
     initiativePhase: def.initiative,
     nextAttackTurn: 1,
+    engaged: false,
   }
+}
+
+/**
+ * 전투 시작 시 맞대고 선 적 — 처음부터 노려보고 있었으니 정상 주기로 바로 행동한다.
+ * 뒤에 대기하는 적은 `engaged=false`로 남아 자기 차례가 올 때 쿨다운을 새로 시작한다.
+ */
+export function engageInitialFront(state: BattleState): void {
+  const front = frontIdx(state)
+  if (front >= 0) state.enemies[front].engaged = true
+}
+
+/**
+ * 맞대던 적이 죽어서 레일 앞으로 올라온 적을 맞댄 상태로 만든다.
+ * 뒤에서 기다린 턴은 공격 카운팅에 넣지 않는다 — 걸어 들어오면서 때리는 꼴이 되므로
+ * 올라온 턴에는 쉬고 자기 주기를 새로 시작한다. 처치 직후와 적 페이즈 앞에서 부른다.
+ */
+export function engageFront(state: BattleState): void {
+  const front = frontIdx(state)
+  if (front < 0) return
+  const e = state.enemies[front]
+  if (e.engaged) return
+  e.engaged = true
+  e.nextAttackTurn = state.turn + e.def.every
+  e.initiativePhase = e.def.initiative
 }
 
 export interface HitFx {
@@ -140,6 +167,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const strikes: EnemyStrike[] = []
   const front = frontIdx(state)
   if (front < 0) return strikes
+  engageFront(state) // 방금 올라온 적은 여기서 쿨다운을 새로 시작하므로 이번 턴엔 못 때린다
   const e = state.enemies[front]
   if (e.initiativePhase === phase && state.turn >= e.nextAttackTurn) {
     const raw = Math.round((e.def.atk + Math.floor(rng() * 3)) * e.atkMult)

@@ -867,6 +867,18 @@ export const GROW_WORDS: Word[] = [
     "lore": "주어부터 자란다. 이야기가 키를 잰다."
   },
   {
+    "id": "gr_adv",
+    "text": "무럭무럭",
+    "slot": "adv",
+    "tags": [
+      "grow"
+    ],
+    "growHp": 1,
+    "rarity": "legendary",
+    "note": "최대 체력 +1 · 배율을 받지 않는다",
+    "lore": "수식하지 않는다. 그냥 자란다."
+  },
+  {
     "id": "gr_verb",
     "text": "무럭무럭",
     "slot": "verb",

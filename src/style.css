@@ -1348,12 +1348,23 @@ button {
   padding: 8px 40px;
   border-radius: 40px;
 }
-/* 임시 로그가 어느 배경 위에서도 읽히도록 은은한 어둠 스크림 */
-.chain-rail:not(:empty) {
-  background: radial-gradient(ellipse at center, rgba(8, 6, 12, 0.62) 0%, rgba(8, 6, 12, 0.28) 62%, transparent 100%);
+/* 어느 배경 위에서도 읽히도록 은은한 어둠 스크림.
+   레일 박스에 직접 깔면 border-radius 경계에서 그림자가 뚝 잘려(카드 설명 칩 아래가
+   특히 티가 난다) — 스크림만 레일보다 크게 뒤로 빼서 여백에서 자연히 사라지게 한다. */
+.chain-rail::before {
+  content: '';
+  position: absolute;
+  inset: -46px -110px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(8, 6, 12, 0.62) 0%, rgba(8, 6, 12, 0.28) 58%, transparent 78%);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, #000 52%, transparent 78%);
+  mask-image: radial-gradient(ellipse at center, #000 0%, #000 52%, transparent 78%);
 }
+.chain-rail:empty::before { display: none; }
 .chain-word {
   display: flex;
   flex-direction: column;
@@ -1389,6 +1400,8 @@ button {
 .cw-note.flat { color: var(--ink-faint); }
 .cw-note.gamble { color: #d7b0f5; background: rgba(120, 60, 170, 0.34); }
 .cw-note.combo { color: #fff0c0; background: rgba(255, 168, 60, 0.28); }
+/* 피노키오의 미아핑 — 문장 끝에 항상 붙는 "…근데?" */
+.chain-word.ctx.doubt .cw-text { color: #e7c6ff; }
 /* 맨 끝 맥락 칸 — 완벽한 맥락은 금빛, 어긋남은 붉게 */
 .chain-word.ctx .cw-text { font-size: 24px; }
 .chain-word.ctx.perfect .cw-text { color: #fff0c0; }
@@ -2339,17 +2352,6 @@ button {
 .id-passive span { font-size: 15px; line-height: 1.45; color: var(--ink); }
 .wd-flavor { margin-top: 10px; font-size: 14px; font-style: italic; color: var(--ink-faint); opacity: 0.8; }
 
-/* 스탯표 아래 상시 표시되는 보유 규칙. */
-.stat-passive {
-  margin-top: 6px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 800;
-  color: #ffe9a8;
-  background: rgba(255, 215, 106, 0.14);
-  border: 1px solid rgba(255, 215, 106, 0.32);
-}
 .id-art {
   margin-top: auto;
   align-self: center;
