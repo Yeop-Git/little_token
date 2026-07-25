@@ -57,7 +57,7 @@ assert(result.emotionResonance === 1.3, 'emotion resonance')
 const neutralResult = compile({ subj: word('subj', 'neutral'), adv: word('adv', 'neutral'), verb: word('v', 'neutral') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })
 assert(neutralResult.emotionResonance === 1, 'neutral cards do not resonate')
 const legacyWord = { ...word('legacy', 'neutral'), emotion: undefined } as unknown as Word
-assert(wordValueLines(legacyWord)[0].text.includes('무감정'), 'legacy save emotion fallback')
+assert(!wordValueLines(legacyWord).some((line) => line.cls.startsWith('emotion')), 'card values keep emotion in the icon badge')
 assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [], multCap: 9 }).emotionResonance === 1, 'legacy emotion does not resonate')
 assert(EARLY_WORDS.subj.every((subject) => subject.emotion !== 'neutral'), 'starting subjects carry emotions')
 

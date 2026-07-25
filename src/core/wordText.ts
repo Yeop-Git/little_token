@@ -4,7 +4,7 @@
  */
 
 import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
-import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, type StatBlock, type Variance, type Word } from './types'
+import type { StatBlock, Variance, Word } from './types'
 
 /**
  * 도박 표기 — "40% 확률로 배율 ×2.50".
@@ -48,8 +48,6 @@ export interface ValueLine {
  */
 export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   const out: ValueLine[] = []
-  const emotion = emotionOrNeutral(w.emotion)
-  out.push({ text: `${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}`, cls: `emotion ${emotion}` })
   const lane = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
   if (w.stat && w.statMult != null) {

@@ -21,7 +21,7 @@ import {
 import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { emotionBadgeContent } from '@/ui/EmotionBadge'
+import { emotionBadgeContent, emotionIconBadge } from '@/ui/EmotionBadge'
 import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -179,7 +179,12 @@ export class BattleView {
     this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
     this.isBoss = !!opts.isBoss
-    this.playerVisual = CHARACTER_VISUALS.player
+    // 보스전은 카드 뒤에서 보스를 올려다보는 3인칭 구도다. 공용 플레이어
+    // 매니페스트의 일반 전투 측면 방향은 유지하고, 이 뷰에서만 등을 돌린다.
+    // 토큰은 보스전 전용 배우로 따로 렌더하므로 플레이어 모델의 동반자는 뺀다.
+    this.playerVisual = this.isBoss
+      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI, companion: undefined }
+      : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
@@ -327,6 +332,8 @@ export class BattleView {
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
         </div>
+
+        ${this.isBoss ? this.bossPlayerHudHtml() : ''}
 
         <div class="word-zone">
           <div class="pane-stack">
@@ -652,13 +659,21 @@ export class BattleView {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
-        <div class="nameplate glass">
+        ${this.isBoss ? '' : `<div class="nameplate glass">
           <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
-        </div>
+        </div>`}
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
       </div>`
+  }
+
+  private bossPlayerHudHtml(): string {
+    return `
+      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="프롬 체력">
+        <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
+        <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
+      </section>`
   }
 
   private bossHudHtml(): string {
@@ -715,9 +730,10 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
+    const hud = this.isBoss ? this.q('#boss-player-health-hud') : el
+    hud.querySelector<HTMLElement>('.hpn')!.innerHTML =
       `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
-    this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+    this.paintGuardedHpBar(hud.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
   /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
@@ -1094,7 +1110,7 @@ export class BattleView {
       ${art ? `<div class="wd-art"><img src="${art}" alt="" /><span class="wd-art-tint" aria-hidden="true"></span></div>` : ''}
       <div class="wd-scrim" aria-hidden="true"></div>
       <div class="wd-body">
-        <div class="wd-name">${w.text}</div>
+        <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
         ${this.projectionHtml(w, key)}
         <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
@@ -1266,10 +1282,10 @@ export class BattleView {
       ? `<div class="card-face card-front art">
           <img class="card-illus" src="${art}" alt="" aria-hidden="true">
           <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
-          ${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><strong class="card-title" ${cardTitleStyle(w.text, true)}>${w.text}</strong><span class="card-note">${w.note}</span>
+          ${badge}${emotionIconBadge(emotion, 'card-emotion')}<strong class="card-title" ${cardTitleStyle(w.text, true)}>${w.text}</strong><span class="card-note">${w.note}</span>
         </div>`
       : `<div class="card-face card-front">
-          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
+          <span class="card-foil" aria-hidden="true"></span>${badge}${emotionIconBadge(emotion, 'card-emotion')}<span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
           <strong class="card-title" ${cardTitleStyle(w.text)}>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
         </div>`
     return `<div class="deck-hover-card mood-${mood} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${face}</div>`
@@ -1444,7 +1460,7 @@ export class BattleView {
       <div class="cdx-detail-kicker">WORD CARD</div>
       <div class="cdx-cardstage">${this.deckPreviewHtml(w)}</div>
       <div class="cdx-detail-copy">
-        <div class="wd-name">${w.text}</div>
+        <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(w.emotion), 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${label} · ${RARITY_LABEL[rarity]}${level > 1 ? ` · Lv.${level}` : ''}</div>
         ${values.length ? `<div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>` : ''}
         <p class="wd-flavor">${w.note}</p>

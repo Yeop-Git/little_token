@@ -1005,19 +1005,29 @@ button {
 .actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
 
-/* 보스전은 프롬의 1인칭 시점이다. 배우 본체는 걷어 내고 체력 HUD만 좌하단에 둔다. */
+/* 보스전은 프롬의 등 뒤에서 보스를 올려다보는 3인칭 구도다. 모델의 하반신은
+   카드 뒤로 내려 카드 아래에 서 있는 것처럼 보이고, 체력 HUD는 좌하단에 고정한다. */
 .scene.battle[data-boss='true'] .actor.you {
-  left: 38px;
+  left: calc(50% - 260px);
   bottom: -316px;
-  z-index: 58;
-  width: 360px;
-  height: 100px;
+  z-index: 36;
+  width: 520px;
+  height: 520px;
 }
-.scene.battle[data-boss='true'] .actor.you .model-shell,
-.scene.battle[data-boss='true'] .actor.you .shadow { display: none; }
-.scene.battle[data-boss='true'] .actor.you .nameplate {
-  left: 0;
-  bottom: 0;
+.scene.battle[data-boss='true'] .actor.you .model-shell {
+  width: 520px;
+  height: 520px;
+  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, .38));
+}
+.scene.battle[data-boss='true'] .actor.you .shadow {
+  bottom: 2px;
+  width: 300px;
+  opacity: .72;
+}
+.scene.battle[data-boss='true'] .boss-player-health-hud {
+  left: 38px;
+  bottom: 28px;
+  z-index: 58;
   width: 360px;
   margin: 0;
   padding: 14px 18px 16px;
@@ -1025,10 +1035,10 @@ button {
   border: 1px solid rgba(255, 225, 170, .34);
   box-shadow: inset 0 0 0 3px rgba(255, 245, 214, .05), 0 10px 28px rgba(0, 0, 0, .56);
 }
-.scene.battle[data-boss='true'] .actor.you .nameplate .row { margin-bottom: 9px; }
-.scene.battle[data-boss='true'] .actor.you .nameplate .nm { font-size: 19px; }
-.scene.battle[data-boss='true'] .actor.you .nameplate .hpn { font-size: 15px; }
-.scene.battle[data-boss='true'] .actor.you .hpbar { height: 17px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .row { margin-bottom: 9px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .nm { font-size: 19px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 15px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
   z-index: 38 !important;
 }
@@ -2620,7 +2630,9 @@ button {
     inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--wglow)) 55%, transparent),
     0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
-.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 2px 7px 2px 3px; border-radius: 999px; color: #fff8e7; background: rgba(8, 6, 14, .74); font-size: 10px; font-weight: 900; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 10px color-mix(in srgb, var(--emotion-color) 28%, transparent); }
+.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: grid; width: 38px; height: 38px; place-items: center; padding: 3px; border-radius: 50%; color: #fff8e7; background: rgba(8, 6, 14, .74); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 12px color-mix(in srgb, var(--emotion-color) 34%, transparent); }
+.card-emotion .emotion-face { width: 32px; height: 32px; }
+.card-emotion .emotion-symbol { width: 30px; height: 30px; font-size: 22px; }
 .card-action { position: absolute; top: 8px; left: 50%; z-index: 4; display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid currentColor; border-radius: 9px; background: rgba(8, 6, 14, .78); box-shadow: 0 0 10px color-mix(in srgb, currentColor 42%, transparent), inset 0 0 8px color-mix(in srgb, currentColor 16%, transparent); transform: translateX(-50%); }
 .card-action svg { width: 18px; height: 18px; }
 .card-action.action-attack { color: #ff7966; }
@@ -3212,6 +3224,20 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .cast-empty { margin: auto 0; padding: 28px 10px; color: var(--ink-faint); font-size: 15px; line-height: 1.7; text-align: center; }
 .wd-name { font-size: 40px; font-weight: 900; color: #fff6e2; line-height: 1.05; text-shadow: 0 0 20px rgba(255, 210, 122, 0.3); }
 .wd-grade { margin-top: 6px; font-size: 14px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); text-shadow: 0 0 12px var(--wglow, var(--gold)); }
+.wd-title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wd-title-row .wd-name { min-width: 0; }
+.wd-emotion {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(8, 6, 14, .68);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 70%, transparent), 0 0 13px color-mix(in srgb, var(--emotion-color) 34%, transparent);
+}
+.wd-emotion .emotion-face { width: 36px; height: 36px; }
+.wd-emotion .emotion-symbol { width: 32px; height: 32px; font-size: 23px; }
 .wd-range {
   margin-top: 12px;
   align-self: flex-start;
@@ -5028,20 +5054,19 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-shadow: 0 0 9px color-mix(in srgb, var(--rarity-color, #d8c6a4) 70%, transparent);
 }
 .rp-emotion {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .4px;
-  padding: 2px 8px 2px 3px;
-  border-radius: 999px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  padding: 3px;
+  border-radius: 50%;
   color: var(--emotion-color, #ece5d4);
   background: rgba(8, 6, 14, .62);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color, #d8c6a4) 72%, transparent), 0 0 9px color-mix(in srgb, var(--emotion-color, #d8c6a4) 30%, transparent);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .92);
 }
-.rp-emotion .emotion-face { width: 20px; height: 20px; }
+.rp-emotion .emotion-face { width: 34px; height: 34px; }
+.rp-emotion .emotion-symbol { width: 32px; height: 32px; font-size: 23px; }
 .rp-emotion.emotion-joy { --emotion-color: #fdd355; }
 .rp-emotion.emotion-sorrow { --emotion-color: #88cdf2; }
 .rp-emotion.emotion-anger { --emotion-color: #ef4b33; }

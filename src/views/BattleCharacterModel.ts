@@ -254,9 +254,10 @@ class BattleCharacterModel {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.domElement.className = 'battle-model'
     this.renderer.domElement.setAttribute('aria-hidden', 'true')
-    // 캐릭터 중심을 바라보는 약한 하향 시점으로, 지면과 평행한 발밑 오라도 함께 읽히게 한다.
-    this.camera.position.set(0, 3, 7)
-    this.camera.lookAt(0, 1.45, 0)
+    // 캐릭터 중심을 바라보는 약한 하향 시점이 기본이다. 깊이가 특히 긴
+    // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
+    this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
+    this.camera.lookAt(0, visual.cameraTargetY ?? 1.45, 0)
     this.scene.add(this.effects)
     this.shell.append(this.renderer.domElement)
     this.shell.dataset.modelInteractive = 'true'
