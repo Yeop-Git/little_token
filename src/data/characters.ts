@@ -92,13 +92,13 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     },
     modelYaw: ENEMY_MODEL_YAW,
     modelGroundOffset: -0.18,
-    portrait2d: SPRITES.enemy_moth,
+    portrait2d: SPRITES.enemy_termite,
     title: '종이 속의 하얀 이빨',
     description: '투명한 날개를 접고 낡은 문장의 섬유부터 차근차근 갉아 먹는다.',
   },
   moth: {
     id: 'moth',
-    name: '좀나방',
+    name: '먼지벌레',
     model3d: MODELS.enemy_moth,
     animations: {
       idle: 'Armature|idle|BaseLayer',
@@ -116,12 +116,12 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     // 플레이어와 서로 다른 모델 셸 높이를 보정해 실제 발끝을 같은 전장선에 둔다.
     modelGroundOffset: -0.18,
     portrait2d: SPRITES.enemy_moth,
-    title: '책장을 갉는 날개',
-    description: '가벼운 날갯짓으로 문장의 가장자리부터 빠르게 먹어 치운다.',
+    title: '책장 사이의 먼지 청소부',
+    description: '먼지 묻은 솔로 문장 가장자리를 털어 내듯 조각조각 지워 버린다.',
   },
   flea: {
     id: 'flea',
-    name: '벼룩',
+    name: '좀나방',
     model3d: MODELS.enemy_flea,
     animations: {
       idle: 'Armature|idle|BaseLayer',
@@ -132,13 +132,13 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     },
     modelYaw: ENEMY_MODEL_YAW,
     modelGroundOffset: -0.18,
-    portrait2d: SPRITES.enemy_roach,
-    title: '먼저 튀어 오르는 점',
-    description: '문장이 다 써지기 전 지면을 박차고 먼저 달려든다.',
+    portrait2d: SPRITES.enemy_flea,
+    title: '먼저 날아드는 종이 포식자',
+    description: '문장이 다 써지기 전 날아들어 종잇조각부터 먼저 물어뜯는다.',
   },
   roach: {
     id: 'roach',
-    name: '바퀴벌레',
+    name: '바퀴',
     model3d: MODELS.enemy_roach,
     animations: {
       idle: 'Armature|idle|BaseLayer',
@@ -158,7 +158,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
   },
   pillbug: {
     id: 'pillbug',
-    name: '콩벌레',
+    name: '공벌레',
     model3d: MODELS.enemy_pillbug,
     animations: {
       idle: 'Armature|idle|BaseLayer',
@@ -169,7 +169,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     },
     modelYaw: ENEMY_MODEL_YAW,
     modelGroundOffset: -0.18,
-    portrait2d: SPRITES.enemy_roach,
+    portrait2d: SPRITES.enemy_pillbug,
     title: '한 번을 지워 내는 등껍질',
     description: '몸을 말아 첫 타격을 통째로 흘려보낸다.',
   },
@@ -178,7 +178,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '모기',
     model3d: null,
     animations: null,
-    portrait2d: SPRITES.enemy_moth,
+    portrait2d: SPRITES.enemy_mosquito,
     title: '방어막 틈을 찌르는 침',
     description: '긴 침을 밀어 넣어 방어막 뒤의 체력을 바로 갉아 낸다.',
   },

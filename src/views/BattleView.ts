@@ -70,11 +70,14 @@ interface Opts {
   onWin: (grade: number) => void
   onLose: () => void
   onHome?: () => void
+  onResetAll?: () => void
   player?: PlayerState
   tables?: Tables
   hpMult?: number
   atkMult?: number
   isBoss?: boolean
+  /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
+  modeLabel?: string
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
   intro?: boolean
   /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
@@ -125,8 +128,10 @@ export class BattleView {
   private onWin: (grade: number) => void
   private onLose: () => void
   private onHome?: () => void
+  private onResetAll?: () => void
   private onIntroComplete?: () => void
   private isBoss = false
+  private modeLabel = ''
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
@@ -161,8 +166,10 @@ export class BattleView {
     this.onWin = opts.onWin
     this.onLose = opts.onLose
     this.onHome = opts.onHome
+    this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
     this.isBoss = !!opts.isBoss
+    this.modeLabel = opts.modeLabel ?? ''
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -296,6 +303,7 @@ export class BattleView {
         </div>
 
         <div class="stage-area" id="pbox">
+          ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? `<div class="boss-ribbon" role="status"><span>위험한 낙서</span><b>보스전 · ${this.state.enemies[0]?.def.name ?? '보스'}</b></div>` : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
@@ -457,7 +465,15 @@ export class BattleView {
   private visualForEnemy(enemy: EnemyInst): CharacterVisualDef {
     const direct = CHARACTER_VISUALS[enemy.def.id as CharacterVisualDef['id']]
     if (direct) return direct
-    return enemy.def.sprite === 'enemy_roach' ? CHARACTER_VISUALS.roach : CHARACTER_VISUALS.moth
+    const visualBySprite: Partial<Record<string, CharacterVisualDef['id']>> = {
+      enemy_moth: 'moth',
+      enemy_flea: 'flea',
+      enemy_termite: 'termite',
+      enemy_roach: 'roach',
+      enemy_pillbug: 'pillbug',
+      enemy_mosquito: 'mosquito',
+    }
+    return CHARACTER_VISUALS[visualBySprite[enemy.def.sprite] ?? 'moth']
   }
 
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
@@ -1143,7 +1159,7 @@ export class BattleView {
   }
 
   private openSettings() {
-    openSettingsModal(this.root)
+    openSettingsModal(this.root, { onResetAll: () => this.onResetAll?.() })
   }
 
   // ── 단어장(전체 덱) 오버레이 ──

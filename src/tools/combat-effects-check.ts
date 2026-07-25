@@ -5,7 +5,7 @@ import { wordValueLines } from '@core/wordText'
 import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
-import { stageFor } from '@data/stages'
+import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
 import { applyIntent, applyPendingAttack, applyPreparation, enemyTurn, makeEnemy, type BattleState } from '../sim/reference'
 
 const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(message) }
@@ -41,6 +41,12 @@ for (let day = 1; day <= 8; day++) {
   if (!stage.isBoss) stage.encounter.forEach((id) => stagedRegularEnemies.add(id))
 }
 assert(regularEnemyIds.every((id) => stagedRegularEnemies.has(id)), 'all six regular enemies appear by day 8')
+assert(floorInCycle(15) === 15 && floorInCycle(16) === 1 && endlessCycleFor(16) === 1, 'endless cycle boundary')
+assert(stageFor(20).encounter.join(',') === 'saltSkater', 'endless floor 5 repeats first boss')
+assert(stageFor(25).encounter.join(',') === 'queenBee', 'endless floor 10 repeats second boss')
+assert(stageFor(30).encounter.join(',') === 'elderSpider', 'endless floor 15 repeats final boss')
+assert(stageFor(16).encounter.join(',') === stageFor(1).encounter.join(','), 'endless roster repeats every fifteen floors')
+assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageFor(1).atkMult, 'endless repeat keeps scaling')
 
 const word = (id: string, emotion: Word['emotion']): Word => ({ id, text: id, slot: id === 'v' ? 'verb' : id, tags: [], emotion, note: '', kind: id === 'v' ? 'attack' : undefined, power: id === 'v' ? 10 : undefined })
 const result = compile({ subj: word('subj', 'joy'), adv: word('adv', 'joy'), verb: word('v', 'joy') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })

@@ -3,7 +3,7 @@ import { GraphicsSettings, type GraphicsQuality } from '@/ui/GameSettings'
 import { icon } from '@/ui/Icons'
 
 /** 전투와 타이틀이 같은 저장값·마크업을 쓰는 공용 설정 모달. */
-export function openSettingsModal(root: HTMLElement) {
+export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => void }) {
   let host = root.querySelector<HTMLElement>('#overlay')
   if (!host) {
     host = document.createElement('div')
@@ -28,6 +28,11 @@ export function openSettingsModal(root: HTMLElement) {
           <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>절전</b><span>효과를 줄여 가볍게</span></button>
         </div>
       </div>
+      <div class="settings-group records-reset-group">
+        <div class="settings-label"><b>플레이 기록</b><span>처음부터 다시 쓰기</span></div>
+        <button id="records-reset" class="settings-reset-btn" type="button">모든 기록 삭제하고 새 게임</button>
+        <p id="records-reset-note" aria-live="polite">진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.</p>
+      </div>
     </section>`
   host.classList.add('open')
 
@@ -50,5 +55,22 @@ export function openSettingsModal(root: HTMLElement) {
       host!.querySelectorAll('[data-quality]').forEach((item) => item.classList.remove('on'))
       button.classList.add('on')
     })
+  })
+  const recordsReset = host.querySelector<HTMLButtonElement>('#records-reset')!
+  let resetConfirmTimer = 0
+  recordsReset.addEventListener('click', () => {
+    if (!recordsReset.classList.contains('is-danger')) {
+      recordsReset.classList.add('is-danger')
+      recordsReset.textContent = '정말 모두 삭제할까요?'
+      host!.querySelector<HTMLElement>('#records-reset-note')!.textContent = '한 번 더 누르면 삭제 후 새 게임을 시작합니다.'
+      resetConfirmTimer = window.setTimeout(() => {
+        recordsReset.classList.remove('is-danger')
+        recordsReset.textContent = '모든 기록 삭제하고 새 게임'
+        host?.querySelector<HTMLElement>('#records-reset-note')?.replaceChildren('진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.')
+      }, 3400)
+      return
+    }
+    clearTimeout(resetConfirmTimer)
+    opts.onResetAll()
   })
 }

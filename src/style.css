@@ -903,6 +903,25 @@ button {
 }
 .boss-ribbon span { font-size: 12px; font-weight: 900; letter-spacing: .2em; opacity: .78; }
 .boss-ribbon b { font-size: 21px; letter-spacing: .04em; text-shadow: 0 2px 0 rgba(48, 7, 13, .7); }
+.endless-ribbon {
+  position: absolute;
+  z-index: 21;
+  top: 72px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 18px;
+  color: #fff1c5;
+  background: rgba(41, 21, 55, .84);
+  border: 1px solid rgba(229, 184, 255, .52);
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .36), 0 0 18px rgba(185, 107, 255, .16);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.endless-ribbon span { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .72; }
+.endless-ribbon b { font-size: 17px; letter-spacing: .05em; }
 .actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.16)); }
 .actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
@@ -3243,6 +3262,23 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .graphics-options button b { font-size: 17px; }
 .graphics-options button span { margin-top: 2px; font-size: 12px; }
 .graphics-options button.on { color: #2b1e10; background: var(--gold); box-shadow: 0 0 18px rgba(255,207,118,.32); }
+.settings-reset-btn {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  color: #fff3d3;
+  background: rgba(255,255,255,.06);
+  box-shadow: inset 0 0 0 1px rgba(255,207,118,.28);
+  font-size: 16px;
+  font-weight: 900;
+}
+.settings-reset-btn:hover:not(:disabled) { color: #2b1e10; background: var(--gold); }
+.settings-reset-btn:disabled { color: var(--ink-faint); cursor: default; opacity: .7; }
+.settings-reset-btn.is-danger {
+  color: #2b120c;
+  background: var(--danger);
+  box-shadow: 0 0 18px rgba(255,138,106,.3);
+}
 
 .deck-panel { width: 1200px; }
 .deck-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
@@ -3514,7 +3550,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 
 .reward-scene,
 .item-scene,
-.defeat-scene {
+.defeat-scene,
+.ending-scene {
   display: grid;
   place-items: center;
   background-size: cover;
@@ -3522,7 +3559,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .reward-scene::before,
 .item-scene::before,
-.defeat-scene::before {
+.defeat-scene::before,
+.ending-scene::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -3534,7 +3572,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 24px;
 }
 .defeat-scene::before {
   background: rgba(17, 13, 18, 0.72);
@@ -3581,9 +3619,54 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .defeat-new { color: #fff9e8; background: #a85145; box-shadow: 0 7px 0 #713a35, 0 11px 18px rgba(74, 35, 30, .28); }
 .defeat-title { color: #5f4538; background: rgba(255, 250, 229, .74); box-shadow: inset 0 0 0 2px rgba(105, 70, 51, .3); }
 
+/* 첫 15층 완주 엔딩 — 후속 원화가 들어와도 같은 컷 프레임을 유지한다. */
+.ending-scene { overflow: hidden; background-position: center; }
+.ending-scene::before {
+  background: radial-gradient(circle at 50% 44%, rgba(72, 55, 75, .18), rgba(6, 5, 11, .86) 76%);
+  backdrop-filter: blur(4px) saturate(.72);
+}
+.ending-vignette { position: absolute; inset: 0; box-shadow: inset 0 0 220px 70px rgba(0, 0, 0, .88); pointer-events: none; }
+.ending-cut {
+  position: relative;
+  z-index: 1;
+  width: 1360px;
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 550px 1fr;
+  align-items: center;
+  gap: 56px;
+}
+.ending-cut.is-entering { animation: ending-cut-in .72s cubic-bezier(.22, .86, .24, 1) both; }
+@keyframes ending-cut-in {
+  from { opacity: 0; transform: translateX(34px) scale(.985); filter: blur(7px); }
+  to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+}
+.ending-art { height: 650px; display: grid; place-items: end center; filter: drop-shadow(0 28px 34px rgba(0, 0, 0, .58)); }
+.ending-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.tone-spider .ending-art img { filter: grayscale(.78) brightness(.62); transform: rotate(-5deg) translateY(36px); }
+.tone-token .ending-art img { max-width: 430px; filter: drop-shadow(0 0 38px rgba(255, 220, 117, .5)); }
+.tone-from .ending-art img { filter: drop-shadow(0 0 34px rgba(135, 203, 255, .24)); }
+.ending-page {
+  position: relative;
+  padding: 62px 68px 58px;
+  color: #49372e;
+  background: repeating-linear-gradient(0deg, transparent 0 39px, rgba(103, 76, 55, .11) 39px 40px), #f3dfb9;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, .64), inset 0 0 0 3px rgba(111, 76, 51, .16);
+  transform: rotate(.7deg);
+}
+.ending-page::after { content: ''; position: absolute; inset: 15px; border: 1px dashed rgba(103, 69, 47, .3); pointer-events: none; }
+.ending-kicker { color: #a45248; font-size: 17px; font-weight: 900; letter-spacing: .22em; }
+.ending-page h1 { margin: 22px 0 24px; font-size: 52px; line-height: 1.15; color: #41302b; }
+.ending-page p { min-height: 126px; margin: 0 0 38px; font-size: 21px; font-weight: 700; line-height: 1.85; color: #70594b; }
+.ending-next { position: relative; z-index: 1; min-width: 240px; padding: 16px 26px; border-radius: 12px; color: #fff8e7; background: #9e4d43; box-shadow: 0 7px 0 #66362f, 0 12px 20px rgba(66, 35, 30, .25); font-size: 18px; font-weight: 900; }
+.ending-next:hover, .ending-next:focus-visible { transform: translateY(-3px); filter: brightness(1.08); }
+.ending-progress { position: absolute; z-index: 2; bottom: 52px; display: flex; gap: 12px; }
+.ending-progress i { width: 38px; height: 5px; border-radius: 9px; background: rgba(255, 243, 210, .25); }
+.ending-progress i.on { background: #ffe5a0; box-shadow: 0 0 16px rgba(255, 215, 119, .65); }
+
 .reward-card {
   position: relative;
-  width: 1000px;
+  width: 1080px;
   flex: none;
   padding: 40px 48px 46px;
   border-radius: 28px;
@@ -3611,8 +3694,14 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   color: var(--ink-dim);
 }
 .reward-field b { color: #fff2da; }
-.reward-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 22px;
+}
 .reward-pick {
+  min-width: 0;
   padding: 0;
   border-radius: 20px;
   background: var(--glass-strong);
@@ -3648,6 +3737,25 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   display: grid; place-items: center;
   background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--wglow, var(--gold)) 40%, #241d30), #130e1b 78%);
 }
+.rp-bg.word-noart {
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 13%, color-mix(in srgb, var(--wglow, var(--gold)) 28%, transparent) 13% 13.6%, transparent 13.6%),
+    repeating-linear-gradient(0deg, transparent 0 38px, rgba(255, 246, 226, .09) 38px 40px),
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--wglow, var(--gold)) 34%, #2a2431), #130e1b 82%);
+}
+.rp-word-mark {
+  width: 76%;
+  color: rgba(255, 248, 230, .24);
+  font-family: var(--font);
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1.18;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 24px color-mix(in srgb, var(--wglow, var(--gold)) 42%, transparent);
+  transform: translateY(-12px) rotate(-3deg);
+}
 .rp-bg.noart .rp-icon {
   width: 104px; height: 104px; color: #fff;
   filter: drop-shadow(0 0 18px var(--wglow, var(--gold))) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.7));
@@ -3666,12 +3774,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
     inset 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 40%, transparent);
 }
 .rp-foil { border-radius: 20px; }
-.rp-top { position: relative; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; }
+.rp-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 72px;
+  padding: 12px 14px;
+}
 .rp-type {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff;
   text-shadow: 0 0 12px var(--wglow, var(--gold)), 0 0 22px color-mix(in srgb, var(--wglow, var(--gold)) 68%, transparent), 0 2px 4px rgba(0, 0, 0, 0.96);
 }
 .rp-badge {
+  white-space: nowrap;
   font-size: 11px; font-weight: 900; letter-spacing: 1px; padding: 3px 9px; border-radius: 999px;
   color: #fff; background: rgba(8, 6, 14, 0.5);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 62%, transparent);
@@ -3681,10 +3801,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .rp-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 0 14px 14px; text-align: center; }
 .rp-name {
   font-size: 32px; font-weight: 900; color: #fff; line-height: 1.1;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-shadow: 0 0 12px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 78%, transparent), 0 2px 3px rgba(0, 0, 0, 0.98), 0 3px 12px rgba(0, 0, 0, 0.92);
 }
+.reward-pick.has-medium-name .rp-name { font-size: 28px; }
+.reward-pick.has-long-name .rp-name { font-size: 24px; line-height: 1.16; }
 .rp-effect {
-  margin-top: 3px; font-size: 15px; font-weight: 800; color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
 .rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
@@ -3814,10 +3948,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .dev-cheat {
   position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 650px;
-  height: 560px;
+  top: 24px;
+  left: 24px;
+  width: 920px;
+  height: 820px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3855,17 +3989,54 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px;
+  padding: 16px;
 }
-.dev-cheat-section + .dev-cheat-section { margin-top: 18px; }
-.dev-cheat-section h3 { margin: 0 0 8px 2px; color: rgba(243, 227, 194, .5); font-size: 11px; letter-spacing: .12em; }
-.dev-cheat-scenes {
+.dev-cheat-section h3 { margin: 0; color: #ffe9a8; font-size: 12px; letter-spacing: .12em; }
+.dev-cheat-section h4 { margin: 14px 0 7px; color: rgba(243, 227, 194, .52); font-size: 10px; letter-spacing: .08em; }
+.dev-cheat-section-heading {
+  min-height: 34px;
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dev-cheat-section-heading p { margin: 4px 0 0; color: rgba(243, 227, 194, .42); font-size: 10px; font-weight: 700; }
+.dev-cheat-section-heading strong {
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 8px;
+  color: #2b1e10;
+  background: var(--gold);
+  font-size: 11px;
+}
+.dev-cheat-navigation,
+.dev-cheat-card-section {
+  padding: 14px;
+  border: 1px solid rgba(255, 215, 106, .14);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+.dev-cheat-nav-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.dev-cheat-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(0, .84fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: 12px;
+}
+.dev-cheat-word-column { display: flex; flex-direction: column; gap: 12px; }
+.dev-cheat-scenes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 .dev-cheat-scenes button {
-  flex: 1;
-  padding: 9px 10px;
+  min-width: 0;
+  padding: 9px 6px;
   border-radius: 10px;
   color: rgba(243, 227, 194, .72);
   background: rgba(255,255,255,.06);
@@ -3873,14 +4044,64 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   font-weight: 800;
 }
 .dev-cheat-scenes button:hover, .dev-cheat-scenes button.on { color: #23190e; background: var(--gold); }
+.dev-cheat-stage-jump {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  gap: 6px;
+}
+.dev-cheat-stage-jump label {
+  min-width: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255, 215, 106, .2);
+  border-radius: 9px;
+  background: #211923;
+  overflow: hidden;
+}
+.dev-cheat-stage-jump label span { padding-left: 10px; color: rgba(243, 227, 194, .4); font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.dev-cheat-stage-jump input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  color: #fff1c8;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  outline: none;
+}
+.dev-cheat-stage-jump label:focus-within { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 215, 106, .13); }
+.dev-cheat-stage-jump > button {
+  border-radius: 9px;
+  color: #241a10;
+  background: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+}
+.dev-cheat-stage-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 6px; }
+.dev-cheat-stage-presets button {
+  min-width: 0;
+  padding: 5px 3px;
+  border: 1px solid rgba(255, 215, 106, .14);
+  border-radius: 7px;
+  color: rgba(243, 227, 194, .58);
+  background: rgba(255,255,255,.045);
+  font-size: 9px;
+  font-weight: 900;
+}
+.dev-cheat-stage-presets button:hover,
+.dev-cheat-stage-presets button.on { color: #ffe9a8; border-color: rgba(255, 215, 106, .42); background: rgba(255, 215, 106, .12); }
 .dev-cheat-items {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
+.dev-cheat-items-normal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dev-cheat-item {
-  min-height: 58px;
-  padding: 8px 10px;
+  min-height: 48px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3891,7 +4112,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   background: rgba(255,255,255,.055);
 }
 .dev-cheat-item:hover { background: rgba(255,255,255,.12); border-color: rgba(255, 215, 106, .3); }
-.dev-cheat-item b { color: #f3e3c2; font-size: 13px; font-weight: 900; }
+.dev-cheat-item b { color: #f3e3c2; font-size: 12px; font-weight: 900; }
 .dev-cheat-item span { margin-top: 2px; color: rgba(243, 227, 194, .48); font-size: 10px; font-weight: 700; }
 .dev-cheat-item.passive { border-color: rgba(255, 215, 106, .28); background: rgba(255, 215, 106, .08); }
 .dev-cheat-item.passive b { color: #ffe9a8; }
@@ -3899,8 +4120,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-word-grant,
 .dev-cheat-card-spawn {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 6px;
 }
 .dev-cheat-word-grant select,
 .dev-cheat-word-grant button,
@@ -3933,10 +4154,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .dev-cheat-card-spawn button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
 .dev-cheat-card-spawn button:disabled { opacity: .35; cursor: not-allowed; }
 .dev-cheat-result { min-height: 16px; margin: 6px 2px 0; color: rgba(243, 227, 194, .55); font-size: 10px; font-weight: 700; }
-.dev-cheat-run-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.dev-cheat-run-tools { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 9px; }
 .dev-cheat-run-tools button {
-  min-height: 42px;
-  padding: 8px;
+  min-height: 36px;
+  padding: 7px 10px;
   border: 1px solid rgba(255, 215, 106, .18);
   border-radius: 10px;
   color: #f3e3c2;
@@ -4483,9 +4704,15 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .rp-tags {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 184px;
   gap: 6px;
 }
 .rp-rarity {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1px;

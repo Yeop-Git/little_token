@@ -20,7 +20,11 @@ import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
+import enemyFlea from './sprites/enemy_flea.webp'
+import enemyTermite from './sprites/enemy_termite.webp'
 import enemyRoach from './sprites/enemy_roach.webp'
+import enemyPillbug from './sprites/enemy_pillbug.webp'
+import enemyMosquito from './sprites/enemy_mosquito.webp'
 import bossSaltSkater from './sprites/boss_salt_skater.webp'
 import bossQueenBee from './sprites/boss_queen_bee.webp'
 import bossElderSpider from './sprites/boss_elder_spider.webp'
@@ -121,7 +125,11 @@ export const EMOTION_FACES: Record<string, string> = {
 export const SPRITES: Record<string, string> = {
   player_001: player001,
   enemy_moth: enemyMoth,
+  enemy_flea: enemyFlea,
+  enemy_termite: enemyTermite,
   enemy_roach: enemyRoach,
+  enemy_pillbug: enemyPillbug,
+  enemy_mosquito: enemyMosquito,
   boss_salt_skater: bossSaltSkater,
   boss_queen_bee: bossQueenBee,
   boss_elder_spider: bossElderSpider,
