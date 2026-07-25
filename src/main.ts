@@ -18,12 +18,14 @@ import { newRun, registerWord, applyItemReward } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearRun, loadRun, saveRun } from '@core/save'
 import packageInfo from '../package.json'
+import { GraphicsSettings } from '@/ui/GameSettings'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
+GraphicsSettings.apply()
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
@@ -186,6 +188,7 @@ function goBattle(intro = false) {
     player: run.player,
     tables: makeEarlyTables(run.player.deck, run.player),
     onWin: (grade) => goReward(grade),
+    onHome: goTitle,
     intro,
   })
   mountMeta(intro ? 'intro' : 'battle')

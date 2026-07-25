@@ -488,6 +488,25 @@ button {
   align-items: stretch;
   gap: 10px;
 }
+.hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 7px;
+  border-radius: 24px;
+  pointer-events: auto;
+}
+.hud-actions button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-dim);
+  transition: color .14s ease, background .14s ease, transform .14s ease;
+}
+.hud-actions button:hover, .hud-actions button:focus-visible { color: var(--gold-hi); background: rgba(255,255,255,.09); transform: scale(1.08); }
+.hud-actions svg { width: 20px; height: 20px; }
 .turn-badge {
   padding: 6px 18px;
   border-radius: 30px;
@@ -553,7 +572,7 @@ button {
 }
 /* 최전방 적만 선명 + 발광, 뒷줄은 흐릿 */
 .actor.foe.front .model-shell {
-  filter: drop-shadow(0 0 16px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px var(--glow)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
 }
 .battle-sprite {
   display: block;
@@ -564,7 +583,7 @@ button {
 }
 .actor:hover .model-shell,
 .actor:focus-visible .model-shell {
-  filter: drop-shadow(0 0 22px var(--gold)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px var(--gold)) drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
 }
 /* 타원 그림자 레이어(반투명 도형) */
 .actor .shadow {
@@ -773,6 +792,7 @@ button {
   animation: first-mark-bob 1.05s ease-in-out infinite alternate;
 }
 .actor.foe.strikes-first .first-mark { display: inline-flex; }
+.actor.foe.back .first-mark { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
 .nameplate.gone ~ .first-mark {
   bottom: calc(330px * var(--model-scale, 1) + 10px);
@@ -818,13 +838,13 @@ button {
 }
 
 .actor.foe.strikes-first .model-shell {
-  filter: drop-shadow(0 0 16px rgba(255, 66, 36, 0.85)) drop-shadow(0 0 42px rgba(255, 56, 26, 0.4))
+  filter: blur(var(--model-blur, 0)) drop-shadow(0 0 16px rgba(255, 66, 36, 0.85)) drop-shadow(0 0 42px rgba(255, 56, 26, 0.4))
     drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
   animation: first-strike-glow 1.05s ease-in-out infinite alternate;
 }
 @keyframes first-strike-glow {
   to {
-    filter: drop-shadow(0 0 26px rgba(255, 90, 46, 1)) drop-shadow(0 0 60px rgba(255, 66, 30, 0.6))
+    filter: blur(var(--model-blur, 0)) drop-shadow(0 0 26px rgba(255, 90, 46, 1)) drop-shadow(0 0 60px rgba(255, 66, 30, 0.6))
       drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
   }
 }
@@ -1758,17 +1778,20 @@ button {
   mix-blend-mode: screen;
 }
 .word-card.rarity-rare .card-foil,
+.deck-hover-card.rarity-rare .card-foil,
 .reward-pick.rarity-rare .rp-foil {
-  opacity: .28;
+  opacity: .42;
   background:
     linear-gradient(112deg, transparent 20%, rgba(196, 246, 255, .08) 38%, rgba(226, 252, 255, .72) 48%, rgba(99, 207, 234, .18) 58%, transparent 76%);
   background-size: 240% 100%;
   background-position: 100% 0;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity-color) 62%, transparent);
+  animation: rare-foil-idle 5.2s ease-in-out infinite alternate;
 }
 .word-card.rarity-epic .card-foil,
+.deck-hover-card.rarity-epic .card-foil,
 .reward-pick.rarity-epic .rp-foil {
-  opacity: .38;
+  opacity: .5;
   background:
     radial-gradient(circle at 18% 24%, rgba(111, 231, 255, .42), transparent 28%),
     radial-gradient(circle at 78% 68%, rgba(255, 129, 227, .4), transparent 32%),
@@ -1778,8 +1801,9 @@ button {
   animation: epic-foil-drift 6s ease-in-out infinite alternate;
 }
 .word-card.rarity-legendary .card-foil,
+.deck-hover-card.rarity-legendary .card-foil,
 .reward-pick.rarity-legendary .rp-foil {
-  opacity: .52;
+  opacity: .66;
   background:
     radial-gradient(circle at 18% 20%, rgba(255, 255, 255, .92) 0 1px, transparent 2px),
     radial-gradient(circle at 72% 34%, rgba(255, 241, 158, .85) 0 1px, transparent 2px),
@@ -1802,6 +1826,10 @@ button {
 @keyframes rare-foil-sweep {
   from { background-position: 100% 0; }
   to { background-position: -120% 0; }
+}
+@keyframes rare-foil-idle {
+  from { background-position: 100% 0; filter: brightness(.92); }
+  to { background-position: -60% 0; filter: brightness(1.14); }
 }
 @keyframes epic-foil-drift {
   from { background-position: 0% 20%; }
@@ -2136,6 +2164,11 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  min-width: 112px;
+  padding: 10px 12px;
+  border: 3px double rgba(255,224,151,.54);
+  border-radius: 22px 6px 22px 6px;
+  background: rgba(38,25,34,.52);
   transition: transform 0.16s cubic-bezier(0.2, 1.4, 0.4, 1), filter 0.16s;
 }
 .bag-art { width: 74px; height: 74px; color: var(--gold); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
@@ -2192,10 +2225,10 @@ button {
 .stat .si svg { width: 100%; height: 100%; }
 .stat .sl { font-size: 17px; font-weight: 700; color: var(--ink); }
 .stat .sv { margin-left: auto; font-size: 22px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
-/* 좌하단 보조 메뉴 — 스탯 독과 손패 사이에서 뽑기 덱과 같은 수평축에 둔다. */
+/* 뽑기 덱 오른쪽 빈 공간의 보조 메뉴 — 덱과 같은 수평축에 둔다. */
 .battle-tools {
   position: absolute;
-  left: 292px;
+  right: 34px;
   bottom: 109px;
   z-index: 8;
   height: 218px;
@@ -2276,6 +2309,29 @@ button {
 .ov-close svg { width: 100%; height: 100%; }
 .ov-close:hover { color: var(--gold); background: rgba(255, 255, 255, 0.06); }
 
+.settings-panel { width: 620px; }
+.settings-group { padding: 18px 20px; border-radius: 16px; background: rgba(255,255,255,.045); }
+.settings-group + .settings-group { margin-top: 14px; }
+.settings-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.settings-label b { color: #fff3d3; font-size: 20px; }
+.settings-label span { color: var(--gold); font-size: 14px; font-weight: 900; }
+.settings-group p { margin-top: 8px; color: var(--ink-faint); font-size: 13px; }
+#volume-range { width: 100%; accent-color: var(--gold); cursor: pointer; }
+.graphics-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.graphics-options button {
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-radius: 12px;
+  color: var(--ink-dim);
+  background: rgba(255,255,255,.05);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.graphics-options button b { font-size: 17px; }
+.graphics-options button span { margin-top: 2px; font-size: 12px; }
+.graphics-options button.on { color: #2b1e10; background: var(--gold); box-shadow: 0 0 18px rgba(255,207,118,.32); }
+
 .deck-panel { width: 1200px; }
 .deck-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
 .deck-col { background: rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 14px; box-shadow: inset 0 1px 0 var(--glass-hi); }
@@ -2285,6 +2341,27 @@ button {
 .deck-word:last-child { border-bottom: none; }
 .deck-word .dw { display: block; font-size: 21px; font-weight: 900; color: var(--wglow, #fff2da); text-shadow: 0 0 12px var(--wglow, transparent); }
 .deck-word .dn { font-size: 13px; color: var(--ink-faint); }
+.deck-word { cursor: default; transition: background .14s ease, transform .14s ease; }
+.deck-word:hover { background: rgba(255,255,255,.07); transform: translateX(3px); }
+#deck-card-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 8;
+  width: 158px;
+  height: 218px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+#deck-card-preview.show { opacity: 1; }
+.deck-hover-card {
+  position: relative;
+  width: 158px;
+  height: 218px;
+  filter: drop-shadow(0 18px 24px rgba(0,0,0,.68)) drop-shadow(0 0 16px var(--wglow));
+}
+.deck-hover-card .card-face { transform: none; }
 
 /* 캐릭터 상세 — 우측 캐스트 로그 위에 오버랩되는 2D 스프라이트 카드 */
 .character-dock { --wglow: var(--gold); padding: 0; animation: dock-swap 0.2s ease; }
@@ -2513,6 +2590,21 @@ button {
 .rp-take { font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 5px rgba(0, 0, 0, 0.95); }
 .reward-pick.detailing { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 45%, transparent), inset 0 1px 0 var(--glass-hi); }
 
+/* 아이템은 단어 카드의 둥근 사각 프레임과 다른 비대칭 이중 금속 프레임을 쓴다. */
+.reward-pick.is-item { border-radius: 30px 9px 30px 9px; box-shadow: 0 12px 30px rgba(0,0,0,.54), inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 7px rgba(65,43,35,.58); }
+.reward-pick.is-item::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  z-index: 3;
+  border: 3px double rgba(255,224,151,.72);
+  border-radius: 21px 5px 21px 5px;
+  pointer-events: none;
+  box-shadow: inset 0 0 18px rgba(255,181,72,.16);
+}
+.reward-pick.is-item .rp-bg { inset: 7px; border-radius: 22px 4px; overflow: hidden; }
+.reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+
 /* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
 .reward-dock {
   position: static;
@@ -2574,12 +2666,13 @@ button {
 /* 아이템 일러스트(좌) + 스탯표(우) */
 .iforge-top { display: grid; grid-template-columns: 360px 1fr; gap: 30px; width: 100%; }
 .iforge-illust {
-  border-radius: 22px;
+  border-radius: 30px 9px 30px 9px;
   padding: 26px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  box-shadow: inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 8px rgba(65,43,35,.48), 0 14px 28px rgba(0,0,0,.38);
 }
 .iforge-illust .glint { font-size: 15px; letter-spacing: 5px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .iforge-illust .art { width: 152px; height: 152px; margin: 16px 0 10px; color: var(--gold); filter: drop-shadow(0 0 18px rgba(255, 210, 122, 0.5)); animation: float 3s ease-in-out infinite; }
@@ -3244,10 +3337,10 @@ button {
 /* ── 체인 아래 "지금 배율" — 카드를 고르는 즉시 삐리릭 돌다가 팅! 하고 확정 ── */
 .mult-now {
   position: absolute;
-  left: 50%;
+  left: var(--mult-left, 62%);
   top: 118px;
   z-index: 12;
-  transform: translateX(-50%);
+  transform: none;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -3300,3 +3393,11 @@ button {
 /* 동사 전 — 깡수치 자리는 숨기고 배율만 */
 .mult-now.no-flat .mn-flat,
 .mult-now.no-flat .mn-x { display: none; }
+
+/* 그래픽 절전 — 규칙 전달에 필요한 캐릭터 오라는 유지하고 장식 비용만 낮춘다. */
+html[data-graphics='low'] .glass,
+html[data-graphics='low'] .ov-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-graphics='low'] .weather-wash,
+html[data-graphics='low'] .title-fireflies { display: none; }
+html[data-graphics='low'] .card-foil,
+html[data-graphics='low'] .rp-foil { animation: none !important; filter: none !important; }

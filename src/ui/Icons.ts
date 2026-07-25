@@ -18,6 +18,14 @@ export const icon = (key: string): string => {
         <path d="M22 15v25"/></svg>`
     case 'close':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M14 14l20 20M34 14L14 34"/></svg>`
+    case 'settings':
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
+        <circle cx="24" cy="24" r="7" fill="currentColor" fill-opacity="0.16"/>
+        <path d="M24 7v5M24 36v5M7 24h5M36 24h5M12 12l4 4M32 32l4 4M36 12l-4 4M16 32l-4 4"/>
+        <circle cx="24" cy="24" r="14"/></svg>`
+    case 'home':
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M7 23 24 8l17 15"/><path d="M12 20v20h24V20" fill="currentColor" fill-opacity="0.14"/><path d="M20 40V28h8v12"/></svg>`
     case 'sword':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
         <path d="M34 8l6 6-16 16-6-6z" fill="currentColor" fill-opacity="0.2"/><path d="M12 30l6 6M10 34l4 4M18 30l-8 8"/></svg>`

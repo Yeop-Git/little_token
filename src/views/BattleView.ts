@@ -3,7 +3,7 @@
  *  · 상단: 완성 중인 문장(체인) 그림자 강조
  *  · 중앙 하단: 단어를 가로 배치하고 클릭으로 발동. 전부 채우면 자동 완성(반짝 후 발동)
  *  · 되돌리기: 하단 중앙 회색 연한 글자, 한 단계씩 되돌림
- *  · 좌측: 스탯표 + 단어장(전체 덱 오버레이) 버튼
+ *  · 좌측: 스탯표 · 우하단: 단어장과 가방 보조 버튼
  *  · 우측: 정보 패널 — "해당 단어"만의 효과/수치(누적 아님) 또는 가방 아이템 정보
  *  · 가방: 오버레이 대신, 하단 단어 영역이 내려가고 아이템 목록이 올라오는 토글
  */
@@ -48,6 +48,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
+import { GraphicsSettings, type GraphicsQuality } from '@/ui/GameSettings'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -56,6 +57,7 @@ interface Opts {
   encounter: string[]
   /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
   onWin: (grade: number) => void
+  onHome?: () => void
   player?: PlayerState
   tables?: Tables
   hpMult?: number
@@ -96,6 +98,7 @@ export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
   private onWin: (grade: number) => void
+  private onHome?: () => void
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
@@ -124,6 +127,7 @@ export class BattleView {
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
     this.onWin = opts.onWin
+    this.onHome = opts.onHome
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -204,14 +208,18 @@ export class BattleView {
 
         <div class="hud-top">
           <div class="hud-left">
-            <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
             <div class="hud-weather"><span id="f-weather"></span></div>
+            <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
           </div>
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-status">
             <div class="top-badges">
               <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
               <div class="turn-badge glass"><span>턴 <b id="turn">1</b></span><em id="phase">주어 선택</em></div>
+              <div class="hud-actions glass" aria-label="시스템 메뉴">
+                <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
+                <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
+              </div>
             </div>
             <div class="effect-log" id="log"></div>
           </div>
@@ -263,6 +271,8 @@ export class BattleView {
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#deck-btn').addEventListener('click', () => this.openDeck())
+    this.q('#settings-btn').addEventListener('click', () => this.openSettings())
+    this.q('#home-btn').addEventListener('click', () => this.onHome?.())
 
     this.cardHand = new CardHand({
       handRoot: this.q('#card-hand'),
@@ -394,7 +404,8 @@ export class BattleView {
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     el.style.opacity = Math.max(0.34, 1 - rank * 0.19).toFixed(2)
     el.style.setProperty('--model-scale', Math.max(0.44, 1 - rank * 0.13).toFixed(2))
-    el.style.setProperty('--model-blur', `${Math.min(7, rank * 2.2).toFixed(1)}px`)
+    // 대기열 깊이와 무관하게 대기 중인 적은 같은 블러를 써서 상태가 흔들리지 않게 한다.
+    el.style.setProperty('--model-blur', front ? '0px' : '3px')
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
@@ -456,12 +467,13 @@ export class BattleView {
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
     } else {
       const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
+      const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
       stats = enemy
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
             ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
             ['행동 주기', `${enemy.def.every}턴`],
-            ['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공'],
+            ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
         : ''
     }
@@ -555,9 +567,14 @@ export class BattleView {
     if (!anyPicked) {
       host.innerHTML = ''
       host.className = 'mult-now'
+      host.style.removeProperty('--mult-left')
       this.multReelToken++
       return
     }
+    // 선택 단어가 늘어날 때마다 체인의 실제 오른쪽 끝을 따라가 겹치지 않게 이동한다.
+    const chain = this.q('#chain')
+    const chainRight = this.root.offsetWidth / 2 + chain.offsetWidth / 2
+    host.style.setProperty('--mult-left', `${Math.min(1400, chainRight + 24)}px`)
     const intent = compile(this.sel, this.t, this.player.stats, this.mods())
     const mult = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
     // 정산판과 같은 출처(컴파일러가 쌓아 둔 깡수치)를 쓴다 — 방어·회복 문장도 0이 되지 않는다.
@@ -853,7 +870,67 @@ export class BattleView {
       <div class="id-art">${itemArt(item.art)}</div>`
   }
 
+  private openSettings() {
+    const host = this.q('#overlay')
+    const volume = Math.round(GameAudio.getVolume() * 100)
+    const graphics = GraphicsSettings.get()
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <section class="ov-panel glass settings-panel" aria-label="설정">
+        <div class="ov-head"><div class="ov-title">${icon('settings')} 설정</div><button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button></div>
+        <div class="settings-group">
+          <div class="settings-label"><b>오디오</b><span id="volume-value">${volume}%</span></div>
+          <input id="volume-range" type="range" min="0" max="100" step="5" value="${volume}" aria-label="마스터 볼륨">
+          <p>배경음악과 효과음의 전체 크기를 조절합니다.</p>
+        </div>
+        <div class="settings-group">
+          <div class="settings-label"><b>그래픽</b><span>효과 품질</span></div>
+          <div class="graphics-options" role="group" aria-label="그래픽 품질">
+            <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>고급</b><span>블러·포일·배경 효과</span></button>
+            <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>절전</b><span>효과를 줄여 가볍게</span></button>
+          </div>
+        </div>
+      </section>`
+    host.classList.add('open')
+    const close = () => this.closeOverlay()
+    host.querySelector('#ov-x')!.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+    const range = host.querySelector<HTMLInputElement>('#volume-range')!
+    const value = host.querySelector<HTMLElement>('#volume-value')!
+    range.addEventListener('input', () => {
+      const next = Number(range.value)
+      value.textContent = `${next}%`
+      GameAudio.setVolume(next / 100)
+    })
+    host.querySelectorAll<HTMLButtonElement>('[data-quality]').forEach((button) => {
+      button.addEventListener('click', () => {
+        GraphicsSettings.set(button.dataset.quality as GraphicsQuality)
+        host.querySelectorAll('[data-quality]').forEach((item) => item.classList.remove('on'))
+        button.classList.add('on')
+      })
+    })
+  }
+
   // ── 단어장(전체 덱) 오버레이 ──
+  private deckPreviewHtml(w: Word): string {
+    const mood = this.moodOf(w)
+    const art = w.art ? SKILL_ART[w.art] : undefined
+    const rarity = w.rarity ?? 'common'
+    const level = w.level ?? 1
+    const badge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
+    const face = art
+      ? `<div class="card-face card-front art">
+          <img class="card-illus" src="${art}" alt="" aria-hidden="true">
+          <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
+          ${badge}<strong class="card-title">${w.text}</strong><span class="card-note">${w.note}</span>
+        </div>`
+      : `<div class="card-face card-front">
+          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
+          <strong>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
+        </div>`
+    return `<div class="deck-hover-card mood-${mood} rarity-${rarity}" aria-hidden="true">${face}</div>`
+  }
+
   private openDeck() {
     const host = this.q('#overlay')
     const slots = this.t.template.slots
@@ -868,7 +945,7 @@ export class BattleView {
               <div class="deck-col-h"><b>${i + 1}</b> ${s.label}</div>
               ${(this.player.deck[s.key] ?? [])
                 .map(
-                  (w) => `<div class="deck-word mood-${this.moodOf(w)}">
+                  (w) => `<div class="deck-word mood-${this.moodOf(w)}" data-slot="${s.key}" data-word="${w.id}">
                     <span class="dw">${w.text}</span><span class="dn">${w.note}</span>
                   </div>`,
                 )
@@ -877,11 +954,33 @@ export class BattleView {
             )
             .join('')}
         </div>
-      </div>`
+      </div>
+      <div id="deck-card-preview"></div>`
     host.classList.add('open')
     const close = () => this.closeOverlay()
     host.querySelector('#ov-x')!.addEventListener('click', close)
     host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+    const preview = host.querySelector<HTMLElement>('#deck-card-preview')!
+    const movePreview = (event: MouseEvent) => {
+      const rect = this.root.getBoundingClientRect()
+      const scale = rect.width / this.root.offsetWidth || 1
+      const cardWidth = 158
+      const cardHeight = 218
+      const x = Math.min(this.root.offsetWidth - cardWidth - 18, Math.max(18, (event.clientX - rect.left) / scale + 20))
+      const y = Math.min(this.root.offsetHeight - cardHeight - 18, Math.max(18, (event.clientY - rect.top) / scale - cardHeight - 20))
+      preview.style.transform = `translate3d(${x}px, ${y}px, 0)`
+    }
+    host.querySelectorAll<HTMLElement>('.deck-word').forEach((row) => {
+      const word = (this.player.deck[row.dataset.slot!] ?? []).find((item) => item.id === row.dataset.word)
+      if (!word) return
+      row.addEventListener('mouseenter', (event) => {
+        preview.innerHTML = this.deckPreviewHtml(word)
+        preview.classList.add('show')
+        movePreview(event)
+      })
+      row.addEventListener('mousemove', movePreview)
+      row.addEventListener('mouseleave', () => preview.classList.remove('show'))
+    })
   }
   private closeOverlay() {
     const host = this.q('#overlay')
