@@ -44,21 +44,23 @@ export interface ExclaimSlot {
 
 // 기본 스탯 예산: 종합 4점. 체력은 2가 1점 가치다(hp 2 = 다른 스탯 1).
 export const ITEMS: Record<string, ItemDef> = {
+  // id는 저장된 런이 참조하므로 그대로 둔다 — 바꾸면 이어하기에서 아이템이 사라진다.
+  // 보이는 것(이름·그림·문구)만 갈아 끼운다.
   ribbon: {
     id: 'ribbon',
-    name: '낡은 리본',
+    name: '낡은 책',
     rarity: 'common',
-    art: 'ribbon',
+    art: 'book',
     base: { hp: 2, atk: 0, guard: 2, heal: 0, luck: 1 },
-    flavor: '어제 주운 것 같은데 기억이 안 난다.',
+    flavor: '표지의 잠금쇠는 진작 헐거워졌다.',
   },
   candle: {
     id: 'candle',
-    name: '몽당 양초',
+    name: '짜리몽땅 연필',
     rarity: 'common',
-    art: 'candle',
+    art: 'pencil',
     base: { hp: 0, atk: 2, guard: 0, heal: 1, luck: 1 },
-    flavor: '심지가 아직 살아 있다.',
+    flavor: '심이 짧아도 쓰는 데는 지장 없다.',
   },
 }
 

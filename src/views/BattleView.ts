@@ -51,6 +51,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
+import { AttackCinematic, attackCutFor, PUMP_RATIO } from '@/ui/AttackCinematic'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
@@ -145,6 +146,13 @@ export class BattleView {
   private grade = 0
   private player: PlayerState
   private state: BattleState
+  /**
+   * 이 판의 크기 — 전투 시작 시 적 전체의 최대 체력 합.
+   * 집계판이 달아오르는 문턱도, 액션 컷이 터지는 문턱도 전부 이 값의 비율이다.
+   * 깡수치로 잡으면 초반엔 영영 안 터지고 후반엔 매 턴 터진다.
+   */
+  private encounterHp = 0
+  private attackCine: AttackCinematic | null = null
   private sel: Selection = {}
   private slotIndex = 0
   private target = 0
@@ -195,6 +203,9 @@ export class BattleView {
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
+    // 이 판의 크기 — 적 전체의 최대 체력 합. 연출 문턱을 깡수치가 아니라 이 값의 비율로
+    // 잡으면 층이 올라 적이 단단해질수록 문턱도 저절로 따라 올라간다.
+    this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
     engageInitialFront(this.state)
     this.grade = startGrade(this.player.stats.luck)
     this.target = aliveIdx(this.state)[0] ?? 0
@@ -210,6 +221,7 @@ export class BattleView {
     document.removeEventListener('pointercancel', this.onPointerUp, true)
     this.cardHand.destroy()
     this.introDialogue?.destroy()
+    this.attackCine?.destroy()
     destroyCharacterModels(this.root)
     this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
@@ -361,6 +373,10 @@ export class BattleView {
       </div>`
 
     this.renderGrade()
+
+    // 액션 컷은 화면 밖에 붙여 두고 지금부터 받아 둔다 — 터질 때 받기 시작하면
+    // 가장 짜릿해야 할 순간에 검은 사각형이 먼저 뜬다.
+    this.attackCine = new AttackCinematic(this.q<HTMLElement>('.scene.battle'))
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
@@ -1619,6 +1635,8 @@ export class BattleView {
       baseBox.querySelector('b')!.textContent = String(base)
       this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
       this.bump(baseBox)
+      // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
+      this.setFever(el, base)
       await sleep(165)
     }
     let mult = 1
@@ -1637,6 +1655,9 @@ export class BattleView {
       await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 330)
       mult = nextMult
       this.bump(multBox)
+      // 배율이 한 칸 꽂힐 때마다 지금까지의 예상 총합으로 열기를 다시 잰다 —
+      // 곱이 겹칠수록 판이 커지고 흔들리고 불이 붙는다.
+      this.setFever(el, base * mult)
       await sleep(36)
     }
     multBox.classList.remove('rolling')
@@ -1893,6 +1914,16 @@ export class BattleView {
 
     // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
     this.setPhase('본인 캐릭터 행동')
+
+    // 액션 컷 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
+    // 문턱은 판 크기 비율이라(encounterHp) 층이 올라도 희소성이 그대로 유지된다.
+    if (dealsDamage) {
+      const alive = aliveIdx(this.state)
+      const wipesAll =
+        alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
+      const cut = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
+      if (cut) await this.attackCine?.play(cut)
+    }
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
     const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.aoe === 'all') >= 2
@@ -2158,6 +2189,27 @@ export class BattleView {
       host.appendChild(shard)
       this.timers.push(window.setTimeout(() => shard.remove(), 720))
     }
+  }
+
+  /**
+   * 열기 단계 — 이 수치가 판 크기의 몇 할인가로 0~3을 매긴다.
+   * 3은 액션 컷이 터지는 문턱과 같은 자리다. 집계판이 미쳐 날뛰다가 그대로 컷으로
+   * 이어지도록 두 연출이 같은 기준을 공유한다.
+   */
+  private feverOf(value: number): number {
+    if (this.encounterHp <= 0 || value <= 0) return 0
+    const ratio = value / this.encounterHp
+    if (ratio >= PUMP_RATIO) return 3
+    if (ratio >= PUMP_RATIO * 0.66) return 2
+    if (ratio >= PUMP_RATIO * 0.33) return 1
+    return 0
+  }
+
+  /** 집계판에 지금 열기를 반영한다. 오르기만 하고 내려가지 않는다 — 달아오른 판은 안 식는다. */
+  private setFever(el: HTMLElement, value: number) {
+    const next = this.feverOf(value)
+    if (next <= Number(el.dataset.fever ?? 0)) return
+    el.dataset.fever = String(next)
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.

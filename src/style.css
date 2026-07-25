@@ -1,4 +1,4 @@
-/* =========================================================================
+﻿/* =========================================================================
    그림일기 — 단어 조립 전투 · 디자인 시스템 v2
    실제 배경 일러스트(따뜻한 폐허 광장) 위에 얹는 "쉐이더틱" UI:
    테두리는 최소화하고 유리(blur) 패널 + 발광 + 그림자로 영역을 나눈다.
@@ -22,6 +22,7 @@ body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+
 
 :root {
   --font: 'Griun', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
@@ -80,19 +81,25 @@ body {
   --glass: rgba(26, 18, 30, 0.62);
   --glass-strong: rgba(20, 14, 24, 0.8);
   --glass-hi: rgba(255, 240, 210, 0.1);
-  /* 스크롤바 — 어두운 잉크 홈 위에 금빛 연필심이 움직이는 공용 그림일기 톤 */
-  --scroll-track: rgba(10, 7, 14, 0.5);
-  --scroll-thumb: rgba(220, 160, 77, 0.7);
-  --scroll-thumb-hover: rgba(255, 207, 118, 0.92);
-  --scroll-thumb-active: #ffe4a8;
+  /* 스크롤바 — 별자리처럼 가는 노란 발광선. 색은 아래 ::-webkit 규칙이 직접 굽고,
+     이 변수는 웹킷 가상요소를 못 쓰는 파이어폭스 폴백에만 쓰인다. */
+  --scroll-thumb: #ffd83c;
 }
 
 /* Firefox와 Chromium/Safari의 모든 스크롤 영역을 같은 모양으로 통일한다.
-   실제로 스크롤되지 않는 요소에는 그려지지 않으므로 새 전용 클래스가 필요 없다. */
-.stage,
-.stage * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+   실제로 스크롤되지 않는 요소에는 그려지지 않으므로 새 전용 클래스가 필요 없다.
+
+   표준 속성(scrollbar-width·scrollbar-color)은 파이어폭스에만 준다.
+   크롬은 이 둘 중 하나라도 지정되면 **아래 ::-webkit-scrollbar 규칙을 통째로 무시하고**
+   표준 스크롤바로 그려 버린다 — 여기 색을 걸어 둔 탓에 공들여 만든 손잡이가 한 번도
+   안 그려지고 scrollbar-thumb 색의 밋밋한 막대만 나오고 있었다.
+   @supports selector(...)는 크롬/사파리에서 참이므로 not 쪽은 파이어폭스만 탄다. */
+@supports not selector(::-webkit-scrollbar) {
+  .stage,
+  .stage * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 
 .stage::-webkit-scrollbar,
@@ -101,42 +108,64 @@ body {
   height: 12px;
 }
 
+/* 별들을 잇는 흐릿한 실선 — 손잡이가 도드라지도록 아주 옅게만 둔다.
+   굵은 투명 테두리를 두고 안쪽만 칠해서 보이는 선을 가늘게 만든다. */
 .stage::-webkit-scrollbar-track,
 .stage *::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: var(--scroll-track);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 238, 204, 0.08),
-    inset 0 0 8px rgba(0, 0, 0, 0.32);
+  border: 5px solid transparent;
+  background-clip: padding-box;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255, 226, 90, 0.09) 10%,
+    rgba(255, 226, 90, 0.09) 90%,
+    transparent
+  );
 }
 
+/* 손잡이는 별자리다 — 위아래 끝에 별이 맺히고 그 사이를 가는 발광선이 잇는다.
+   발광을 box-shadow로 주면 스크롤바 폭에서 잘려 바깥으로 안 번진다. 그래서 가로
+   그라디언트에 직접 구워 넣는다: 가운데가 희게 타고 양옆으로 사그라들면 그 자체가
+   발광하는 얇은 선으로 읽힌다. 반짝임은 애니메이션으로 못 준다 — 크롬은 스크롤바
+   가상요소에 애니메이션을 적용하지 않는다. */
 .stage::-webkit-scrollbar-thumb,
 .stage *::-webkit-scrollbar-thumb {
-  min-width: 36px;
   min-height: 36px;
-  border: 3px solid transparent;
-  border-radius: 999px;
+  border-radius: 99px;
   background:
-    linear-gradient(180deg, var(--gold-hi), var(--scroll-thumb) 48%, var(--gold-deep))
-    padding-box;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 246, 220, 0.28),
-    0 0 9px rgba(255, 194, 89, 0.18);
+    radial-gradient(circle at 50% 7px, #fffce6 0 1.8px, rgba(255, 226, 40, 0.6) 3.2px, transparent 5.5px),
+    radial-gradient(circle at 50% calc(100% - 7px), #fffce6 0 1.8px, rgba(255, 226, 40, 0.6) 3.2px, transparent 5.5px),
+    linear-gradient(
+      90deg,
+      rgba(255, 214, 0, 0) 0%,
+      rgba(255, 214, 0, 0.22) 22%,
+      rgba(255, 226, 40, 0.62) 36%,
+      rgba(255, 242, 130, 0.95) 45%,
+      #fffce6 50%,
+      rgba(255, 242, 130, 0.95) 55%,
+      rgba(255, 226, 40, 0.62) 64%,
+      rgba(255, 214, 0, 0.22) 78%,
+      rgba(255, 214, 0, 0) 100%
+    );
 }
 
 .stage::-webkit-scrollbar-thumb:hover,
 .stage *::-webkit-scrollbar-thumb:hover {
   background:
-    linear-gradient(180deg, #fff1c9, var(--scroll-thumb-hover) 48%, #edaa4e)
-    padding-box;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 251, 238, 0.42),
-    0 0 12px rgba(255, 207, 118, 0.38);
-}
-
-.stage::-webkit-scrollbar-thumb:active,
-.stage *::-webkit-scrollbar-thumb:active {
-  background: var(--scroll-thumb-active) padding-box;
+    radial-gradient(circle at 50% 7px, #fff 0 2.4px, rgba(255, 236, 90, 0.7) 4px, transparent 6px),
+    radial-gradient(circle at 50% calc(100% - 7px), #fff 0 2.4px, rgba(255, 236, 90, 0.7) 4px, transparent 6px),
+    linear-gradient(
+      90deg,
+      rgba(255, 222, 20, 0) 0%,
+      rgba(255, 222, 20, 0.34) 18%,
+      rgba(255, 236, 90, 0.8) 32%,
+      rgba(255, 250, 180, 1) 44%,
+      #fffef5 50%,
+      rgba(255, 250, 180, 1) 56%,
+      rgba(255, 236, 90, 0.8) 68%,
+      rgba(255, 222, 20, 0.34) 82%,
+      rgba(255, 222, 20, 0) 100%
+    );
 }
 
 .stage::-webkit-scrollbar-corner,
@@ -1884,6 +1913,87 @@ button {
   background: radial-gradient(ellipse at center, rgba(10, 7, 16, .68), rgba(10, 7, 16, .32) 60%, transparent 79%);
   filter: drop-shadow(0 18px 34px rgba(0,0,0,.28));
 }
+/* ── 열기 곡선 — 수치가 판 크기의 몇 할을 넘길 때마다 한 단계씩 미쳐 간다 ──
+   문턱은 BattleView.feverOf가 정한다(깡수치가 아니라 이 판 적 체력 총합의 비율).
+   3단계는 액션 컷이 터지는 자리와 같아서, 판이 날뛰다 그대로 컷으로 이어진다.
+   한 번 오른 단계는 안 내려간다 — 달아오른 판은 식지 않는다. */
+.tally[data-fever] .tally-slots {
+  transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1), filter 0.3s ease;
+}
+/* 상자가 커진 만큼 아래 총합과의 사이를 벌린다 — 안 벌리면 3단계에서 서로 파고든다.
+   transform 확대는 자리를 안 밀어내므로 여백으로 직접 밀어야 한다. */
+.tally[data-fever='1'] { gap: 18px; }
+.tally[data-fever='2'] { gap: 28px; }
+.tally[data-fever='3'] { gap: 42px; }
+/* 1 — 커지고 노랗게 달아오르며 낮게 떤다 */
+.tally[data-fever='1'] .tally-slots {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 18px rgba(255, 208, 110, 0.6));
+  animation: fever-shake 0.5s ease-in-out infinite;
+  --shake: 1.4px;
+  --tilt: 0.25deg;
+}
+/* 2 — 더 커지고 주황빛이 번지며 떨림이 거칠어진다 */
+.tally[data-fever='2'] .tally-slots {
+  transform: scale(1.22);
+  filter: drop-shadow(0 0 26px rgba(255, 168, 64, 0.8)) drop-shadow(0 0 60px rgba(255, 110, 40, 0.45));
+  animation: fever-shake 0.28s ease-in-out infinite;
+  --shake: 3px;
+  --tilt: 0.7deg;
+}
+/* 3 — 불이 붙는다. 상자 뒤로 화염이 넘실대고 판 전체가 흔들린다 */
+.tally[data-fever='3'] .tally-slots {
+  transform: scale(1.36);
+  filter: drop-shadow(0 0 34px rgba(255, 214, 92, 0.95)) drop-shadow(0 0 90px rgba(255, 88, 24, 0.7));
+  animation: fever-shake 0.16s ease-in-out infinite;
+  --shake: 5.5px;
+  --tilt: 1.4deg;
+}
+.tally[data-fever='3'] { animation: fever-quake 0.19s ease-in-out infinite; }
+@keyframes fever-shake {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  25% { translate: calc(var(--shake) * -1) calc(var(--shake) * 0.4); rotate: calc(var(--tilt) * -1); }
+  50% { translate: var(--shake) calc(var(--shake) * -0.5); rotate: var(--tilt); }
+  75% { translate: calc(var(--shake) * 0.6) var(--shake); rotate: calc(var(--tilt) * 0.5); }
+}
+@keyframes fever-quake {
+  0%, 100% { translate: -50% -50%; }
+  33% { translate: calc(-50% - 4px) calc(-50% + 3px); }
+  66% { translate: calc(-50% + 4px) calc(-50% - 2px); }
+}
+/* 화염 — 2단계부터 상자 뒤에서 피어오르고 3단계에서 활활 탄다 */
+.tally[data-fever='2'] .tally-box,
+.tally[data-fever='3'] .tally-box { position: relative; }
+.tally[data-fever='2'] .tally-box::after,
+.tally[data-fever='3'] .tally-box::after {
+  content: '';
+  position: absolute;
+  inset: -26% -14% -46%;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50% 50% 42% 42% / 62% 62% 38% 38%;
+  background:
+    radial-gradient(ellipse at 50% 78%, rgba(255, 246, 190, 0.95), transparent 42%),
+    radial-gradient(ellipse at 50% 84%, rgba(255, 176, 54, 0.85), transparent 58%),
+    radial-gradient(ellipse at 50% 92%, rgba(255, 88, 26, 0.6), transparent 72%);
+  mix-blend-mode: screen;
+  animation: fever-flame 0.42s ease-in-out infinite alternate;
+}
+.tally[data-fever='3'] .tally-box::after {
+  inset: -44% -22% -66%;
+  animation-duration: 0.26s;
+}
+@keyframes fever-flame {
+  from { transform: scaleY(0.9) scaleX(0.96); opacity: 0.72; }
+  to { transform: scaleY(1.14) scaleX(1.04); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tally[data-fever] .tally-slots,
+  .tally[data-fever='3'],
+  .tally[data-fever='2'] .tally-box::after,
+  .tally[data-fever='3'] .tally-box::after { animation: none; }
+}
+
 /* 준비 효과·선공이 지나가는 동안 총합은 한쪽에 물러나 대기한다(다시 계산하지 않는다) */
 .tally.parked {
   opacity: 1;
@@ -4090,11 +4200,11 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
    카드가 넘어오는 page-turn이 끝날 즈음 살짝 늦게 떠오른다. */
 .reward-token {
   position: absolute;
-  top: -58px;
-  right: -26px;
+  top: -92px;
+  right: -44px;
   z-index: 3;
-  width: 190px;
-  height: 190px;
+  width: 288px;
+  height: 288px;
   pointer-events: none;
   transform: rotate(11deg);
   animation: reward-token-in 0.66s cubic-bezier(0.2, 0.8, 0.3, 1.2) 0.34s both;
@@ -4113,7 +4223,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .reward-token-shadow {
   z-index: 0;
-  transform: translate(-24px, 8px);
+  /* 본체 크기에 비례해서 민다 — 토큰을 키우면 이 값도 같이 키워야 잔상 결이 유지된다. */
+  transform: translate(-36px, 12px);
   opacity: 0.3;
   filter: blur(1px) brightness(0.55) saturate(0.7);
 }
@@ -5298,3 +5409,92 @@ html[data-graphics='low'] .card-foil::after,
 html[data-graphics='low'] .rp-foil,
 html[data-graphics='low'] .rp-foil::before,
 html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: none !important; }
+
+/* ── 공격 액션 컷 ──
+   왼쪽 화면 밖에 접어 두었다가, 크게 부푼 일격에만 정보 패널처럼 밀려 들어온다.
+   나갈 때도 같은 방향(왼쪽)으로 돌아가서 "잠깐 꺼내 봤다 넣는" 결이 된다.
+   평소엔 visibility로 완전히 빼 둔다 — 영상은 미리 받아 두되 합성에는 안 얹는다. */
+.atk-cine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 98;
+  /* 위아래를 꽉 채운 풀 일러스트. 원본이 1080×1080 정사각이라 높이를 무대에 맞추고
+     너비는 비율로 따라오게 둔다 — 16:9로 잡으면 위아래가 잘리고, 4:3으로 잡으면
+     좌우에 빈 띠가 생겨 오른쪽 흐림이 그림에 안 걸린다. */
+  height: 100%;
+  width: auto;
+  aspect-ratio: 1 / 1;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateX(-104%);
+  will-change: transform, opacity;
+  opacity: 0;
+}
+.atk-cine.is-in,
+.atk-cine.is-out { visibility: visible; }
+.atk-cine.is-in {
+  opacity: 1;
+  transform: translateX(0);
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease-out;
+}
+/* 나갈 때가 들어올 때보다 빨라야 전투가 안 늘어진다 */
+.atk-cine.is-out {
+  opacity: 0;
+  transform: translateX(-104%);
+  transition: transform 0.26s cubic-bezier(0.7, 0, 0.84, 0), opacity 0.26s ease-in;
+}
+/* 오른쪽 끝은 자르지 않고 풀어 준다 — 화면 안쪽으로 스며들 듯 사라져야 패널이
+   덧붙은 판때기처럼 안 보인다. 마스크로 알파를 빼므로 그림자도 같이 옅어진다. */
+.atk-cine-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 6px 0 0 6px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  /* 90deg는 왼쪽 → 오른쪽. 왼쪽이 불투명하고 오른쪽 끝이 투명해진다. */
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 58%, transparent 97%);
+  mask-image: linear-gradient(90deg, #000 0, #000 58%, transparent 97%);
+}
+.atk-cine-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 잘라내지 않고 다 담는다 — 위아래가 잘리면 연출의 핵심이 사라진다. */
+  object-fit: contain;
+  opacity: 0;
+}
+/* 지금 트는 컷만 보인다 — 둘 다 붙여 두고 골라 켜야 미리 받아 둔 게 헛되지 않는다 */
+.atk-cine[data-cut='pump'] .atk-cine-video[data-cut='pump'],
+.atk-cine[data-cut='wipe'] .atk-cine-video[data-cut='wipe'] { opacity: 1; }
+/* 들어오는 방향을 따라 빛이 한 번 훑고 지나간다 */
+.atk-cine-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 34%, rgba(255, 244, 206, 0.5) 50%, transparent 66%);
+  mix-blend-mode: screen;
+  transform: translateX(-120%);
+}
+.atk-cine.is-in .atk-cine-sheen { animation: atk-sheen 0.7s ease-out 0.16s; }
+@keyframes atk-sheen {
+  to { transform: translateX(120%); }
+}
+/* 예전엔 오른쪽 끝을 금빛 띠로 잘라 뒀는데, 그러면 화면에 판때기를 덧댄 티가 났다.
+   이제 프레임 자체가 흐려지며 풀리므로 띠는 빼고, 대신 왼쪽에서 들어오는 결만
+   은은한 발광으로 남긴다. */
+.atk-cine-edge {
+  position: absolute;
+  inset: -6% -2% -6% -2%;
+  border-radius: 18px;
+  background: radial-gradient(ellipse at 34% 50%, rgba(255, 198, 108, 0.24), transparent 68%);
+  mix-blend-mode: screen;
+}
+/* 판을 통째로 쓸어버리는 컷은 더 붉게 탄다(크기는 이미 무대 높이를 꽉 채운다) */
+.atk-cine[data-cut='wipe'] .atk-cine-edge {
+  background: radial-gradient(ellipse at 34% 50%, rgba(255, 138, 62, 0.32), transparent 70%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .atk-cine.is-in, .atk-cine.is-out { transition: opacity 0.2s ease; transform: translateX(0); }
+  .atk-cine.is-in .atk-cine-sheen { animation: none; }
+}
