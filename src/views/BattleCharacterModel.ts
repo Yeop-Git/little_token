@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
+import { currentFieldLight } from '@data/backgrounds'
 
 export type BattleAnimation = 'idle' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 type OneShotAnimation = Exclude<BattleAnimation, 'idle'>
@@ -304,18 +305,20 @@ class BattleCharacterModel {
     // 모델은 매니페스트에서 직교 시점을 선택해 실루엣 왜곡을 막는다.
     this.camera.position.set(0, visual.cameraPositionY ?? 3, 7)
     this.camera.lookAt(0, visual.cameraTargetY ?? 1.45, 0)
-    // 배경의 날씨별 광원 배치를 그대로 캐릭터에 옮긴다. 배경 중앙의 밝은
-    // 하늘을 향한 좌상단 주광과 지면색 반사광만 사용하며 투영 그림자는 없다.
-    const atmosphere = BATTLE_ATMOSPHERES[battleWeatherOf(shell)]
-    const skyFill = new THREE.HemisphereLight(
-      atmosphere.skyLight,
-      atmosphere.groundTint,
-      atmosphere.skyLightIntensity,
-    )
-    const keyLight = new THREE.DirectionalLight(atmosphere.keyLight, atmosphere.keyLightIntensity)
-    keyLight.position.set(...atmosphere.keyLightPosition)
+    // 그림자를 만들지 않는 공용 카툰 조명. 방향과 색은 **지금 깔린 배경 그림에서 뽑은
+    // 실측값**을 그대로 쓴다(data/backgrounds.ts) — 배경마다 빛이 오는 쪽이 다른데
+    // 캐릭터만 늘 같은 데서 빛을 받으면 붙여 놓은 티가 난다.
+    // 주광 반대편에는 그늘색 반사광을 하나 더 세운다. 이게 있어야 어두운 면이 검게
+    // 죽지 않고 배경색을 머금어서, 배경과 캐릭터가 같은 공간에 있는 것처럼 보인다.
+    const fl = currentFieldLight()
+    const skyFill = new THREE.HemisphereLight(fl.skyColor, fl.groundColor, 0.58)
+    const keyLight = new THREE.DirectionalLight(fl.keyColor, fl.intensity)
+    keyLight.position.set(...fl.key)
     keyLight.castShadow = false
-    this.scene.add(skyFill, keyLight)
+    const bounceLight = new THREE.DirectionalLight(fl.bounceColor, fl.intensity * 0.42)
+    bounceLight.position.set(...fl.bounce)
+    bounceLight.castShadow = false
+    this.scene.add(skyFill, keyLight, bounceLight)
     this.scene.add(this.effects)
     this.shell.append(this.renderer.domElement)
     this.shell.dataset.modelInteractive = 'true'

@@ -50,7 +50,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
+import { SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
@@ -61,6 +61,8 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
+import { AttackCinematic, attackCutFor, PUMP_RATIO } from '@/ui/AttackCinematic'
+import { currentFieldStage, pickFieldBackground, type FieldBackground } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
@@ -86,6 +88,8 @@ interface Opts {
   hpMult?: number
   atkMult?: number
   isBoss?: boolean
+  /** 현재 층. 배경 고르기에 쓴다 — 1스테이지는 늘 첫 배경으로 고정한다. */
+  day?: number
   /** 현재 보스의 체력 막 수. 일반 전투에는 전달하지 않는다. */
   bossHealthBars?: number
   /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
@@ -100,8 +104,7 @@ type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 // 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
 // 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
-const RAIL_FRONT_RIGHT = 860
-const RAIL_GAP = 260
+// 레일의 자리·간격·물러남은 배경마다 다르다(data/backgrounds.ts의 FieldStage).
 const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
 const TOKEN_BOSS_LINES = [
@@ -165,6 +168,20 @@ export class BattleView {
   private grade = 0
   private player: PlayerState
   private state: BattleState
+  /**
+   * 이 판의 크기 — 전투 시작 시 적 전체의 최대 체력 합.
+   * 집계판이 달아오르는 문턱도, 액션 컷이 터지는 문턱도 전부 이 값의 비율이다.
+   * 깡수치로 잡으면 초반엔 영영 안 터지고 후반엔 매 턴 터진다.
+   */
+  private encounterHp = 0
+  private attackCine: AttackCinematic | null = null
+  /** 이번 판 배경과 직전 배경 — 직전 것이 있으면 그 위로 새 그림이 밀려 들어온다. */
+  private bg: FieldBackground = { next: '', prev: null }
+  /**
+   * 적 줄의 흐트러짐 — 자로 잰 듯 늘어서면 뻣뻣해 보인다.
+   * 전투가 열릴 때 한 번만 굴린다. 매 렌더마다 다시 굴리면 적이 제자리에서 덜덜 떤다.
+   */
+  private railJitter: { x: number; y: number }[] = []
   private sel: Selection = {}
   private slotIndex = 0
   private target = 0
@@ -217,6 +234,19 @@ export class BattleView {
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
+    // 이 판의 크기 — 적 전체의 최대 체력 합. 연출 문턱을 깡수치가 아니라 이 값의 비율로
+    // 잡으면 층이 올라 적이 단단해질수록 문턱도 저절로 따라 올라간다.
+    this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
+    // 배경은 판마다 갈린다(1스테이지 고정 · 보스방 전용 · 나머지는 직전 것 빼고 무작위).
+    // 이 한 줄이 조명과 무대 배치까지 함께 정한다.
+    this.bg = pickFieldBackground(opts.day ?? 1, this.isBoss)
+    // 맨 앞줄은 타격 지점이라 건드리지 않고, 뒷줄만 조금씩 흐트러뜨린다.
+    this.railJitter = Array.from({ length: MAX_VISIBLE_ENEMIES }, (_, rank) =>
+      rank === 0
+        ? { x: 0, y: 0 }
+        : { x: Math.round((Math.random() * 2 - 1) * 34), y: Math.round((Math.random() * 2 - 1) * 13) },
+    )
+    // 여왕벌의 첫 일벌은 배경·연출 기준값을 확정한 뒤, 첫 행동 순서를 잡기 전에 소환한다.
     summonAtTurnStart(this.state)
     engageInitialFront(this.state)
     this.grade = startGrade(this.player.stats.luck)
@@ -233,6 +263,7 @@ export class BattleView {
     document.removeEventListener('pointercancel', this.onPointerUp, true)
     this.cardHand.destroy()
     this.introDialogue?.destroy()
+    this.attackCine?.destroy()
     destroyCharacterModels(this.root)
     this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
@@ -317,10 +348,16 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${this.bg.prev ?? this.bg.next});--actor-bottom:${currentFieldStage().bottom}px">
+        ${
+          this.bg.prev
+            ? `<div class="field-swap" aria-hidden="true" style="background-image:url(${this.bg.next})"></div>`
+            : ''
+        }
         ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
         <div class="weather-wash"></div>
+        <div class="storybook-grade" aria-hidden="true"></div>
         <div class="spider-web-pressure" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 
         <div class="hud-top">
@@ -385,6 +422,10 @@ export class BattleView {
       </div>`
 
     this.renderGrade()
+
+    // 액션 컷은 화면 밖에 붙여 두고 지금부터 받아 둔다 — 터질 때 받기 시작하면
+    // 가장 짜릿해야 할 순간에 검은 사각형이 먼저 뜬다.
+    this.attackCine = new AttackCinematic(this.q<HTMLElement>('.scene.battle'))
 
     this.q('#bag').addEventListener('click', () => this.toggleBag())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
@@ -868,13 +909,17 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
-    el.style.bottom = this.isBoss && e.def.boss ? '24px' : '26px'
+    // 레일은 배경마다 다르다 — 가운데 골목이 깊게 뚫린 그림이면 좁게 모아 위로
+    // 물러나게 하고, 트인 벌판이면 넓게 벌린다(data/backgrounds.ts의 FieldStage).
+    const st = currentFieldStage()
+    const jit = this.railJitter[rank] ?? { x: 0, y: 0 }
+    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${st.railRight - rank * st.railGap + jit.x}px`
+    el.style.bottom = this.isBoss && e.def.boss ? '24px' : `${st.bottom + rank * st.railRise + jit.y}px`
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
     el.style.opacity = `${1 - depth * 0.2}`
-    el.style.setProperty('--model-scale', `${1 - depth * 0.24}`)
+    el.style.setProperty('--model-scale', `${1 - depth * st.railShrink}`)
     el.style.setProperty('--model-blur', `${depth * 1.5}px`)
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
@@ -1803,6 +1848,8 @@ export class BattleView {
       baseBox.querySelector('b')!.textContent = String(base)
       this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
       this.bump(baseBox)
+      // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
+      this.setFever(el, base)
       await sleep(165)
     }
     let mult = 1
@@ -1821,6 +1868,9 @@ export class BattleView {
       await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 330)
       mult = nextMult
       this.bump(multBox)
+      // 배율이 한 칸 꽂힐 때마다 지금까지의 예상 총합으로 열기를 다시 잰다 —
+      // 곱이 겹칠수록 판이 커지고 흔들리고 불이 붙는다.
+      this.setFever(el, base * mult)
       await sleep(36)
     }
     multBox.classList.remove('rolling')
@@ -2077,6 +2127,16 @@ export class BattleView {
 
     // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
     this.setPhase('본인 캐릭터 행동')
+
+    // 액션 컷 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
+    // 문턱은 판 크기 비율이라(encounterHp) 층이 올라도 희소성이 그대로 유지된다.
+    if (dealsDamage) {
+      const alive = aliveIdx(this.state)
+      const wipesAll =
+        alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
+      const cut = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
+      if (cut) await this.attackCine?.play(cut)
+    }
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
     const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.aoe === 'all') >= 2
@@ -2435,6 +2495,27 @@ export class BattleView {
       host.appendChild(shard)
       this.timers.push(window.setTimeout(() => shard.remove(), 720))
     }
+  }
+
+  /**
+   * 열기 단계 — 이 수치가 판 크기의 몇 할인가로 0~3을 매긴다.
+   * 3은 액션 컷이 터지는 문턱과 같은 자리다. 집계판이 미쳐 날뛰다가 그대로 컷으로
+   * 이어지도록 두 연출이 같은 기준을 공유한다.
+   */
+  private feverOf(value: number): number {
+    if (this.encounterHp <= 0 || value <= 0) return 0
+    const ratio = value / this.encounterHp
+    if (ratio >= PUMP_RATIO) return 3
+    if (ratio >= PUMP_RATIO * 0.66) return 2
+    if (ratio >= PUMP_RATIO * 0.33) return 1
+    return 0
+  }
+
+  /** 집계판에 지금 열기를 반영한다. 오르기만 하고 내려가지 않는다 — 달아오른 판은 안 식는다. */
+  private setFever(el: HTMLElement, value: number) {
+    const next = this.feverOf(value)
+    if (next <= Number(el.dataset.fever ?? 0)) return
+    el.dataset.fever = String(next)
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.

@@ -440,6 +440,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     hpMult: st.hpMult,
     atkMult: st.atkMult,
     isBoss: st.isBoss,
+    day: run.day,
     bossHealthBars: st.bossHealthBars,
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,

@@ -4,6 +4,11 @@
  */
 
 import bg001 from './backgrounds/bg_001.webp'
+import bg002 from './backgrounds/bg_002.webp'
+import bg003 from './backgrounds/bg_003.webp'
+import bg004 from './backgrounds/bg_004.webp'
+import bg005 from './backgrounds/bg_005.webp'
+import bg006 from './backgrounds/bg_006.webp'
 import backgroundDark from './backgrounds/backgroundDark.webp'
 import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
@@ -113,7 +118,11 @@ import itemCloak from './sprites/items/item_008.webp'
 import itemBbq from './sprites/items/item_009.webp'
 import itemPino from './sprites/items/item_010.webp'
 import itemBeanstalk from './sprites/items/item_011.webp'
+import itemBook from './sprites/items/item_012.webp'
+import itemPencil from './sprites/items/item_013.webp'
 import cinematic from './video/cinematic.webm'
+import attack001 from './video/attack_001.webm'
+import attack002 from './video/attack_002.webm'
 import griunFont from './fonts/Griun_PolFairness-Rg.woff2'
 import paperMapParade from './audio/paper-map-parade.mp3'
 import sentenceComplete from './audio/sentence-complete.mp3'
@@ -138,8 +147,22 @@ import contextBonus from './audio/context-bonus.mp3'
 // 배경 키 → URL
 export const BACKGROUNDS: Record<string, string> = {
   bg001,
+  bg002,
+  bg003,
+  bg004,
+  bg005,
+  bg006,
   battleDark: backgroundDark,
 }
+
+/**
+ * 일반 전투 배경 풀 — 스테이지마다 여기서 하나를 뽑는다.
+ * bg006은 보스방 전용이라 뺀다. battleDark는 옛 어두운 판이라 이제 안 쓴다.
+ */
+export const FIELD_BACKGROUNDS: string[] = [bg001, bg002, bg003, bg004, bg005]
+
+/** 보스방 배경 — 일반 풀에 섞이지 않는다. */
+export const BOSS_BACKGROUND = bg006
 
 export const GUIDE_ART = { combat: combatGuide }
 
@@ -300,11 +323,16 @@ export const ITEM_ART: Record<string, string> = {
   bbq: itemBbq, // 아기돼지 바베큐
   pino: itemPino, // 피노키오의 미아핑
   beanstalk: itemBeanstalk, // 잭과 숙주나물
+  book: itemBook, // 낡은 책 — 시작 지급
+  pencil: itemPencil, // 짜리몽땅 연필 — 시작 지급
 }
 
-// 영상 — 오프닝 시네마틱. 어택 컷은 전투 연출에 붙일 때 함께 등록한다.
+// 영상 — 오프닝 시네마틱과 공격 액션 컷.
+// attack1은 수치가 크게 부풀었을 때, attack2는 그 일격이 판을 통째로 쓸어버릴 때.
 export const VIDEO = {
   cinematic,
+  attack1: attack001,
+  attack2: attack002,
 }
 
 export const FONT_URL = griunFont
