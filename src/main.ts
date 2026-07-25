@@ -47,7 +47,7 @@ fit()
 let run = newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
-void preloadBattleResources(run.player.deck)
+void preloadBattleResources(run.player.deck, run.player.items)
 let current: { destroy?: () => void } | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
@@ -294,7 +294,7 @@ function goTitle() {
 
 async function goBattle(intro = false) {
   const request = ++battleRequest
-  await preloadBattleResources(run.player.deck)
+  await preloadBattleResources(run.player.deck, run.player.items)
   if (request !== battleRequest) return
   reset()
   const st = stageFor(run.day)

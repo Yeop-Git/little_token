@@ -3,6 +3,8 @@
  * 배낭/단어장/스탯 등 UI 아이콘을 모아 둔다.
  */
 
+import { ITEM_ART } from '@/assets'
+
 export const icon = (key: string): string => {
   switch (key) {
     case 'backpack':
@@ -56,8 +58,13 @@ export const icon = (key: string): string => {
   }
 }
 
-// 아이템/보상 일러스트 아이콘(sprites.ts에서 이동).
+/**
+ * 아이템/보상 일러스트. 그려 둔 일러스트가 있으면 그걸 쓰고,
+ * 없는 키(노멀 아이템·보상 단어 아이콘)는 아래 SVG로 떨어진다.
+ */
 export const itemArt = (key: string): string => {
+  const illus = ITEM_ART[key]
+  if (illus) return `<img class="item-illus" src="${illus}" alt="" aria-hidden="true">`
   if (key === 'candle')
     return `<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="4">
       <rect x="36" y="40" width="28" height="46" rx="4" fill="currentColor" fill-opacity="0.15"/>

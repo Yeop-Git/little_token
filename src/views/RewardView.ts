@@ -5,7 +5,7 @@
 
 import { RARITY_LABEL, type FieldDef, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
-import { BACKGROUNDS, SKILL_ART } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, SKILL_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
@@ -60,9 +60,10 @@ function mainEffect(opt: RewardOption): string {
   return opt.word!.note
 }
 
-// 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(아이템/보상단어) 색 그라디언트 + 아이콘.
+// 풀 카드 배경 — 일러스트가 있으면 꽉 채우고, 없으면(SVG뿐인 아이템/보상단어) 색 그라디언트 + 아이콘.
 function bgHtml(opt: RewardOption): string {
-  const art = opt.kind === 'word' && opt.word?.art ? SKILL_ART[opt.word.art] : undefined
+  const art =
+    opt.kind === 'word' ? (opt.word?.art ? SKILL_ART[opt.word.art] : undefined) : ITEM_ART[opt.item!.art]
   if (art) return `<div class="rp-bg"><img src="${art}" alt="" /></div>`
   const icon = opt.kind === 'item' && opt.item ? itemArt(opt.item.art) : itemArt('word')
   return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`

@@ -2542,6 +2542,15 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   filter: drop-shadow(0 0 16px rgba(255, 210, 122, 0.45));
 }
 
+/* 아이템 일러스트 — SVG 아이콘이 있던 칸(가방·상세·도감·감탄)을 그대로 꽉 채운다. */
+.item-illus {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
 /* 되돌리기 — 하단 중앙, 회색 연하게 */
 .undo-btn {
   font-size: 18px;
@@ -3174,6 +3183,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   box-shadow: inset 0 0 18px rgba(255,181,72,.16);
 }
 .reward-pick.is-item .rp-bg { inset: 7px; border-radius: 22px 4px; overflow: hidden; }
+/* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
+.reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
 .reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
 
 /* 우측 정보창 — 전투 정보 패널 재사용(위치만 static으로) */
