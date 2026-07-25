@@ -3037,9 +3037,6 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   opacity: 1;
   transform: translate(-50%, -50%) scale(var(--tally-fit));
   padding: 20px 28px;
-  border-radius: 34px;
-  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .68), rgba(10, 7, 16, .32) 60%, transparent 79%);
-  filter: drop-shadow(0 18px 34px rgba(0,0,0,.28));
 }
 /* ── 열기 곡선 — 수치가 판 크기의 몇 할을 넘길 때마다 한 단계씩 미쳐 간다 ──
    문턱은 BattleView.feverOf가 정한다(깡수치가 아니라 이 판 적 체력 총합의 비율).

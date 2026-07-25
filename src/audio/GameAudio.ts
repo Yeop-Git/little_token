@@ -94,7 +94,6 @@ class GameAudioController {
   private failedLoads = new WeakSet<Howl>()
   private pencilVoice: number | null = null
   private pencilStopTimer: number | null = null
-  private lastCardHoverAt = 0
   private lastUiHoverAt = 0
   private buttonSoundsInstalled = false
   private streamsUnlocked = false
@@ -210,9 +209,9 @@ class GameAudioController {
         void Promise.all(this.preloadPreparedStreams())
       }
       const target = event.target
-      // 단어 카드는 종이 전용음을 따로 재생한다. 그 외에는 버튼뿐 아니라 캐릭터 상세,
-      // 컷신처럼 화면 자체가 입력면인 클릭에도 공용 마우스 피드백을 준다.
-      if (!(target instanceof Element) || target.closest('.word-card, :disabled, [aria-disabled="true"], [data-click-sound="none"]')) return
+      // 단어 카드를 포함해 실제 클릭이 닿는 모든 입력면에 공용 피드백을 준다.
+      // 비활성 요소와 소리를 명시적으로 끈 연출만 제외한다.
+      if (!(target instanceof Element) || target.closest(':disabled, [aria-disabled="true"], [data-click-sound="none"]')) return
       this.play('button')
     }, true)
     // pointerenter는 버블링하지 않는다. pointerover를 위임하되 같은 버튼의 자식
@@ -220,7 +219,7 @@ class GameAudioController {
     document.addEventListener('pointerover', (event) => {
       const target = event.target
       const card = target instanceof Element
-        ? target.closest<HTMLElement>('.word-card, .reward-pick, .discard-pick, .deck-hover-card, .draw-deck')
+        ? target.closest<HTMLElement>('.word-card, .word-cell, .reward-pick, .discard-pick, .deck-hover-card, .draw-deck, .codex-selectable[data-detail-kind="word"]')
         : null
       if (card) {
         if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return
@@ -250,11 +249,6 @@ class GameAudioController {
   }
 
   play(effect: EffectName) {
-    if (effect === 'cardHover') {
-      const now = performance.now()
-      if (now - this.lastCardHoverAt < 70) return
-      this.lastCardHoverAt = now
-    }
     if (effect === 'hover') {
       const now = performance.now()
       if (now - this.lastUiHoverAt < 55) return
