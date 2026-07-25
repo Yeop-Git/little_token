@@ -101,8 +101,12 @@ export interface PreparationResult {
 
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
   const guardGain = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
-  state.guard = guardGain
-  state.counterMultiplier = guardGain > 0 ? intent.counterMultiplier : 0
+  // 남은 방어막은 피해로 모두 소모되거나 새 방어막으로 교체될 때까지 유지한다.
+  // 방어가 없는 문장을 준비했다는 이유만으로 기존 방어막을 지우지 않는다.
+  if (guardGain > 0) {
+    state.guard = guardGain
+    state.counterMultiplier = intent.counterMultiplier
+  }
   return { guardGain, counterMultiplier: state.counterMultiplier }
 }
 
@@ -222,6 +226,7 @@ export interface EnemyStrike {
   dealt: number
   idx: number
   absorbed: number
+  piercedGuard: boolean
   counterHit: HitFx | null
 }
 
@@ -234,21 +239,27 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   if (enemy.initiativePhase !== phase || state.turn < enemy.nextAttackTurn) return strikes
 
   const raw = Math.round((enemy.def.atk + Math.floor(rng() * 3)) * enemy.atkMult)
-  const absorbed = Math.min(state.guard, raw)
-  const dealt = Math.max(0, raw - state.guard)
+  const piercedGuard = !!enemy.def.pierceGuard
+  const absorbed = piercedGuard ? 0 : Math.min(state.guard, raw)
+  const dealt = piercedGuard ? raw : Math.max(0, raw - state.guard)
   state.playerHp -= dealt
   const counterHit = absorbed > 0 && state.counterMultiplier > 0
     ? damageEnemy(state, front, Math.round(absorbed * state.counterMultiplier), false, [])
     : null
   strikes.push({
-    text: `${enemy.def.name}의 습격 → ${dealt} 피해` + (absorbed ? ` (방어 ${absorbed} 흡수)` : ''),
+    text: `${enemy.def.name}의 습격 → ${dealt} 피해`
+      + (piercedGuard ? ' (방어 관통)' : absorbed ? ` (방어 ${absorbed} 흡수)` : ''),
     dealt,
     idx: front,
     absorbed,
+    piercedGuard,
     counterHit,
   })
-  state.guard = 0
-  state.counterMultiplier = 0
+  state.guard -= absorbed
+  if (state.guard <= 0) {
+    state.guard = 0
+    state.counterMultiplier = 0
+  }
   enemy.nextAttackTurn = state.turn + enemy.def.every
   if (enemy.def.initiative === 'first') enemy.initiativePhase = phase === 'first' ? 'second' : 'first'
   if (enemy.dead) engageFront(state)

@@ -1,5 +1,6 @@
 import { SKILL_ART } from '@/assets'
-import { EMOTION_ICON, EMOTION_LABEL, emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionBadgeContent } from '@/ui/EmotionBadge'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -379,7 +380,7 @@ export class CardHand {
       const note = button.querySelector<HTMLElement>('.card-note')
       if (note) note.textContent = blocked ?? card.word.note
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
-      if (emotionBadge) emotionBadge.textContent = `${EMOTION_ICON[emotionKey]} ${EMOTION_LABEL[emotionKey]}`
+      if (emotionBadge) emotionBadge.innerHTML = emotionBadgeContent(emotionKey)
       const footer = button.querySelector<HTMLElement>('.card-front > small')
       if (footer) footer.textContent = blocked ? '맥락 충돌' : 'WORD CARD'
     }
@@ -406,13 +407,13 @@ export class CardHand {
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
+          ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>
           <strong class="card-title">${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}<span class="card-emotion">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</span>
+          ${levelBadge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span>
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
           <strong>${card.word.text}</strong>
           <span class="card-note">${blocked ?? card.word.note}</span>

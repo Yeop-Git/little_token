@@ -31,15 +31,10 @@ export const ENEMIES: Record<string, EnemyDef> = {
     sprite: 'boss_elder_spider', guard: 12, magicShield: 1, weakEmotion: 'pleasure',
     note: '낡은 일기장을 거미줄로 꿰매며 이야기를 다른 결말로 고친다. 즐거운 한 줄이 거미줄을 흔든다.',
   },
-  armoredRoach: {
-    id: 'armoredRoach', name: '갑각 바퀴', hp: 12, atk: 6, every: 2, initiative: 'first',
-    sprite: 'enemy_roach', guard: 7, weakEmotion: 'anger',
-    note: '먼저 달려들며 단단한 껍질이 피해를 받아 낸다. 분노에 약하다.',
-  },
-  shieldMoth: {
-    id: 'shieldMoth', name: '유리날개 좀나방', hp: 8, atk: 5, every: 2, initiative: 'second',
-    sprite: 'enemy_moth', magicShield: 1, weakEmotion: 'sorrow',
-    note: '매직실드가 한 타격을 막는다. 슬픔에 약하다.',
+  termite: {
+    id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',
+    sprite: 'enemy_moth',
+    note: '특별한 능력 없이 종이 섬유를 차근차근 갉아 먹는다.',
   },
   moth: {
     id: 'moth',
@@ -49,7 +44,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
     every: 2,
     initiative: 'second',
     sprite: 'enemy_moth',
-    note: '책장을 갉아 문다 — 서둘러야 한다',
+    note: '특별한 능력 없이 책장 가장자리를 갉아 먹는다.',
+  },
+  flea: {
+    id: 'flea', name: '벼룩', hp: 7, atk: 5, every: 2, initiative: 'first',
+    sprite: 'enemy_roach',
+    note: '작고 빠른 몸으로 문장이 시작되기 전 먼저 뛰어든다.',
   },
   roach: {
     id: 'roach',
@@ -57,11 +57,22 @@ export const ENEMIES: Record<string, EnemyDef> = {
     hp: 10,
     atk: 6,
     every: 2,
-    initiative: 'first',
+    initiative: 'second',
     sprite: 'enemy_roach',
-    note: '재빠르게 먼저 달려들고, 단단한 껍질로 오래 버틴다',
+    guard: 7,
+    note: '단단한 껍질의 방어 7이 피해를 먼저 받아 낸다.',
+  },
+  pillbug: {
+    id: 'pillbug', name: '콩벌레', hp: 12, atk: 5, every: 2, initiative: 'second',
+    sprite: 'enemy_roach', magicShield: 1,
+    note: '매직실드 1겹이 첫 타격을 완전히 막고 사라진다.',
+  },
+  mosquito: {
+    id: 'mosquito', name: '모기', hp: 8, atk: 6, every: 2, initiative: 'second',
+    sprite: 'enemy_moth', pierceGuard: true,
+    note: '긴 침으로 방어막을 소모시키지 않고 체력에 직접 피해를 준다.',
   },
 }
 
-// 화면 데모 조우: 3마리 무리(범위 단어의 필요성을 보여준다).
-export const DEMO_ENCOUNTER = ['moth', 'roach', 'moth']
+// 화면 데모 조우: 서로 다른 능력을 바로 비교한다.
+export const DEMO_ENCOUNTER = ['flea', 'roach', 'pillbug', 'mosquito']

@@ -11,6 +11,7 @@ import { FIELDS } from './fields'
 
 // 레일에 한 번에 세울 수 있는 최대 마릿수.
 export const MAX_ENCOUNTER = 8
+const ENEMY_ORDER = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito'] as const
 
 /** 첫 세 보스는 날짜로 고정하고, 15일 이후의 5일 단위 전투는 장로거미가 다시 지킨다. */
 export const BOSS_BY_DAY: Record<number, string> = {
@@ -47,11 +48,10 @@ export function stageFor(day: number): Stage {
   if (boss) return { day, field, encounter: [boss], hpMult, atkMult, isBoss }
 
   const encounter: string[] = []
-  // 날이 갈수록 단단한 바퀴벌레 비중이 는다.
+  // 1일차 무능력 2종에서 시작해 날짜마다 능력 적을 하나씩 소개한다.
+  const available = ENEMY_ORDER.slice(0, Math.min(ENEMY_ORDER.length, day + 1))
   for (let i = 0; i < count; i++) {
-    if (day >= 3 && i % 4 === 3) encounter.push('shieldMoth')
-    else if (day >= 3 && i % 4 === 2) encounter.push('armoredRoach')
-    else encounter.push(i % 3 === 2 ? 'roach' : 'moth')
+    encounter.push(available[(day - 1 + i) % available.length])
   }
   return { day, field, encounter, hpMult, atkMult, isBoss }
 }

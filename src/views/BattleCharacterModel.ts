@@ -8,6 +8,7 @@ type OneShotAnimation = Exclude<BattleAnimation, 'idle'>
 const MODEL_VIEW_HEIGHT = 3.6
 // 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
 const MODEL_FIT_HEIGHT = 2.78
+const COMPANION_FIT_HEIGHT = 0.72
 const TRANSITION_SECONDS = 0.18
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['attack', 'heal', 'shield'])
 
@@ -55,6 +56,13 @@ interface PlusParticle {
   phase: number
   x: number
   y: number
+}
+
+interface EffectShard {
+  group: THREE.Group
+  material: THREE.MeshBasicMaterial
+  distance: number
+  delay: number
 }
 
 const modelLoads = new Map<string, Promise<GLTF>>()
@@ -183,10 +191,19 @@ class BattleCharacterModel {
   private actions: Partial<Record<BattleAnimation, THREE.AnimationAction>> = {}
   private current: THREE.AnimationAction | null = null
   private model: THREE.Object3D | null = null
+  private companion: THREE.Group | null = null
+  private companionMixer: THREE.AnimationMixer | null = null
+  private companionGlow: THREE.Sprite | null = null
+  private companionElapsed = 0
+  private companionActionElapsed = 0
+  private cameraZoom = 1
+  private cameraZoomTarget = 1
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
   private healMaterials: THREE.ShaderMaterial[] = []
   private plusParticles: PlusParticle[] = []
+  private healShards: EffectShard[] = []
+  private shieldShards: EffectShard[] = []
   private shieldMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null = null
   private shieldBaseY = 1
   private effectKind: 'heal' | 'shield' | null = null
@@ -251,9 +268,173 @@ class BattleCharacterModel {
       }
       this.mixer.addEventListener('finished', this.onAnimationFinished)
       this.play(this.requestedAnimation)
+      await this.loadCompanion()
     } catch (error) {
       console.warn(`3D 캐릭터 모델을 불러오지 못해 2D 초상을 사용합니다: ${this.visual.id}`, error)
       this.shell.dataset.modelStatus = 'fallback-2d'
+    }
+  }
+
+  private async loadCompanion() {
+    const companion = this.visual.companion
+    if (!companion) return
+    try {
+      const gltf = await loadModel(companion.model3d)
+      if (this.disposed) return
+
+      const model = cloneSkeleton(gltf.scene)
+      model.rotation.y = companion.modelYaw ?? 0
+      this.useCompanionUnlitMaterials(model)
+      model.updateMatrixWorld(true)
+      const bounds = new THREE.Box3().setFromObject(model)
+      const size = bounds.getSize(new THREE.Vector3())
+      if (!Number.isFinite(size.y) || size.y <= 0) return
+      model.scale.multiplyScalar(COMPANION_FIT_HEIGHT / size.y)
+      model.updateMatrixWorld(true)
+      const fitted = new THREE.Box3().setFromObject(model)
+      const center = fitted.getCenter(new THREE.Vector3())
+      model.position.sub(center)
+
+      const group = new THREE.Group()
+      const glow = this.makeCompanionGlow()
+      glow.position.z = -0.08
+      group.add(glow, model)
+      group.position.set(-1.08, 1.8, 0.45)
+      this.scene.add(group)
+      this.companion = group
+      this.companionGlow = glow
+
+      const clip = gltf.animations.find((candidate) => candidate.name === companion.idleAnimation)
+        ?? gltf.animations.find((candidate) => candidate.name.toLowerCase().includes('fly'))
+      if (clip) {
+        this.companionMixer = new THREE.AnimationMixer(model)
+        const action = this.companionMixer.clipAction(normalizedClip(clip, true, 0.35))
+        action.setLoop(THREE.LoopRepeat, Infinity).play()
+      }
+    } catch (error) {
+      console.warn(`도우미 3D 모델을 불러오지 못했습니다: ${companion.name}`, error)
+    }
+  }
+
+  private useCompanionUnlitMaterials(model: THREE.Object3D) {
+    model.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return
+      const originals = Array.isArray(object.material) ? object.material : [object.material]
+      const replacements = originals.map((material) => {
+        const source = material as THREE.MeshStandardMaterial
+        return new THREE.MeshBasicMaterial({
+          name: `${material.name}-token-unlit`,
+          color: source.color?.clone() ?? new THREE.Color(0xffffff),
+          map: source.map ?? null,
+          alphaMap: source.alphaMap ?? null,
+          transparent: material.transparent,
+          opacity: material.opacity,
+          alphaTest: material.alphaTest,
+          side: material.side,
+          vertexColors: source.vertexColors,
+          toneMapped: false,
+        })
+      })
+      object.material = Array.isArray(object.material) ? replacements : replacements[0]
+    })
+  }
+
+  private makeCompanionGlow(): THREE.Sprite {
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const context = canvas.getContext('2d')!
+    const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 62)
+    gradient.addColorStop(0, 'rgba(255,255,232,1)')
+    gradient.addColorStop(0.2, 'rgba(255,226,126,.8)')
+    gradient.addColorStop(0.55, 'rgba(255,185,72,.28)')
+    gradient.addColorStop(1, 'rgba(255,174,56,0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, 128, 128)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      color: 0xffd878,
+      transparent: true,
+      opacity: 0.58,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+      toneMapped: false,
+    })
+    const glow = new THREE.Sprite(material)
+    glow.scale.setScalar(1.15)
+    glow.renderOrder = 10
+    return glow
+  }
+
+  private updateCompanion(delta: number) {
+    if (!this.companion) return
+    this.companionElapsed += delta
+    this.companionActionElapsed += delta
+    this.companionMixer?.update(delta)
+
+    const t = this.companionElapsed
+    const actionTime = this.companionActionElapsed
+    const animation = this.requestedAnimation
+    let x = -1.08 + Math.sin(t * 1.15) * 0.07
+    let y = 1.8 + Math.sin(t * 2.1) * 0.1
+    let z = 0.45 + Math.cos(t * 1.6) * 0.05
+    let roll = Math.sin(t * 1.7) * 0.08
+    let glowColor = 0xffd878
+    let glowStrength = 0.58
+    let pulseSpeed = 2.2
+
+    if (animation === 'attack') {
+      const p = Math.min(1, actionTime / 0.44)
+      x += Math.sin(p * Math.PI) * 0.95
+      y += Math.sin(p * Math.PI * 2) * 0.23
+      roll = -Math.sin(p * Math.PI) * 0.55
+      glowColor = 0xff745e
+      glowStrength = 0.82
+      pulseSpeed = 7
+    } else if (animation === 'heal') {
+      const p = Math.min(1, actionTime / 0.9)
+      x = -0.9 + Math.cos(p * Math.PI * 2) * 0.32
+      y = 1.72 + Math.sin(p * Math.PI * 2) * 0.38
+      roll = p * Math.PI * 2
+      glowColor = 0x7cff9d
+      glowStrength = 0.76
+      pulseSpeed = 4.6
+    } else if (animation === 'shield') {
+      const p = Math.min(1, actionTime / 1.1)
+      x = -0.72 + Math.cos(p * Math.PI * 2 + Math.PI) * 0.48
+      y = 1.6 + Math.sin(p * Math.PI * 2 + Math.PI) * 0.5
+      roll = -p * Math.PI * 2
+      glowColor = 0x75ccff
+      glowStrength = 0.84
+      pulseSpeed = 5.2
+    } else if (animation === 'victory1' || animation === 'victory2') {
+      x = -0.88 + Math.sin(actionTime * 3.6) * 0.4
+      y = 2.02 + Math.sin(actionTime * 7.2) * 0.27
+      z = 0.5 + Math.cos(actionTime * 3.6) * 0.12
+      roll = Math.cos(actionTime * 3.6) * 0.38
+      glowColor = 0xffec76
+      glowStrength = 0.92
+      pulseSpeed = 6
+    } else if (animation === 'defeat') {
+      x = -1.02 + Math.sin(actionTime * 1.8) * 0.05
+      y = 1.24 + Math.sin(actionTime * 2.5) * 0.07
+      z = 0.36
+      roll = 0.42 + Math.sin(actionTime * 1.4) * 0.08
+      glowColor = 0x9ba7d8
+      glowStrength = 0.34
+      pulseSpeed = 1.4
+    }
+
+    this.companion.position.set(x, y, z)
+    this.companion.rotation.z = roll
+    if (this.companionGlow) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * pulseSpeed)
+      this.companionGlow.material.color.setHex(glowColor)
+      this.companionGlow.material.opacity = glowStrength * (0.68 + pulse * 0.32)
+      this.companionGlow.scale.setScalar(1.02 + pulse * 0.28)
     }
   }
 
@@ -363,17 +544,20 @@ outgoingLight *= uBattleExposure;`)
     aura.renderOrder = 6
     const auraMaxRadius = radius * 1.06
     const auraDefs = [
-      { inner: radius * 0.52, outer: radius * 0.92 },
-      { inner: radius * 0.82, outer: radius * 1.06 },
+      { delay: 0, width: 0.105, opacity: 1 },
+      { delay: 0.09, width: 0.075, opacity: 0.72 },
     ]
-    auraDefs.forEach(({ inner, outer }) => {
-      // 실드와 동일한 카드-버스트 결: 화이트-핫 코어 + 발밑에서 퍼지는 충격파 링.
+    auraDefs.forEach(({ delay, width, opacity }) => {
+      // 카드의 확장 링처럼 넓은 면광이 아니라 얇은 이중 충격파만 지면을 훑는다.
       const material = new THREE.ShaderMaterial({
         uniforms: {
           uColor: { value: new THREE.Color(0x79f29a) },
           uOpacity: { value: 0 },
           uProgress: { value: 0 },
           uMaxRadius: { value: auraMaxRadius },
+          uDelay: { value: delay },
+          uWidth: { value: width },
+          uLayerOpacity: { value: opacity },
         },
         vertexShader: `
           varying float vRadial;
@@ -388,23 +572,27 @@ outgoingLight *= uBattleExposure;`)
           uniform float uOpacity;
           uniform float uProgress;
           uniform float uMaxRadius;
+          uniform float uDelay;
+          uniform float uWidth;
+          uniform float uLayerOpacity;
           varying float vRadial;
           void main() {
-            float r = clamp(vRadial / uMaxRadius, 0.0, 1.3);
+            float r = clamp(vRadial / uMaxRadius, 0.0, 1.45);
+            float localProgress = clamp((uProgress - uDelay) / (1.0 - uDelay), 0.0, 1.0);
 
-            // 형성 순간의 버스트 플래시 — 초반에 확 밝았다 빠르게 사그라든다(카드 flash).
-            float flash = pow(1.0 - min(1.0, uProgress * 3.4), 2.0);
+            // 카드 중앙광처럼 발끝에서 한 프레임 달아오른 뒤 링으로 빠져나간다.
+            float flash = pow(1.0 - min(1.0, localProgress * 4.2), 2.4);
 
-            // 발밑에서 바깥으로 퍼지는 충격파 링(카드의 확장 링에 대응).
-            float front = mix(0.05, 1.3, clamp(uProgress * 1.9, 0.0, 1.0));
-            float wave = smoothstep(0.3, 0.0, abs(r - front));
+            // 카드의 가는 원형 테두리와 같은 속도로 바깥까지 단번에 확장한다.
+            float front = mix(0.04, 1.18, smoothstep(0.0, 0.72, localProgress));
+            float wave = 1.0 - smoothstep(uWidth * 0.35, uWidth, abs(r - front));
+            float core = (1.0 - smoothstep(0.0, 0.28, r)) * flash;
 
-            // 안쪽일수록 흰색으로 달아오르는 화이트-핫 코어(카드의 #fff→color).
-            float hot = clamp((1.0 - r) * (0.45 + flash * 1.05) + wave * 0.9, 0.0, 1.0);
-            vec3 color = mix(uColor, vec3(1.0), hot);
-
-            float glow = 0.5 + flash * 1.7 + wave * 1.2;
-            gl_FragColor = vec4(color * glow, min(1.0, glow) * uOpacity);
+            float hot = clamp(core * 1.2 + wave * 0.82, 0.0, 1.0);
+            vec3 color = mix(uColor, vec3(0.86, 1.0, 0.9), hot);
+            float energy = core * 1.8 + wave * 1.35;
+            float fade = 1.0 - smoothstep(0.58, 1.0, localProgress);
+            gl_FragColor = vec4(color * energy, energy * uOpacity * uLayerOpacity * fade);
           }
         `,
         transparent: true,
@@ -414,13 +602,46 @@ outgoingLight *= uBattleExposure;`)
         side: THREE.DoubleSide,
         toneMapped: false,
       })
-      const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 64), material)
+      const ring = new THREE.Mesh(new THREE.CircleGeometry(auraMaxRadius * 1.22, 80), material)
       ring.rotation.x = -Math.PI / 2
       aura.add(ring)
       this.healMaterials.push(material)
     })
     this.effects.add(aura)
     this.healAura = aura
+
+    // 카드 파편보다 잘고 많은 32방향 스트로크. 회복은 지면에 눕혀 넓게 흩뿌린다.
+    const healShardColors = [0xd8ffe2, 0x91f5aa, 0x55d97b]
+    for (let index = 0; index < 32; index += 1) {
+      const angle = (Math.PI * 2 * index) / 32 + (index % 3 - 1) * 0.055
+      const material = new THREE.MeshBasicMaterial({
+        color: healShardColors[index % healShardColors.length],
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        toneMapped: false,
+      })
+      const group = new THREE.Group()
+      const shard = new THREE.Mesh(new THREE.PlaneGeometry(
+        radius * (0.028 + (index % 3) * 0.006),
+        radius * (0.16 + (index % 4) * 0.025),
+      ), material)
+      shard.position.y = radius * 0.1
+      group.add(shard)
+      group.position.set(center.x, groundY + 0.205, 0)
+      group.rotation.set(-Math.PI / 2, 0, angle)
+      group.visible = false
+      group.renderOrder = 8
+      this.effects.add(group)
+      this.healShards.push({
+        group,
+        material,
+        distance: radius * (1.08 + (index % 7) * 0.13),
+        delay: (index % 5) * 0.008,
+      })
+    }
 
     for (let index = 0; index < 7; index += 1) {
       const plus = new THREE.Group()
@@ -490,7 +711,7 @@ outgoingLight *= uBattleExposure;`)
 
           // 화이트-핫 코어: 림·밴드의 가장 밝은 부분은 흰색으로 달아오른다(카드의 #fff→color).
           float hot = clamp(fresnel * (0.55 + flash * 1.1) + band * 0.85, 0.0, 1.0);
-          vec3 color = mix(uColor, vec3(1.0), hot);
+          vec3 color = mix(uColor, vec3(0.55, 0.86, 1.0), hot);
 
           gl_FragColor = vec4(color * rim, min(1.0, rim) * uOpacity);
         }
@@ -510,6 +731,40 @@ outgoingLight *= uBattleExposure;`)
     shield.renderOrder = 7
     this.effects.add(shield)
     this.shieldMesh = shield
+
+    // 프레스넬 껍질 바깥으로 작은 32방향 파편을 멀리 흩뿌려 형성 타격감을 만든다.
+    const shieldShardColors = [0x8bdcff, 0x5ab7ec, 0x2f77d0]
+    for (let index = 0; index < 32; index += 1) {
+      const angle = (Math.PI * 2 * index) / 32 + (index % 3 - 1) * 0.055
+      const material = new THREE.MeshBasicMaterial({
+        color: shieldShardColors[index % shieldShardColors.length],
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        toneMapped: false,
+      })
+      const group = new THREE.Group()
+      group.position.copy(center)
+      group.quaternion.copy(this.camera.quaternion)
+      group.rotateZ(-angle)
+      const shard = new THREE.Mesh(new THREE.PlaneGeometry(
+        radius * (0.028 + (index % 3) * 0.006),
+        radius * (0.17 + (index % 4) * 0.026),
+      ), material)
+      shard.position.y = radius * 0.48
+      group.add(shard)
+      group.visible = false
+      group.renderOrder = 9
+      this.effects.add(group)
+      this.shieldShards.push({
+        group,
+        material,
+        distance: radius * (0.72 + (index % 7) * 0.12),
+        delay: (index % 5) * 0.008,
+      })
+    }
   }
 
   private startEffect(kind: 'heal' | 'shield') {
@@ -517,14 +772,18 @@ outgoingLight *= uBattleExposure;`)
     this.effectElapsed = 0
     if (this.healAura) this.healAura.visible = kind === 'heal'
     this.plusParticles.forEach(({ group }) => { group.visible = kind === 'heal' })
+    this.healShards.forEach(({ group }) => { group.visible = kind === 'heal' })
     if (this.shieldMesh) this.shieldMesh.visible = kind === 'shield'
+    this.shieldShards.forEach(({ group }) => { group.visible = kind === 'shield' })
   }
 
   private stopEffect() {
     this.effectKind = null
     if (this.healAura) this.healAura.visible = false
     this.plusParticles.forEach(({ group }) => { group.visible = false })
+    this.healShards.forEach(({ group }) => { group.visible = false })
     if (this.shieldMesh) this.shieldMesh.visible = false
+    this.shieldShards.forEach(({ group }) => { group.visible = false })
   }
 
   private updateEffect(delta: number) {
@@ -544,10 +803,11 @@ outgoingLight *= uBattleExposure;`)
       const envelope = progress < 0.14
         ? progress / 0.14
         : Math.pow(1 - (progress - 0.14) / 0.86, 1.3)
-      this.healMaterials.forEach((material, index) => {
+      this.healMaterials.forEach((material) => {
         material.uniforms.uProgress.value = progress
-        material.uniforms.uOpacity.value = Math.max(0, envelope) * (index ? 0.72 : 0.44)
+        material.uniforms.uOpacity.value = Math.max(0, envelope)
       })
+      this.updateShards(this.healShards, progress, 0.58)
       this.plusParticles.forEach((particle) => {
         const local = (progress + particle.phase) % 1
         particle.group.position.set(particle.x, particle.y + local * 1.15, 0.55)
@@ -575,7 +835,21 @@ outgoingLight *= uBattleExposure;`)
       this.shieldMesh.material.uniforms.uProgress.value = progress
       this.shieldMesh.material.uniforms.uOpacity.value = Math.max(0, envelope) * 0.9
     }
+    this.updateShards(this.shieldShards, progress, 0.58)
     if (progress >= 1) this.stopEffect()
+  }
+
+  private updateShards(shards: EffectShard[], progress: number, activeUntil: number) {
+    shards.forEach((shard) => {
+      const delayed = Math.max(0, progress - shard.delay)
+      const local = Math.min(1, delayed / activeUntil)
+      const travel = 1 - Math.pow(1 - local, 3)
+      const mesh = shard.group.children[0] as THREE.Mesh
+      const base = shard.distance * (0.38 + travel)
+      mesh.position.set(0, base, 0)
+      mesh.scale.set(1, Math.max(0.08, 0.42 - local * 0.34), 1)
+      shard.material.opacity = delayed <= 0 ? 0 : Math.max(0, 1 - local) * 0.92
+    })
   }
 
   private onAnimationFinished = (event: { action: THREE.AnimationAction }) => {
@@ -621,7 +895,9 @@ outgoingLight *= uBattleExposure;`)
   }
 
   play(animation: BattleAnimation): number {
+    if (animation !== this.requestedAnimation) this.companionActionElapsed = 0
     this.requestedAnimation = animation
+    this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
     this.shell.dataset.modelAnimation = animation
     if (animation !== 'idle') this.shell.dataset.modelLastAction = animation
     const next = this.actions[animation]
@@ -653,6 +929,34 @@ outgoingLight *= uBattleExposure;`)
         ?? next.getClip().duration * 1000 / (this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1))
   }
 
+  /** 풀에서 재사용할 때 이전 one-shot 자세를 한 프레임도 노출하지 않고 idle로 되돌린다. */
+  resetToIdle() {
+    this.requestedAnimation = 'idle'
+    this.companionActionElapsed = 0
+    this.cameraZoom = 1
+    this.cameraZoomTarget = 1
+    this.camera.zoom = 1
+    this.camera.updateProjectionMatrix()
+    this.shell.dataset.modelAnimation = 'idle'
+    delete this.shell.dataset.modelLastAction
+    this.stopEffect()
+
+    const idle = this.actions.idle
+    if (!idle) return
+    this.mixer?.stopAllAction()
+    idle.reset().enabled = true
+    idle.setLoop(THREE.LoopRepeat, Infinity)
+    idle.clampWhenFinished = false
+    idle.setEffectiveTimeScale(1)
+    idle.play()
+    this.current = idle
+
+    // 풀에 있는 동안 캔버스에는 defeat의 마지막 프레임이 남는다. DOM에 다시
+    // 붙이기 전에 idle 첫 자세를 즉시 그려 재스폰 섬광을 막는다.
+    this.mixer?.update(0)
+    this.renderer.render(this.scene, this.camera)
+  }
+
   private resize() {
     const width = Math.max(1, this.shell.clientWidth)
     const height = Math.max(1, this.shell.clientHeight)
@@ -673,7 +977,15 @@ outgoingLight *= uBattleExposure;`)
   render(delta: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
     this.mixer?.update(delta)
+    this.updateCompanion(delta)
     this.updateEffect(delta)
+    const zoomBlend = 1 - Math.exp(-delta * 8)
+    const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
+    if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {
+      this.cameraZoom = nextZoom
+      this.camera.zoom = nextZoom
+      this.camera.updateProjectionMatrix()
+    }
     this.renderer.render(this.scene, this.camera)
     if (this.model && !this.firstFrameRendered) {
       // 실제 WebGL 컨텍스트에서 텍스처 업로드와 첫 드로우까지 성공한 뒤에만
@@ -710,6 +1022,7 @@ outgoingLight *= uBattleExposure;`)
     this.shell.removeEventListener('click', this.onClickCapture, true)
     this.mixer?.removeEventListener('finished', this.onAnimationFinished)
     this.mixer?.stopAllAction()
+    this.companionMixer?.stopAllAction()
     this.model?.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const materials = Array.isArray(object.material) ? object.material : [object.material]
@@ -720,6 +1033,14 @@ outgoingLight *= uBattleExposure;`)
       object.geometry.dispose()
       const materials = Array.isArray(object.material) ? object.material : [object.material]
       materials.forEach((material) => material.dispose())
+    })
+    this.companion?.traverse((object) => {
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Sprite)) return
+      const materials = Array.isArray(object.material) ? object.material : [object.material]
+      materials.forEach((material) => {
+        if (material instanceof THREE.SpriteMaterial) material.map?.dispose()
+        material.dispose()
+      })
     })
     this.renderer.dispose()
     this.renderer.domElement.remove()
@@ -732,8 +1053,12 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
   if (!shell) return
   const mounted = mountedModels.get(shell)
   if (mounted) {
-    // 풀에서 꺼낸 모델은 첫 프레임이 검증된 인스턴스만 다시 활성화한다.
-    if (mounted.isReadyForOutput()) mounted.setActive(true)
+    // 풀에서 꺼낸 모델은 defeat 같은 이전 one-shot 자세를 버리고 idle 첫 프레임부터
+    // 다시 노출한다. 첫 프레임이 검증된 인스턴스만 재활성화하는 조건은 유지한다.
+    if (mounted.isReadyForOutput()) {
+      mounted.resetToIdle()
+      mounted.setActive(true)
+    }
     return
   }
   shell.dataset.modelStatus = 'preparing-3d'
@@ -748,7 +1073,10 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
 
 /** GLB 다운로드뿐 아니라 GLTF 파싱·텍스처 디코딩이 끝날 때까지 기다린다. */
 export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): Promise<void> {
-  const urls = [...new Set(visuals.flatMap((visual) => visual.model3d ? [visual.model3d] : []))]
+  const urls = [...new Set(visuals.flatMap((visual) => [
+    ...(visual.model3d ? [visual.model3d] : []),
+    ...(visual.companion ? [visual.companion.model3d] : []),
+  ]))]
   return Promise.all(urls.map((url) => loadModel(url).then(() => undefined).catch(() => undefined)))
     .then(() => undefined)
 }

@@ -19,7 +19,7 @@ export interface CharacterAnimationDef {
 }
 
 export interface CharacterVisualDef {
-  id: 'player' | 'moth' | 'roach' | 'saltSkater' | 'queenBee' | 'elderSpider'
+  id: 'player' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'saltSkater' | 'queenBee' | 'elderSpider'
   name: string
   model3d: string | null
   animations: CharacterAnimationDef | null
@@ -30,6 +30,12 @@ export interface CharacterVisualDef {
   portrait2d: string
   title: string
   description: string
+  companion?: {
+    name: string
+    model3d: string
+    idleAnimation: string
+    modelYaw?: number
+  }
 }
 
 // 전장의 3D 모델과 상세 화면의 2D 스프라이트를 한 곳에서 1:1로 연결한다.
@@ -64,9 +70,31 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     // 화면 정면에서 90° 돌아 오른쪽의 적을 완전히 바라보는 측면 자세.
     modelYaw: Math.PI / 2,
     modelGroundOffset: -0.34,
+    companion: {
+      name: '토큰',
+      model3d: MODELS.token,
+      idleAnimation: 'Armature|fly|BaseLayer',
+    },
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',
     description: '비에 젖은 일기장을 품고, 올바른 문장으로 이야기를 지켜낸다.',
+  },
+  termite: {
+    id: 'termite',
+    name: '흰개미',
+    model3d: MODELS.enemy_termite,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    modelGroundOffset: -0.18,
+    portrait2d: SPRITES.enemy_moth,
+    title: '종이 속의 하얀 이빨',
+    description: '투명한 날개를 접고 낡은 문장의 섬유부터 차근차근 갉아 먹는다.',
   },
   moth: {
     id: 'moth',
@@ -91,6 +119,23 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     title: '책장을 갉는 날개',
     description: '가벼운 날갯짓으로 문장의 가장자리부터 빠르게 먹어 치운다.',
   },
+  flea: {
+    id: 'flea',
+    name: '벼룩',
+    model3d: MODELS.enemy_flea,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    modelGroundOffset: -0.18,
+    portrait2d: SPRITES.enemy_roach,
+    title: '먼저 튀어 오르는 점',
+    description: '문장이 다 써지기 전 지면을 박차고 먼저 달려든다.',
+  },
   roach: {
     id: 'roach',
     name: '바퀴벌레',
@@ -110,6 +155,32 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     portrait2d: SPRITES.enemy_roach,
     title: '문장 사이의 단단한 얼룩',
     description: '두꺼운 껍질로 버티며 일기장 깊숙한 곳까지 파고든다.',
+  },
+  pillbug: {
+    id: 'pillbug',
+    name: '콩벌레',
+    model3d: MODELS.enemy_pillbug,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    modelGroundOffset: -0.18,
+    portrait2d: SPRITES.enemy_roach,
+    title: '한 번을 지워 내는 등껍질',
+    description: '몸을 말아 첫 타격을 통째로 흘려보낸다.',
+  },
+  mosquito: {
+    id: 'mosquito',
+    name: '모기',
+    model3d: null,
+    animations: null,
+    portrait2d: SPRITES.enemy_moth,
+    title: '방어막 틈을 찌르는 침',
+    description: '긴 침을 밀어 넣어 방어막 뒤의 체력을 바로 갉아 낸다.',
   },
   saltSkater: {
     id: 'saltSkater',

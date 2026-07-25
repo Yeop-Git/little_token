@@ -21,7 +21,8 @@ import {
 import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
+import { emotionBadgeContent } from '@/ui/EmotionBadge'
+import { emotionOrNeutral, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
@@ -612,11 +613,10 @@ export class BattleView {
   private playerHtml(): string {
     const modelStatus = CHARACTER_VISUALS.player.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
-      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬 상세 보기">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
         <div class="nameplate glass">
           <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
-          <div class="hpbar you"><div class="fill"></div></div>
-          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
+          <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
@@ -625,15 +625,23 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    el.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, s.playerHp)}/${s.playerMax}`
-    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width =
-      `${Math.max(0, (s.playerHp / s.playerMax) * 100)}%`
-    // 보호막은 체력을 기준으로 읽는다 — 최대 체력만큼 쌓이면 꽉 찬다.
-    // 숫자만 있던 칩보다 "얼마나 버틸 수 있나"가 체력 바와 같은 축에서 바로 보인다.
-    this.paintShield(el.querySelector<HTMLElement>('.shieldbar')!, s.guard, s.playerMax)
+    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
+      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
+    // 실드(방어)는 리그 오브 레전드처럼 초록 체력을 덮지 않고, 그 뒤에 파란 막으로
+    // 이어 붙는다. 실드가 붙는 만큼 바의 전체 척도를 (최대체력 + 실드)로 늘려 초록은
+    // 그대로 초록으로 두고 추가분만 파랗게 표기한다.
+    const hp = Math.max(0, s.playerHp)
+    const guard = Math.max(0, s.guard)
+    const total = Math.max(1, s.playerMax + guard)
+    const hpPct = hp / total
+    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width = `${hpPct * 100}%`
+    const shield = el.querySelector<HTMLElement>('.hpbar.you > .shield')!
+    shield.style.left = `${hpPct * 100}%`
+    shield.style.width = `${(guard / total) * 100}%`
+    shield.classList.toggle('on', guard > 0)
   }
 
-  /** 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
+  /** 적 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
   private paintShield(bar: HTMLElement, value: number, max: number) {
     const on = value > 0
     bar.hidden = !on
@@ -704,9 +712,12 @@ export class BattleView {
     }
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
-    traits.innerHTML = weak
-      ? `<span class="trait weak ${weak}">${EMOTION_ICON[weak]} ${EMOTION_LABEL[weak]} 약점 ×1.25</span>`
-      : ''
+    traits.innerHTML = [
+      weak ? `<span class="trait weak emotion-${weak}">${emotionBadgeContent(weak)}<strong>약점</strong></span>` : '',
+      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
+      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
+      e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
+    ].join('')
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
@@ -776,6 +787,9 @@ export class BattleView {
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
             ['공격', String(Math.round(enemy.def.atk * enemy.atkMult))],
+            ...(enemy.def.weakEmotion
+              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
+              : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
@@ -954,6 +968,7 @@ export class BattleView {
     // w.slot을 쓰면 지금 고르는 칸이 아니라 원래 칸을 가리킨다.
     const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
     const mood = this.moodOf(w)
+    const emotion = emotionOrNeutral(w.emotion)
     const values = this.wordOwnValues(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
@@ -964,9 +979,9 @@ export class BattleView {
 
     // 일러스트가 있으면 패널 전체에 풀로 깔고, 글은 아래쪽 스크림 위에 얹는다.
     const art = w.art ? SKILL_ART[w.art] : undefined
-    detail.className = `info-dock glass word-detail mood-${mood}`
+    detail.className = `info-dock glass word-detail mood-${mood} emotion-${emotion}`
     detail.innerHTML = `
-      ${art ? `<div class="wd-art"><img src="${art}" alt="" /></div>` : ''}
+      ${art ? `<div class="wd-art"><img src="${art}" alt="" /><span class="wd-art-tint" aria-hidden="true"></span></div>` : ''}
       <div class="wd-scrim" aria-hidden="true"></div>
       <div class="wd-body">
         <div class="wd-name">${w.text}</div>
@@ -1132,6 +1147,7 @@ export class BattleView {
   // ── 단어장(전체 덱) 오버레이 ──
   private deckPreviewHtml(w: Word): string {
     const mood = this.moodOf(w)
+    const emotion = emotionOrNeutral(w.emotion)
     const art = w.art ? SKILL_ART[w.art] : undefined
     const rarity = w.rarity ?? 'common'
     const level = w.level ?? 1
@@ -1140,13 +1156,13 @@ export class BattleView {
       ? `<div class="card-face card-front art">
           <img class="card-illus" src="${art}" alt="" aria-hidden="true">
           <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
-          ${badge}<strong class="card-title">${w.text}</strong><span class="card-note">${w.note}</span>
+          ${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><strong class="card-title">${w.text}</strong><span class="card-note">${w.note}</span>
         </div>`
       : `<div class="card-face card-front">
-          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
+          <span class="card-foil" aria-hidden="true"></span>${badge}<span class="card-emotion">${emotionBadgeContent(emotion)}</span><span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
           <strong>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
         </div>`
-    return `<div class="deck-hover-card mood-${mood} rarity-${rarity}" aria-hidden="true">${face}</div>`
+    return `<div class="deck-hover-card mood-${mood} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${face}</div>`
   }
 
   // ── 도감 — 현재 단어장과 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
@@ -1174,11 +1190,11 @@ export class BattleView {
     const foundItems = itemCatalog.filter((item) => ownedItems.has(item.id)).length
 
     const ownedContent = `<div class="codex-page codex-owned-page" data-codex-page="owned">
-      <p class="codex-intro">이번 런에서 모은 단어다. 단어에 마우스를 올리면 카드 정보를 볼 수 있다.</p>
+      <p class="codex-intro">이번 런에서 모은 단어다. 단어를 고르면 옆에 카드 상세가 펼쳐진다.</p>
       <div class="deck-cols">
         ${slots.map((slot, index) => `<section class="deck-col">
           <div class="deck-col-h"><b>${index + 1}</b> ${slot.label}</div>
-          ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word mood-${this.moodOf(word)}" data-slot="${slot.key}" data-word="${word.id}">
+          ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word codex-selectable mood-${this.moodOf(word)}" data-detail-kind="word" data-slot="${slot.key}" data-word="${word.id}">
             <span class="dw">${word.text}</span><span class="dn">${word.note}</span>
           </div>`).join('')}
         </section>`).join('')}
@@ -1191,7 +1207,7 @@ export class BattleView {
         <div class="codex-grid">
           ${catalog.filter((word) => word.slot === slot).map((word) => {
             const discovered = owned.has(word.id)
-            return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered' : ' missing'}">
+            return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="word" data-word="${word.id}"` : ''}>
               <span class="codex-mark">${discovered ? '✦' : '?'}</span>
               <div><b>${discovered ? word.text : '미발견 카드'}</b><span>${discovered ? word.note : '보상에서 만나면 기록된다.'}</span></div>
             </article>`
@@ -1206,7 +1222,7 @@ export class BattleView {
         ${enemyCatalog.map((enemy) => {
           const discovered = encountered.has(enemy.id)
           const sprite = SPRITES[enemy.sprite]
-          return `<article class="codex-portrait-entry${discovered ? ' discovered' : ' missing'}">
+          return `<article class="codex-portrait-entry${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="enemy" data-enemy="${enemy.id}"` : ''}>
             <div class="codex-portrait-art">${discovered && sprite ? `<img src="${sprite}" alt="">` : '<span>?</span>'}</div>
             <div><b>${discovered ? enemy.name : '미발견 벌레'}</b><span>${discovered ? enemy.note : '전장에서 만나면 기록된다.'}</span></div>
             <dl><div><dt>체력</dt><dd>${discovered ? enemy.hp : '—'}</dd></div><div><dt>공격</dt><dd>${discovered ? enemy.atk : '—'}</dd></div><div><dt>행동</dt><dd>${discovered ? `${enemy.every}턴` : '—'}</dd></div></dl>
@@ -1220,7 +1236,7 @@ export class BattleView {
       <div class="codex-item-grid">
         ${itemCatalog.map((item) => {
           const discovered = ownedItems.has(item.id)
-          return `<article class="codex-item-entry rarity-${item.rarity}${discovered ? ' discovered' : ' missing'}">
+          return `<article class="codex-item-entry rarity-${item.rarity}${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="item" data-item="${item.id}"` : ''}>
             <div class="codex-item-art">${discovered ? itemArt(item.art) : '<span>?</span>'}</div>
             <div><b>${discovered ? item.name : '미발견 아이템'}</b><em>${discovered ? RARITY_LABEL[item.rarity] : '기록 없음'}</em><span>${discovered ? item.flavor : '보상에서 만나면 기록된다.'}</span></div>
           </article>`
@@ -1248,43 +1264,118 @@ export class BattleView {
             ${enemyContent}
             ${itemContent}
           </div>
+          <aside class="codex-detail" id="codex-detail" aria-live="polite"></aside>
         </div>
-      </section>
-      <div id="deck-card-preview"></div>`
+      </section>`
     host.classList.add('open')
     const close = () => this.closeOverlay()
     host.querySelector('#ov-x')!.addEventListener('click', close)
     host.querySelector('.ov-backdrop')!.addEventListener('click', close)
     const count = host.querySelector<HTMLElement>('.codex-current-count')!
+    const panel = host.querySelector<HTMLElement>('.codex-panel')!
+    const detail = host.querySelector<HTMLElement>('#codex-detail')!
+    let selected: HTMLElement | null = null
+
+    // 상세를 닫으면 창을 원래 폭으로 되돌린다.
+    const closeDetail = () => {
+      panel.classList.remove('detail-open')
+      selected?.classList.remove('selected')
+      selected = null
+      detail.innerHTML = ''
+    }
+    // 항목을 고르면 창이 좌우로 늘어나며 옆에 상세 카드가 열린다(같은 항목을 다시 누르면 닫힘).
+    const openDetail = (el: HTMLElement, body: string) => {
+      if (selected === el) { closeDetail(); return }
+      selected?.classList.remove('selected')
+      selected = el
+      el.classList.add('selected')
+      detail.innerHTML = `<button class="cdx-detail-close" type="button" aria-label="상세 닫기">${icon('close')}</button>${body}`
+      panel.classList.add('detail-open')
+      detail.querySelector('.cdx-detail-close')!.addEventListener('click', closeDetail)
+      GameAudio.play('paper')
+    }
+
     host.querySelectorAll<HTMLButtonElement>('[data-codex-tab]').forEach((button) => {
       button.addEventListener('click', () => {
         const tab = button.dataset.codexTab!
         host.querySelectorAll('[data-codex-tab]').forEach((entry) => entry.classList.toggle('on', entry === button))
         host.querySelectorAll<HTMLElement>('[data-codex-page]').forEach((page) => { page.hidden = page.dataset.codexPage !== tab })
         count.textContent = button.dataset.count ?? ''
+        closeDetail() // 분류를 바꾸면 상세는 접는다.
       })
     })
-    const preview = host.querySelector<HTMLElement>('#deck-card-preview')!
-    const movePreview = (event: MouseEvent) => {
-      const rect = this.root.getBoundingClientRect()
-      const scale = rect.width / this.root.offsetWidth || 1
-      const cardWidth = 158
-      const cardHeight = 218
-      const x = Math.min(this.root.offsetWidth - cardWidth - 18, Math.max(18, (event.clientX - rect.left) / scale + 20))
-      const y = Math.min(this.root.offsetHeight - cardHeight - 18, Math.max(18, (event.clientY - rect.top) / scale - cardHeight - 20))
-      preview.style.transform = `translate3d(${x}px, ${y}px, 0)`
-    }
-    host.querySelectorAll<HTMLElement>('.codex-owned-page .deck-word').forEach((row) => {
-      const word = (this.player.deck[row.dataset.slot!] ?? []).find((item) => item.id === row.dataset.word)
-      if (!word) return
-      row.addEventListener('mouseenter', (event) => {
-        preview.innerHTML = this.deckPreviewHtml(word)
-        preview.classList.add('show')
-        movePreview(event)
+
+    host.querySelectorAll<HTMLElement>('.codex-selectable').forEach((el) => {
+      el.addEventListener('click', () => {
+        const kind = el.dataset.detailKind
+        if (kind === 'word') {
+          const id = el.dataset.word!
+          const word = (this.player.deck[el.dataset.slot ?? ''] ?? []).find((w) => w.id === id)
+            ?? catalog.find((w) => w.id === id)
+          if (word) openDetail(el, this.codexWordDetailHtml(word, el.dataset.slot ?? word.slot, slotLabel))
+        } else if (kind === 'enemy') {
+          const enemy = enemyCatalog.find((e) => e.id === el.dataset.enemy)
+          if (enemy) openDetail(el, this.codexEnemyDetailHtml(enemy))
+        } else if (kind === 'item') {
+          const item = itemCatalog.find((i) => i.id === el.dataset.item)
+          if (item) openDetail(el, this.codexItemDetailHtml(item))
+        }
       })
-      row.addEventListener('mousemove', movePreview)
-      row.addEventListener('mouseleave', () => preview.classList.remove('show'))
     })
+  }
+
+  // ── 도감 상세 카드 — 전투 중 호버 상세와 같은 표기(wd-name·character-dock·id-stats)를 재활용한다. ──
+  private codexWordDetailHtml(w: Word, slotKey: string, slotLabel: Record<string, string>): string {
+    const values = this.wordOwnValues(w)
+    const rarity = w.rarity ?? 'common'
+    const level = w.level ?? 1
+    const label = slotLabel[slotKey] ?? slotKey
+    return `<div class="cdx-detail-card cdx-word mood-${this.moodOf(w)} rarity-${rarity}">
+      <div class="cdx-detail-kicker">WORD CARD</div>
+      <div class="cdx-cardstage">${this.deckPreviewHtml(w)}</div>
+      <div class="cdx-detail-copy">
+        <div class="wd-name">${w.text}</div>
+        <div class="wd-grade">✦ ${label} · ${RARITY_LABEL[rarity]}${level > 1 ? ` · Lv.${level}` : ''}</div>
+        ${values.length ? `<div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>` : ''}
+        <p class="wd-flavor">${w.note}</p>
+      </div>
+    </div>`
+  }
+
+  private codexEnemyDetailHtml(enemy: (typeof ENEMIES)[keyof typeof ENEMIES]): string {
+    const sprite = SPRITES[enemy.sprite]
+    return `<article class="cdx-detail-card cdx-character" aria-label="${enemy.name} 상세 정보">
+      <div class="character-portrait">${sprite ? `<img src="${sprite}" alt="${enemy.name}">` : '<span>?</span>'}</div>
+      <div class="character-copy">
+        <div class="character-kicker">ENEMY DETAIL</div>
+        <h2>${enemy.name}</h2>
+        <div class="character-stats">
+          <div><span>체력</span><b>${enemy.hp}</b></div>
+          <div><span>공격</span><b>${enemy.atk}</b></div>
+          <div><span>행동 주기</span><b>${enemy.every}턴</b></div>
+        </div>
+        <div class="character-note">${enemy.note}</div>
+      </div>
+    </article>`
+  }
+
+  private codexItemDetailHtml(item: (typeof ALL_ITEMS)[keyof typeof ALL_ITEMS]): string {
+    const rows = STAT_ORDER.filter((k) => item.base[k])
+      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.base[k]}</span></div>`)
+      .join('')
+    const p = item.passive ? PASSIVES[item.passive] : null
+    const passive = p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''
+    return `<div class="cdx-detail-card cdx-item${p ? ' is-passive' : ''}">
+      <div class="cdx-detail-kicker">ITEM DETAIL</div>
+      <div class="id-art">${itemArt(item.art)}</div>
+      <div class="cdx-detail-copy">
+        <div class="wd-name">${item.name}</div>
+        <div class="wd-grade">✦ ${RARITY_LABEL[item.rarity]}</div>
+        ${passive}
+        ${rows ? `<div class="id-stats">${rows}</div>` : ''}
+        <p class="wd-flavor">${item.flavor}</p>
+      </div>
+    </div>`
   }
 
   private closeOverlay() {
@@ -1294,6 +1385,8 @@ export class BattleView {
   }
 
   private pick(id: string) {
+    // CardHand 외부의 개발 입력이나 지연된 confirm도 정산 잠금 뒤에는 선택을 바꾸지 못한다.
+    if (this.busy || this.over) return
     const key = this.order()[this.slotIndex]
     const debugKey = `${key}:${id}`
     const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
@@ -1311,7 +1404,7 @@ export class BattleView {
     GameAudio.play('pencil')
     this.renderWords()
     // 전부 채우면 자동 완성(반짝 → 발동)
-    if (this.complete() && !this.busy && !this.over) {
+    if (this.complete()) {
       GameAudio.play('sentenceComplete')
       void this.autoComplete()
     }
@@ -1322,6 +1415,11 @@ export class BattleView {
   }
 
   private async autoComplete() {
+    // 마지막 카드 확정 직후 잠근다. 반짝임을 기다린 뒤 execute에서 잠그면 그 사이
+    // 광클이 두 번째 카드 적용 연출을 시작할 수 있다.
+    if (!this.complete() || this.busy || this.over) return
+    this.busy = true
+    this.q('.word-zone').classList.add('is-resolving')
     const rail = this.q('#chain')
     rail.classList.add('sparkle')
     await sleep(300)
@@ -1533,10 +1631,8 @@ export class BattleView {
 
   // ── 발동: 팅팅팅(기여 수치) → 맥락 → 총합 롤업 → 돌진·사각 블라스트로 꽂힘 ──
   private async execute() {
-    if (!this.complete() || this.busy || this.over) return
-    this.busy = true
-    // 정산이 도는 동안 손패는 "이미 쓴" 상태로 흐려지고 입력을 받지 않는다(연타 방지).
-    this.q('.word-zone').classList.add('is-resolving')
+    // autoComplete가 마지막 선택 승인과 같은 호출 스택에서 정산 잠금을 선점한다.
+    if (!this.complete() || !this.busy || this.over) return
 
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
@@ -1595,6 +1691,8 @@ export class BattleView {
     const prep = applyPreparation(this.state, intent, mult)
     if (prep.guardGain > 0) {
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
+      // 캐릭터의 실드 형성과 같은 프레임에 체력바도 차오르기 시작한다.
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       await this.rollTotal(prep.guardGain, 'guard')
       await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
@@ -2112,6 +2210,8 @@ export class BattleView {
       playCharacterAnimation(foe ?? null, 'attack')
       foe?.classList.add('lunge')
       await sleep(170)
+      // 적의 타격이 닿는 순간 실제 흡수 뒤 남은 방어막을 체력바에 반영한다.
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       if (st.dealt <= 0) {
         this.log(st.text)
         if (st.counterHit) {
