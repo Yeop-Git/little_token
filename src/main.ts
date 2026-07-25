@@ -30,8 +30,6 @@ const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
 let battleRequest = 0
-// 타이틀을 보는 동안 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
-const battleResourcesReady = preloadBattleResources()
 GraphicsSettings.apply()
 
 function fit() {
@@ -42,6 +40,9 @@ window.addEventListener('resize', fit)
 fit()
 
 let run = newRun()
+// 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
+// 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
+void preloadBattleResources(run.player.deck)
 let current: { destroy?: () => void } | null = null
 type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
@@ -211,7 +212,7 @@ function goTitle() {
 
 async function goBattle(intro = false) {
   const request = ++battleRequest
-  await battleResourcesReady
+  await preloadBattleResources(run.player.deck)
   if (request !== battleRequest) return
   reset()
   const st = stageFor(run.day)
@@ -277,10 +278,11 @@ const params = new URLSearchParams(location.search)
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
-FontManager.load().finally(() => {
-  if (start === 'reward') goReward()
-  else if (start === 'item') goItem(ITEMS.candle)
-  else if (start === 'intro') goBattle(true)
-  else if (start === 'battle') goBattle()
-  else goTitle()
-})
+// 1MB에 가까운 장식 폰트가 내려오는 동안 화면 전체를 비워 두지 않는다.
+// 폴백으로 즉시 첫 씬을 그리고, 로드가 끝나면 FontManager가 같은 CSS 변수만 교체한다.
+void FontManager.load()
+if (start === 'reward') goReward()
+else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'intro') goBattle(true)
+else if (start === 'battle') goBattle()
+else goTitle()

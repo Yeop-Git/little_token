@@ -1,9 +1,15 @@
 import { BACKGROUNDS, SKILL_ART, SPRITES } from '@/assets'
+import type { Word } from '@core/types'
 
-let battlePreload: Promise<void> | null = null
+// URL별 Promise를 기억하면 씬을 다시 열거나 덱이 성장해도 이미 예열한 이미지를
+// 다시 만들지 않는다. 새로 얻은 카드 일러스트만 다음 전투 진입 전에 추가된다.
+const imageLoads = new Map<string, Promise<void>>()
 
 function loadImage(src: string): Promise<void> {
-  return new Promise((resolve) => {
+  const cached = imageLoads.get(src)
+  if (cached) return cached
+
+  const pending = new Promise<void>((resolve) => {
     const image = new Image()
     image.decoding = 'async'
     image.onload = () => {
@@ -13,12 +19,18 @@ function loadImage(src: string): Promise<void> {
     image.onerror = () => resolve()
     image.src = src
   })
+  imageLoads.set(src, pending)
+  return pending
 }
 
-/** 타이틀 체류 중 전투에 쓰이는 배경·카드·캐릭터 리소스를 한 번만 예열한다. */
-export function preloadBattleResources(): Promise<void> {
-  if (battlePreload) return battlePreload
-  const urls = [...new Set([...Object.values(BACKGROUNDS), ...Object.values(SPRITES), ...Object.values(SKILL_ART)])]
-  battlePreload = Promise.all(urls.map(loadImage)).then(() => undefined)
-  return battlePreload
+/** 현재 덱으로 다음 전투에 실제 쓰일 배경·카드·캐릭터 리소스만 예열한다. */
+export function preloadBattleResources(deck: Record<string, Word[]>): Promise<void> {
+  const cardArt = Object.values(deck)
+    .flat()
+    .flatMap((word) => {
+      const src = word.art ? SKILL_ART[word.art] : undefined
+      return src ? [src] : []
+    })
+  const urls = [...new Set([...Object.values(BACKGROUNDS), ...Object.values(SPRITES), ...cardArt])]
+  return Promise.all(urls.map(loadImage)).then(() => undefined)
 }
