@@ -213,7 +213,7 @@ export function compile(
 
   // 천장 없음 — 배율은 상한 없이 곱해진다(벌레 스웜을 오버킬로 관통하는 쾌감).
   // 등급제 폐지 — 희귀도 보너스 없음(다양성 + 반복강화로 대체 예정).
-  const emotions = order.flatMap((key) => (sel[key] ? [sel[key]!.emotion] : []))
+  const emotions = order.flatMap((key) => (sel[key]?.emotion && sel[key]!.emotion !== 'neutral' ? [sel[key]!.emotion] : []))
   const emotionCounts = new Map<Emotion, number>()
   emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
   const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]

@@ -14,7 +14,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   shieldMoth: {
     id: 'shieldMoth', name: '유리날개 좀나방', hp: 8, atk: 5, every: 2, initiative: 'first',
-    sprite: 'enemy_moth', magicShield: 1, weakEmotion: 'sadness',
+    sprite: 'enemy_moth', magicShield: 1, weakEmotion: 'sorrow',
     note: '매직실드가 한 타격을 막는다. 슬픔에 약하다.',
   },
   moth: {

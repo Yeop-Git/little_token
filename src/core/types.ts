@@ -35,9 +35,14 @@ export type IntentKind = 'attack' | 'guard' | 'heal' | 'debuff'
 export type TargetMode = 'enemy' | 'self' | 'both'
 export type AoeMode = 'single' | 'all' // 범위: 단일 vs 전체 적
 /** 카드와 적이 공유하는 감정 속성. 한 카드는 하나만, 한 적은 약점 하나만 가진다. */
-export type Emotion = 'joy' | 'sadness' | 'anger' | 'anxiety'
-export const EMOTION_LABEL: Record<Emotion, string> = { joy: '기쁨', sadness: '슬픔', anger: '분노', anxiety: '불안' }
-export const EMOTION_ICON: Record<Emotion, string> = { joy: '☀', sadness: '☂', anger: '✦', anxiety: '◌' }
+/** 희·노·애·락과, 감정 설계를 하지 않은 카드의 무감정 상태. */
+export type Emotion = 'joy' | 'anger' | 'sorrow' | 'pleasure' | 'neutral'
+export const EMOTION_LABEL: Record<Emotion, string> = {
+  joy: '희', anger: '노', sorrow: '애', pleasure: '락', neutral: '무감정',
+}
+export const EMOTION_ICON: Record<Emotion, string> = {
+  joy: '☀', anger: '✦', sorrow: '☂', pleasure: '♪', neutral: '·',
+}
 /** 전체 공격은 기존 aoe와 호환하고, 나머지는 적 레일 앞쪽부터 세는 타격 수다. */
 export type TargetCount = 1 | 2 | 3 | 'all'
 

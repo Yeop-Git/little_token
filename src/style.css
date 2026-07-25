@@ -262,14 +262,24 @@ button {
 .title-reveal.ready .title-menu {
   animation: menu-in 0.9s ease-out 0.5s both;
 }
+.tmenu-link {
+  position: absolute;
+  left: 6.5%;
+  bottom: 10.5%;
+  z-index: 6;
+  opacity: 0;
+}
+.title-reveal.ready .tmenu-link { animation: menu-in 0.9s ease-out 0.65s both; }
 @keyframes menu-in {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }
-.tmenu-btn {
+.tmenu-btn,
+.tmenu-link {
   position: relative;
   text-align: left;
   color: rgba(255, 247, 230, 0.9);
+  text-decoration: none;
   font-size: 26px;
   font-weight: 900;
   letter-spacing: 4px;
@@ -278,7 +288,8 @@ button {
   text-shadow: 0 0 14px rgba(255, 205, 120, 0.4), 0 3px 12px rgba(0, 0, 0, 0.88);
   transition: color 0.18s ease, transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1.1), text-shadow 0.18s ease;
 }
-.tmenu-btn::before {
+.tmenu-btn::before,
+.tmenu-link::before {
   content: '✦';
   position: absolute;
   left: 2px;
@@ -289,17 +300,22 @@ button {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .tmenu-btn:hover,
-.tmenu-btn:focus-visible {
+.tmenu-btn:focus-visible,
+.tmenu-link:hover,
+.tmenu-link:focus-visible {
   color: #fff;
   transform: translateX(7px) scale(1.1);
   text-shadow: 0 0 22px rgba(255, 224, 150, 0.75), 0 3px 12px rgba(0, 0, 0, 0.88);
   outline: none;
 }
 .tmenu-btn:hover::before,
-.tmenu-btn:focus-visible::before {
+.tmenu-btn:focus-visible::before,
+.tmenu-link:hover::before,
+.tmenu-link:focus-visible::before {
   opacity: 1;
   transform: translateX(0);
 }
+.tmenu-link { position: absolute; left: 6.5%; bottom: 10.5%; z-index: 6; }
 /* 새로하기 확인 대기 — 지워진다는 걸 색으로 먼저 알린다. */
 .tmenu-btn.is-danger {
   color: #ffd0b0;
@@ -988,7 +1004,7 @@ button {
 .trait { padding: 2px 5px; border-radius: 7px; font-size: 10px; font-weight: 900; line-height: 1.2; background: rgba(10, 8, 16, .58); }
 .trait.guard { color: #8ee4f4; border: 1px solid rgba(142, 228, 244, .42); }
 .trait.magic { color: #d9aaff; border: 1px solid rgba(217, 170, 255, .48); }
-.trait.weak.joy { color: #ffd76b; }.trait.weak.sadness { color: #8cc8ff; }.trait.weak.anger { color: #ff967a; }.trait.weak.anxiety { color: #c9a7ff; }
+.trait.weak.joy { color: #ffd76b; }.trait.weak.sorrow { color: #8cc8ff; }.trait.weak.anger { color: #ff967a; }.trait.weak.pleasure { color: #c9f28a; }
 .shield-chip {
   display: inline-flex;
   align-items: center;
@@ -1922,7 +1938,7 @@ button {
     0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
 .card-emotion { position: absolute; top: 9px; left: 9px; z-index: 4; padding: 2px 6px; border-radius: 999px; color: #fff8e7; background: rgba(8, 6, 14, .7); font-size: 10px; font-weight: 900; }
-.word-card.emotion-joy { --emotion-color: #ffd76b; }.word-card.emotion-sadness { --emotion-color: #8cc8ff; }.word-card.emotion-anger { --emotion-color: #ff967a; }.word-card.emotion-anxiety { --emotion-color: #c9a7ff; }
+.word-card.emotion-joy { --emotion-color: #ffd76b; }.word-card.emotion-sorrow { --emotion-color: #8cc8ff; }.word-card.emotion-anger { --emotion-color: #ff967a; }.word-card.emotion-pleasure { --emotion-color: #c9f28a; }.word-card.emotion-neutral { --emotion-color: #c9c2b5; }
 .word-card[class*='emotion-'] .card-face { box-shadow: 0 14px 28px rgba(0,0,0,.58), inset 0 0 0 2px var(--emotion-color), inset 0 0 0 4px color-mix(in srgb, var(--wglow) 48%, #6a5040); }
 
 .word-card.blocked { opacity: .5; filter: grayscale(.55); cursor: not-allowed; }

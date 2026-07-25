@@ -1,6 +1,8 @@
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 
+const COMBAT_SPEC_URL = new URL('../../SENTENCE_COMBAT_SPEC.md', import.meta.url).href
+
 interface Opts {
   /** fresh=true면 이어하던 런을 버리고 처음부터 시작한다. */
   onStart: (fresh: boolean) => void
@@ -78,6 +80,7 @@ export class TitleView {
             <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
             <button class="tmenu-btn" type="button" data-act="exit">나가기</button>
           </nav>
+          <a class="tmenu-link" href="${COMBAT_SPEC_URL}" target="_blank" rel="noopener">전투 시스템 설명</a>
           <div class="title-toast" id="title-toast" aria-live="polite"></div>
           <div class="title-loadmask" aria-hidden="true"></div>
         </div>
