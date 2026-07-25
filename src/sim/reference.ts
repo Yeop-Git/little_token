@@ -9,6 +9,10 @@ export interface EnemyInst {
   def: EnemyDef
   hp: number
   maxHp: number
+  /** 보스 체력을 구성하는 막 수. 일반 적은 항상 1이다. */
+  healthBars: number
+  /** 한 막의 체력. 총 체력은 이 값 × healthBars다. */
+  hpPerBar: number
   atkMult: number
   dead: boolean
   initiativePhase: 'first' | 'second'
@@ -38,12 +42,16 @@ export interface BattleState {
   pending: PendingAttack | null
 }
 
-export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1): EnemyInst {
-  const maxHp = Math.max(1, Math.round(def.hp * hpMult))
+export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1): EnemyInst {
+  const hpPerBar = Math.max(1, Math.round(def.hp * hpMult))
+  const bars = def.boss ? Math.max(1, Math.floor(healthBars)) : 1
+  const maxHp = hpPerBar * bars
   return {
     def,
     hp: maxHp,
     maxHp,
+    healthBars: bars,
+    hpPerBar,
     atkMult,
     dead: false,
     initiativePhase: def.initiative,
@@ -81,7 +89,11 @@ export interface HitFx {
   dmg: number
   guardAbsorbed: number
   magicShieldBroken: boolean
+  /** 이 타격을 막고 남은 매직실드 겹 수. 실드 타격이 아니면 현재 값과 무관하다. */
+  magicShieldRemaining: number
   weak: boolean
+  /** 한 번의 타격으로 완전히 소진한 보스 체력 막 수. */
+  barsBroken: number
 }
 
 export interface ApplyResult {
@@ -128,14 +140,32 @@ function damageEnemy(state: BattleState, target: number, dmg: number, pierceGuar
   const raw = Math.max(0, Math.round(dmg * (weak ? 1.25 : 1)))
   if (enemy.magicShield > 0) {
     enemy.magicShield--
-    return { target, dmg: 0, guardAbsorbed: 0, magicShieldBroken: true, weak }
+    return {
+      target,
+      dmg: 0,
+      guardAbsorbed: 0,
+      magicShieldBroken: true,
+      magicShieldRemaining: enemy.magicShield,
+      weak,
+      barsBroken: 0,
+    }
   }
   const guardAbsorbed = pierceGuard ? 0 : Math.min(enemy.guard, raw)
   if (!pierceGuard) enemy.guard -= guardAbsorbed
   const dealt = Math.max(0, raw - guardAbsorbed)
+  const barsBefore = Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   enemy.hp -= dealt
+  const barsAfter = Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (enemy.hp <= 0) enemy.dead = true
-  return { target, dmg: dealt, guardAbsorbed, magicShieldBroken: false, weak }
+  return {
+    target,
+    dmg: dealt,
+    guardAbsorbed,
+    magicShieldBroken: false,
+    magicShieldRemaining: enemy.magicShield,
+    weak,
+    barsBroken: barsBefore - barsAfter,
+  }
 }
 
 function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; killed: number[]; overflow: number } {

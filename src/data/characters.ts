@@ -176,8 +176,16 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
   mosquito: {
     id: 'mosquito',
     name: '모기',
-    model3d: null,
-    animations: null,
+    model3d: MODELS.enemy_mosquito,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    modelGroundOffset: -0.18,
     portrait2d: SPRITES.enemy_mosquito,
     title: '방어막 틈을 찌르는 침',
     description: '긴 침을 밀어 넣어 방어막 뒤의 체력을 바로 갉아 낸다.',

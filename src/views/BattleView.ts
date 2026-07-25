@@ -76,6 +76,8 @@ interface Opts {
   hpMult?: number
   atkMult?: number
   isBoss?: boolean
+  /** 현재 보스의 체력 막 수. 일반 전투에는 전달하지 않는다. */
+  bossHealthBars?: number
   /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
   modeLabel?: string
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
@@ -131,6 +133,7 @@ export class BattleView {
   private onResetAll?: () => void
   private onIntroComplete?: () => void
   private isBoss = false
+  private playerVisual: CharacterVisualDef
   private modeLabel = ''
   // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
@@ -169,11 +172,16 @@ export class BattleView {
     this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
     this.isBoss = !!opts.isBoss
+    this.playerVisual = this.isBoss
+      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI * 0.78 }
+      : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
-    const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1))
+    const enemies = opts.encounter.map((id) =>
+      makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1, this.isBoss ? opts.bossHealthBars ?? 3 : 1),
+    )
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
     this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
@@ -276,7 +284,8 @@ export class BattleView {
 
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${BACKGROUNDS.battleDark})">
+        ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
         <div class="weather-wash"></div>
 
@@ -408,7 +417,7 @@ export class BattleView {
       this.bindActor(you)
     }
     this.updatePlayer(you)
-    mountCharacterModel(you, CHARACTER_VISUALS.player)
+    mountCharacterModel(you, this.playerVisual)
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -629,7 +638,7 @@ export class BattleView {
   }
 
   private playerHtml(): string {
-    const modelStatus = CHARACTER_VISUALS.player.model3d ? 'preparing-3d' : 'fallback-2d'
+    const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
         <div class="nameplate glass">
@@ -637,7 +646,7 @@ export class BattleView {
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
       </div>`
   }
 
@@ -681,10 +690,13 @@ export class BattleView {
             <span class="hpn"></span>
           </div>
           <div class="hp-row">
-            <div class="hpbar foe"><div class="fill"></div></div>
+            <div class="hpbar foe">
+              <div class="fill"></div>
+              <div class="boss-hp-segments" hidden></div>
+              <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
+            </div>
           </div>
           <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
-          <div class="magicbar" hidden></div>
           <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -699,8 +711,8 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    el.style.right = `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
-    el.style.bottom = '26px'
+    el.style.right = this.isBoss && e.def.boss ? '17%' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
+    el.style.bottom = this.isBoss && e.def.boss ? '82px' : '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
@@ -715,19 +727,29 @@ export class BattleView {
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
     plate.classList.remove('gone')
-    plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
-    plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    const remainingBars = Math.ceil(Math.max(0, e.hp) / e.hpPerBar)
+    plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
+      ? `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`
+      : `${Math.max(0, e.hp)}/${e.maxHp}`
+    const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
+    hpbar.querySelector<HTMLElement>(':scope > .fill')!.style.width =
+      `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    hpbar.setAttribute('aria-label', e.healthBars > 1
+      ? `보스 체력 ${remainingBars}막 남음, 전체 ${e.healthBars}막`
+      : `체력 ${Math.max(0, e.hp)} / ${e.maxHp}`)
+    const segments = hpbar.querySelector<HTMLElement>('.boss-hp-segments')!
+    segments.hidden = e.healthBars <= 1
+    if (!segments.hidden) {
+      segments.style.gridTemplateColumns = `repeat(${e.healthBars}, 1fr)`
+      segments.innerHTML = Array.from({ length: e.healthBars }, (_, i) =>
+        `<i${i === e.healthBars - 1 ? ' class="last"' : ''}></i>`,
+      ).join('')
+    }
+    const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
+    spellshield.hidden = e.magicShield <= 0
+    spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
     // 방어막은 남은 양을 게이지로 — 깎이는 게 보여야 "한 대 더 치면 뚫린다"가 읽힌다.
     this.paintShield(plate.querySelector<HTMLElement>('.shieldbar')!, e.guard, e.def.guard ?? e.guard)
-    // 매직실드는 양이 아니라 "몇 대를 지우나"라서 칸으로 센다.
-    const magic = plate.querySelector<HTMLElement>('.magicbar')!
-    magic.hidden = e.magicShield <= 0
-    if (!magic.hidden) {
-      const max = Math.max(e.magicShield, e.def.magicShield ?? e.magicShield)
-      magic.innerHTML =
-        `<span class="mlabel">✧</span>` +
-        Array.from({ length: max }, (_, i) => `<i class="${i < e.magicShield ? 'on' : ''}"></i>`).join('')
-    }
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
     traits.innerHTML = [
@@ -1841,7 +1863,7 @@ export class BattleView {
       if (result) {
         for (const hit of result.hits) {
           const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
-          if (hit.magicShieldBroken) this.popAt(hit.target, '매직실드!', 'guard')
+          if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining)
           else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
@@ -1943,7 +1965,7 @@ export class BattleView {
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
     res: {
-      hits: { target: number; dmg: number }[]
+      hits: { target: number; dmg: number; magicShieldBroken: boolean; magicShieldRemaining: number }[]
       selfDmg: number
       heal: number
       killed: number[]
@@ -1966,6 +1988,10 @@ export class BattleView {
     }
 
     for (const h of res.hits) {
+      if (h.magicShieldBroken) {
+        await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
+        continue
+      }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
       if (el) {
         SquareBurst.playOn(el, 'damage', { spread: 120 })
@@ -2007,6 +2033,42 @@ export class BattleView {
     if (fast) el.classList.add('fast')
     this.spawnSparks(el, 8 + combo * 5)
     await sleep(fast ? 190 : 560)
+  }
+
+  /** 매직실드가 공격을 삼킨 순간의 결정 균열. 마지막 겹은 체력바 밖으로 파편이 터진다. */
+  private async playSpellShieldImpact(target: number, remaining: number): Promise<void> {
+    const actor = this.q<HTMLElement>(`#actors .actor.foe[data-i="${target}"]`)
+    const hpbar = actor?.querySelector<HTMLElement>('.hpbar.foe')
+    const overlay = hpbar?.querySelector<HTMLElement>('.spellshield-overlay')
+    if (!actor || !hpbar || !overlay) return
+
+    const removed = remaining <= 0
+    overlay.hidden = false
+    overlay.querySelector<HTMLElement>('b')!.textContent = remaining > 1 ? `×${remaining}` : ''
+    overlay.classList.remove('cracking', 'shattering')
+    void overlay.offsetWidth
+    overlay.classList.add(removed ? 'shattering' : 'cracking')
+    this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard')
+    if (removed) this.spawnCrystalShards(hpbar)
+    await sleep(removed ? 360 : 180)
+  }
+
+  private spawnCrystalShards(hpbar: HTMLElement) {
+    const host = this.q('#pbox')
+    const screenRect = hpbar.getBoundingClientRect()
+    const rect = this.toStage(screenRect)
+    for (let i = 0; i < 14; i++) {
+      const shard = document.createElement('i')
+      shard.className = 'spellshield-shard'
+      shard.style.left = `${rect.x + Math.random() * screenRect.width}px`
+      shard.style.top = `${rect.y + screenRect.height * 0.5}px`
+      shard.style.setProperty('--shard-x', `${(Math.random() - 0.5) * 150}px`)
+      shard.style.setProperty('--shard-y', `${-25 - Math.random() * 90}px`)
+      shard.style.setProperty('--shard-r', `${(Math.random() - 0.5) * 240}deg`)
+      shard.style.setProperty('--shard-delay', `${Math.random() * 70}ms`)
+      host.appendChild(shard)
+      this.timers.push(window.setTimeout(() => shard.remove(), 720))
+    }
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.
@@ -2287,7 +2349,9 @@ export class BattleView {
       if (st.dealt <= 0) {
         this.log(st.text)
         if (st.counterHit) {
-          if (st.counterHit.magicShieldBroken) this.popAt(st.counterHit.target, '매직실드!', 'guard')
+          if (st.counterHit.magicShieldBroken) {
+            await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining)
+          }
           else if (st.counterHit.dmg > 0) {
             this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
             if (foe) this.hitOne(foe)

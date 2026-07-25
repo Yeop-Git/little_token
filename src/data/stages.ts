@@ -21,6 +21,13 @@ export const BOSS_BY_FLOOR: Record<number, string> = {
   15: 'elderSpider',
 }
 
+/** 보스의 체력 막 수. 뒤쪽 보스일수록 더 긴 결전을 요구한다. */
+export function bossHealthBarsForFloor(floor: number): number {
+  if (floor >= 15) return 5
+  if (floor >= 10) return 4
+  return 3
+}
+
 export function bossForDay(day: number): string | null {
   if (day <= 0) return null
   return BOSS_BY_FLOOR[floorInCycle(day)] ?? null
@@ -43,6 +50,7 @@ export interface Stage {
   hpMult: number
   atkMult: number
   isBoss: boolean
+  bossHealthBars: number
   floor: number
   endlessCycle: number
 }
@@ -60,7 +68,17 @@ export function stageFor(day: number): Stage {
   const hpMult = 1 + (day - 1) * 0.26
   // 압력은 뒤로 갈수록 가팔라진다(초반은 완만, 후반에 조여든다).
   const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1) * (field.enemyAtkMult ?? 1)
-  if (boss) return { day, field, encounter: [boss], hpMult, atkMult, isBoss, floor, endlessCycle }
+  if (boss) return {
+    day,
+    field,
+    encounter: [boss],
+    hpMult,
+    atkMult,
+    isBoss,
+    bossHealthBars: bossHealthBarsForFloor(floor),
+    floor,
+    endlessCycle,
+  }
 
   const encounter: string[] = []
   // 1일차 무능력 2종에서 시작해 날짜마다 능력 적을 하나씩 소개한다.
@@ -68,5 +86,5 @@ export function stageFor(day: number): Stage {
   for (let i = 0; i < count; i++) {
     encounter.push(available[(floor - 1 + i) % available.length])
   }
-  return { day, field, encounter, hpMult, atkMult, isBoss, floor, endlessCycle }
+  return { day, field, encounter, hpMult, atkMult, isBoss, bossHealthBars: 1, floor, endlessCycle }
 }

@@ -903,6 +903,21 @@ button {
 }
 .boss-ribbon span { font-size: 12px; font-weight: 900; letter-spacing: .2em; opacity: .78; }
 .boss-ribbon b { font-size: 21px; letter-spacing: .04em; text-shadow: 0 2px 0 rgba(48, 7, 13, .7); }
+
+/* 보스 진입 전환. 추후 컷신이 준비되면 data-entrance 값과 이 한 레이어만
+   컷신 호스트로 교체하고, 아래의 전용 대치 구도는 그대로 이어받는다. */
+.boss-entry-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  background: #09070d;
+  pointer-events: none;
+  animation: boss-stage-fade 1.25s cubic-bezier(.22, .72, .25, 1) forwards;
+}
+@keyframes boss-stage-fade {
+  0%, 18% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
 .endless-ribbon {
   position: absolute;
   z-index: 21;
@@ -925,6 +940,33 @@ button {
 .actor.foe.boss .model-shell { transform: scale(calc(var(--model-scale, 1) * 1.16)); }
 .actor.foe.boss.front .model-shell { filter: blur(var(--model-blur, 0)) drop-shadow(0 0 28px rgba(255, 118, 78, .86)) drop-shadow(0 18px 24px rgba(0, 0, 0, .3)); }
 .actor.foe.boss .nameplate { box-shadow: inset 0 0 0 2px rgba(255, 148, 92, .72), 0 0 20px rgba(185, 52, 33, .34); }
+
+/* 레퍼런스처럼 카메라를 프롬의 등 뒤로 낮추고, 보스를 맞은편 높은 축에 둔다. */
+.scene.battle[data-boss='true'] .actor.you {
+  left: 24%;
+  bottom: -18px;
+  z-index: 54;
+}
+.scene.battle[data-boss='true'] .actor.you .model-shell {
+  transform: scale(1.2);
+  transform-origin: center bottom;
+  filter: drop-shadow(0 22px 28px rgba(0, 0, 0, .4));
+}
+.scene.battle[data-boss='true'] .actor.you .nameplate {
+  transform: translate(-54%, -8px);
+}
+.scene.battle[data-boss='true'] .actor.foe.boss {
+  z-index: 38 !important;
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .model-shell {
+  width: 390px;
+  height: 430px;
+  transform: scale(1.08);
+}
+.scene.battle[data-boss='true'] .actor.foe.boss .nameplate {
+  width: 330px;
+  margin-bottom: 4px;
+}
 
 /* 배우 */
 .actor {
@@ -1230,6 +1272,21 @@ button {
 }
 .hp-row { display: flex; align-items: center; gap: 7px; }
 .hp-row .hpbar { flex: 1; min-width: 0; }
+.boss-hp-segments {
+  position: absolute;
+  inset: 0;
+  /* 매직실드 결정막 위에서도 체력 막 경계가 계속 읽혀야 한다. */
+  z-index: 6;
+  display: grid;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.boss-hp-segments[hidden] { display: none; }
+.boss-hp-segments i {
+  border-right: 3px solid rgba(24, 12, 18, .82);
+  box-shadow: 1px 0 0 rgba(255, 242, 218, .62);
+}
+.boss-hp-segments i.last { border-right: 0; box-shadow: none; }
 /* 선공 적 — 이름표 위에 따로 떠 있는 붉은 발광 글씨 + 캐릭터의 붉은 맥동 발광.
    판때기(테두리·배경)는 두지 않는다. 이름표(유리판) 바깥 레이어라 뒷줄에서 이름표가
    흐려지거나 사라져도 경고는 그대로 읽힌다. 후공은 아무 표시도 없다. */
@@ -1362,25 +1419,60 @@ button {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-/* 매직실드 — 남은 '지울 타격 수'라 양이 아니라 칸으로 센다. */
-.magicbar {
+/* 매직실드 — 천상의 보호막처럼 캐릭터를 감싸는 황금막과 체력바 위 결정층을
+   같은 상태에서 켠다. 체력과 별개로 한 타격을 통째로 지운다는 점이 즉시 읽힌다. */
+.spellshield-overlay {
+  position: absolute;
+  inset: 1px;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 3px;
-  margin-top: 4px;
+  justify-content: flex-end;
+  gap: 2px;
+  padding-right: 7px;
+  overflow: hidden;
+  border-radius: 11px;
+  color: #fff9cc;
+  background:
+    linear-gradient(122deg, transparent 0 13%, rgba(255,255,255,.72) 14% 17%, transparent 18% 42%, rgba(255,248,174,.58) 43% 48%, transparent 49%),
+    linear-gradient(58deg, rgba(255,193,37,.84), rgba(255,242,128,.94) 38%, rgba(229,151,17,.9) 72%, rgba(255,224,88,.88));
+  box-shadow: inset 0 0 0 1px rgba(255,255,225,.92), inset 0 -5px 8px rgba(147,83,0,.3), 0 0 13px rgba(255,205,50,.72);
+  text-shadow: 0 1px 3px #7d4800, 0 0 7px #fff;
+  animation: spellshield-bar-shimmer 1.4s ease-in-out infinite alternate;
+  pointer-events: none;
 }
-.magicbar[hidden] { display: none; }
-.magicbar .mlabel { color: #d9aaff; font-size: 10px; font-weight: 900; }
-.magicbar i {
-  flex: 1;
-  height: 7px;
-  border-radius: 4px;
-  background: rgba(217, 170, 255, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(217, 170, 255, 0.4);
+.spellshield-overlay[hidden] { display: none; }
+.spellshield-overlay span { font-size: 12px; }
+.spellshield-overlay b { min-width: 9px; font-size: 9px; line-height: 1; }
+@keyframes spellshield-bar-shimmer {
+  to { filter: brightness(1.18) saturate(1.08); background-position: 18px 0, 0 0; }
 }
-.magicbar i.on {
-  background: linear-gradient(180deg, #f0dcff, #d9aaff);
-  box-shadow: 0 0 8px rgba(217, 170, 255, 0.75);
+.spellshield-overlay.cracking { animation: spellshield-bar-crack .18s ease-out; }
+.spellshield-overlay.shattering { animation: spellshield-bar-shatter .36s ease-out forwards; }
+@keyframes spellshield-bar-crack {
+  35% { filter: brightness(2.2); transform: scaleY(1.3); }
+  100% { filter: brightness(1); transform: none; }
+}
+@keyframes spellshield-bar-shatter {
+  0% { opacity: 1; filter: brightness(2.5); transform: scale(1.03); clip-path: inset(0); }
+  55% { opacity: .86; clip-path: polygon(0 0, 18% 12%, 31% 0, 46% 28%, 63% 3%, 78% 20%, 100% 0, 92% 100%, 69% 77%, 51% 100%, 28% 70%, 0 100%); }
+  100% { opacity: 0; filter: brightness(1.7); transform: scale(1.18); clip-path: polygon(8% 8%, 12% 18%, 30% 5%, 36% 26%, 68% 8%, 74% 28%, 96% 7%, 87% 84%, 65% 70%, 52% 94%, 34% 64%, 7% 90%); }
+}
+
+.spellshield-shard {
+  position: absolute;
+  z-index: 98;
+  width: 11px;
+  height: 17px;
+  clip-path: polygon(50% 0, 100% 28%, 70% 100%, 10% 74%, 0 25%);
+  background: linear-gradient(135deg, #fffbd0, #ffd43b 48%, #d98508);
+  box-shadow: 0 0 8px #ffe866, 0 0 16px rgba(255,172,20,.8);
+  pointer-events: none;
+  animation: spellshield-shard-fly .62s cubic-bezier(.15,.7,.28,1) var(--shard-delay, 0ms) forwards;
+}
+@keyframes spellshield-shard-fly {
+  from { opacity: 1; transform: translate(0,0) rotate(0) scale(1); }
+  to { opacity: 0; transform: translate(var(--shard-x), var(--shard-y)) rotate(var(--shard-r)) scale(.35); }
 }
 .hpbar > .fill::after {
   content: '';
