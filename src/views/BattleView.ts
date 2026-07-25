@@ -206,8 +206,8 @@ export class BattleView {
 
         <div class="hud-top">
           <div class="hud-left">
-            <div class="hud-weather"><span id="f-weather"></span></div>
             <div class="hud-date" id="f-date" aria-label="현재 날짜"></div>
+            <div class="hud-weather"><span id="f-weather"></span></div>
           </div>
           <div class="hud-title glass"><div class="t" id="f-title"></div><div class="s" id="f-desc"></div></div>
           <div class="hud-status">
@@ -225,7 +225,6 @@ export class BattleView {
           <div class="combo-flash" id="combo"></div>
           <div class="flash" id="flash"></div>
           <div id="actors"></div>
-          <button class="backpack" id="bag" title="가방">${icon('backpack')}<span>가방</span></button>
         </div>
 
         <div class="word-zone">
@@ -243,10 +242,14 @@ export class BattleView {
           </div>
         </div>
 
+        <div class="battle-tools" aria-label="전투 보조 메뉴">
+          <button class="battle-tool wordbook-btn" id="deck-btn" type="button">${icon('book')}<span>단어장</span></button>
+          <button class="battle-tool backpack" id="bag" type="button" title="가방">${icon('backpack')}<span>가방</span></button>
+        </div>
+
         <div class="stat-dock glass">
           <div class="dock-title">프롬</div>
           <div class="stat-list" id="stats"></div>
-          <button class="wordbook-btn" id="deck-btn">${icon('book')}<span>단어장</span></button>
         </div>
 
         <aside class="info-dock glass cast-dock" id="detail" aria-live="polite"></aside>
@@ -352,7 +355,6 @@ export class BattleView {
         </div>
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${CHARACTER_VISUALS.player.portrait2d}" alt="프롬"></div>
-        <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>`
   }
 
@@ -384,7 +386,6 @@ export class BattleView {
         <div class="shadow"></div>
         <div class="model-shell" data-model-status="fallback-2d"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
         <span class="guard-hint" aria-hidden="true">우선 방어하세요!</span>
-        <span class="inspect-hint">마우스를 올려 상세 보기</span>
       </div>`
   }
 
@@ -410,7 +411,6 @@ export class BattleView {
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', !e.dead && e.initiativePhase === 'first')
-    el.querySelector<HTMLElement>('.inspect-hint')!.classList.toggle('gone', !front)
   }
 
   private bindActor(actor: HTMLElement) {
@@ -420,8 +420,11 @@ export class BattleView {
       this.renderCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
     }
     const leave = () => this.fadeDock(() => this.renderCastLog())
-    actor.addEventListener('mouseenter', show)
-    actor.addEventListener('mouseleave', leave)
+    // 체력바뿐 아니라 캐릭터 본체도 각각 명시적인 상세보기 호버 영역으로 사용한다.
+    actor.querySelectorAll<HTMLElement>('.nameplate, .model-shell').forEach((target) => {
+      target.addEventListener('mouseenter', show)
+      target.addEventListener('mouseleave', leave)
+    })
     actor.addEventListener('focus', show)
     actor.addEventListener('blur', leave)
     actor.addEventListener('click', show)

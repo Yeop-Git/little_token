@@ -21,7 +21,9 @@ import packageInfo from '../package.json'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
+const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
+let devCheatCleanup: (() => void) | null = null
 
 function fit() {
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
@@ -54,39 +56,37 @@ function grantItem(def: ItemDef) {
   else goBattle()
 }
 
-// 좌상단 모서리를 다섯 번 누르면 열리는 개발용 채팅 패널.
-function mountDev(active: SceneName) {
+// 좌상단 모서리를 다섯 번 누르면 열리는 개발용 치트 패널.
+function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
+  const sceneLabel: Record<SceneName, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
+  const itemButton = (def: ItemDef) =>
+    `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
+      <b>${def.name}</b><span>${def.passive ? '문장 규칙' : '스탯 아이템'}${owned.has(def.id) ? ' · 보유 중' : ''}</span>
+    </button>`
   const shell = document.createElement('div')
-  shell.className = 'dev-chat-shell'
+  shell.className = 'dev-cheat-shell'
   shell.innerHTML = `
-    <button class="dev-corner" type="button" aria-label="개발 패널 열기"></button>
-    <section class="dev-chat" aria-label="개발 채팅" aria-hidden="true">
-      <header><span>DEV CHAT</span><b>${active.toUpperCase()}</b><button type="button" data-close aria-label="닫기">×</button></header>
-      <div class="dev-chat-log" aria-live="polite"></div>
-      <div class="dev-chat-scenes">
-        ${(['title', 'intro', 'battle', 'reward', 'item'] as SceneName[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${scene}</button>`).join('')}
+    <section class="dev-cheat" aria-label="개발 치트" aria-hidden="true">
+      <header><span>DEV CHEAT</span><b>${active.toUpperCase()}</b><button type="button" data-close aria-label="닫기">×</button></header>
+      <div class="dev-cheat-body">
+        <section class="dev-cheat-section">
+          <h3>SCENE JUMP</h3>
+          <div class="dev-cheat-scenes">
+            ${(['title', 'intro', 'battle', 'reward', 'item'] as SceneName[]).map((scene) => `<button type="button" data-scene="${scene}"${scene === active ? ' class="on"' : ''}>${sceneLabel[scene]}</button>`).join('')}
+          </div>
+        </section>
+        <section class="dev-cheat-section">
+          <h3>ITEM GRANT</h3>
+          <div class="dev-cheat-items">${Object.values(ALL_ITEMS).map(itemButton).join('')}</div>
+        </section>
       </div>
-      <form><span>›</span><input name="command" autocomplete="off" spellcheck="false" placeholder="help 또는 명령어 입력" aria-label="개발 명령어" /></form>
     </section>`
 
-  const panel = shell.querySelector<HTMLElement>('.dev-chat')!
-  const log = shell.querySelector<HTMLElement>('.dev-chat-log')!
-  const input = shell.querySelector<HTMLInputElement>('input')!
-  const say = (text: string, kind: 'system' | 'user' = 'system') => {
-    const line = document.createElement('p')
-    const sender = document.createElement('span')
-    line.className = kind
-    sender.textContent = kind === 'user' ? 'YOU' : 'DEV'
-    line.append(sender, document.createTextNode(text))
-    log.append(line)
-    log.scrollTop = log.scrollHeight
-  }
+  const panel = shell.querySelector<HTMLElement>('.dev-cheat')!
   const open = () => {
     panel.classList.add('open')
     panel.setAttribute('aria-hidden', 'false')
-    say('연결됨. help로 명령어를 확인하세요.')
-    window.setTimeout(() => input.focus(), 0)
   }
   const close = () => {
     panel.classList.remove('open')
@@ -99,47 +99,12 @@ function mountDev(active: SceneName) {
     else if (scene === 'reward') goReward()
     else goItem(ITEMS.candle)
   }
-  const execute = (raw: string) => {
-    const command = raw.trim()
-    if (!command) return
-    say(command, 'user')
-    const [verb = '', ...args] = command.split(/\s+/)
-    const lower = verb.toLowerCase().replace(/^\//, '')
-    if (lower === 'help' || lower === '도움') {
-      say('scene [title|intro|battle|reward|item] · item [이름 또는 id] · clear · close')
-      return
-    }
-    if (lower === 'clear') {
-      log.innerHTML = ''
-      return
-    }
-    if (lower === 'close' || lower === '닫기') {
-      close()
-      return
-    }
-    if (lower === 'scene' || lower === '씬') {
-      const scene = args[0]?.toLowerCase() as SceneName
-      if (['title', 'intro', 'battle', 'reward', 'item'].includes(scene)) goScene(scene)
-      else say('알 수 없는 씬입니다.')
-      return
-    }
-    if (lower === 'item' || lower === '아이템') {
-      const query = args.join(' ').toLowerCase()
-      const def = Object.values(ALL_ITEMS).find((item) => item.id.toLowerCase() === query || item.name.toLowerCase() === query)
-      if (!def) say('아이템을 찾지 못했습니다.')
-      else if (owned.has(def.id)) say(`${def.name}: 이미 보유 중입니다.`)
-      else grantItem(def)
-      return
-    }
-    if (['title', 'intro', 'battle', 'reward', 'item'].includes(lower)) {
-      goScene(lower as SceneName)
-      return
-    }
-    say('알 수 없는 명령입니다. help를 입력하세요.')
-  }
-
   let cornerClicks = 0
-  shell.querySelector<HTMLElement>('.dev-corner')!.addEventListener('click', () => {
+  const corner = document.createElement('button')
+  corner.className = 'dev-cheat-corner'
+  corner.type = 'button'
+  corner.setAttribute('aria-label', '개발 치트 열기')
+  corner.addEventListener('click', () => {
     cornerClicks++
     if (cornerClicks < 5) return
     cornerClicks = 0
@@ -150,12 +115,26 @@ function mountDev(active: SceneName) {
   shell.querySelectorAll<HTMLElement>('[data-scene]').forEach((button) =>
     button.addEventListener('click', () => goScene(button.dataset.scene as SceneName)),
   )
-  shell.querySelector('form')!.addEventListener('submit', (event) => {
-    event.preventDefault()
-    execute(input.value)
-    input.value = ''
-  })
+  shell.querySelectorAll<HTMLElement>('[data-item]').forEach((button) =>
+    button.addEventListener('click', () => grantItem(ALL_ITEMS[button.dataset.item!])),
+  )
   stage.appendChild(shell)
+  viewport.appendChild(corner)
+
+  // 고정 무대 왼쪽에 레터박스가 생기면 그 여백 전체도 숨은 클릭 영역에 포함한다.
+  const fitCorner = () => {
+    const rect = stage.getBoundingClientRect()
+    const scale = rect.width / STAGE_W || 1
+    corner.style.width = `${Math.max(34, rect.left + 34 * scale)}px`
+    corner.style.height = rect.left > 1 ? `${window.innerHeight}px` : `${Math.max(34, rect.top + 34 * scale)}px`
+  }
+  fitCorner()
+  window.addEventListener('resize', fitCorner)
+  devCheatCleanup = () => {
+    window.removeEventListener('resize', fitCorner)
+    corner.remove()
+    devCheatCleanup = null
+  }
 }
 
 function mountVersion() {
@@ -168,12 +147,13 @@ function mountVersion() {
 
 function mountMeta(active: SceneName) {
   lastScene = active
-  mountDev(active)
+  mountDevCheat(active)
   mountVersion()
 }
 
 function reset() {
   current?.destroy?.()
+  devCheatCleanup?.()
   stage.innerHTML = ''
 }
 
