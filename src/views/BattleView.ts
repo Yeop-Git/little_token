@@ -94,6 +94,12 @@ const RAIL_FRONT_RIGHT = 860
 const RAIL_GAP = 260
 const MAX_VISIBLE_ENEMIES = 3
 const MAX_ACTION_ORDER_ENEMIES = 3
+const TOKEN_BOSS_LINES = [
+  '어떡하지...! 도와줘, 프롬!!',
+  '프롬, 저 녀석 너무 커...!',
+  '으으... 그래도 물러나면 안 돼!',
+  '조심해! 뭔가 오고 있어!',
+] as const
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
   'target',
@@ -163,6 +169,7 @@ export class BattleView {
   private readonly debugSpawnedWords = new Map<string, Word>()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
   private killsThisBattle = 0
+  private tokenSpeechIndex = 0
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.field = opts.field
@@ -172,9 +179,7 @@ export class BattleView {
     this.onResetAll = opts.onResetAll
     this.onIntroComplete = opts.onIntroComplete
     this.isBoss = !!opts.isBoss
-    this.playerVisual = this.isBoss
-      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI * 0.78 }
-      : CHARACTER_VISUALS.player
+    this.playerVisual = CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
     this.t = opts.tables ?? TABLES
     this.player = opts.player ?? defaultPlayer()
@@ -313,7 +318,8 @@ export class BattleView {
 
         <div class="stage-area" id="pbox">
           ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
-          ${this.isBoss ? `<div class="boss-ribbon" role="status"><span>위험한 낙서</span><b>보스전 · ${this.state.enemies[0]?.def.name ?? '보스'}</b></div>` : ''}
+          ${this.isBoss ? this.bossHudHtml() : ''}
+          ${this.isBoss ? this.bossTokenHtml() : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
@@ -378,6 +384,7 @@ export class BattleView {
     this.renderStats()
     this.renderBag()
     this.clearDetailDock()
+    if (this.isBoss) this.scheduleBossTokenSpeech(1800)
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -418,6 +425,10 @@ export class BattleView {
     }
     this.updatePlayer(you)
     mountCharacterModel(you, this.playerVisual)
+    if (this.isBoss) {
+      const token = this.root.querySelector<HTMLElement>('.boss-token')
+      if (token) mountCharacterModel(token, CHARACTER_VISUALS.token)
+    }
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -650,32 +661,76 @@ export class BattleView {
       </div>`
   }
 
+  private bossHudHtml(): string {
+    const bossName = this.state.enemies[0]?.def.name ?? '보스'
+    return `
+      <section class="boss-health-hud" id="boss-health-hud" aria-label="${bossName} 보스 체력">
+        <div class="boss-health-heading">
+          <span class="boss-health-mark" aria-hidden="true">BOSS</span>
+          <b class="nm">${bossName}</b>
+          <span class="hpn"></span>
+        </div>
+        <div class="hp-row">
+          <div class="hpbar foe">
+            <div class="fill"></div>
+            <div class="shield"></div>
+            <div class="boss-hp-segments" hidden></div>
+            <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
+          </div>
+        </div>
+        <div class="enemy-traits"></div>
+      </section>`
+  }
+
+  private bossTokenHtml(): string {
+    const token = CHARACTER_VISUALS.token
+    const modelStatus = token.model3d ? 'preparing-3d' : 'fallback-2d'
+    return `
+      <div class="boss-token" aria-label="불안해하며 프롬을 응원하는 토큰">
+        <div class="token-speech" role="status" aria-live="polite"></div>
+        <div class="token-panic-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="model-shell" data-model-status="${modelStatus}">
+          <img class="battle-sprite" src="${token.portrait2d}" alt="토큰">
+        </div>
+      </div>`
+  }
+
+  private scheduleBossTokenSpeech(delay: number) {
+    const timer = window.setTimeout(() => {
+      if (this.over) return
+      const bubble = this.root.querySelector<HTMLElement>('.token-speech')
+      if (!bubble) return
+      bubble.textContent = TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length]
+      this.tokenSpeechIndex += 1
+      bubble.classList.remove('is-speaking')
+      // 연속 대사도 말풍선의 손글씨 팝업을 첫 프레임부터 다시 재생한다.
+      void bubble.offsetWidth
+      bubble.classList.add('is-speaking')
+      const hideTimer = window.setTimeout(() => bubble.classList.remove('is-speaking'), 3600)
+      this.timers.push(hideTimer)
+      this.scheduleBossTokenSpeech(7600)
+    }, delay)
+    this.timers.push(timer)
+  }
+
   private updatePlayer(el: HTMLElement) {
     const s = this.state
     el.querySelector<HTMLElement>('.hpn')!.innerHTML =
       `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip">◈${s.guard}</span>` : ''}`
-    // 실드(방어)는 리그 오브 레전드처럼 초록 체력을 덮지 않고, 그 뒤에 파란 막으로
-    // 이어 붙는다. 실드가 붙는 만큼 바의 전체 척도를 (최대체력 + 실드)로 늘려 초록은
-    // 그대로 초록으로 두고 추가분만 파랗게 표기한다.
-    const hp = Math.max(0, s.playerHp)
-    const guard = Math.max(0, s.guard)
-    const total = Math.max(1, s.playerMax + guard)
+    this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+  }
+
+  /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
+  private paintGuardedHpBar(bar: HTMLElement, currentHp: number, maxHp: number, currentGuard: number) {
+    const hp = Math.max(0, currentHp)
+    const guard = Math.max(0, currentGuard)
+    const total = Math.max(1, maxHp + guard)
     const hpPct = hp / total
-    el.querySelector<HTMLElement>('.hpbar.you > .fill')!.style.width = `${hpPct * 100}%`
-    const shield = el.querySelector<HTMLElement>('.hpbar.you > .shield')!
+    bar.querySelector<HTMLElement>(':scope > .fill')!.style.width = `${hpPct * 100}%`
+    const shield = bar.querySelector<HTMLElement>(':scope > .shield')!
     shield.style.left = `${hpPct * 100}%`
     shield.style.width = `${(guard / total) * 100}%`
     shield.classList.toggle('on', guard > 0)
-  }
-
-  /** 적 보호막 게이지 한 칸 갱신 — 없으면 숨기고, 있으면 비율만큼 채우고 수치를 적는다. */
-  private paintShield(bar: HTMLElement, value: number, max: number) {
-    const on = value > 0
-    bar.hidden = !on
-    if (!on) return
-    bar.querySelector<HTMLElement>('.fill')!.style.width =
-      `${Math.min(100, (value / Math.max(1, max)) * 100)}%`
-    bar.querySelector<HTMLElement>('.val')!.textContent = `◈ ${value}`
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
@@ -692,11 +747,11 @@ export class BattleView {
           <div class="hp-row">
             <div class="hpbar foe">
               <div class="fill"></div>
+              <div class="shield"></div>
               <div class="boss-hp-segments" hidden></div>
               <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
             </div>
           </div>
-          <div class="shieldbar" hidden><div class="fill"></div><span class="val"></span></div>
           <div class="enemy-traits"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -711,8 +766,8 @@ export class BattleView {
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number, visibleCount: number) {
     const front = rank === 0
     const depth = visibleCount <= 1 ? 0 : rank / (visibleCount - 1)
-    el.style.right = this.isBoss && e.def.boss ? '17%' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
-    el.style.bottom = this.isBoss && e.def.boss ? '82px' : '26px'
+    el.style.right = this.isBoss && e.def.boss ? 'calc(50% - 195px)' : `${RAIL_FRONT_RIGHT - rank * RAIL_GAP}px`
+    el.style.bottom = this.isBoss && e.def.boss ? '24px' : '26px'
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
@@ -727,16 +782,27 @@ export class BattleView {
     const plate = el.querySelector<HTMLElement>('.nameplate')!
     plate.classList.toggle('faint', rank > 0)
     plate.classList.remove('gone')
+    this.updateFoePlate(plate, e, false)
+    if (e.def.boss) {
+      const bossHud = this.root.querySelector<HTMLElement>('#boss-health-hud')
+      if (bossHud) this.updateFoePlate(bossHud, e, true)
+    }
+    // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
+    el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
+  }
+
+  private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
     const remainingBars = Math.ceil(Math.max(0, e.hp) / e.hpPerBar)
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
-      ? `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`
+      ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
       : `${Math.max(0, e.hp)}/${e.maxHp}`
     const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
-    hpbar.querySelector<HTMLElement>(':scope > .fill')!.style.width =
-      `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
-    hpbar.setAttribute('aria-label', e.healthBars > 1
-      ? `보스 체력 ${remainingBars}막 남음, 전체 ${e.healthBars}막`
-      : `체력 ${Math.max(0, e.hp)} / ${e.maxHp}`)
+    this.paintGuardedHpBar(hpbar, e.hp, e.maxHp, e.guard)
+    hpbar.setAttribute('aria-label', bossHud
+      ? `보스 체력 ${Math.max(0, e.hp)} / ${e.maxHp}`
+      : e.healthBars > 1
+        ? `보스 체력 ${remainingBars}막 남음, 전체 ${e.healthBars}막`
+        : `체력 ${Math.max(0, e.hp)} / ${e.maxHp}`)
     const segments = hpbar.querySelector<HTMLElement>('.boss-hp-segments')!
     segments.hidden = e.healthBars <= 1
     if (!segments.hidden) {
@@ -748,8 +814,6 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
-    // 방어막은 남은 양을 게이지로 — 깎이는 게 보여야 "한 대 더 치면 뚫린다"가 읽힌다.
-    this.paintShield(plate.querySelector<HTMLElement>('.shieldbar')!, e.guard, e.def.guard ?? e.guard)
     const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
     const weak = e.def.weakEmotion
     traits.innerHTML = [
@@ -758,8 +822,6 @@ export class BattleView {
       e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
       e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
     ].join('')
-    // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
-    el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
 
   private bindActor(actor: HTMLElement) {
@@ -1125,7 +1187,7 @@ export class BattleView {
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
-          return `<div class="hud-stat" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${m.label} · ${m.desc}" title="${m.label}: ${value} — ${m.desc}">
+          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${m.label} · ${m.desc}" title="${m.label}: ${value} — ${m.desc}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
       </div>`

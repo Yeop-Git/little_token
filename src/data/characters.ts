@@ -1,4 +1,4 @@
-import { MODELS, SPRITES } from '@/assets'
+import { MODELS, SPRITES, TOKEN_FACES } from '@/assets'
 
 export interface CharacterAnimationDef {
   idle: string
@@ -14,12 +14,14 @@ export interface CharacterAnimationDef {
   playbackRates?: Partial<Record<'attack' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** idle 끝 자세를 첫 자세로 점진 보간할 루프 연결 구간. */
   idleLoopBlendMs?: number
+  /** 원본 idle 끝에서 잘라낼 불필요한 꼬리 구간. */
+  idleEndTrimMs?: number
   /** 승리 동작 중 스테이지 전환 전에 보여 줄 하이라이트 길이. */
   victoryHighlightMs?: number
 }
 
 export interface CharacterVisualDef {
-  id: 'player' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'saltSkater' | 'queenBee' | 'elderSpider'
+  id: 'player' | 'token' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'saltSkater' | 'queenBee' | 'elderSpider'
   name: string
   model3d: string | null
   animations: CharacterAnimationDef | null
@@ -42,6 +44,9 @@ export interface CharacterVisualDef {
 // 모델 에셋이 준비되기 전에는 model3d를 null로 두고 portrait2d를 전장에도 쓴다.
 // 모든 적은 완전 측면(-90°)에서 화면 쪽으로 60° 돌아간 같은 방향을 공유한다.
 const ENEMY_MODEL_YAW = -Math.PI / 6
+// 보스전은 주인공의 1인칭 시점으로 맞선다. 추후 GLB가 들어오면 보스만
+// 공용 적의 사선 방향 대신 카메라를 정면으로 바라보게 한다.
+const BOSS_MODEL_YAW = 0
 const ENEMY_IDLE_LOOP_BLEND_MS = 500
 
 export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisualDef> = {
@@ -78,6 +83,19 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',
     description: '비에 젖은 일기장을 품고, 올바른 문장으로 이야기를 지켜낸다.',
+  },
+  token: {
+    id: 'token',
+    name: '토큰',
+    model3d: MODELS.token,
+    animations: {
+      idle: 'Armature|fly|BaseLayer',
+      attack: 'Armature|fly|BaseLayer',
+      idleLoopBlendMs: 350,
+    },
+    portrait2d: TOKEN_FACES.neutral,
+    title: '불안한 이야기 길잡이',
+    description: '프롬의 곁을 맴돌며 위험한 낙서 앞에서 부산하게 신호를 보낸다.',
   },
   termite: {
     id: 'termite',
@@ -148,6 +166,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
         attack: 440,
         defeat: 560,
       },
+      idleEndTrimMs: 250,
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: ENEMY_MODEL_YAW,
@@ -195,6 +214,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '소금쟁이',
     model3d: null,
     animations: null,
+    modelYaw: BOSS_MODEL_YAW,
     portrait2d: SPRITES.boss_salt_skater,
     title: '먹물 웅덩이를 가르는 왕관',
     description: '검은 물 위를 글씨처럼 스쳐 지나가며, 소금빛 종이 왕관으로 문장을 긁어낸다.',
@@ -204,6 +224,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '여왕벌',
     model3d: null,
     animations: null,
+    modelYaw: BOSS_MODEL_YAW,
     portrait2d: SPRITES.boss_queen_bee,
     title: '찢어진 종이의 벌집 여왕',
     description: '달콤한 잉크와 밀랍으로 빈 칸을 벌집처럼 막아 버린다.',
@@ -213,6 +234,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     name: '장로거미',
     model3d: null,
     animations: null,
+    modelYaw: BOSS_MODEL_YAW,
     portrait2d: SPRITES.boss_elder_spider,
     title: '결말을 꿰매는 오래된 편집자',
     description: '낡은 일기장과 거미줄로 이야기를 억지로 다른 결말에 묶어 둔다.',
