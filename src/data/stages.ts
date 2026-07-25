@@ -16,14 +16,14 @@ const ENEMY_ORDER = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito'] 
 
 /** 15층짜리 한 권 안의 보스 배치. 엔드리스에서는 이 한 권을 더 강하게 반복한다. */
 export const BOSS_BY_FLOOR: Record<number, string> = {
-  5: 'saltSkater',
+  5: 'mantis',
   10: 'queenBee',
   15: 'elderSpider',
 }
 
 /** 보스의 체력 막 수. 뒤쪽 보스일수록 더 긴 결전을 요구한다. */
 export function bossHealthBarsForFloor(floor: number): number {
-  if (floor >= 15) return 5
+  if (floor >= 15) return 9
   if (floor >= 10) return 4
   return 3
 }

@@ -8,6 +8,7 @@ const COMMIT_FLIGHT_MS = 480
 const COMMIT_POP_MS = 180
 
 export const CARD_HAND_CONFIG = {
+  initialHand: 3,
   maxHand: 6,
   /** 한 스테이지에서 추가로 뽑을 수 있는 횟수. 전투를 시작할 때 이 값으로 초기화된다. */
   drawsPerStage: 2,
@@ -85,6 +86,34 @@ export function ensureCardInInitialDraw(
   return ordered
 }
 
+/**
+ * 초기 손패에 여러 종류를 각각 한 장씩 보장한다.
+ * 입력은 이미 섞인 순서이므로 각 종류에서 처음 만난 카드만 앞으로 옮기고,
+ * 나머지 카드의 상대적인 순서는 유지한다.
+ */
+export function ensureCardsInInitialDraw(
+  words: Word[],
+  initialCount: number,
+  predicates: Array<(word: Word) => boolean>,
+): Word[] {
+  if (initialCount <= 0 || predicates.length === 0) return [...words]
+
+  const guaranteedIndexes: number[] = []
+  for (const predicate of predicates.slice(0, initialCount)) {
+    const index = words.findIndex((word, wordIndex) =>
+      !guaranteedIndexes.includes(wordIndex) && predicate(word),
+    )
+    if (index >= 0) guaranteedIndexes.push(index)
+  }
+
+  if (guaranteedIndexes.length === 0) return [...words]
+  const guaranteed = guaranteedIndexes
+    .sort((a, b) => a - b)
+    .map((index) => words[index])
+  const guaranteedSet = new Set(guaranteedIndexes)
+  return [...guaranteed, ...words.filter((_, index) => !guaranteedSet.has(index))]
+}
+
 interface CardHandOptions {
   handRoot: HTMLElement
   deckButton: HTMLButtonElement
@@ -104,6 +133,7 @@ export class CardHand {
   private slotKey = ''
   private selectedId: string | null = null
   private drawingId: string | null = null
+  private sealedId: string | null = null
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
@@ -166,7 +196,21 @@ export class CardHand {
     this.slotKey = ''
     this.selectedId = null
     this.drawingId = null
+    this.sealedId = null
     this.processing = false
+  }
+
+  /** 장로거미 전용 — 보이는 카드 중 하나를 묶되 선택 가능한 카드를 반드시 남긴다. */
+  sealRandom(rng: () => number = Math.random): Word | null {
+    const state = this.currentState()
+    if (!state || this.processing) return null
+    const candidates = state.hand.filter((card) => !this.conflictOf(card.word))
+    if (candidates.length <= 1) return null
+    const picked = candidates[Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))]
+    this.sealedId = picked.instanceId
+    if (this.selectedId === picked.instanceId) this.selectedId = null
+    this.render()
+    return picked.word
   }
 
   showSlot(slotKey: string, words: Word[], chosen: Word | undefined, conflictOf: ConflictResolver) {
@@ -181,14 +225,18 @@ export class CardHand {
 
     let state = this.states.get(slotKey)
     if (!state) {
-      const initialCount = Math.min(2, words.length)
-      const ordered = ensureCardInInitialDraw(
-        this.shuffle(words),
-        initialCount,
-        // ③ 동사의 첫 손패에는 현재 문맥에서 고를 수 있는 공격을 최소 한 장 보장한다.
-        // 모순 카드를 억지로 살리지는 않아 Validator의 차단 규칙은 그대로 유지한다.
-        (word) => word.kind === 'attack' && !this.conflictOf(word),
-      ).map((word) => this.makeInstance(slotKey, word))
+      const initialCount = Math.min(CARD_HAND_CONFIG.initialHand, words.length)
+      const shuffled = this.shuffle(words)
+      // 동사와 겹동사의 첫 손패에는 현재 문맥에서 선택 가능한 공격·방어·회복을
+      // 각각 한 장씩 보장한다. 모순 카드를 억지로 살리지는 않는다.
+      const orderedWords = slotKey === 'verb' || slotKey === 'verb2'
+        ? ensureCardsInInitialDraw(shuffled, initialCount, [
+            (word) => word.kind === 'attack' && !this.conflictOf(word),
+            (word) => word.kind === 'guard' && !this.conflictOf(word),
+            (word) => word.kind === 'heal' && !this.conflictOf(word),
+          ])
+        : shuffled
+      const ordered = orderedWords.map((word) => this.makeInstance(slotKey, word))
       state = { hand: ordered.slice(0, initialCount), deck: ordered.slice(initialCount) }
       this.states.set(slotKey, state)
     }
@@ -380,7 +428,7 @@ export class CardHand {
   private releaseRenderedCards() {
     this.opts.handRoot.querySelectorAll<HTMLButtonElement>(':scope > .word-card').forEach((button) => {
       button.getAnimations().forEach((animation) => animation.cancel())
-      button.classList.remove('pressing', 'selected', 'drawing')
+      button.classList.remove('pressing', 'selected', 'drawing', 'sealed', 'blocked')
       button.remove()
       const key = button.dataset.poolKey
       if (!key) return
@@ -400,14 +448,16 @@ export class CardHand {
     } else {
       const line = calculateLineTransform(index, count, availableWidth)
       const blocked = this.conflictOf(card.word)
+      const sealed = this.sealedId === card.instanceId
+      const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
       const selected = this.selectedId === card.instanceId
       const drawing = this.drawingId === card.instanceId
       const rarity = card.word.rarity ?? 'common'
       const emotionKey = emotionOrNeutral(card.word.emotion)
-      button.className = `word-card mood-${this.moodOf(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${drawing ? ' drawing' : ''}`
+      button.className = `word-card mood-${this.moodOf(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
-      button.disabled = !!blocked
-      button.setAttribute('aria-label', blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`)
+      button.disabled = !!unavailable
+      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`)
       button.setAttribute('aria-pressed', String(selected))
       button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
       button.style.setProperty('--card-z', String(line.zIndex))
@@ -417,13 +467,13 @@ export class CardHand {
       const badge = button.querySelector<HTMLElement>('.card-level')
       if (badge) badge.textContent = `${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}`
       const note = button.querySelector<HTMLElement>('.card-note')
-      if (note) note.textContent = blocked ?? card.word.note
+      if (note) note.textContent = unavailable ?? card.word.note
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
       if (emotionBadge) {
         emotionBadge.outerHTML = emotionIconBadge(emotionKey, 'card-emotion')
       }
       const footer = button.querySelector<HTMLElement>('.card-front > small')
-      if (footer) footer.textContent = blocked ? '맥락 충돌' : 'WORD CARD'
+      if (footer) footer.textContent = sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD'
     }
     button.dataset.poolKey = card.word.id
     return button
@@ -432,9 +482,11 @@ export class CardHand {
   private cardHtml(card: CardInstance, index: number, count: number, availableWidth: number): string {
     const line = calculateLineTransform(index, count, availableWidth)
     const blocked = this.conflictOf(card.word)
+    const sealed = this.sealedId === card.instanceId
+    const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
-    const aria = blocked ? `${card.word.text}, 선택 불가: ${blocked}` : `${card.word.text}, ${card.word.note}`
+    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`
     const artUrl = card.word.art ? SKILL_ART[card.word.art] : undefined
     const level = card.word.level ?? 1
     // 대상 범위 대신 등급·강화 단계를 보여준다 — 카드에서 알고 싶은 건 이쪽이다.
@@ -451,18 +503,18 @@ export class CardHand {
           <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${actionBadge}
           <strong class="card-title" ${cardTitleStyle(card.word.text, true)}>${card.word.text}</strong>
-          <span class="card-note">${blocked ?? card.word.note}</span>
+          <span class="card-note">${unavailable ?? card.word.note}</span>
         </span>`
       : `<span class="card-face card-front">
           <span class="card-foil" aria-hidden="true"></span>
           ${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${actionBadge}
           <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
           <strong class="card-title" ${cardTitleStyle(card.word.text)}>${card.word.text}</strong>
-          <span class="card-note">${blocked ?? card.word.note}</span>
-          <small>${blocked ? '맥락 충돌' : 'WORD CARD'}</small>
+          <span class="card-note">${unavailable ?? card.word.note}</span>
+          <small>${sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD'}</small>
         </span>`
-    return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}${isDrawing ? ' drawing' : ''}"
-      data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${blocked ? 'disabled' : ''}
+    return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
+      data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${unavailable ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
@@ -509,6 +561,7 @@ export class CardHand {
     // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
     if (button && !button.isConnected) return
     if (this.drawingId === card.instanceId) return
+    if (this.sealedId === card.instanceId) return
     if (this.conflictOf(card.word)) return
 
     this.selectedId = card.instanceId

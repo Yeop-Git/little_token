@@ -35,7 +35,8 @@ import enemyTermite from './sprites/enemy_termite.webp'
 import enemyRoach from './sprites/enemy_roach.webp'
 import enemyPillbug from './sprites/enemy_pillbug.webp'
 import enemyMosquito from './sprites/enemy_mosquito.webp'
-import bossSaltSkater from './sprites/boss_salt_skater.webp'
+import enemyWorkerBee from './sprites/enemy_worker_bee.webp'
+import bossMantis from './sprites/boss_mantis.webp'
 import bossQueenBee from './sprites/boss_queen_bee.webp'
 import bossElderSpider from './sprites/boss_elder_spider.webp'
 import emotionJoy from './sprites/emotions/emotion_joy.webp'
@@ -199,7 +200,8 @@ export const SPRITES: Record<string, string> = {
   enemy_roach: enemyRoach,
   enemy_pillbug: enemyPillbug,
   enemy_mosquito: enemyMosquito,
-  boss_salt_skater: bossSaltSkater,
+  enemy_worker_bee: enemyWorkerBee,
+  boss_mantis: bossMantis,
   boss_queen_bee: bossQueenBee,
   boss_elder_spider: bossElderSpider,
 }

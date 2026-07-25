@@ -240,6 +240,57 @@ export interface EnemyDef {
   /** 플레이어의 일반 방어막을 소모시키지 않고 체력에 직접 피해를 준다. */
   pierceGuard?: boolean
   weakEmotion?: Emotion
+  /** 장로거미처럼 하나의 적 안에 순차적으로 파괴되는 독립 체력 부위를 가진 경우. */
+  parts?: readonly EnemyPartDef[]
+  /** 매 문장 시작에 카드를 묶고, 누적 장력으로 공격을 강화하는 거미줄 패턴. */
+  webPattern?: {
+    sealPerTurn: number
+    attackPerTension: number
+    maxAttackBonus: number
+  }
+  /** 공격할 때마다 순서대로 반복하는 예고형 기술. bonusAtk은 기본 공격력에 가산한다. */
+  attackPattern?: readonly {
+    name: string
+    bonusAtk: number
+    /** 기본 공격 피해에 적용하는 기술별 위력 비율. 0이면 피해 없는 쇼 동작이다. */
+    damageScale?: number
+    /** 이 기술을 한 번 더 반복할 확률. 한 사이클에서 최대 한 번만 굴린다. */
+    repeatOnceChance?: number
+    /** 피해 없이 다음 공격을 준비할 때 화면에 띄우는 예고 문구. */
+    telegraphText?: string
+    /** 플레이어 방어가 있으면 전량 소모하고 체력 피해를 0으로 만든다. */
+    shatterGuard?: boolean
+    /** 실제 체력 피해 중 적이 회복하는 비율. */
+    lifeStealRate?: number
+    /** 공격 직후 다음 플레이어 턴에 적이 받는 피해 배율. */
+    groggyDamageMult?: number
+    /** 방어를 실제로 전량 파괴했을 때만 그로기에 들어간다. */
+    groggyRequiresGuardShatter?: boolean
+  }[]
+  /** 턴 시작마다 보스 곁에 쌓이는 호위 소환물. 전투 레일의 별도 적으로 취급하지 않는다. */
+  summonPattern?: {
+    name: string
+    sprite: string
+    perTurn: number
+    max: number
+    maxPerSide: number
+    /** 살아 있는 호위 하나마다 보스 공격에 더하는 값. */
+    attackBonusPerUnit: number
+    /** 이 수에 도달한 채 공격하면 호위를 모두 내보내고 다시 모으기 시작한다. */
+    releaseAt: number
+  }
+}
+
+export interface EnemyPartDef {
+  id: string
+  name: string
+  kind: 'leg' | 'body'
+  /** 현재 앞에 나온 다리 하나의 약점만 공개한다. 본체에는 약점이 없다. */
+  weakness?: {
+    kind: 'emotion' | 'tag'
+    value: string
+    label: string
+  }
 }
 
 // ── 필드(날씨/날짜/제목) 효과 ──
