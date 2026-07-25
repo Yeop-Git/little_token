@@ -52,7 +52,12 @@ import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHa
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_RATIO } from '@/ui/AttackCinematic'
-import { currentFieldStage, pickFieldBackground, type FieldBackground } from '@data/backgrounds'
+import {
+  currentFieldLight,
+  currentFieldStage,
+  pickFieldBackground,
+  type FieldBackground,
+} from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import {
   destroyCharacterModels,
@@ -96,6 +101,10 @@ const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 // 전투 상태의 전체 적 배열은 유지하므로 관통·광역 피해 규칙에는 영향을 주지 않는다.
 // 레일의 자리·간격·물러남은 배경마다 다르다(data/backgrounds.ts의 FieldStage).
 const MAX_VISIBLE_ENEMIES = 3
+/** 배경이 갈리는 판 — 와이프(1.7초 + 0.15 지연)가 지나간 뒤 적이 들어온다. */
+const ENEMY_ENTER_AFTER_SWAP_MS = 1500
+/** 첫 판처럼 갈릴 배경이 없으면 한 박자만 두고 바로 들어온다. */
+const ENEMY_ENTER_DELAY_MS = 260
 const MAX_ACTION_ORDER_ENEMIES = 3
 const TOKEN_BOSS_LINES = [
   '어떡하지...! 도와줘, 프롬!!',
@@ -229,6 +238,19 @@ export class BattleView {
     this.target = aliveIdx(this.state)[0] ?? 0
     this.mount()
     if (opts.intro) this.mountIntro()
+    else this.enterEnemies()
+  }
+
+  /**
+   * 일반 전투의 적 등장 — 오른쪽 밖에 세워 두었다가 배경이 다 갈린 뒤 걸어 들어온다.
+   * 배경 와이프가 지나가기 전에 들어오면 아직 옛 전장에 적이 서 있는 꼴이 된다.
+   */
+  private enterEnemies() {
+    const scene = this.q('.scene.battle')
+    scene.classList.add('is-intro-hold')
+    // 배경이 바뀌는 판에서만 와이프를 기다린다. 첫 판은 갈릴 배경이 없으니 바로 들어온다.
+    const wait = this.bg.prev ? ENEMY_ENTER_AFTER_SWAP_MS : ENEMY_ENTER_DELAY_MS
+    this.timers.push(window.setTimeout(() => this.releaseEnemies(scene), wait))
   }
 
   destroy() {
@@ -315,16 +337,29 @@ export class BattleView {
       onComplete: () => {
         this.introDialogue = null
         this.onIntroComplete?.()
-        scene.classList.add('is-enemies-arriving')
-        requestAnimationFrame(() => scene.classList.remove('is-intro-hold'))
-        this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
+        this.releaseEnemies(scene)
       },
     })
   }
 
+  /**
+   * 적을 오른쪽 밖에서 걸어 들어오게 한다.
+   *
+   * 예전엔 이 연출이 첫 튜토리얼 전투에만 붙어 있었다. 나머지 판에서는 화면이 열리는
+   * 순간 적이 제자리에 그냥 나타나서, 배경이 바뀌는 연출을 붙여 놓고도 정작 적은
+   * 순간이동하는 꼴이었다. 이제 모든 전투가 같은 길로 들어온다.
+   *
+   * 배경 와이프(1.7초)가 지나간 뒤에 들어와야 "새 전장에 적이 도착한다"는 순서로 읽힌다.
+   */
+  private releaseEnemies(scene: HTMLElement) {
+    scene.classList.add('is-enemies-arriving')
+    requestAnimationFrame(() => scene.classList.remove('is-intro-hold'))
+    this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
+  }
+
   private mount() {
     this.root.innerHTML = `
-      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${this.bg.prev ?? this.bg.next});--actor-bottom:${currentFieldStage().bottom}px">
+      <div class="scene battle" data-weather="${this.field.weather}"${this.isBoss ? ' data-boss="true" data-entrance="fade"' : ''} style="background-image:url(${this.bg.prev ?? this.bg.next});--actor-bottom:${currentFieldStage().bottom}px;--player-left:${currentFieldStage().playerLeft ?? 290}px;--sun-x:${(currentFieldLight().sunX * 100).toFixed(1)}%;--sun-y:${(currentFieldLight().sunY * 100).toFixed(1)}%;--sun-color:#${currentFieldLight().keyColor.toString(16).padStart(6, '0')};--sun-strength:${currentFieldLight().sunStrength};--model-grade-hue:${currentFieldLight().gradeHue}deg">
         ${
           this.bg.prev
             ? `<div class="field-swap" aria-hidden="true" style="background-image:url(${this.bg.next})"></div>`
@@ -333,6 +368,8 @@ export class BattleView {
         ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
         <div class="weather-wash"></div>
+        <div class="field-clarity" aria-hidden="true"></div>
+        <div class="field-sun" aria-hidden="true"></div>
         <div class="storybook-grade" aria-hidden="true"></div>
 
         <div class="hud-top">
@@ -831,12 +868,15 @@ export class BattleView {
     el.style.zIndex = String(40 - rank) // 앞줄이 뒷줄을 가린다
     // 뒤쪽도 적의 수와 종류를 읽을 수 있을 만큼 남긴다. 깊이감은 크기와 아주
     // 얕은 흐림으로만 표현하며, opacity로 사라지게 만들지 않는다.
-    el.style.opacity = `${1 - depth * 0.2}`
+    // 뒤로 갈수록 옅어진다 — 맨 뒷줄은 확실히 물러나 보여야 앞줄이 지금 상대라는 게 읽힌다.
+    el.style.opacity = `${1 - depth * 0.58}`
     el.style.setProperty('--model-scale', `${1 - depth * st.railShrink}`)
     el.style.setProperty('--model-blur', `${depth * 1.5}px`)
     el.classList.toggle('front', front)
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
+    // 맨 뒷줄은 한 번 더 물러난다(CSS의 .rank-last).
+    el.classList.toggle('rank-last', visibleCount > 1 && rank === visibleCount - 1)
 
     // 세 마리 모두 같은 축에서 읽히도록 이름표를 유지하되 대기 적만 은은하게 한다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!

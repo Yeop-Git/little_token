@@ -724,9 +724,11 @@ button {
   inset: 0;
   pointer-events: none;
   z-index: 2;
+  /* 어둠은 화면을 눌러 탁하게 만든다. 입체는 인공 태양(.field-sun)이 빛으로 만들고,
+     여기는 위아래 끝을 살짝 여미는 정도만 남긴다 — 예전 값의 3분의 1쯤. */
   background:
-    linear-gradient(180deg, rgba(10, 8, 14, 0.42) 0%, transparent 18%, transparent 52%, rgba(8, 6, 12, 0.5) 100%),
-    radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(8, 6, 12, 0.35) 100%);
+    linear-gradient(180deg, rgba(10, 8, 14, 0.16) 0%, transparent 14%, transparent 58%, rgba(8, 6, 12, 0.18) 100%),
+    radial-gradient(ellipse at 50% 40%, transparent 68%, rgba(8, 6, 12, 0.12) 100%);
 }
 
 /* ── 배경 교체 와이프 ──
@@ -770,23 +772,90 @@ button {
    배경(그린 그림)과 3D 캐릭터(렌더된 것)는 태생이 달라서 그냥 얹으면 따로 논다.
    둘 위에 한 겹을 덮어 같은 색으로 눌러 주면 한 장면처럼 보인다.
    배우(z 6~10)보다는 위, HUD(z 96~)보다는 아래에 앉아서 UI 글자는 물들이지 않는다.
-   soft-light라 밝은 데는 덜 먹고 어두운 데는 더 먹어서 대비가 뭉개지지 않는다. */
+
+   두 겹으로 나눠 건다. 예전엔 soft-light 한 겹에 다 몰아넣었더니 색은 맞았지만
+   화면 전체가 눌려 어두워졌다. 색을 맞추는 일과 명암을 만드는 일은 분리해야 한다.
+
+   ① 본체(mix-blend-mode: color) — 색조와 채도만 덮어쓰고 **밝기는 아래 것을 그대로 둔다.**
+      그래서 어두워지지 않으면서 배경과 캐릭터가 같은 색 계열로 묶인다. 통일의 몫은 여기.
+   ② ::after(soft-light) — 가운데를 살짝 덥히고 구석을 식히는 정도로만. 아주 옅게. */
+/* 배경 선명도 — 톤은 그대로 두고 흐릿함만 걷는다.
+   backdrop-filter는 **자기 뒤에 있는 것**에만 걸리므로, 배경과 교체 와이프까지만
+   또렷해지고 그 위에 서는 배우와 UI는 건드리지 않는다.
+   (씬 전체에 filter를 걸면 캐릭터와 글자까지 같이 조여져서 못 쓴다.) */
+.field-clarity {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  backdrop-filter: contrast(1.12) saturate(1.1);
+  -webkit-backdrop-filter: contrast(1.12) saturate(1.1);
+}
+
+/* ── 인공 태양 ──
+   배경 그림에서 실측한 광원 자리(--sun-x/--sun-y)에 실제로 빛을 얹는다.
+   3D 주광의 방향도 같은 좌표에서 뽑았으므로, 화면이 밝은 쪽과 캐릭터가 빛을 받는
+   쪽이 어긋나지 않는다.
+
+   그림자를 만들려고 어둠을 덮는 대신 빛을 더한다 — 어둠을 깔면 화면 전체가 눌려
+   탁해지지만, 빛을 얹으면 밝은 데와 안 닿는 데의 차이로 입체가 생긴다.
+   screen 합성이라 어두운 부분은 거의 건드리지 않고 밝은 쪽만 들어 올린다. */
+.field-sun {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  /* 빛무리는 좁게. 넓게 퍼뜨리면 화면 전체가 주광색으로 씻겨 배경 그림이 사라진다 —
+     처음에 88%까지 퍼뜨렸다가 전장이 통째로 주황빛이 됐다.
+     광원 자리만 또렷하게 타고, 거기서 멀어지면 배경 원래 색이 그대로 남아야 한다. */
+  opacity: calc(var(--sun-strength, 0.55) * 0.62);
+  background:
+    radial-gradient(circle at var(--sun-x, 42%) var(--sun-y, 34%), var(--sun-color, #ffe6b0) 0%, transparent 7%),
+    radial-gradient(circle at var(--sun-x, 42%) var(--sun-y, 34%), var(--sun-color, #ffe6b0) 0%, transparent 19%),
+    radial-gradient(ellipse at var(--sun-x, 42%) var(--sun-y, 34%), var(--sun-color, #ffe6b0) 0%, transparent 42%);
+}
+
 .storybook-grade {
   position: absolute;
   inset: 0;
   z-index: 12;
   pointer-events: none;
-  mix-blend-mode: soft-light;
-  opacity: 0.62;
-  background:
-    radial-gradient(ellipse at 50% 38%, rgba(255, 226, 168, 0.85), transparent 62%),
-    radial-gradient(ellipse at 12% 96%, rgba(126, 150, 196, 0.5), transparent 58%),
-    radial-gradient(ellipse at 88% 92%, rgba(150, 126, 178, 0.42), transparent 58%),
-    linear-gradient(180deg, rgba(255, 214, 150, 0.34), rgba(96, 108, 158, 0.38));
+  mix-blend-mode: color;
+  /* 배경에는 거의 안 건다 — 배경은 이미 그 색으로 그려져 있어서 더 덮으면 탁해진다.
+     겉도는 건 렌더된 3D 쪽이라, 통일의 몫은 아래 .battle-model 필터가 맡는다. */
+  opacity: 0.07;
+  background: linear-gradient(170deg, #ffd7a2 0%, #e8c9a8 42%, #a9b6d6 100%);
 }
-/* 밤·비에는 차가운 쪽으로 기운다 — 날씨 워시와 같은 방향으로 밀어야 서로 안 싸운다. */
-.battle[data-weather='night'] .storybook-grade { opacity: 0.5; filter: hue-rotate(-12deg) saturate(0.9); }
-.battle[data-weather='rain'] .storybook-grade { opacity: 0.54; filter: hue-rotate(-6deg) saturate(0.94); }
+.storybook-grade::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: soft-light;
+  /* 넓게 깔린 겹은 그 자체로 화면을 뿌옇게 만든다. 톤을 만드는 최소치만 남긴다. */
+  opacity: 0.12;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 236, 194, 0.8), transparent 66%),
+    radial-gradient(ellipse at 10% 98%, rgba(150, 172, 212, 0.34), transparent 60%),
+    radial-gradient(ellipse at 90% 96%, rgba(168, 146, 194, 0.28), transparent 60%);
+}
+
+/* 3D 모델에만 거는 색 보정.
+   캔버스에 filter를 걸면 알파를 존중해서 **모델 실루엣에만** 먹는다. 오버레이를 얹으면
+   투명한 부분까지 네모나게 물들어서 못 쓴다.
+   sepia로 색을 살짝 모아 배경 색조 쪽으로 기울인다.
+
+   회전은 아주 얕게만 준다. 처음엔 배경 주광색의 색상각까지 통째로 돌렸는데, 그러면
+   프롬의 노란 우비가 초록으로 바뀌어 버렸다 — 캐릭터 고유색은 배경에 맞춘다고
+   갈아치울 수 있는 게 아니다. 통일은 조명(3D 주광·반사광)이 이미 하고 있고,
+   여기는 마지막에 결을 맞추는 정도만 맡는다. */
+.actor .battle-model {
+  filter: sepia(var(--model-grade, 0.1))
+    hue-rotate(calc((var(--model-grade-hue, 45deg) - 40deg) * 0.18)) saturate(1.06);
+}
+/* 밤·비에는 색조만 차갑게 민다. 밝기는 날씨 워시가 이미 담당하므로 여기서 또 누르지 않는다. */
+.battle[data-weather='night'] .storybook-grade { opacity: 0.24; filter: hue-rotate(-14deg); }
+.battle[data-weather='rain'] .storybook-grade { opacity: 0.22; filter: hue-rotate(-7deg); }
 
 /* 날씨/밤낮 워시 — 배경 위에 톤 오버레이(적/UI보다 아래) */
 .weather-wash {
@@ -1433,26 +1502,55 @@ button {
   filter: blur(var(--model-blur, 0)) drop-shadow(0 0 22px color-mix(in srgb, var(--gold) 56%, transparent));
 }
 /* 투영 그림자 대신 발선만 배경에 살짝 묻는 접지 흔적을 둔다. */
+/* 접지 그림자 — 발바닥에 거의 붙는 가로로 긴 타원.
+   공간감은 이 한 겹이 거의 다 만든다. 옅게 깔면 캐릭터가 배경 위에 얹힌 스티커처럼
+   보이므로, 안쪽은 진하게 두고 바깥으로 빠르게 풀어 "닿아 있다"는 인상만 남긴다.
+   가로로 길쭉해야(폭 대비 높이 1/9쯤) 서 있는 발밑처럼 읽힌다 — 원에 가까우면
+   공중에 뜬 구체의 그림자가 된다. */
 .actor .shadow {
   position: absolute;
-  bottom: -1px;
-  width: 126px;
-  height: 19px;
-  background: radial-gradient(ellipse at center, rgba(28, 45, 42, .18), transparent 70%);
+  bottom: -3px;
+  width: 208px;
+  height: 24px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(10, 16, 18, 0.94) 0%,
+    rgba(10, 16, 18, 0.72) 38%,
+    rgba(10, 16, 18, 0.34) 62%,
+    transparent 84%
+  );
   border-radius: 50%;
-  filter: blur(3px);
-  opacity: .46;
+  filter: blur(4px);
+  opacity: 1;
   z-index: -1;
 }
-.battle[data-weather='rain'] .actor .shadow {
-  background: radial-gradient(ellipse at center, rgba(37, 62, 72, .2), transparent 70%);
-}
-.battle[data-weather='night'] .actor .shadow {
-  background: radial-gradient(ellipse at center, rgba(37, 43, 72, .22), transparent 72%);
-}
+/* 뒷줄 적은 모델과 같은 비율로 작아져야 발밑이 어긋나 보이지 않는다. */
 .actor.foe .shadow {
-  width: 108px;
-  height: 17px;
+  transform: scaleX(var(--model-scale, 1));
+}
+.battle[data-weather='rain'] .actor .shadow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(20, 36, 44, 0.68) 0%,
+    rgba(20, 36, 44, 0.4) 44%,
+    transparent 80%
+  );
+}
+/* 밤에도 색만 차갑게 바꾸고 진하기는 유지한다 — 예전엔 여기서 0.22로 옅어져
+   접지감이 통째로 사라졌다. */
+.battle[data-weather='night'] .actor .shadow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(18, 22, 44, 0.92) 0%,
+    rgba(18, 22, 44, 0.68) 40%,
+    rgba(18, 22, 44, 0.3) 64%,
+    transparent 84%
+  );
+}
+/* 적은 플레이어보다 조금 작게. 위에서 잡은 208×24를 덮지 않도록 비율만 줄인다. */
+.actor.foe .shadow {
+  width: 176px;
+  height: 22px;
 }
 .actor.hit {
   animation: shake 0.34s ease;
@@ -1627,9 +1725,15 @@ button {
   transition: opacity 0.32s ease, filter 0.32s ease;
 }
 /* 2번째 적 — 있다는 것만 알 정도로 은은하게 */
+/* 대기 중인 적의 이름표·체력바 — 지금 상대가 아니라는 걸 옅기로 알린다.
+   맨 뒷줄은 한 번 더 물린다(.back.rank-last). 정보는 읽히되 앞줄과 다투지 않는 정도. */
 .actor.foe .nameplate.faint {
-  opacity: 0.44;
-  filter: saturate(0.65);
+  opacity: 0.3;
+  filter: saturate(0.55);
+}
+.actor.foe.rank-last .nameplate.faint {
+  opacity: 0.18;
+  filter: saturate(0.4);
 }
 .actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
 .nameplate .row {
