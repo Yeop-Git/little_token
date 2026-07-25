@@ -6,20 +6,23 @@
   "scripts": {
     "assets:optimize": "tsx scripts/optimize-assets.ts",
     "assets:check": "tsx scripts/optimize-assets.ts --check",
+    "resources:check": "tsx src/tools/resource-lifecycle-check.ts",
     "predev": "npm run assets:optimize",
     "prebuild": "npm run assets:optimize",
     "data:generate": "tsx scripts/generate-sentence-data.ts",
     "clip:beats": "tsx scripts/clip-beats.ts",
+    "sprites:bake": "node scripts/bake-slash-sprites.mjs",
     "dev": "npm run data:generate && vite",
-    "build": "npm run data:generate && npm run assets:check && tsc && vite build",
+    "build": "npm run data:generate && npm run assets:check && npm run resources:check && tsc && vite build",
     "preview": "vite preview",
     "type-check": "npm run data:generate && tsc --noEmit",
     "sweep": "npm run data:generate && tsx src/tools/sweep.ts",
     "check": "npm run data:generate && tsx src/tools/check-tables.ts",
     "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts",
-    "sprites:bake": "node scripts/bake-slash-sprites.mjs"
+    "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts"
   },
   "devDependencies": {
+    "@types/howler": "^2.2.13",
     "@types/node": "^26.1.1",
     "@types/three": "^0.179.0",
     "playwright-core": "^1.61.1",
@@ -29,6 +32,7 @@
     "vite": "^5.2.0"
   },
   "dependencies": {
+    "howler": "^2.2.4",
     "three": "^0.179.1"
   }
 }

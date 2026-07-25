@@ -1,7 +1,7 @@
 /**
  * 스테이지 클리어 보상 — 주어·수식어 → 아이템 → 동사 순서로 각각 3택한다.
- * 전투 등급에 15층 사이클 진행 보정을 더해 뒤로 갈수록 높은 희귀도가 자연스럽게
- * 자주 나오며, 10층에는 매 사이클 전설 규칙 아이템 한 장이 확정 등장한다.
+ * 전투 등급에 15층 사이클 진행 보정을 더해 뒤로 갈수록 단어 보상의 높은 희귀도가
+ * 자주 나온다. 아이템 단계는 매번 일반 스탯 아이템 2장과 전설 규칙 아이템 1장을 보여 준다.
  */
 
 import type { Rarity, Word } from '@core/types'
@@ -12,8 +12,6 @@ import { floorInCycle, STORY_FLOORS } from './stages'
 import { ALL_REWARD_WORDS } from './earlyWords'
 import { ITEMS, LEGENDARY_ITEMS, type ItemDef } from './items'
 import { tacticalCardIdsForRewardDay } from './tacticalCards'
-
-export const LEGENDARY_GIFT_FLOOR = 10
 
 export interface RewardOption {
   kind: 'word' | 'item'
@@ -111,12 +109,6 @@ const toItemOption = (item: ItemDef): RewardOption => ({
   item,
 })
 
-function freshLegendaries(player: PlayerState): ItemDef[] {
-  const owned = new Set(player.items.map((item) => item.id))
-  const fresh = Object.values(LEGENDARY_ITEMS).filter((item) => !owned.has(item.id))
-  return fresh.length ? fresh : Object.values(LEGENDARY_ITEMS)
-}
-
 function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb'): RewardOption[] {
   const slots = phase === 'subject' ? ['subj', 'adv'] : ['verb']
   const all = wordOptions(player, slots)
@@ -145,23 +137,13 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   return shuffle(picks)
 }
 
-function generateItemRewards(player: PlayerState, grade: number, day: number): RewardOption[] {
-  const candidates = Object.values(ITEMS).map(toItemOption)
-  const used = new Set<string>()
-  const picks: RewardOption[] = []
-  while (picks.length < 3) {
-    const option = pickOne(candidates, grade, used)
-    if (!option) break
-    picks.push(option)
-  }
-
-  // 규칙 아이템은 확률 풀이 아니라 날짜 규칙으로만 등장한다. 15층마다 같은 10층에서
-  // 한 장을 확정 노출하므로 본편과 모든 엔드리스 사이클에 같은 획득 기회가 생긴다.
-  if (floorInCycle(day) === LEGENDARY_GIFT_FLOOR) {
-    const legendary = shuffle(freshLegendaries(player))[0]
-    if (legendary) picks[0] = toItemOption(legendary)
-  }
-  return picks
+function generateItemRewards(player: PlayerState): RewardOption[] {
+  const normal = shuffle(Object.values(ITEMS)).slice(0, 2).map(toItemOption)
+  const owned = new Set(player.items.map((item) => item.id))
+  const unownedLegendary = Object.values(LEGENDARY_ITEMS).filter((item) => !owned.has(item.id))
+  const legendaryPool = unownedLegendary.length ? unownedLegendary : Object.values(LEGENDARY_ITEMS)
+  const legendary = shuffle(legendaryPool)[0]
+  return shuffle(legendary ? [...normal, toItemOption(legendary)] : normal)
 }
 
 export function genRewards(
@@ -171,6 +153,6 @@ export function genRewards(
   phase: RewardPhase = 'subject',
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
-  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day)
+  if (phase === 'item') return generateItemRewards(player)
   return generateWordRewards(player, effectiveGrade, day, phase)
 }

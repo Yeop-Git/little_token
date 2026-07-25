@@ -1,29 +1,8 @@
-import { BACKGROUNDS, ITEM_ART, SKILL_ART, SPRITES } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, SKILL_ART } from '@/assets'
 import type { Word } from '@core/types'
 import { CHARACTER_VISUALS } from '@data/characters'
 import { preloadCharacterModelResources } from '@views/BattleCharacterModel'
-
-// URL별 Promise를 기억하면 씬을 다시 열거나 덱이 성장해도 이미 예열한 이미지를
-// 다시 만들지 않는다. 새로 얻은 카드 일러스트만 다음 전투 진입 전에 추가된다.
-const imageLoads = new Map<string, Promise<void>>()
-
-function loadImage(src: string): Promise<void> {
-  const cached = imageLoads.get(src)
-  if (cached) return cached
-
-  const pending = new Promise<void>((resolve) => {
-    const image = new Image()
-    image.decoding = 'async'
-    image.onload = () => {
-      // decode()까지 기다려 첫 전투 프레임에서 메인 스레드 디코딩이 몰리지 않게 한다.
-      void image.decode().catch(() => undefined).finally(resolve)
-    }
-    image.onerror = () => resolve()
-    image.src = src
-  })
-  imageLoads.set(src, pending)
-  return pending
-}
+import { preloadImages } from '@/ui/ResourceLibrary'
 
 /**
  * 현재 덱·가방으로 다음 전투에 실제 쓰일 배경·카드·캐릭터 리소스만 예열한다.
@@ -51,18 +30,17 @@ export function preloadBattleResources(
   const visuals = [
     CHARACTER_VISUALS.player,
     ...encounterVisuals,
+    ...(encounter.includes('queenBee') ? [CHARACTER_VISUALS.workerBee] : []),
     ...(encounter.some((id) => id === 'queenBee' || id === 'elderSpider')
       ? [CHARACTER_VISUALS.token]
       : []),
   ]
   const characterArt = visuals.map((visual) => visual.portrait2d)
-  // 여왕벌의 일벌은 독립 배우 매니페스트가 없는 전투 전용 스프라이트다.
-  const summonArt = encounter.includes('queenBee') ? [SPRITES.enemy_worker_bee] : []
   const urls = [
-    ...new Set([...Object.values(BACKGROUNDS), ...characterArt, ...summonArt, ...cardArt, ...bagArt]),
+    ...new Set([...Object.values(BACKGROUNDS), ...characterArt, ...cardArt, ...bagArt]),
   ]
   return Promise.all([
-    ...urls.map(loadImage),
+    preloadImages(urls),
     preloadCharacterModelResources(visuals),
   ]).then(() => undefined)
 }

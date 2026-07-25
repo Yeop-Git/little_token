@@ -22,6 +22,8 @@ import enemyTermiteModel from './models/enemy_termite.glb?url'
 import enemyFleaModel from './models/enemy_flea.glb?url'
 import enemyPillbugModel from './models/enemy_pillbug.glb?url'
 import enemyMosquitoModel from './models/enemy_mosquito.glb?url'
+import enemyWorkerBeeModel from './models/enemy_worker_bee.glb?url'
+import bossMantisModel from './models/boss_mantis.glb?url'
 import bossQueenBeeModel from './models/boss_queen_bee.glb?url'
 import bossElderSpiderModel from './models/boss_elder_spider.glb?url'
 import token001 from './sprites/token/token_001.webp'
@@ -220,6 +222,8 @@ export const MODELS: Record<string, string> = {
   enemy_flea: enemyFleaModel,
   enemy_pillbug: enemyPillbugModel,
   enemy_mosquito: enemyMosquitoModel,
+  enemy_worker_bee: enemyWorkerBeeModel,
+  boss_mantis: bossMantisModel,
   boss_queen_bee: bossQueenBeeModel,
   boss_elder_spider: bossElderSpiderModel,
 }

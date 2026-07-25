@@ -10,6 +10,7 @@
  */
 
 import { GameAudio } from '@/audio/GameAudio'
+import { acquireVideo, releaseVideo } from '@/ui/ResourceLibrary'
 
 interface Opts {
   /** 재생할 webm. */
@@ -41,16 +42,15 @@ export class BossCinematic {
     this.el = document.createElement('div')
     this.el.className = 'boss-cine'
     this.el.setAttribute('aria-hidden', 'true')
-    this.el.innerHTML = `
-      <video class="boss-cine-video" playsinline preload="auto">
-        <source src="${opts.src}" type="video/webm" />
-      </video>
-      <button class="boss-cine-skip" type="button">건너뛰기</button>`
+    this.el.innerHTML = '<button class="boss-cine-skip" type="button">건너뛰기</button>'
+    // 영상 요소는 공용 자원 풀에서 받는다 — 마크업에 직접 박으면 장면이 바뀔 때마다
+    // 미디어 파이프라인을 새로 열게 되고, resources:check도 그걸 막는다.
+    this.video = acquireVideo({ key: 'boss-cinematic-1', src: opts.src, type: 'video/webm' })
+    this.video.className = 'boss-cine-video'
+    this.el.prepend(this.video)
     document.body.appendChild(this.el)
-    this.video = this.el.querySelector('.boss-cine-video')!
     // 자동재생 정책에 막히지 않게 음소거로 시작한다. 배경음은 게임이 따로 깐다.
     this.video.muted = true
-    this.video.load()
 
     this.el.querySelector<HTMLButtonElement>('.boss-cine-skip')?.addEventListener('click', () => this.skip())
     this.video.addEventListener('ended', () => void this.raiseCurtain())
@@ -64,6 +64,8 @@ export class BossCinematic {
     this.timers.forEach((t) => clearTimeout(t))
     this.timers = []
     this.video.pause()
+    // 다음 회차에 다시 쓸 수 있게 풀로 돌려준다.
+    releaseVideo(this.video)
     this.el.remove()
   }
 

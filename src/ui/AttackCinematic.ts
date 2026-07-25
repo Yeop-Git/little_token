@@ -13,6 +13,12 @@
  */
 
 import { VIDEO } from '@/assets'
+import {
+  acquireVideo,
+  isVideoWarmed,
+  markVideoWarmed,
+  releaseVideo,
+} from '@/ui/ResourceLibrary'
 
 export type AttackCut = 'pump' | 'wipe'
 
@@ -33,7 +39,7 @@ export class AttackCinematic {
   private warmups = new Map<AttackCut, Promise<void>>()
   private readonly readyCuts = new Set<AttackCut>()
   private idleWarmup = 0
-  private timers: number[] = []
+  private timers = new Map<number, () => void>()
   private playing = false
   private lastPlayedAt = -Infinity
   private destroyed = false
@@ -44,21 +50,14 @@ export class AttackCinematic {
     this.el.setAttribute('aria-hidden', 'true')
     this.el.innerHTML = `
       <div class="atk-cine-frame">
-        <video class="atk-cine-video" data-cut="pump" muted playsinline preload="auto">
-          <source src="${VIDEO.attack1}" type="video/webm" />
-        </video>
-        <video class="atk-cine-video" data-cut="wipe" muted playsinline preload="auto">
-          <source src="${VIDEO.attack2}" type="video/webm" />
-        </video>
         <div class="atk-cine-sheen" aria-hidden="true"></div>
         <div class="atk-cine-edge" aria-hidden="true"></div>
       </div>`
+    const pump = this.acquireCut('pump', VIDEO.attack1)
+    const wipe = this.acquireCut('wipe', VIDEO.attack2)
+    this.el.querySelector<HTMLElement>('.atk-cine-frame')!.prepend(pump, wipe)
     host.appendChild(this.el)
-    this.videos = {
-      pump: this.el.querySelector('[data-cut="pump"]')!,
-      wipe: this.el.querySelector('[data-cut="wipe"]')!,
-    }
-    // 화면 밖에 둔 채로 먼저 받아 둔다. muted라 정책에 막히지 않는다.
+    this.videos = { pump, wipe }
     // preload/load는 파일만 먼저 가져올 뿐 첫 프레임 디코딩과 GPU 업로드까지
     // 보장하지 않는다. 전투 첫 화면을 그린 뒤 한가한 틈에 실제로 한 프레임씩
     // 재생해 두면, 컷이 터지는 순간 미디어 파이프라인이 처음 열리며 끊기지 않는다.
@@ -68,16 +67,19 @@ export class AttackCinematic {
   }
 
   destroy() {
+    if (this.destroyed) return
     this.destroyed = true
     this.cancelIdleWarmup(this.idleWarmup)
     this.idleWarmup = 0
-    for (const t of this.timers) clearTimeout(t)
-    this.timers = []
+    for (const [timer, resolve] of this.timers) {
+      clearTimeout(timer)
+      resolve()
+    }
+    this.timers.clear()
+    this.playing = false
+    this.el.classList.remove('is-in', 'is-out')
     for (const v of Object.values(this.videos)) {
-      v.pause()
-      v.querySelector('source')?.remove()
-      v.removeAttribute('src')
-      v.load()
+      releaseVideo(v)
     }
     this.el.remove()
   }
@@ -101,7 +103,7 @@ export class AttackCinematic {
    */
   open(cut: AttackCut): boolean {
     const now = performance.now()
-    if (this.playing || now - this.lastPlayedAt < 4500) return false
+    if (this.destroyed || this.playing || now - this.lastPlayedAt < 4500) return false
     if (!this.readyCuts.has(cut)) {
       // 아직 안 데워졌으면 이번 컷은 건너뛰되(턴을 붙잡는 쪽이 더 나쁘다) 지금 데워 둔다.
       // 이렇게 두면 첫 시도가 영상 로드보다 일렀어도 다음 강타에는 제대로 뜬다.
@@ -134,6 +136,7 @@ export class AttackCinematic {
     this.el.classList.remove('is-in')
     this.el.classList.add('is-out')
     await this.wait(OUT_MS)
+    if (this.destroyed) return
     this.el.classList.remove('is-out')
     this.playing = false
   }
@@ -151,14 +154,19 @@ export class AttackCinematic {
   }
 
   private warm(cut: AttackCut): Promise<void> {
+    const video = this.videos[cut]
+    if (isVideoWarmed(video)) {
+      this.readyCuts.add(cut)
+      return Promise.resolve()
+    }
     const current = this.warmups.get(cut)
     if (current) return current
 
-    const warmup = this.warmVideo(this.videos[cut]).then((ready) => {
+    const warmup = this.warmVideo(video).then((ready) => {
       if (ready) this.readyCuts.add(cut)
-      // 실패한 워밍업은 캐시하지 않는다. 첫 시도는 유휴 시점(약 1초)에 도는데 영상이
-      // 실제로 쓸 만해지는 건 약 5초 뒤다 — 실패를 캐시해 두면 다시 데울 기회가 없어
-      // 그 런 내내 컷이 한 번도 안 뜬다(실측: ready=none으로 8초까지 유지).
+      // 실패한 워밍업은 캐시하지 않는다. 첫 시도는 유휴 시점에 도는데 영상이 실제로
+      // 쓸 만해지는 건 몇 초 뒤다 — 실패를 캐시해 두면 다시 데울 기회가 없어 그 런
+      // 내내 컷이 한 번도 안 뜬다(실측: ready=none으로 8초까지 유지).
       else this.warmups.delete(cut)
       // 준비 상태를 DOM에 남긴다. 관문이 닫히면 컷은 아무 흔적 없이 건너뛰어지므로,
       // 밖에서 볼 수 있는 값이 없으면 "왜 안 뜨는지"를 영영 못 잡는다.
@@ -184,6 +192,7 @@ export class AttackCinematic {
       video.currentTime = 0
       await video.play()
       await this.firstVideoFrameOrTimeout(video, 700)
+      if (this.destroyed) return false
       // 되감기 **전에** 판정한다. currentTime을 건드리면 탐색이 시작되며 readyState가
       // HAVE_METADATA(1)로 떨어지므로, 되감은 뒤에 재면 멀쩡히 다 받아 둔 영상도
       // 준비 안 된 것으로 읽힌다 — 그래서 readyCuts가 영영 안 채워지고 컷이 한 번도
@@ -191,12 +200,20 @@ export class AttackCinematic {
       const ready = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
       video.pause()
       video.currentTime = 0
+      if (ready) markVideoWarmed(video)
       return ready
     } catch {
-      video.pause()
+      if (!this.destroyed) video.pause()
       // 재생 시점의 기존 fallback이 처리한다. 워밍업 실패는 전투를 막을 이유가 없다.
       return false
     }
+  }
+
+  private acquireCut(cut: AttackCut, src: string): HTMLVideoElement {
+    const video = acquireVideo({ key: `attack-${cut}`, src, type: 'video/webm' })
+    video.className = 'atk-cine-video'
+    video.dataset.cut = cut
+    return video
   }
 
   private onceOrTimeout(target: EventTarget, event: string, ms: number): Promise<void> {
@@ -205,10 +222,12 @@ export class AttackCinematic {
       const finish = () => {
         target.removeEventListener(event, finish)
         clearTimeout(timer)
+        this.timers.delete(timer)
         resolve()
       }
       target.addEventListener(event, finish, { once: true })
       timer = window.setTimeout(finish, ms)
+      this.timers.set(timer, finish)
     })
   }
 
@@ -216,20 +235,30 @@ export class AttackCinematic {
     return new Promise((resolve) => {
       let done = false
       let timer = 0
+      let frameId: number | null = null
+      const frameVideo = video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (callback: () => void) => number
+        cancelVideoFrameCallback?: (handle: number) => void
+      }
+      const onTimeUpdate = () => finish()
       const finish = () => {
         if (done) return
         done = true
         clearTimeout(timer)
+        this.timers.delete(timer)
+        video.removeEventListener('timeupdate', onTimeUpdate)
+        if (frameId != null) frameVideo.cancelVideoFrameCallback?.(frameId)
         resolve()
       }
       timer = window.setTimeout(finish, ms)
-      const frameVideo = video as HTMLVideoElement & {
-        requestVideoFrameCallback?: (callback: () => void) => number
-      }
+      this.timers.set(timer, finish)
       if (typeof frameVideo.requestVideoFrameCallback === 'function') {
-        frameVideo.requestVideoFrameCallback(() => finish())
+        frameId = frameVideo.requestVideoFrameCallback(() => {
+          frameId = null
+          finish()
+        })
       }
-      else video.addEventListener('timeupdate', finish, { once: true })
+      else video.addEventListener('timeupdate', onTimeUpdate, { once: true })
     })
   }
 
@@ -255,7 +284,11 @@ export class AttackCinematic {
 
   private wait(ms: number) {
     return new Promise<void>((res) => {
-      this.timers.push(window.setTimeout(res, ms))
+      const timer = window.setTimeout(() => {
+        this.timers.delete(timer)
+        res()
+      }, ms)
+      this.timers.set(timer, res)
     })
   }
 }

@@ -2,6 +2,10 @@ import { MODELS, SPRITES, TOKEN_FACES } from '@/assets'
 
 export interface CharacterAnimationDef {
   idle: string
+  /** 소환되어 전장에 나타나는 단발 동작. */
+  appear?: string
+  /** attack2의 준비 자세를 이어 받아 강공격 전까지 유지하는 대기 루프. */
+  idle2?: string
   attack: string
   /**
    * 걸어오는 동작. 전장에 등장할 때만 쓰고, 도착하면 idle로 돌아온다.
@@ -25,9 +29,11 @@ export interface CharacterAnimationDef {
    */
   attackBeats?: { raise: number; impact: number }
   /** 원본 클립 길이와 무관하게 화면 연출에 맞출 단발 동작별 재생 시간. */
-  durationsMs?: Partial<Record<'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  durationsMs?: Partial<Record<'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
-  playbackRates?: Partial<Record<'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  playbackRates?: Partial<Record<'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
+  /** 클립별로 실제 움직임 뒤에 남은 정지 꼬리를 잘라낼 길이. */
+  endTrimsMs?: Partial<Record<'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** idle 끝 자세를 첫 자세로 점진 보간할 루프 연결 구간. */
   idleLoopBlendMs?: number
   /** 원본 idle 끝에서 잘라낼 불필요한 꼬리 구간. */
@@ -37,7 +43,7 @@ export interface CharacterAnimationDef {
 }
 
 export interface CharacterVisualDef {
-  id: 'player' | 'token' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'mantis' | 'queenBee' | 'elderSpider'
+  id: 'player' | 'token' | 'termite' | 'moth' | 'flea' | 'roach' | 'pillbug' | 'mosquito' | 'workerBee' | 'mantis' | 'queenBee' | 'elderSpider'
   name: string
   model3d: string | null
   animations: CharacterAnimationDef | null
@@ -237,12 +243,47 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     title: '방어막 틈을 찌르는 침',
     description: '긴 침을 밀어 넣어 방어막 뒤의 체력을 바로 갉아 낸다.',
   },
+  workerBee: {
+    id: 'workerBee',
+    name: '일벌',
+    model3d: MODELS.enemy_worker_bee,
+    animations: {
+      idle: 'Armature|idle|BaseLayer',
+      appear: 'Armature|appear|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
+      attack: 'Armature|attack|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { appear: 340, attack: 390, defeat: 280 },
+      // appear는 실제 등장 동작 뒤 약 2.4초 동안 거의 같은 자세가 이어진다.
+      // 마지막 2.2초를 덜어 내고 남은 동작만 소환 팝 타이밍에 맞춰 재생한다.
+      endTrimsMs: { appear: 2200 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
+    modelYaw: ENEMY_MODEL_YAW,
+    portrait2d: SPRITES.enemy_worker_bee,
+    title: '여왕의 문장을 지키는 호위',
+    description: '여왕벌의 양옆을 지켜 본체를 무적으로 만든다. 모두 쓰러뜨리면 여왕이 빈틈을 보인다.',
+  },
   mantis: {
     id: 'mantis',
     name: '사마귀',
-    model3d: null,
-    animations: null,
+    model3d: MODELS.boss_mantis,
+    animations: {
+      idle: 'Armature|idle1|BaseLayer',
+      idle2: 'Armature|idle2|BaseLayer',
+      walk: 'Armature|walk|BaseLayer',
+      attack: 'Armature|attack1|BaseLayer',
+      // 원본 GLB의 `attack`은 큰낫을 드는 준비 동작이며 끝 자세가 idle2의
+      // 첫 자세와 정확히 이어진다. 다음 턴의 attack3 전까지 idle2를 유지한다.
+      attack2: 'Armature|attack|BaseLayer',
+      attack3: 'Armature|attack3|BaseLayer',
+      defeat: 'Armature|defeat|BaseLayer',
+      durationsMs: { attack: 440, attack2: 440, attack3: 440, defeat: 560 },
+      idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
+    },
     modelYaw: BOSS_MODEL_YAW,
+    cameraPositionY: 1.45,
+    cameraTargetY: 1.45,
     portrait2d: SPRITES.boss_mantis,
     title: '문장을 재단하는 큰낫',
     description: '평범한 낫질 뒤 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청이며 빈틈을 보인다.',

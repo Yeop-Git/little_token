@@ -260,7 +260,7 @@ export interface EnemyDef {
     repeatOnceChance?: number
     /** 피해 없이 다음 공격을 준비할 때 화면에 띄우는 예고 문구. */
     telegraphText?: string
-    /** 플레이어 방어가 있으면 전량 소모하고 체력 피해를 0으로 만든다. */
+    /** 예고된 최대 피해 이상을 방어했을 때 전량 소모하고 체력 피해를 0으로 만든다. */
     shatterGuard?: boolean
     /** 실제 체력 피해 중 적이 회복하는 비율. */
     lifeStealRate?: number
@@ -269,17 +269,29 @@ export interface EnemyDef {
     /** 방어를 실제로 전량 파괴했을 때만 그로기에 들어간다. */
     groggyRequiresGuardShatter?: boolean
   }[]
-  /** 턴 시작마다 보스 곁에 쌓이는 호위 소환물. 전투 레일의 별도 적으로 취급하지 않는다. */
+  /** 보스 곁에 놓이는 호위 소환물. 전투 레일의 별도 적으로 취급하지 않는다. */
   summonPattern?: {
     name: string
     sprite: string
+    /** 호위 한 마리의 체력. 초과 피해는 범위/관통이 닿는 다음 호위로 이어진다. */
+    hp?: number
     perTurn: number
     max: number
     maxPerSide: number
     /** 살아 있는 호위 하나마다 보스 공격에 더하는 값. */
-    attackBonusPerUnit: number
+    attackBonusPerUnit?: number
     /** 이 수에 도달한 채 공격하면 호위를 모두 내보내고 다시 모으기 시작한다. */
-    releaseAt: number
+    releaseAt?: number
+    /** 일부만 남았을 때 채우지 않고, 전멸한 다음 턴에만 한 묶음을 다시 소환한다. */
+    refillOnlyWhenEmpty?: boolean
+    /** 호위가 한 마리라도 살아 있으면 소환자의 공격이 플레이어 방어를 관통한다. */
+    pierceWhileEscorted?: boolean
+    /** 호위 하나를 흩뜨릴 때 소환자 최대 체력에서 직접 깎는 비율. */
+    backlashMaxHpRatePerUnit?: number
+    /** 누적해서 이만큼 퇴치할 때마다 소환자가 그로기되고 다음 공격을 한 턴 미룬다. */
+    groggyEvery?: number
+    /** 호위 전멸로 열린 현재 턴의 받는 피해 배율. */
+    groggyDamageMult?: number
   }
 }
 

@@ -35,6 +35,8 @@ export interface BurstOptions {
 
 const OVERLAY_ID = 'square-burst-overlay'
 const STYLE_ID = 'square-burst-styles'
+const MAX_POOLED_PIECES = 96
+const piecePool: HTMLElement[] = []
 
 function getOverlay(): HTMLElement {
   let el = document.getElementById(OVERLAY_ID)
@@ -61,7 +63,8 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min)
 const pickShade = (p: Palette) => p.shades[Math.floor(Math.random() * p.shades.length)]
 
 function spawnSquare(overlay: HTMLElement, ox: number, oy: number, palette: Palette, spread: number, duration: number, sizeRange: [number, number]) {
-  const piece = document.createElement('div')
+  const piece = piecePool.pop() ?? document.createElement('div')
+  piece.getAnimations().forEach((animation) => animation.cancel())
   piece.className = 'square-burst-piece'
   const size = rand(sizeRange[0], sizeRange[1])
   const angle = rand(0, Math.PI * 2)
@@ -84,8 +87,15 @@ function spawnSquare(overlay: HTMLElement, ox: number, oy: number, palette: Pale
     ],
     { duration, easing: 'cubic-bezier(0.18,0.78,0.28,1)', fill: 'forwards' },
   )
-  anim.onfinish = () => piece.remove()
-  window.setTimeout(() => piece.remove(), duration + 200)
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    piece.remove()
+    if (piecePool.length < MAX_POOLED_PIECES) piecePool.push(piece)
+  }
+  anim.onfinish = release
+  window.setTimeout(release, duration + 200)
 }
 
 export const SquareBurst = {

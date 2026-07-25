@@ -1,6 +1,7 @@
 import { COMBAT_BALANCE_VERSION, DECK_LIMITS, emptyRunRecord, reinforceWord, type RunState } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import type { Emotion, Word } from './types'
+import type { PlayerStats } from './player'
 
 const SAVE_KEY = 'little-token.run.v1'
 // v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
@@ -21,6 +22,8 @@ const CARD_REPLACEMENTS: Record<string, string> = {
   baksal: 'focusStrike',
   hwissda: 'scatterThree',
 }
+
+const REMOVED_ITEM_IDS = new Set(['inkBottle', 'softEraser'])
 
 const CURRENT_CARD_BY_ID = new Map(
   [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS].map((word) => [word.id, word]),
@@ -63,6 +66,20 @@ function migrateCardDefinitions(run: RunState): boolean {
     }
   }
   return migrated
+}
+
+/** 삭제된 아이템은 기존 런에서도 보유 목록과 누적 스탯을 함께 거두어 들인다. */
+function migrateRemovedItems(run: RunState): boolean {
+  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id))
+  if (!removed.length) return false
+
+  for (const item of removed) {
+    for (const key of Object.keys(item.stats) as (keyof PlayerStats)[]) {
+      run.player.stats[key] = Math.max(0, run.player.stats[key] - (item.stats[key] ?? 0))
+    }
+  }
+  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id))
+  return true
 }
 
 /**
@@ -133,6 +150,7 @@ export function loadRun(): RunState | null {
       }
     }
     migrated = migrateCardDefinitions(parsed) || migrated
+    migrated = migrateRemovedItems(parsed) || migrated
     if (migrated) saveRun(parsed)
     return parsed
   } catch {

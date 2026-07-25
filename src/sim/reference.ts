@@ -38,6 +38,11 @@ export interface EnemyInst {
   /** 보스 좌우에 현재 남아 있는 호위 소환물 수. */
   summonsLeft: number
   summonsRight: number
+  /** 좌우 호위의 슬롯 순서별 현재 체력. */
+  summonHpLeft: number[]
+  summonHpRight: number[]
+  /** 여왕벌 그로기 한 주기 안에서 지금까지 퇴치한 호위 수. */
+  summonsDefeated: number
   /** 같은 전투 턴에 턴 시작 소환을 두 번 처리하지 않기 위한 표식. */
   lastSummonTurn: number
   /** 거미 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
@@ -63,6 +68,18 @@ export function bossAttackStage(enemy: Pick<EnemyInst, 'def' | 'hp' | 'maxHp'>):
   return 1
 }
 
+/** RNG 최고치까지 막아야 그로기가 열리므로 플레이어에게 항상 같은 목표값을 보여 준다. */
+export function enemyGuardBreakRequirement(
+  enemy: Pick<EnemyInst, 'def' | 'atkMult' | 'hp' | 'maxHp'>,
+): number {
+  const step = enemy.def.attackPattern?.find((candidate) => candidate.shatterGuard)
+  if (!step) return 0
+  const stageMult = BOSS_ATTACK_MULTIPLIER[bossAttackStage(enemy)]
+  return Math.max(1, Math.round(
+    (enemy.def.atk + step.bonusAtk + 2) * enemy.atkMult * stageMult * (step.damageScale ?? 1),
+  ))
+}
+
 export interface PendingAttack {
   dmg: number
   sentence: string
@@ -72,6 +89,7 @@ export interface PendingAttack {
   pierceGuard: boolean
   emotions: Emotion[]
   tags: string[]
+  comboMatched: boolean
 }
 
 export interface BattleState {
@@ -116,6 +134,9 @@ export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1
     groggyDamageMult: 1,
     summonsLeft: 0,
     summonsRight: 0,
+    summonHpLeft: [],
+    summonHpRight: [],
+    summonsDefeated: 0,
     lastSummonTurn: 0,
     parts: (def.parts ?? []).map((part) => ({
       def: part,
@@ -184,6 +205,7 @@ export function summonAtTurnStart(state: BattleState): TurnSummon[] {
   state.enemies.forEach((enemy, idx) => {
     const pattern = enemy.def.summonPattern
     if (!pattern || enemy.dead || enemy.lastSummonTurn === state.turn) return
+    if (pattern.refillOnlyWhenEmpty && summonCount(enemy) > 0) return
     enemy.lastSummonTurn = state.turn
     for (let i = 0; i < pattern.perTurn && summonCount(enemy) < pattern.max; i++) {
       const canLeft = enemy.summonsLeft < pattern.maxPerSide
@@ -193,6 +215,8 @@ export function summonAtTurnStart(state: BattleState): TurnSummon[] {
       if (side === 'left') enemy.summonsLeft++
       else enemy.summonsRight++
       const slot = side === 'left' ? enemy.summonsLeft : enemy.summonsRight
+      if (side === 'left') enemy.summonHpLeft.push(pattern.hp ?? 1)
+      else enemy.summonHpRight.push(pattern.hp ?? 1)
       summoned.push({ idx, name: pattern.name, side, slot, count: summonCount(enemy), max: pattern.max })
     }
   })
@@ -242,6 +266,8 @@ export function engageFront(state: BattleState): void {
 export interface HitFx {
   target: number
   dmg: number
+  /** 살아 있는 호위 때문에 소환자 본체가 이 타격을 받지 않았는가. */
+  summonShieldBlocked?: boolean
   guardAbsorbed: number
   magicShieldBroken: boolean
   /** 이 타격을 막고 남은 매직실드 겹 수. 실드 타격이 아니면 현재 값과 무관하다. */
@@ -267,8 +293,15 @@ export interface ApplyResult {
   heal: number
   killed: number[]
   overflow: number
-  /** 다대상 문장이 보스 곁에서 흩어 낸 호위 소환물 수. */
+  /** 문장이 보스 곁에서 퇴치한 호위 소환물 수. */
   summonsDispersed: number
+  summonDamage: number
+  /** 쓰러진 호위가 소환자 본체에 되돌려 준 직접 피해. */
+  summonBacklashDamage: number
+  /** 호위 전멸이 그로기와 공격 스킵을 열었는가. */
+  summonGroggyTriggered: boolean
+  /** 피해 없이 방어·회복 문장으로 현재 거미 다리의 약점을 맞혀 푼 봉인. */
+  supportWebCut: { target: number; tensionReduced: number } | null
 }
 
 export interface PreparationResult {
@@ -295,6 +328,8 @@ interface AttackPlan {
   pierceGuard: boolean
   emotions: Emotion[]
   tags: string[]
+  /** 현재 약점과 관용구가 함께 맞았을 때만 부위 너머로 남은 피해를 보낸다. */
+  comboMatched: boolean
 }
 
 const TARGET_FALLOFF = [1, 0.7, 0.5] as const
@@ -307,6 +342,17 @@ function activePartWeak(enemy: EnemyInst, emotions: readonly Emotion[], tags: re
     : tags.includes(weakness.value)
 }
 
+function cutSpiderWebWithSupport(state: BattleState, target: number, intent: Intent): ApplyResult['supportWebCut'] {
+  const enemy = state.enemies[target]
+  const supportsPlayer = intent.guard > 0 || intent.heal > 0
+  if (!enemy || enemy.dead || !enemy.def.webPattern || !supportsPlayer) return null
+  if (!activePartWeak(enemy, intent.emotions, intent.tags)) return null
+
+  const tensionBefore = spiderWebTension(enemy)
+  enemy.webTurns = Math.max(brokenSpiderLegs(enemy), enemy.webTurns - 1)
+  return { target, tensionReduced: Math.max(0, tensionBefore - spiderWebTension(enemy)) }
+}
+
 function damageEnemy(
   state: BattleState,
   target: number,
@@ -314,6 +360,7 @@ function damageEnemy(
   pierceGuard: boolean,
   emotions: Emotion[],
   tags: string[] = [],
+  comboMatched = false,
 ): HitFx | null {
   const enemy = state.enemies[target]
   if (!enemy || enemy.dead) return null
@@ -324,11 +371,29 @@ function damageEnemy(
     : !!enemy.def.weakEmotion && emotions.includes(enemy.def.weakEmotion)
   const groggyMult = state.turn <= enemy.groggyUntilTurn ? enemy.groggyDamageMult : 1
   const raw = Math.max(0, Math.round(dmg * (weak ? (part ? 1.5 : 1.25) : 1) * groggyMult))
+  if (enemy.def.summonPattern && summonCount(enemy) > 0) {
+    return {
+      target,
+      dmg: 0,
+      summonShieldBlocked: true,
+      guardAbsorbed: 0,
+      magicShieldBroken: false,
+      magicShieldRemaining: enemy.magicShield,
+      weak,
+      barsBroken: 0,
+      partId: part?.def.id,
+      partName: part?.def.name,
+      webCut: false,
+      webBurst: false,
+      tensionReduced: 0,
+    }
+  }
   if (enemy.magicShield > 0) {
     enemy.magicShield--
     return {
       target,
       dmg: 0,
+      summonShieldBlocked: false,
       guardAbsorbed: 0,
       magicShieldBroken: true,
       magicShieldRemaining: enemy.magicShield,
@@ -348,11 +413,10 @@ function damageEnemy(
     ? enemy.parts.filter((candidate) => !candidate.broken).length
     : Math.ceil(Math.max(0, enemy.hp) / enemy.hpPerBar)
   if (part) {
-    // 지금 드러난 약점을 맞힌 문장만 다음 다리와 본체까지 순차 관통해 다중
-    // 체력막의 폭발적인 상한 판타지를 낸다. 약점을 빗나간 문장은 그 다리의
-    // 관절에서 멈춘다 — 안 그러면 강한 문장 하나가 다리 둘을 한꺼번에 끊어
-    // 기쁨·분노·슬픔·즐거움이 드러나기도 전에 사라진다.
-    let remaining = weak ? dealt : Math.min(dealt, part.hp)
+    // 약점만 맞힌 문장은 현재 다리를 확실히 끊는 정답이고, 약점과 이름 있는
+    // 관용구까지 함께 맞힌 완벽한 맥락만 뒤 부위로 관통한다. 순차 약점 퍼즐을
+    // 보존하면서도 후반 덱의 폭발적인 상한은 관용구 보상으로 남긴다.
+    let remaining = weak && comboMatched ? dealt : Math.min(dealt, part.hp)
     for (const candidate of enemy.parts.slice(enemy.parts.indexOf(part))) {
       if (remaining <= 0) break
       const applied = Math.min(candidate.hp, remaining)
@@ -381,6 +445,7 @@ function damageEnemy(
   return {
     target,
     dmg: dealt,
+    summonShieldBlocked: false,
     guardAbsorbed,
     magicShieldBroken: false,
     magicShieldRemaining: enemy.magicShield,
@@ -407,7 +472,7 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
   if (plan.hitCount > 1 && plan.targetCount === 1) {
     for (let i = 0; i < plan.hitCount; i++) {
       if (state.enemies[plan.target]?.dead) break
-      record(damageEnemy(state, plan.target, plan.dmg, plan.pierceGuard, plan.emotions, plan.tags))
+      record(damageEnemy(state, plan.target, plan.dmg, plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched))
     }
     return { hits, killed, overflow: 0 }
   }
@@ -419,7 +484,7 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
     const target = targets[rank]
     const before = state.enemies[target].hp
     const scale = plan.targetCount === 1 || plan.targetCount === 'all' ? 1 : TARGET_FALLOFF[rank] ?? TARGET_FALLOFF[2]
-    const hit = damageEnemy(state, target, Math.round(plan.dmg * scale), plan.pierceGuard, plan.emotions, plan.tags)
+    const hit = damageEnemy(state, target, Math.round(plan.dmg * scale), plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
     record(hit)
     if (plan.targetCount === 1 && hit && state.enemies[target].dead) {
       return { hits, killed, overflow: Math.max(0, hit.dmg - before) }
@@ -428,22 +493,68 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
   return { hits, killed, overflow: 0 }
 }
 
-function disperseTargetSummons(state: BattleState, target: number, targetCount: TargetCount): number {
+interface SummonDisperseResult {
+  count: number
+  damage: number
+  backlashDamage: number
+  groggyTriggered: boolean
+  killed: boolean
+}
+
+function disperseTargetSummons(
+  state: BattleState,
+  target: number,
+  dmg: number,
+  targetCount: TargetCount,
+  pierceGuard = false,
+): SummonDisperseResult {
   const enemy = state.enemies[target]
-  if (!enemy || enemy.dead || !enemy.def.summonPattern) return 0
-  const available = summonCount(enemy)
-  // 범위 카드를 못 얻은 런도 호위에 대응할 수 있게 공격 한 번당 최소 한 마리는
-  // 흩어진다. 범위가 넓을수록 더 많이 지워져 낮은 계수와 제어력의 선택은 유지한다.
-  const requested = targetCount === 'all' ? available : Math.max(1, targetCount)
-  let remaining = Math.min(available, requested)
-  const dispersed = remaining
-  // 최근에 들어온 오른쪽 호위부터 번갈아 걷어 내 좌우 실루엣이 한쪽으로 쏠리지 않게 한다.
-  while (remaining > 0) {
-    if (enemy.summonsRight >= enemy.summonsLeft && enemy.summonsRight > 0) enemy.summonsRight--
-    else if (enemy.summonsLeft > 0) enemy.summonsLeft--
-    remaining--
+  if (!enemy || enemy.dead || !enemy.def.summonPattern) {
+    return { count: 0, damage: 0, backlashDamage: 0, groggyTriggered: false, killed: false }
   }
-  return dispersed
+  const pattern = enemy.def.summonPattern
+  const available = summonCount(enemy)
+  const reachable = pierceGuard
+    ? available
+    : targetCount === 'all'
+      ? available
+      : Math.min(available, Math.max(1, targetCount))
+  let remainingDamage = Math.max(0, dmg)
+  let damage = 0
+  let dispersed = 0
+  // 한 문장의 피해 풀을 앞 일벌부터 소모한다. 범위는 닿는 마릿수를 정하고,
+  // 관통은 그 제한을 없애므로 120 이상의 극고점은 체력 30짜리 넷을 한 번에 꿰뚫는다.
+  for (let reached = 0; reached < reachable && remainingDamage > 0; reached++) {
+    const useRight = enemy.summonsRight >= enemy.summonsLeft && enemy.summonsRight > 0
+    const hpList = useRight ? enemy.summonHpRight : enemy.summonHpLeft
+    const hp = hpList[hpList.length - 1] ?? pattern.hp ?? 1
+    const applied = Math.min(hp, remainingDamage)
+    damage += applied
+    remainingDamage -= applied
+    hpList[hpList.length - 1] = hp - applied
+    if (hpList[hpList.length - 1] > 0) break
+    hpList.pop()
+    if (useRight) enemy.summonsRight--
+    else enemy.summonsLeft--
+    dispersed++
+  }
+  const backlashDamage = Math.min(
+    enemy.hp,
+    Math.max(0, Math.round(enemy.maxHp * (pattern.backlashMaxHpRatePerUnit ?? 0) * dispersed)),
+  )
+  enemy.hp -= backlashDamage
+  if (enemy.hp <= 0) enemy.dead = true
+
+  const groggyEvery = Math.max(0, pattern.groggyEvery ?? 0)
+  const defeatedTotal = enemy.summonsDefeated + dispersed
+  const groggyTriggered = groggyEvery > 0 && defeatedTotal >= groggyEvery && !enemy.dead
+  enemy.summonsDefeated = groggyEvery > 0 ? defeatedTotal % groggyEvery : defeatedTotal
+  if (groggyTriggered) {
+    enemy.groggyUntilTurn = state.turn
+    enemy.groggyDamageMult = pattern.groggyDamageMult ?? 1.5
+    enemy.nextAttackTurn += 1
+  }
+  return { count: dispersed, damage, backlashDamage, groggyTriggered, killed: enemy.dead }
 }
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
@@ -458,14 +569,19 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     pierceGuard: intent.pierceGuard,
     emotions: intent.emotions,
     tags: intent.tags,
+    comboMatched: intent.combos.length > 0,
   }
   if (intent.timing === 'delayed') {
     state.pending = { ...plan, sentence: intent.sentence }
-    return { text: `${intent.sentence} → 다음 턴에 ${dmg} 예약`, combos: intent.combos, hits: [], selfDmg: 0, heal: 0, killed: [], overflow: 0, summonsDispersed: 0 }
+    return { text: `${intent.sentence} → 다음 턴에 ${dmg} 예약`, combos: intent.combos, hits: [], selfDmg: 0, heal: 0, killed: [], overflow: 0, summonsDispersed: 0, summonDamage: 0, summonBacklashDamage: 0, summonGroggyTriggered: false, supportWebCut: null }
   }
 
-  const attack = dealsDamage ? resolveAttack(state, plan) : { hits: [], killed: [], overflow: 0 }
-  const summonsDispersed = dealsDamage ? disperseTargetSummons(state, target, intent.targetCount) : 0
+  // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
+  const summonDisperse = dealsDamage
+    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard)
+    : { count: 0, damage: 0, backlashDamage: 0, groggyTriggered: false, killed: false }
+  const attack = dealsDamage && !summonDisperse.killed ? resolveAttack(state, plan) : { hits: [], killed: [], overflow: 0 }
+  const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
   let selfDmg = intent.recoil
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
   state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + healAmt)
@@ -476,9 +592,13 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     hits: attack.hits,
     selfDmg,
     heal: healAmt,
-    killed: attack.killed,
+    killed: summonDisperse.killed && !attack.killed.includes(target) ? [target, ...attack.killed] : attack.killed,
     overflow: attack.overflow,
-    summonsDispersed,
+    summonsDispersed: summonDisperse.count,
+    summonDamage: summonDisperse.damage,
+    summonBacklashDamage: summonDisperse.backlashDamage,
+    summonGroggyTriggered: summonDisperse.groggyTriggered,
+    supportWebCut,
   }
 }
 
@@ -486,17 +606,21 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
   const pending = state.pending
   if (!pending) return null
   state.pending = null
-  const attack = resolveAttack(state, pending)
-  const summonsDispersed = disperseTargetSummons(state, pending.target, pending.targetCount)
+  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard)
+  const attack = summonDisperse.killed ? { hits: [], killed: [], overflow: 0 } : resolveAttack(state, pending)
   return {
     text: `${pending.sentence} → 예약 발동`,
     combos: [],
     hits: attack.hits,
     selfDmg: 0,
     heal: 0,
-    killed: attack.killed,
+    killed: summonDisperse.killed && !attack.killed.includes(pending.target) ? [pending.target, ...attack.killed] : attack.killed,
     overflow: attack.overflow,
-    summonsDispersed,
+    summonsDispersed: summonDisperse.count,
+    summonDamage: summonDisperse.damage,
+    summonBacklashDamage: summonDisperse.backlashDamage,
+    summonGroggyTriggered: summonDisperse.groggyTriggered,
+    supportWebCut: null,
   }
 }
 
@@ -516,6 +640,8 @@ export interface EnemyStrike {
   /** 공격 직후 다음 플레이어 턴까지 받는 피해 증가 상태에 들어갔는가. */
   groggyEntered: boolean
   groggyDamageMult: number
+  /** 예고 강공격을 완전히 막고 그로기를 열기 위해 필요한 방어. */
+  guardRequired: number
   telegraphText: string | null
   /** 벌떼 돌격으로 이번 공격에 참가한 뒤 사라진 호위 수. */
   summonsReleased: number
@@ -538,7 +664,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
-  const summonsReleased = summonPattern && escorts >= summonPattern.releaseAt ? escorts : 0
+  const summonsReleased = summonPattern?.releaseAt != null && escorts >= summonPattern.releaseAt ? escorts : 0
   const uncappedRaw = Math.round(
     (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + Math.floor(rng() * 3))
       * enemy.atkMult
@@ -546,13 +672,20 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
       * (attackStep?.damageScale ?? 1),
   )
   // 장로거미는 카드 봉인 파훼를 읽을 시간을 주도록 한 번의 체력 피해를 제한한다.
-  const webShowCap = Math.max(1, Math.round(state.playerMax * .5))
+  // 방어막을 타고 넘는 대신 한 방을 최대 체력의 1/5로 묶어, 여러 턴에 걸쳐
+  // 조여드는 압박으로 만든다.
+  const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
   const raw = enemy.def.webPattern
     ? Math.min(uncappedRaw, webShowCap)
     : uncappedRaw
+  // 모여든 호위가 한꺼번에 돌격하면 방패 위로 넘어 들어온다. 넷이 모이기 전에
+  // 넓은 문장으로 흩어 놓는 것이 유일한 대응이고, 방어로 버티기는 답이 아니다.
   const piercedGuard = !!enemy.def.pierceGuard
+    || summonsReleased > 0
+    || (!!summonPattern?.pierceWhileEscorted && escorts > 0)
   const immune = !!state.damageImmune
-  const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard > 0
+  const guardRequired = enemyGuardBreakRequirement(enemy)
+  const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard >= guardRequired
   const absorbed = immune ? 0 : guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
   const dealt = immune ? 0 : guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
   state.playerHp -= dealt
@@ -579,6 +712,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
       + (summonAttackBonus > 0 ? ` (호위 공격 +${summonAttackBonus})` : '')
       + (immune ? ' (무적)' : '')
       + (guardShattered ? ` (방어 ${absorbed} 전량 파괴)` : '')
+      + (attackStep?.shatterGuard && !guardShattered && absorbed > 0 ? ` (방어 ${absorbed}/${guardRequired} · 그로기 실패)` : '')
       + (lifeStolen > 0 ? ` (흡혈 ${lifeStolen})` : '')
       + (groggyEntered ? ` (그로기 · 받는 피해 ×${enemy.groggyDamageMult.toFixed(1)})` : '')
       + (piercedGuard ? ' (방어 관통)' : absorbed && !guardShattered ? ` (방어 ${absorbed} 흡수)` : ''),
@@ -591,6 +725,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     lifeStolen,
     groggyEntered,
     groggyDamageMult: enemy.groggyDamageMult,
+    guardRequired,
     telegraphText: attackStep?.telegraphText ?? null,
     summonsReleased,
     piercedGuard,
@@ -599,6 +734,8 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   if (summonsReleased > 0) {
     enemy.summonsLeft = 0
     enemy.summonsRight = 0
+    enemy.summonHpLeft = []
+    enemy.summonHpRight = []
   }
   enemy.attacksMade++
   advanceEnemyAttackPattern(enemy, rng)
