@@ -13,6 +13,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -29,6 +30,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "mind"
       ],
+      "emotion": "sadness",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -50,6 +52,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "echo"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -71,6 +74,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "now"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -92,6 +96,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "fear"
       ],
+      "emotion": "anxiety",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -113,6 +118,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "solo"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0.6,
       "targetMode": "enemy",
@@ -129,6 +135,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "self",
         "hurt"
       ],
+      "emotion": "sadness",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -151,6 +158,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "force"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "bonus": 0.15,
       "crit": 0.1,
@@ -166,6 +174,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "solid"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "bonus": 0.1,
       "crit": 0.2,
@@ -181,6 +190,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "soft"
       ],
+      "emotion": "joy",
       "stat": "heal",
       "bonus": 0,
       "crit": 0.4,
@@ -196,6 +206,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "rush"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "bonus": 0.4,
       "crit": 0.25,
@@ -211,6 +222,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "grit"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "bonus": 0.45,
       "crit": 0.2,
@@ -226,6 +238,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "tear"
       ],
+      "emotion": "sadness",
       "stat": "heal",
       "bonus": 0.25,
       "crit": 0.55,
@@ -243,6 +256,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "atk"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "statMult": 1,
       "kind": "attack",
@@ -258,6 +272,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "grd"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "statMult": 1,
       "kind": "guard",
@@ -273,6 +288,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "tags": [
         "mend"
       ],
+      "emotion": "sadness",
       "stat": "heal",
       "statMult": 1,
       "kind": "heal",
@@ -289,6 +305,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "atk",
         "swing"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "statMult": 1.5,
       "kind": "attack",
@@ -304,6 +321,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "grd",
         "hold"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "statMult": 1.5,
       "kind": "guard",
@@ -319,6 +337,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "mend",
         "warm"
       ],
+      "emotion": "sadness",
       "stat": "heal",
       "statMult": 1.5,
       "kind": "heal",
@@ -338,6 +357,7 @@ export const REWARD_WORDS: Word[] = [
       "self",
       "both"
     ],
+    "emotion": "joy",
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -358,6 +378,7 @@ export const REWARD_WORDS: Word[] = [
     "tags": [
       "swift"
     ],
+    "emotion": "joy",
     "stat": "luck",
     "bonus": 0.5,
     "crit": 0.15,
@@ -372,6 +393,7 @@ export const REWARD_WORDS: Word[] = [
     "tags": [
       "mad"
     ],
+    "emotion": "anger",
     "stat": "luck",
     "bonus": 0.3,
     "crit": 0.45,
@@ -387,6 +409,7 @@ export const REWARD_WORDS: Word[] = [
       "atk",
       "hurl"
     ],
+    "emotion": "anger",
     "stat": "atk",
     "statMult": 1.5,
     "kind": "attack",
@@ -402,6 +425,7 @@ export const REWARD_WORDS: Word[] = [
       "grd",
       "mend"
     ],
+    "emotion": "sadness",
     "stat": "guard",
     "statMult": 1.5,
     "kind": "guard",
@@ -416,6 +440,7 @@ export const REWARD_WORDS: Word[] = [
     "tags": [
       "mad"
     ],
+    "emotion": "anger",
     "stat": "atk",
     "bonus": 0.7,
     "crit": 0.45,
@@ -430,6 +455,7 @@ export const REWARD_WORDS: Word[] = [
     "tags": [
       "reckless"
     ],
+    "emotion": "joy",
     "stat": "atk",
     "bonus": 0,
     "rarity": "epic",
@@ -449,6 +475,7 @@ export const REWARD_WORDS: Word[] = [
       "atk",
       "smash"
     ],
+    "emotion": "anger",
     "stat": "atk",
     "statMult": 2,
     "kind": "attack",
@@ -464,6 +491,7 @@ export const REWARD_WORDS: Word[] = [
       "atk",
       "wide"
     ],
+    "emotion": "anger",
     "stat": "atk",
     "statMult": 1.4,
     "kind": "attack",
@@ -483,6 +511,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "self"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -497,6 +526,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "enemy"
       ],
+      "emotion": "joy",
       "person": "second",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -511,6 +541,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "other"
       ],
+      "emotion": "joy",
       "person": "third",
       "bonus": 0.2,
       "targetMode": "enemy",
@@ -525,6 +556,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "both"
       ],
+      "emotion": "joy",
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
@@ -547,6 +579,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "solo"
       ],
+      "emotion": "joy",
       "stat": "guard",
       "bonus": 0.55,
       "crit": 0.1,
@@ -561,6 +594,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "quiet"
       ],
+      "emotion": "anxiety",
       "stat": "luck",
       "bonus": 0,
       "crit": 0.4,
@@ -575,6 +609,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "mad"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "bonus": 0.7,
       "crit": 0.45,
@@ -589,6 +624,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "slow"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "bonus": 0.1,
       "crit": 0.2,
@@ -603,6 +639,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "wide"
       ],
+      "emotion": "joy",
       "stat": "luck",
       "bonus": 0.1,
       "crit": 0.2,
@@ -620,6 +657,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "war"
       ],
+      "emotion": "anger",
       "power": 6,
       "rarity": "common",
       "note": "위력 6",
@@ -632,6 +670,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "fire"
       ],
+      "emotion": "anger",
       "power": 8,
       "rarity": "rare",
       "note": "위력 8",
@@ -644,6 +683,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "quiet"
       ],
+      "emotion": "anxiety",
       "power": 3,
       "rarity": "common",
       "note": "위력 3 · 방어 +4",
@@ -659,6 +699,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "mind"
       ],
+      "emotion": "sadness",
       "power": 4,
       "rarity": "rare",
       "note": "위력 4 · 회복 3",
@@ -675,6 +716,7 @@ export const WORDS: Record<string, Word[]> = {
         "water",
         "wide"
       ],
+      "emotion": "sadness",
       "power": 5,
       "aoe": "all",
       "rarity": "rare",
@@ -690,6 +732,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "atk"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "statMult": 1,
       "kind": "attack",
@@ -704,6 +747,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "grd"
       ],
+      "emotion": "anxiety",
       "stat": "guard",
       "statMult": 1,
       "kind": "guard",
@@ -718,6 +762,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "fire"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "statMult": 1.5,
       "kind": "attack",
@@ -732,6 +777,7 @@ export const WORDS: Record<string, Word[]> = {
       "tags": [
         "mind"
       ],
+      "emotion": "sadness",
       "stat": "heal",
       "statMult": 1,
       "kind": "heal",
@@ -747,6 +793,7 @@ export const WORDS: Record<string, Word[]> = {
         "atk",
         "wide"
       ],
+      "emotion": "anger",
       "stat": "atk",
       "statMult": 1,
       "kind": "attack",
@@ -762,6 +809,7 @@ export const WORDS: Record<string, Word[]> = {
       "text": "했다",
       "slot": "end",
       "tags": [],
+      "emotion": "joy",
       "bonus": 0.2,
       "timing": "immediate",
       "rarity": "common",
@@ -773,6 +821,7 @@ export const WORDS: Record<string, Word[]> = {
       "text": "하려고 했다",
       "slot": "end",
       "tags": [],
+      "emotion": "joy",
       "bonus": 0.6,
       "timing": "delayed",
       "rarity": "rare",
@@ -784,6 +833,7 @@ export const WORDS: Record<string, Word[]> = {
       "text": "했었나?",
       "slot": "end",
       "tags": [],
+      "emotion": "joy",
       "bonus": 0,
       "timing": "immediate",
       "rarity": "epic",
@@ -800,6 +850,7 @@ export const WORDS: Record<string, Word[]> = {
       "text": "하고 말았다!",
       "slot": "end",
       "tags": [],
+      "emotion": "joy",
       "bonus": 0.7,
       "crit": 0.45,
       "timing": "immediate",
@@ -819,6 +870,7 @@ export const PUNCT_WORDS: Word[] = [
     "tags": [
       "preempt"
     ],
+    "emotion": "joy",
     "rarity": "legendary",
     "art": "7001",
     "note": "선공 상대보다 먼저 행동한다",
@@ -831,6 +883,7 @@ export const PUNCT_WORDS: Word[] = [
     "tags": [
       "calm"
     ],
+    "emotion": "joy",
     "bonus": 0.1,
     "rarity": "legendary",
     "art": "7002",
@@ -844,6 +897,7 @@ export const PUNCT_WORDS: Word[] = [
     "tags": [
       "doubt"
     ],
+    "emotion": "joy",
     "crit": 0.3,
     "rarity": "legendary",
     "art": "7003",
@@ -861,6 +915,7 @@ export const GROW_WORDS: Word[] = [
     "tags": [
       "grow"
     ],
+    "emotion": "joy",
     "growHp": 1,
     "rarity": "legendary",
     "note": "최대 체력 +1 · 배율을 받지 않는다",
@@ -873,6 +928,7 @@ export const GROW_WORDS: Word[] = [
     "tags": [
       "grow"
     ],
+    "emotion": "joy",
     "growHp": 1,
     "rarity": "legendary",
     "note": "최대 체력 +1 · 배율을 받지 않는다",
@@ -885,6 +941,7 @@ export const GROW_WORDS: Word[] = [
     "tags": [
       "grow"
     ],
+    "emotion": "joy",
     "growHp": 1,
     "rarity": "legendary",
     "note": "최대 체력 +1 · 배율을 받지 않는다",
@@ -897,6 +954,7 @@ export const GROW_WORDS: Word[] = [
     "tags": [
       "grow"
     ],
+    "emotion": "joy",
     "growHp": 1,
     "rarity": "legendary",
     "note": "최대 체력 +1 · 배율을 받지 않는다",

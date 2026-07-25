@@ -21,14 +21,15 @@ import {
 import { wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
-import { RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
+import { EMOTION_ICON, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { EARLY_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, EARLY_WORDS, PUNCT_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import {
   allDead,
   aliveIdx,
   applyIntent,
+  applyPendingAttack,
   applyPreparation,
   enemyTurn,
   engageFront,
@@ -139,7 +140,7 @@ export class BattleView {
     const enemies = opts.encounter.map((id) => makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1))
     // 체력 스탯 = 최대 체력.
     const maxHp = this.player.stats.hp
-    this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, turn: 1, enemies, pending: null }
+    this.state = { playerHp: maxHp, playerMax: maxHp, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
     engageInitialFront(this.state)
     this.grade = startGrade(this.player.stats.luck)
     this.target = aliveIdx(this.state)[0] ?? 0
@@ -386,7 +387,7 @@ export class BattleView {
       this.bindActor(actor)
       return actor
     })()
-    const visual = CHARACTER_VISUALS[enemy.def.id as 'moth' | 'roach']
+    const visual = this.enemyVisual(enemy)
     el.dataset.i = String(i)
     el.dataset.character = visual.id
     el.dataset.poolKey = key
@@ -396,6 +397,10 @@ export class BattleView {
     image.src = visual.portrait2d
     image.alt = enemy.def.name
     return el
+  }
+
+  private enemyVisual(enemy: EnemyInst): CharacterVisualDef {
+    return CHARACTER_VISUALS[enemy.def.sprite === 'enemy_roach' ? 'roach' : 'moth']
   }
 
   // 날짜 아래 행동 순서 — 레퍼런스의 세로 초상화 열을 가져오되, 실제 전투 규칙처럼
@@ -423,7 +428,7 @@ export class BattleView {
     const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
       key: `enemy-${front}`,
       name: enemy!.def.name,
-      portrait: CHARACTER_VISUALS[enemy!.def.id as 'moth' | 'roach'].portrait2d,
+      portrait: this.enemyVisual(enemy!).portrait2d,
       side: 'enemy',
       timing,
       note,
@@ -461,7 +466,7 @@ export class BattleView {
       entries.push({
         key: `enemy-${i}`,
         name: waiting.def.name,
-        portrait: CHARACTER_VISUALS[waiting.def.id as 'moth' | 'roach'].portrait2d,
+        portrait: this.enemyVisual(waiting).portrait2d,
         side: 'enemy',
         timing: 'waiting',
         note: '레일 대기',
@@ -533,7 +538,7 @@ export class BattleView {
   }
 
   private foeHtml(i: number, e: EnemyInst): string {
-    const visual = CHARACTER_VISUALS[e.def.id as 'moth' | 'roach']
+    const visual = this.enemyVisual(e)
     return `
       <div class="actor foe" data-i="${i}" data-character="${visual.id}"
         role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
@@ -542,9 +547,10 @@ export class BattleView {
             <span class="nm">${e.def.name}</span>
             <span class="hpn"></span>
           </div>
-          <div class="hp-row">
-            <div class="hpbar foe"><div class="fill"></div></div>
-          </div>
+        <div class="hp-row">
+          <div class="hpbar foe"><div class="fill"></div></div>
+        </div>
+        <div class="enemy-traits" aria-label="적 특성"></div>
         </div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
@@ -580,6 +586,13 @@ export class BattleView {
     plate.classList.toggle('gone', rank >= 3)
     plate.querySelector<HTMLElement>('.hpn')!.textContent = `${Math.max(0, e.hp)}/${e.maxHp}`
     plate.querySelector<HTMLElement>('.fill')!.style.width = `${Math.max(0, (e.hp / e.maxHp) * 100)}%`
+    const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
+    const weak = e.def.weakEmotion
+    traits.innerHTML = [
+      weak ? `<span class="trait weak ${weak}">${EMOTION_ICON[weak]} ${EMOTION_LABEL[weak]} 약점 ×1.25</span>` : '',
+      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
+      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
+    ].join('')
     // 선공 상태는 딱지 대신 캐릭터 자체의 붉은 발광 + "먼저 공격!" 경고로 보여준다(후공은 무표시).
     el.classList.toggle('strikes-first', front && !e.dead && e.initiativePhase === 'first')
   }
@@ -702,6 +715,10 @@ export class BattleView {
       // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
       if (intent.doubtCount > 0) {
         extra += `<span class="chain-word ctx doubt"><b class="cw-text">${DOUBT_SUFFIX}</b><em class="cw-note gamble">×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}</em></span>`
+      }
+      if (intent.emotionResonance > 1) {
+        const emotion = intent.emotions.find((value, index, all) => all.indexOf(value) !== index)!
+        extra += `<span class="chain-word ctx emotion ${emotion}"><b class="cw-text">${EMOTION_ICON[emotion]} ${EMOTION_LABEL[emotion]}</b><em class="cw-note combo">공명 ×${intent.emotionResonance.toFixed(2)}</em></span>`
       }
       // 부조화(어긋난 맥락) — 위력이 깎인다는 걸 실행 전에 보여준다.
       if (intent.penalties.length) {
@@ -1037,7 +1054,7 @@ export class BattleView {
       ...Object.values(this.player.deck).flat().map((word) => word.id),
       ...(punctOwned ? PUNCT_WORDS.map((word) => word.id) : []),
     ])
-    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat(), ...PUNCT_WORDS]
+    const catalog = [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS, ...PUNCT_WORDS]
       .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
     const found = catalog.filter((word) => owned.has(word.id)).length
     const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미', punct: '문장부호' }
@@ -1496,7 +1513,7 @@ export class BattleView {
     this.setPhase('본인 캐릭터 행동')
 
     // 두 마리 이상이 쓸려나갈 일격이면 때리기 직전에 화면이 늘어졌다가, 꽂히는 순간 고속으로 풀린다.
-    const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.aoe === 'all') >= 2
+    const sweep = dealsDamage && this.predictKills(dmg, this.target, intent.targetCount) >= 2
     if (sweep) await this.slowmoWindup()
 
     // 실제 본행동 발동 + 꽂힘 연출
@@ -1549,8 +1566,17 @@ export class BattleView {
     await this.enemyPhase('second')
 
     if (this.state.pending) {
+      const automated = applyPendingAttack(this.state)
+      if (automated) {
+        await this.strike(automated)
+        this.log(automated.text)
+        this.renderActors()
+        if (automated.killed.length > 0) engageFront(this.state)
+        const pendingGain = overkillGain(automated.killed.length, allDead(this.state))
+        if (pendingGain > 0) await this.dingGrade(pendingGain)
+      } else {
       const p = this.state.pending
-      const targets = p.aoe ? aliveIdx(this.state) : [p.target]
+      const targets = p.targetCount === 'all' ? aliveIdx(this.state) : [p.target]
       const killed: number[] = []
       for (const ti of targets) {
         const e = this.state.enemies[ti]
@@ -1573,6 +1599,7 @@ export class BattleView {
       // 예약 문장의 몰살도 오버킬로 인정한다.
       const pendingGain = overkillGain(killed.length, allDead(this.state))
       if (pendingGain > 0) await this.dingGrade(pendingGain)
+      }
     }
 
     if (this.state.playerHp <= 0) {
@@ -1657,7 +1684,7 @@ export class BattleView {
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
     res: {
-      hits: { target: number; dmg: number }[]
+      hits: { target: number; dmg: number; guardAbsorbed?: number; magicShieldBroken?: boolean; weak?: boolean }[]
       selfDmg: number
       heal: number
       killed: number[]
@@ -1680,11 +1707,17 @@ export class BattleView {
 
     for (const h of res.hits) {
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
-      if (el) {
-        SquareBurst.playOn(el, 'damage', { spread: 120 })
-        this.hitOne(el)
+      if (h.magicShieldBroken) {
+        if (el) SquareBurst.playOn(el, 'guard', { spread: 120 })
+        this.popAt(h.target, '매직실드!', 'guard')
+      } else {
+        if (el && h.dmg > 0) {
+          SquareBurst.playOn(el, h.weak ? 'gold' : 'damage', { spread: 120 })
+          this.hitOne(el)
+        }
+        if (h.guardAbsorbed) this.popAt(h.target, `방어 -${h.guardAbsorbed}`, 'guard')
+        if (h.dmg > 0) this.popAt(h.target, `${h.weak ? '약점! ' : ''}${h.dmg}`, 'dmg big')
       }
-      this.popAt(h.target, `${h.dmg}`, 'dmg big')
     }
     if (attacking) {
       await sleep(250)
@@ -1711,10 +1744,11 @@ export class BattleView {
   }
 
   // 이 일격으로 몇 마리가 쓸려나가는지 미리 센다 — 오버킬 연출 트리거.
-  private predictKills(dmg: number, target: number, aoe: boolean): number {
+  private predictKills(dmg: number, target: number, targetCount: Intent['targetCount']): number {
     if (dmg <= 0) return 0
     const alive = aliveIdx(this.state)
-    if (aoe) return alive.filter((i) => this.state.enemies[i].hp <= dmg).length
+    if (targetCount === 'all') return alive.filter((i) => this.state.enemies[i].hp <= dmg).length
+    if (targetCount > 1) return alive.slice(0, targetCount).filter((i, n) => this.state.enemies[i].hp <= Math.round(dmg * [1, .7, .5][n])).length
     let left = dmg
     let kills = 0
     for (const i of alive) {
@@ -1973,6 +2007,14 @@ export class BattleView {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
       if (st.dealt <= 0) {
         this.log(st.text)
+        if (st.counterHit) {
+          if (st.counterHit.magicShieldBroken) this.popAt(st.counterHit.target, '매직실드!', 'guard')
+          else if (st.counterHit.dmg > 0) {
+            this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
+            if (foe) this.hitOne(foe)
+          }
+          if (this.state.enemies[st.counterHit.target]?.dead) await this.playDeath(st.counterHit.target)
+        }
         continue
       }
       foe?.classList.add('lunge')
@@ -1984,6 +2026,17 @@ export class BattleView {
       this.log(st.text)
       await sleep(240)
       foe?.classList.remove('lunge')
+      if (st.counterHit) {
+        const hit = st.counterHit
+        if (hit.magicShieldBroken) this.popAt(hit.target, '매직실드!', 'guard')
+        else if (hit.dmg > 0) {
+          this.popAt(hit.target, `카운터 ${hit.dmg}`, 'dmg big')
+          this.hitOne(foe!)
+        }
+        if (hit.guardAbsorbed) this.popAt(hit.target, `방어 -${hit.guardAbsorbed}`, 'guard')
+        this.log(`카운터 ×${(st.absorbed > 0 ? hit.dmg / st.absorbed : 0).toFixed(2)}`)
+        if (this.state.enemies[hit.target]?.dead) await this.playDeath(hit.target)
+      }
     }
     this.renderActors()
   }

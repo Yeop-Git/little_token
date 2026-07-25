@@ -4,7 +4,7 @@
  */
 
 import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
-import type { StatBlock, Variance, Word } from './types'
+import { EMOTION_ICON, EMOTION_LABEL, type StatBlock, type Variance, type Word } from './types'
 
 /**
  * 도박 표기 — "40% 확률로 배율 ×2.50".
@@ -48,6 +48,7 @@ export interface ValueLine {
  */
 export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   const out: ValueLine[] = []
+  out.push({ text: `${EMOTION_ICON[w.emotion]} ${EMOTION_LABEL[w.emotion]}`, cls: `emotion ${w.emotion}` })
   const lane = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
   if (w.stat && w.statMult != null) {
@@ -67,6 +68,10 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.targetMode === 'both') out.push({ text: '피해 40% 나에게 되돌아옴', cls: 'self' })
   if (w.tags.includes(PREEMPT_TAG)) out.push({ text: '선공 상대보다 먼저 행동', cls: 'buff' })
   // 수치가 없는 카드(규칙 카드·차단 안내)는 카드에 적힌 문구를 그대로 쓴다.
+  if ((w.kind === 'attack' || w.targetCount) && w.aoe !== 'all') out.push({ text: `${w.targetCount ?? 1}명 공격`, cls: 'dmg' })
+  if (w.effects?.pierceGuard) out.push({ text: '방어 관통', cls: 'dmg' })
+  if (w.effects?.hitCount && w.effects.hitCount > 1) out.push({ text: `${w.effects.hitCount}연타`, cls: 'dmg' })
+  if (w.effects?.counterMultiplier) out.push({ text: `카운터 ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
   if (!out.length) out.push({ text: w.note, cls: 'flat' })
   return out
 }

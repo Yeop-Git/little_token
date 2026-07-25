@@ -16,8 +16,10 @@ import {
   PUNCT_WORDS,
   REWARD_WORDS,
 } from './generated/sentenceData'
+import { SPECIAL_REWARD_WORDS } from './specialWords'
 
-export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS }
+export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS, SPECIAL_REWARD_WORDS }
+export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
 
 export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']
 

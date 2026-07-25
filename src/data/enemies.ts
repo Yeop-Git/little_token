@@ -7,6 +7,16 @@
 import type { EnemyDef } from '@core/types'
 
 export const ENEMIES: Record<string, EnemyDef> = {
+  armoredRoach: {
+    id: 'armoredRoach', name: '갑각 바퀴', hp: 12, atk: 6, every: 2, initiative: 'second',
+    sprite: 'enemy_roach', guard: 7, weakEmotion: 'anger',
+    note: '단단한 껍질이 먼저 피해를 받아 낸다. 분노에 약하다.',
+  },
+  shieldMoth: {
+    id: 'shieldMoth', name: '유리날개 좀나방', hp: 8, atk: 5, every: 2, initiative: 'first',
+    sprite: 'enemy_moth', magicShield: 1, weakEmotion: 'sadness',
+    note: '매직실드가 한 타격을 막는다. 슬픔에 약하다.',
+  },
   moth: {
     id: 'moth',
     name: '좀나방',

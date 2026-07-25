@@ -31,6 +31,10 @@ export function stageFor(day: number): Stage {
   const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1) * (field.enemyAtkMult ?? 1)
   const encounter: string[] = []
   // 날이 갈수록 단단한 바퀴벌레 비중이 는다.
-  for (let i = 0; i < count; i++) encounter.push(i % 3 === 2 ? 'roach' : 'moth')
+  for (let i = 0; i < count; i++) {
+    if (day >= 3 && i % 4 === 3) encounter.push('shieldMoth')
+    else if (day >= 3 && i % 4 === 2) encounter.push('armoredRoach')
+    else encounter.push(i % 3 === 2 ? 'roach' : 'moth')
+  }
   return { day, field, encounter, hpMult, atkMult }
 }

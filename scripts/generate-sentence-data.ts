@@ -120,6 +120,16 @@ function compact<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T
 }
 
+// 기존 CSV는 감정 열이 생기기 전부터 축적됐다. 현재 태그를 기준으로 한 번만
+// 안정적으로 분류해 모든 카드가 런타임에서는 단일 감정 속성을 갖게 한다.
+function emotionOf(tags: string): 'joy' | 'sadness' | 'anger' | 'anxiety' {
+  const values = tags.split('|').filter(Boolean)
+  if (values.some((tag) => ['atk', 'fire', 'force', 'rush', 'mad', 'smash', 'hurl', 'war', 'swing'].includes(tag))) return 'anger'
+  if (values.some((tag) => ['mend', 'tear', 'water', 'mind', 'hurt', 'warm'].includes(tag))) return 'sadness'
+  if (values.some((tag) => ['grd', 'solid', 'grit', 'hold', 'slow', 'quiet', 'fear'].includes(tag))) return 'anxiety'
+  return 'joy'
+}
+
 const wordRows = load('words.csv')
 const ids = new Set<string>()
 const wordsByPool = emptyByPool<Record<string, unknown>>()
@@ -148,11 +158,13 @@ wordRows.forEach((row, index) => {
     throw new Error(`words.csv:${line}: variance_p, variance_hi, variance_lo는 모두 함께 입력해야 합니다.`)
   }
 
+  const tags = row.tags ? row.tags.split('|').filter(Boolean) : []
   wordsByPool[pool].push(compact({
     id,
     text: required(row, 'text', 'words.csv', line),
     slot: required(row, 'slot', 'words.csv', line),
-    tags: row.tags ? row.tags.split('|').filter(Boolean) : [],
+    tags,
+    emotion: emotionOf(tags.join('|')),
     power: optionalNumber(row.power, 'words.csv', line, 'power'),
     stat: statOf(row, 'words.csv', line),
     statMult: optionalNumber(row.stat_mult, 'words.csv', line, 'stat_mult'),

@@ -8,7 +8,7 @@
 
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
-import type { Combo, CompileMods, Intent, IntentPart, Selection, StatBlock, StatName, Tables, Word } from './types'
+import { EMOTION_LABEL, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 
 export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
   intent.kind !== 'heal' && intent.kind !== 'guard'
@@ -122,6 +122,7 @@ export function compile(
   const bonusFrom: string[] = [] // 보너스 풀에 기여한 단어 이름(집계판 힌트용)
   let targetMode: Intent['targetMode'] = 'enemy'
   let aoe: Intent['aoe'] = 'single'
+  let targetCount: TargetCount = 1
   let timing: Intent['timing'] = 'immediate'
   let variance: Intent['variance'] = null
   const flats: IntentPart[] = []
@@ -167,6 +168,8 @@ export function compile(
       if (w.targetMode) targetMode = w.targetMode
     }
     if (w.aoe) aoe = w.aoe // subject/verb 어느 쪽이든 지정하면 채택
+    if (w.targetCount) targetCount = w.targetCount
+    if (w.aoe === 'all') targetCount = 'all'
     // 도박 범위(×하한~×상한)는 어느 슬롯이든 가질 수 있다 — 배율이 낮은 카드에
     // "가끔 크게 터진다"는 메리트를 붙여 주는 장치다. 뒤 슬롯이 지정하면 그쪽으로 덮인다.
     if (w.variance) variance = w.variance
@@ -210,10 +213,27 @@ export function compile(
 
   // 천장 없음 — 배율은 상한 없이 곱해진다(벌레 스웜을 오버킬로 관통하는 쾌감).
   // 등급제 폐지 — 희귀도 보너스 없음(다양성 + 반복강화로 대체 예정).
-  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult
+  const emotions = order.flatMap((key) => (sel[key] ? [sel[key]!.emotion] : []))
+  const emotionCounts = new Map<Emotion, number>()
+  emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
+  const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+  const emotionResonance = repeatedEmotion?.[1] === 3 ? 1.3 : repeatedEmotion?.[1] === 2 ? 1.15 : 1
+  if (emotionResonance !== 1) {
+    mults.push({
+      label: `${EMOTION_LABEL[repeatedEmotion![0]]} 공명`,
+      value: emotionResonance,
+      source: 'emotion',
+      hint: `같은 감정 ${repeatedEmotion![1]}장`,
+    })
+  }
+
+  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult * emotionResonance
 
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
-    order.reduce((n, key) => n + (sel[key]?.effects?.[k] || 0), 0)
+    order.reduce((n, key) => {
+      const value = sel[key]?.effects?.[k]
+      return n + (typeof value === 'number' ? value : 0)
+    }, 0)
 
   const sentence = joinTokens(sentenceTokens(sel, t), t)
 
@@ -221,6 +241,7 @@ export function compile(
     sentence: doubting ? `${sentence} ${DOUBT_SUFFIX}` : sentence,
     targetMode,
     aoe,
+    targetCount,
     kind,
     preempt: allTags.includes(PREEMPT_TAG),
     base,
@@ -231,6 +252,11 @@ export function compile(
     heal: sumEffect('heal') + statHeal,
     recoil: sumEffect('recoil'),
     evade: sumEffect('evade'),
+    pierceGuard: order.some((key) => !!sel[key]?.effects?.pierceGuard),
+    hitCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.hitCount ?? 1)),
+    counterMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.counterMultiplier ?? 0)),
+    emotions,
+    emotionResonance,
     tags: allTags,
     combos: combos.map((c) => c.name),
     coherence,

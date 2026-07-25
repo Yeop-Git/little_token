@@ -34,6 +34,12 @@ export interface SentenceTemplate {
 export type IntentKind = 'attack' | 'guard' | 'heal' | 'debuff'
 export type TargetMode = 'enemy' | 'self' | 'both'
 export type AoeMode = 'single' | 'all' // 범위: 단일 vs 전체 적
+/** 카드와 적이 공유하는 감정 속성. 한 카드는 하나만, 한 적은 약점 하나만 가진다. */
+export type Emotion = 'joy' | 'sadness' | 'anger' | 'anxiety'
+export const EMOTION_LABEL: Record<Emotion, string> = { joy: '기쁨', sadness: '슬픔', anger: '분노', anxiety: '불안' }
+export const EMOTION_ICON: Record<Emotion, string> = { joy: '☀', sadness: '☂', anger: '✦', anxiety: '◌' }
+/** 전체 공격은 기존 aoe와 호환하고, 나머지는 적 레일 앞쪽부터 세는 타격 수다. */
+export type TargetCount = 1 | 2 | 3 | 'all'
 
 export interface Variance {
   p: number
@@ -46,6 +52,12 @@ export interface WordEffects {
   heal?: number
   recoil?: number
   evade?: number
+  /** 일반 방어막을 건너뛴다. 매직실드는 절대 건너뛰지 못한다. */
+  pierceGuard?: boolean
+  /** 같은 최전방 적에게 가하는 개별 타격 횟수. */
+  hitCount?: number
+  /** 막아 낸 피해에 곱할 즉시 반격 계수. */
+  counterMultiplier?: number
 }
 
 // 문장이 기대는 플레이어 스탯 — 동사의 깡수치와 수식 룰렛 보정이 여기서 나온다.
@@ -81,6 +93,8 @@ export interface Word {
   // 미지정은 인칭 중립(주어가 아닌 슬롯 단어). 상대(2인칭)는 주어가 아니라 목적어로 간다.
   person?: 'first' | 'second' | 'third'
   aoe?: AoeMode // subject/verb가 지정 가능
+  targetCount?: TargetCount
+  emotion: Emotion
   note: string // UI 한 줄 설명(효과 요약)
   rarity?: Rarity // 보상 티어 표기용(맥락카드 등급제는 폐지 — gradeBonus 없음)
   art?: string // 맥락카드 풀 일러스트 키(assets SKILL_ART: 1xxx 주어·2xxx 수식·3xxx 목적)
@@ -127,6 +141,7 @@ export interface Intent {
   sentence: string
   targetMode: TargetMode
   aoe: AoeMode
+  targetCount: TargetCount
   kind: IntentKind
   /** 선공 상대보다 먼저 행동한다(문장부호 '!'). */
   preempt: boolean
@@ -138,6 +153,11 @@ export interface Intent {
   heal: number
   recoil: number
   evade: number
+  pierceGuard: boolean
+  hitCount: number
+  counterMultiplier: number
+  emotions: Emotion[]
+  emotionResonance: number
   tags: string[]
   combos: string[] // 발동 관용구 이름
   coherence: number // 부조화 패널티 곱(1이면 어긋남 없음)
@@ -156,7 +176,7 @@ export interface Intent {
 export interface IntentPart {
   label: string // 화면 표기 이름(단어/스탯/관용구)
   value: number // 깡수치는 더할 값, 배율은 곱할 값
-  source: 'word' | 'stat' | 'combo' | 'coherence'
+  source: 'word' | 'stat' | 'combo' | 'coherence' | 'emotion'
   hint?: string // "공격 ×1" 처럼 어디서 나온 수치인지
   /**
    * 이 깡수치가 들어간 풀. 동사가 둘일 수 있어(맛동사) 한 문장 안에서
@@ -201,6 +221,11 @@ export interface EnemyDef {
   initiative: 'first' | 'second' // 문장 완성 후 플레이어보다 먼저/나중에 행동
   sprite: string // Sprites.ts 키
   note: string
+  /** 피해를 먼저 흡수하는 일반 방어막. 관통 공격은 소모시키지 않고 지나간다. */
+  guard?: number
+  /** 한 타격을 통째로 지우는 매직실드 횟수. */
+  magicShield?: number
+  weakEmotion?: Emotion
 }
 
 // ── 필드(날씨/날짜/제목) 효과 ──

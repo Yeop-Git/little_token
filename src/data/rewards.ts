@@ -7,7 +7,7 @@
 import type { Rarity, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
 import { rollRarity, startGrade } from '@core/grade'
-import { REWARD_WORDS } from './earlyWords'
+import { ALL_REWARD_WORDS } from './earlyWords'
 import { ITEMS, LEGENDARY_ITEMS, type ItemDef } from './items'
 
 /**
@@ -79,7 +79,7 @@ export function genRewards(
   const ownedIds = new Set(deckWords.map((w) => w.id))
 
   // 다양성 — 아직 없는 새 단어(스킬업).
-  const newWords: RewardOption[] = REWARD_WORDS
+  const newWords: RewardOption[] = ALL_REWARD_WORDS
     .filter((w) => !ownedIds.has(w.id))
     .map((w) => ({
       kind: 'word',

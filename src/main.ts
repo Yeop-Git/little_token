@@ -20,7 +20,7 @@ import { startGrade } from '@core/grade'
 import { clearRun, hasSeenTutorial, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
-import { EARLY_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { preloadBattleResources } from '@/ui/ResourcePreloader'
 import { openSettingsModal } from '@/ui/SettingsModal'
@@ -78,7 +78,7 @@ function grantWord(word: Word) {
 }
 
 function cardCatalog(): Word[] {
-  return [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat()].filter(
+  return [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS].filter(
     (word, index, all) => all.findIndex((entry) => entry.id === word.id) === index,
   )
 }
@@ -109,7 +109,7 @@ function defeatPlayer() {
 function mountDevCheat(active: SceneName) {
   const owned = new Set(run.player.items.map((it) => it.id))
   const ownedWords = new Set(Object.values(run.player.deck).flat().map((word) => word.id))
-  const rewardWords = Object.values(REWARD_WORDS).flat()
+  const rewardWords = ALL_REWARD_WORDS
   const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">

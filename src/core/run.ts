@@ -50,13 +50,16 @@ function cloneWord(w: Word): Word {
 }
 
 // 반복강화 — 중복 단어를 먹으면 단계가 오르고 핵심 수치가 강해진다.
-const REINFORCE_STEP = { power: 2, bonus: 0.15, guard: 2, heal: 2, crit: 0.05 }
+const REINFORCE_STEP = { power: 2, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25 }
 export function reinforceWord(w: Word): void {
   w.level = (w.level ?? 1) + 1
   if (w.power != null) w.power += REINFORCE_STEP.power
   if (w.bonus != null) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
   if (w.effects?.guard) w.effects.guard += REINFORCE_STEP.guard
   if (w.effects?.heal) w.effects.heal += REINFORCE_STEP.heal
+  if (w.effects?.counterMultiplier) {
+    w.effects.counterMultiplier = Math.round((w.effects.counterMultiplier + REINFORCE_STEP.counter) * 100) / 100
+  }
   if (w.crit != null) w.crit = Math.min(0.6, Math.round((w.crit + REINFORCE_STEP.crit) * 100) / 100)
 }
 
