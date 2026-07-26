@@ -9,6 +9,7 @@ import { SKILL_ART } from '@/assets'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { wordNoteText } from '@core/wordText'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -65,7 +66,7 @@ interface FaceOpts {
 
 /** 카드 앞면 한 겹. 일러스트가 있으면 원화 카드, 없으면 문양 카드로 그린다. */
 export function wordCardFrontHtml(word: Word, opts: FaceOpts = {}): string {
-  const { note = word.note, footer = 'WORD CARD', overlay = '' } = opts
+  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '' } = opts
   const artUrl = word.art ? SKILL_ART[word.art] : undefined
   const level = word.level ?? 1
   const rarity = word.rarity ?? 'common'

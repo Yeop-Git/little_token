@@ -1,11 +1,8 @@
 import { SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
-import { cardTitleStyle, wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
-
-// 카드 앞면 마크업의 원본은 ui/WordCardFace.ts다. 도움말 화면이 같은 함수를
-// 쓰므로 여기서 다시 내보내 기존 소비처(BattleView 도감)의 경로를 유지한다.
-export { cardTitleStyle }
+import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
+import { wordNoteText } from '@core/wordText'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -549,7 +546,7 @@ export class CardHand {
       button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !!unavailable
-      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`)
+      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${wordNoteText(card.word)}`)
       button.setAttribute('aria-pressed', String(selected))
       button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
       button.style.setProperty('--card-z', String(line.zIndex))
@@ -559,7 +556,7 @@ export class CardHand {
       const badge = button.querySelector<HTMLElement>('.card-level')
       if (badge) badge.textContent = `${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}`
       const note = button.querySelector<HTMLElement>('.card-note')
-      if (note) note.textContent = unavailable ?? card.word.note
+      if (note) note.textContent = unavailable ?? wordNoteText(card.word)
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
       if (emotionBadge) {
         emotionBadge.outerHTML = emotionIconBadge(emotionKey, 'card-emotion')
@@ -578,14 +575,14 @@ export class CardHand {
     const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
-    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`
+    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${wordNoteText(card.word)}`
     const rarity = card.word.rarity ?? 'common'
     const emotion = emotionOrNeutral(card.word.emotion)
     // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.
     const webOverlay = `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>`
     // 앞면은 손패 밖 화면과 같은 함수로 그린다(ui/WordCardFace.ts).
     const front = wordCardFrontHtml(card.word, {
-      note: unavailable ?? card.word.note,
+      note: unavailable ?? wordNoteText(card.word),
       footer: sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD',
       overlay: webOverlay,
     })

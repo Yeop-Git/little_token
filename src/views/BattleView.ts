@@ -18,7 +18,7 @@ import {
   statBiasOf,
   type ResolvedMult,
 } from '@core/compiler'
-import { wordValueLines } from '@core/wordText'
+import { wordNoteText, wordValueLines } from '@core/wordText'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
@@ -59,12 +59,13 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
-import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
+import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
-import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
+import { ALL_ITEMS, STAT_LABEL } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CARD_HAND_CONFIG, CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
+import { CARD_HAND_CONFIG, CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
+import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_MULT, PUMP_RATIO, type AttackCut } from '@/ui/AttackCinematic'
@@ -123,7 +124,6 @@ interface Opts {
 }
 
 type Mood = 'attack' | 'guard' | 'heal' | 'gamble' | 'sacrifice' | 'buff'
-const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 /** 한 공격 안에서 여러 적이 맞을 때 음계처럼 들리게 하는 타격 간격. */
 const SWORD_HIT_GAP_MS = 85
 // 적 레일 — 전장에는 앞의 세 마리만 세우고, 나머지는 대기 수로 요약한다.
@@ -2084,16 +2084,8 @@ export class BattleView {
       return
     }
     strip.hidden = false
-    // 첫 줄은 이름, 둘째 줄은 이게 나에게 뭘 해 주는지. 규칙 아이템은 패시브 설명이
-    // 곧 그 효과라 그대로 쓰고, 스탯 아이템은 올려 준 수치만 늘어놓는다.
-    const tooltipFor = (item: (typeof this.player.items)[number]) => {
-      const passive = item.passive ? PASSIVES[item.passive] : null
-      const stats = STAT_ORDER
-        .filter((key) => item.stats[key])
-        .map((key) => `${STAT_LABEL[key]} +${item.stats[key]}`)
-        .join(' · ')
-      return tip(item.name, passive ? passive.desc : stats || item.line)
-    }
+    // 이름 / 고유효과 / 감탄사로 얻은 스탯 — 조립은 core/player.ts가 한다.
+    const tooltipFor = itemTooltipText
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
       <div class="relic-icons">
@@ -2107,23 +2099,10 @@ export class BattleView {
 
   // ── 단어장(전체 덱) 오버레이 ──
   private deckPreviewHtml(w: Word): string {
-    const mood = this.moodOf(w)
     const emotion = emotionOrNeutral(w.emotion)
-    const art = w.art ? SKILL_ART[w.art] : undefined
     const rarity = w.rarity ?? 'common'
-    const level = w.level ?? 1
-    const badge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
-    const face = art
-      ? `<div class="card-face card-front art">
-          <img class="card-illus" src="${art}" alt="" aria-hidden="true">
-          <span class="card-tint" aria-hidden="true"></span><span class="card-veil" aria-hidden="true"></span><span class="card-foil" aria-hidden="true"></span>
-          ${badge}${emotionIconBadge(emotion, 'card-emotion')}<strong class="card-title" ${cardTitleStyle(w.text, true)}>${w.text}</strong><span class="card-note">${w.note}</span>
-        </div>`
-      : `<div class="card-face card-front">
-          <span class="card-foil" aria-hidden="true"></span>${badge}${emotionIconBadge(emotion, 'card-emotion')}<span class="card-art" aria-hidden="true"><i></i><b>✦</b></span>
-          <strong class="card-title" ${cardTitleStyle(w.text)}>${w.text}</strong><span class="card-note">${w.note}</span><small>WORD CARD</small>
-        </div>`
-    return `<div class="deck-hover-card mood-${mood} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${face}</div>`
+    // 앞면은 손패와 같은 함수로 그린다 — 도감에서 본 카드가 전투에서 다르게 읽히면 안 된다.
+    return `<div class="deck-hover-card mood-${wordMood(w)} emotion-${emotion} rarity-${rarity}" aria-hidden="true">${wordCardFrontHtml(w)}</div>`
   }
 
   // ── 도감 — 현재 단어장과 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
@@ -2156,7 +2135,7 @@ export class BattleView {
         ${slots.map((slot, index) => `<section class="deck-col">
           <div class="deck-col-h"><b>${index + 1}</b> ${slot.label}</div>
           ${(this.player.deck[slot.key] ?? []).map((word) => `<div class="deck-word codex-selectable mood-${this.moodOf(word)}" data-detail-kind="word" data-slot="${slot.key}" data-word="${word.id}">
-            <span class="dw">${word.text}</span><span class="dn">${word.note}</span>
+            <span class="dw">${word.text}</span><span class="dn">${wordNoteText(word)}</span>
           </div>`).join('')}
         </section>`).join('')}
       </div>
@@ -2170,7 +2149,7 @@ export class BattleView {
             const discovered = owned.has(word.id)
             return `<article class="codex-entry rarity-${word.rarity ?? 'common'}${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="word" data-word="${word.id}"` : ''}>
               <span class="codex-mark">${discovered ? '✦' : '?'}</span>
-              <div><b>${discovered ? word.text : '미발견 카드'}</b><span>${discovered ? word.note : '보상에서 만나면 기록된다.'}</span></div>
+              <div><b>${discovered ? word.text : '미발견 카드'}</b><span>${discovered ? wordNoteText(word) : '보상에서 만나면 기록된다.'}</span></div>
             </article>`
           }).join('')}
         </div>
@@ -2298,7 +2277,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(w.emotion), 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${label} · ${RARITY_LABEL[rarity]}${level > 1 ? ` · Lv.${level}` : ''}</div>
         ${values.length ? `<div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>` : ''}
-        <p class="wd-flavor">${w.note}</p>
+        <p class="wd-flavor">${wordNoteText(w)}</p>
       </div>
     </div>`
   }
@@ -2321,8 +2300,12 @@ export class BattleView {
   }
 
   private codexItemDetailHtml(item: (typeof ALL_ITEMS)[keyof typeof ALL_ITEMS]): string {
-    const rows = STAT_ORDER.filter((k) => item.base[k])
-      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${item.base[k]}</span></div>`)
+    // 모든 아이템의 고정 기본 스탯은 0이다 — 실제 수치는 감탄 문장으로 확정된 보유분에 있다.
+    // 도감은 보유한 아이템만 상세를 여니, 그 판에서 정말 오른 값을 그대로 적는다.
+    const owned = this.player.items.find((entry) => entry.id === item.id)
+    const stats = owned?.stats ?? item.base
+    const rows = ITEM_STAT_ORDER.filter((k) => stats[k])
+      .map((k) => `<div class="idrow"><span>${STAT_LABEL[k]}</span><span class="iv">+${stats[k]}</span></div>`)
       .join('')
     const p = item.passive ? PASSIVES[item.passive] : null
     const passive = p ? `<div class="id-passive"><b>${p.name}</b><span>${p.desc}</span></div>` : ''
@@ -2331,7 +2314,7 @@ export class BattleView {
       <div class="id-art">${itemArt(item.art)}</div>
       <div class="cdx-detail-copy">
         <div class="wd-name">${item.name}</div>
-        <div class="wd-grade">✦ ${RARITY_LABEL[item.rarity]}</div>
+        <div class="wd-grade">✦ ${RARITY_LABEL[item.rarity]}${owned ? ` · ${owned.line}` : ''}</div>
         ${passive}
         ${rows ? `<div class="id-stats">${rows}</div>` : ''}
         <p class="wd-flavor">${item.flavor}</p>

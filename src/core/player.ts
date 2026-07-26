@@ -4,7 +4,8 @@
  */
 
 import { RARITY_LABEL, type Rarity, type Word } from '@core/types'
-import type { PassiveId } from '@core/passives'
+import { PASSIVES, type PassiveId } from '@core/passives'
+import { STAT_LABEL, type StatKey } from '@data/items'
 import { WORDS } from '@data/words'
 
 export interface PlayerStats {
@@ -66,4 +67,30 @@ export function defaultPlayer(): PlayerState {
     ],
     deck: WORDS,
   }
+}
+
+/** 아이템 수치를 화면에 늘어놓는 순서. 스탯 표는 어디서나 이 순서를 쓴다. */
+export const ITEM_STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
+
+/** "공격 +2 · 운 +1" — 감탄사로 확정된 실제 상승치. 없으면 빈 문자열. */
+export function itemStatsText(item: OwnedItem): string {
+  return ITEM_STAT_ORDER
+    .filter((key) => item.stats[key])
+    .map((key) => `${STAT_LABEL[key]} +${item.stats[key]}`)
+    .join(' · ')
+}
+
+/**
+ * 보유 아이템 쪽지 — 이름 / 고유효과 / 감탄사로 얻은 스탯 순으로 줄을 쌓는다.
+ * 규칙(영웅·전설) 아이템도 스탯 줄을 함께 적는다. 고유효과만 보여 주면 감탄사로
+ * 실제로 오른 수치가 화면 어디에도 안 남는다 — 쪽지가 길어지는 편이 낫다.
+ */
+export function itemTooltipText(item: OwnedItem): string {
+  const passive = item.passive ? PASSIVES[item.passive] : null
+  const stats = itemStatsText(item)
+  const lines: string[] = []
+  if (passive) lines.push(`${passive.name} — ${passive.desc}`)
+  if (stats) lines.push(stats)
+  if (!lines.length) lines.push(item.line)
+  return [item.name, ...lines].join('\n')
 }

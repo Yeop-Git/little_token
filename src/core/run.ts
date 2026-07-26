@@ -133,12 +133,22 @@ function cloneWord(w: Word): Word {
 }
 
 // 반복강화 — 중복 단어를 먹으면 단계가 오르고 핵심 수치가 강해진다.
-const REINFORCE_STEP = { power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25 }
+// 카드의 "핵심 수치"는 종류마다 다르다. 도박 카드는 배율 풀이 아니라 고점(variance.hi)이,
+// 성장 카드는 늘려 주는 최대 체력이 그 자리다. 여기서 빠뜨리면 그 카드만 단계는 오르고
+// 아무것도 세지지 않는다(도박 주어들이 그랬다 — 화면 문구가 그대로인 이유이기도 했다).
+const REINFORCE_STEP = {
+  power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25,
+  varianceHi: 0.15, growHp: 1,
+}
 export function reinforceWord(w: Word): void {
   w.level = (w.level ?? 1) + 1
   if (w.power != null) w.power += REINFORCE_STEP.power
   if (w.statMult != null) w.statMult = Math.round((w.statMult + REINFORCE_STEP.statMult) * 100) / 100
   if (w.bonus != null) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
+  if (w.variance) {
+    w.variance = { ...w.variance, hi: Math.round((w.variance.hi + REINFORCE_STEP.varianceHi) * 100) / 100 }
+  }
+  if (w.growHp) w.growHp += REINFORCE_STEP.growHp
   if (w.effects?.guard) w.effects.guard += REINFORCE_STEP.guard
   if (w.effects?.heal) w.effects.heal += REINFORCE_STEP.heal
   if (w.effects?.counterMultiplier) {

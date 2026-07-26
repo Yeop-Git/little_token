@@ -1046,7 +1046,7 @@ export const WORDS: Record<string, Word[]> = {
       "emotion": "sorrow",
       "power": 4,
       "rarity": "rare",
-      "note": "위력 4 · 회복 3",
+      "note": "위력 4 · 회복 +3",
       "lore": "지난 장을 넘기면 상처가 아문다.",
       "effects": {
         "heal": 3
@@ -1181,7 +1181,7 @@ export const WORDS: Record<string, Word[]> = {
       "bonus": 0,
       "timing": "immediate",
       "rarity": "epic",
-      "note": "50% 확률로 배율 ×3.20",
+      "note": "50% 확률로 배율 ×3.20 · 즉발",
       "lore": "기억이 흐릿하다… 운에 맡긴다.",
       "variance": {
         "p": 0.5,
@@ -1199,7 +1199,7 @@ export const WORDS: Record<string, Word[]> = {
       "crit": 0.45,
       "timing": "immediate",
       "rarity": "epic",
-      "note": "배율 ×1.70 · 대성공 45%",
+      "note": "배율 ×1.70 · 대성공 45% · 즉발",
       "lore": "저지르고야 말았다. 손이 떨린다."
     }
   ]

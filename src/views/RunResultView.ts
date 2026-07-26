@@ -52,16 +52,48 @@ const STAMP: Record<RunOutcome, { kicker: string; title: string; token: string; 
   },
 }
 
+/**
+ * 종이 위아래로 삐져나오는 토큰이 잘리지 않게 남기는 여백. 축소 배율을 잴 때
+ * 무대 높이에서 미리 뺀다.
+ */
+const FIT_PADDING = 28
+
 export class RunResultView {
   private acted = false
   private opts: Opts
+  /** 내용이 늘어나면(아이템·처치 목록·폰트 교체) 다시 재어 배율을 고친다. */
+  private fitObserver: ResizeObserver | null = null
 
   constructor(private root: HTMLElement, opts: Opts) {
     this.opts = opts
     this.mount()
   }
 
-  destroy() {}
+  destroy() {
+    this.fitObserver?.disconnect()
+    this.fitObserver = null
+  }
+
+  /**
+   * 결과 종이는 스크롤하지 않는다 — 한 판의 기록은 한 화면에서 다 읽혀야 한다.
+   * 아이템과 처치 목록은 런마다 길이가 달라지므로, 넘칠 때만 종이 전체를 통째로
+   * 줄인다(글자만 줄이면 조판이 무너진다). 넘치지 않으면 배율은 1이다.
+   */
+  private fit = () => {
+    const scene = this.root.querySelector<HTMLElement>('.result-scene')
+    const paper = this.root.querySelector<HTMLElement>('.result-stage')
+    if (!scene || !paper) return
+    // offsetWidth/Height는 transform을 타지 않는 배치 크기라 배율을 되돌리지 않고 잴 수 있다.
+    const height = paper.offsetHeight
+    const width = paper.offsetWidth
+    if (!height || !width) return
+    const scale = Math.min(
+      1,
+      (scene.clientHeight - FIT_PADDING) / height,
+      (scene.clientWidth - FIT_PADDING) / width,
+    )
+    paper.style.setProperty('--result-fit', scale.toFixed(4))
+  }
 
   private mount() {
     const { outcome, day, player, record } = this.opts
@@ -119,6 +151,14 @@ export class RunResultView {
       button.addEventListener('click', () => this.act(button.dataset.act ?? '')),
     )
     this.root.querySelector<HTMLButtonElement>('[data-act="new"]')?.focus()
+
+    const paper = this.root.querySelector<HTMLElement>('.result-stage')
+    if (paper) {
+      this.fit()
+      // 장식 폰트 교체와 아이템 원화 로드가 끝나면 높이가 달라진다 — 그때마다 다시 잰다.
+      this.fitObserver = new ResizeObserver(this.fit)
+      this.fitObserver.observe(paper)
+    }
   }
 
   /** 나를 갉아먹은 것 — 종이에서 가장 크게 적히는 한 줄. */

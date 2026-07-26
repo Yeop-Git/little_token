@@ -14,7 +14,7 @@ import type { RewardPhase } from '@core/run'
 import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
 import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
-import { critText, multText, wordValueLines } from '@core/wordText'
+import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
 
 interface Opts {
@@ -63,7 +63,7 @@ function mainEffect(opt: RewardOption): string {
     return s.join(' · ') || '스탯 상승'
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
-  return opt.word!.note
+  return wordNoteText(opt.word!)
 }
 
 /** 보상 선택 단계에서도 감정을 즉시 읽게 한다. 상세 창을 열 필요가 없다. */
@@ -95,6 +95,13 @@ function reinforceDeltas(w: Word): string {
   if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
+  if (w.effects?.counterMultiplier) {
+    rows.push(`카운터 ×${w.effects.counterMultiplier.toFixed(2)} → <b>×${after.effects!.counterMultiplier!.toFixed(2)}</b>`)
+  }
+  if (w.statMult != null) rows.push(`계수 ×${w.statMult} → <b>×${after.statMult}</b>`)
+  // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
+  if (w.variance) rows.push(`${gambleText(w.variance)} → <b>${gambleText(after.variance!)}</b>`)
+  if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)
   if (w.crit != null) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
   return `<div class="rf-deltas"><div class="rf-h">강화하면</div>${rows.map((row) => `<div class="rf-row">${row}</div>`).join('')}</div>`
 }

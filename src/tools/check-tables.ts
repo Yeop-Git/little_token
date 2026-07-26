@@ -20,7 +20,7 @@ import {
   hasBudget,
   verbCoefBudget,
 } from '@core/budget'
-import { numericNoteParts } from '@core/wordText'
+import { numericNoteParts, wordNoteText } from '@core/wordText'
 import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
 import { RARITY_LABEL, type Tables, type Word } from '@core/types'
@@ -100,6 +100,24 @@ function checkArt(): string[] {
  * 여기에 카드 문구(`note`)가 실제 수치를 빠뜨리지 않았는지도 함께 본다.
  * 5슬롯 확장 데이터는 고정 위력 등 옛 규칙이 남아 있어 대상에서 뺀다(보존 자료).
  */
+/** 화면에 나올 수 있는 모든 카드 — 문구 조립 규칙은 확장·규칙 카드까지 전부 지켜야 한다. */
+function allWords(): { w: Word; pool: string }[] {
+  const seen = new Set<string>()
+  return [
+    ...Object.values(EARLY_WORDS).flat().map((w) => ({ w, pool: '초기' })),
+    ...REWARD_WORDS.map((w) => ({ w, pool: '보상' })),
+    ...SPECIAL_REWARD_WORDS.map((w) => ({ w, pool: '규칙' })),
+    ...GROW_WORDS.map((w) => ({ w, pool: '성장' })),
+    ...PUNCT_WORDS.map((w) => ({ w, pool: '문장부호' })),
+    ...Object.values(TABLES.words).flat().map((w) => ({ w, pool: '확장' })),
+  ].filter(({ w }) => {
+    const key = `${w.slot}:${w.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 function checkBudget(): string[] {
   const out: string[] = []
   const early = Object.entries(EARLY_WORDS).flatMap(([slot, list]) => list.map((w) => ({ slot, w, pool: '초기' })))
@@ -142,6 +160,17 @@ function checkBudget(): string[] {
     if (missing.length) {
       out.push(`${pool}/${w.text}: note에 ${missing.join(' · ')} 없음`)
       console.log(`  위반  ${pool} · ${w.text} — note "${w.note}"에 ${missing.join(' · ')}가 없다`)
+    }
+  }
+
+  // 화면은 note 원문이 아니라 wordNoteText(카드의 현재 값)를 읽는다. 반복강화로
+  // 수치가 올라도 문구가 따라오게 하는 장치라, 1단계 원문과 한 글자도 달라지면
+  // 조립 규칙이 데이터에서 벗어났다는 뜻이다.
+  for (const { w, pool } of allWords()) {
+    const derived = wordNoteText(w)
+    if (derived !== w.note) {
+      out.push(`${pool}/${w.text}: 조립 문구 "${derived}" ≠ note "${w.note}"`)
+      console.log(`  위반  ${pool} · ${w.text} — 조립 문구 "${derived}"가 note "${w.note}"와 다르다`)
     }
   }
   if (!out.length) console.log('  통과  모든 카드가 등급 예산·정원·표기 계약을 지킨다')

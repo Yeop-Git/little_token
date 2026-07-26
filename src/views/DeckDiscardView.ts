@@ -1,6 +1,6 @@
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { BACKGROUNDS, SKILL_ART, TOKEN_FACES } from '@/assets'
-import { wordValueLines } from '@core/wordText'
+import { wordNoteText, wordValueLines } from '@core/wordText'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 
 interface Opts {
@@ -21,7 +21,7 @@ function cardContents(word: Word, label: string, action: string): string {
     <span class="discard-copy">
       <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
       <strong>${word.text}</strong>
-      <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || word.note}</span>
+      <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || wordNoteText(word)}</span>
       <span class="discard-action">${action}</span>
     </span>`
 }

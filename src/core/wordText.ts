@@ -3,8 +3,9 @@
  * 화면마다 따로 조립하면 같은 카드가 화면마다 다르게 읽힌다(도박 표기가 그랬다).
  */
 
+import { TARGET_FALLOFF } from './combatRules'
 import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
-import type { StatBlock, Variance, Word } from './types'
+import type { StatBlock, TargetCount, Variance, Word } from './types'
 
 /**
  * 도박 표기 — "40% 확률로 배율 ×2.50".
@@ -71,7 +72,67 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.effects?.pierceGuard) out.push({ text: '방어 관통', cls: 'dmg' })
   if (w.effects?.hitCount && w.effects.hitCount > 1) out.push({ text: `${w.effects.hitCount}연타`, cls: 'dmg' })
   if (w.effects?.counterMultiplier) out.push({ text: `카운터 ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
-  if (!out.length) out.push({ text: w.note, cls: 'flat' })
+  if (!out.length) out.push({ text: wordNoteText(w), cls: 'flat' })
+  return out
+}
+
+/** 다중 대상 표기 — "2명(100%·70%)". 감쇠율은 실제 전투 규칙에서 읽는다. */
+export function targetCountText(count: TargetCount): string {
+  if (count === 'all') return '전체'
+  if (count <= 1) return '1명'
+  const falloff = Array.from({ length: count }, (_, rank) =>
+    `${Math.round((TARGET_FALLOFF[rank] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1]) * 100)}%`)
+  return `${count}명(${falloff.join('·')})`
+}
+
+/**
+ * 카드 앞면 한 줄 요약을 **지금 이 카드의 값에서** 조립한다.
+ *
+ * 데이터의 `note`는 1단계 카드를 적어 둔 원문이라, 반복강화로 수치가 오르면
+ * 그대로 두는 순간 화면과 실제가 어긋난다(Lv.3인데 "공격 ×1"로 읽히던 문제).
+ * 그래서 표시하는 쪽은 전부 이 함수를 거치고, `note`는 원문 검수 기준으로만 남는다.
+ * `npm run check`가 1단계 카드에 대해 이 함수의 결과와 `note`가 같은지 확인한다.
+ *
+ * 수치가 아니라 규칙을 적는 카드(주어로 못 쓰는 카드 등)는 조각이 하나도 나오지
+ * 않으므로 원문을 그대로 돌려준다.
+ */
+export function wordNoteText(w: Word): string {
+  const parts = noteParts(w)
+  return parts.length ? parts.join(' · ') : w.note
+}
+
+function noteParts(w: Word): string[] {
+  // 성장 카드와 문장부호는 수치 대신 규칙을 적는다 — 같은 값에서 같은 문구를 다시 만든다.
+  if (w.growHp) return [`최대 체력 +${w.growHp}`, '배율을 받지 않는다']
+  if (w.slot === 'punct') {
+    const punct: string[] = []
+    if (w.tags.includes(PREEMPT_TAG)) punct.push('선공 상대보다 먼저 행동한다')
+    if (w.bonus) punct.push(`배율 풀 +${w.bonus.toFixed(2)} (안전한 한 수)`)
+    if (w.crit) punct.push(`대성공 확률 +${Math.round(w.crit * 100)}%`)
+    return punct
+  }
+  // 일기의 주어는 나·우리뿐이라 다른 인칭은 수치가 아니라 차단 이유를 적는다.
+  if (w.person && w.person !== 'first') return []
+
+  const out: string[] = []
+  if (w.stat && w.statMult != null) out.push(`${STAT_NAME[w.stat]} ×${w.statMult}`)
+  else if (w.power) out.push(`위력 ${w.power}`)
+  if (w.variance) out.push(gambleText(w.variance))
+  // 배율 풀에 보태는 칸(주어·수식·어미)은 0이어도 "배율 ×1.00"을 적는다.
+  else if (w.bonus != null && w.statMult == null && !w.power) out.push(multText(w.bonus))
+  else if (w.bonus) out.push(multText(w.bonus))
+  if (w.effects?.guard) out.push(`방어 +${w.effects.guard}`)
+  if (w.effects?.heal) out.push(`회복 +${w.effects.heal}`)
+  if (w.crit) out.push(critText(w.crit))
+  // 연타는 그 자체로 단일 대상이라 대상 수를 겹쳐 적지 않는다.
+  const hits = w.effects?.hitCount ?? 1
+  if (w.targetCount && hits <= 1) out.push(targetCountText(w.targetCount))
+  if (w.effects?.pierceGuard) out.push('관통')
+  if (hits > 1) out.push(`${hits}연타`)
+  if (w.effects?.counterMultiplier) out.push(`카운터 ×${w.effects.counterMultiplier.toFixed(2)}`)
+  if (w.aoe === 'all') out.push(w.slot === 'adv' ? '전체 적중' : '전체')
+  if (w.timing === 'delayed') out.push('다음 턴 발동')
+  else if (w.timing === 'immediate') out.push('즉발')
   return out
 }
 
