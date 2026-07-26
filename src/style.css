@@ -3881,12 +3881,25 @@ html[data-graphics='low'] .tip-bubble {
   transform: translate(-50%, -50%);
   z-index: 94;
   min-width: 520px;
+  /* 이름이 길어도 무대를 넘지 않게 폭을 묶는다 — 넘치면 그 순간 발광이 잘려 보인다. */
+  max-width: 1500px;
   padding: 26px 44px;
-  border-radius: 48px;
-  background: radial-gradient(ellipse at center, rgba(10, 7, 16, .66), rgba(10, 7, 16, .24) 64%, transparent 80%);
   text-align: center;
   pointer-events: none;
   opacity: 0;
+}
+/*
+ * 뒤에 까는 그늘은 상자가 아니라 전용 겹으로 둔다. 상자에 직접 그리면 가로로만
+ * 긴 타원이 되어 위아래가 툭 끊겨 보이고, 상자를 넘어간 발광은 잘린다.
+ * 겹을 글자보다 조금 넓게 잡고 그 안에서 투명까지 다 풀어 낸다.
+ */
+.combo-flash::before {
+  content: '';
+  position: absolute;
+  inset: -26px -40px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(10, 7, 16, .72), rgba(10, 7, 16, .3) 58%, transparent 100%);
 }
 .combo-flash.show { animation: combo-show 1.5s ease forwards; }
 .combo-flash .kicker {
@@ -3902,7 +3915,7 @@ html[data-graphics='low'] .tip-bubble {
   font-weight: 900;
   color: #fff6e2;
   -webkit-text-stroke: .6px rgba(24, 12, 16, .4);
-  text-shadow: 0 0 24px color-mix(in srgb, var(--glow) 84%, transparent), 0 6px 16px rgba(0, 0, 0, .42);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--glow) 84%, transparent), 0 6px 14px rgba(0, 0, 0, .5);
 }
 .combo-flash .mult {
   margin-top: 8px;
@@ -4064,6 +4077,14 @@ html[data-graphics='low'] .tip-bubble {
 .scene.battle[data-boss='true'] .slot-step {
   left: 430px;
   bottom: 38px;
+}
+/* 재련 화면의 순서표는 무대 최상단 중앙에 건다 — 좌하단은 선택지 위를 가린다. */
+.iforge-steps {
+  left: 50%;
+  right: auto;
+  top: 22px;
+  bottom: auto;
+  transform: translateX(-50%);
 }
 .slot-step .step {
   color: var(--ink-faint);
@@ -5164,16 +5185,6 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   border-radius: 12px;
 }
 
-/* 되돌리기 — 하단 중앙, 회색 연하게 */
-.undo-btn {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--ink-faint);
-  opacity: 0.7;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  transition: opacity 0.14s, color 0.14s, transform 0.14s;
-}
-.undo-btn:hover { opacity: 1; color: var(--ink-dim); transform: scale(1.04); }
 
 @media (max-width: 860px) {
   .draw-deck { right: 8px; transform: rotate(20deg) scale(.88); }
@@ -5775,7 +5786,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   flex: none;
   padding: 40px 48px 46px;
   border-radius: 28px;
-  background: rgba(20, 14, 24, .9);
+  /* 뒤 전장이 살짝 비치는 정도까지만 연다 — 글자 대비는 흐림으로 지킨다. */
+  background: rgba(20, 14, 24, .62);
+  -webkit-backdrop-filter: blur(9px) saturate(1.05);
+  backdrop-filter: blur(9px) saturate(1.05);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
   animation: page-turn 0.7s cubic-bezier(0.3, 0.9, 0.3, 1);
 }
@@ -6186,8 +6200,11 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 
 /* 아이템 일러스트(좌) + 스탯표(우) */
-.iforge-top { display: grid; grid-template-columns: 360px 1fr; gap: 30px; width: 100%; }
+/* 일러스트(좌) + 스탯표(우). 스탯표는 다섯 줄에 필요한 만큼만 쓰고 가운데로 모은다. */
+.iforge-top { display: grid; grid-template-columns: 360px minmax(0, 480px); gap: 28px; justify-content: center; width: 100%; }
 .iforge-illust {
+  position: relative;
+  overflow: hidden;
   border-radius: 30px 9px 30px 9px;
   padding: 26px;
   display: flex;
@@ -6196,20 +6213,42 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   justify-content: center;
   box-shadow: inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 8px rgba(65,43,35,.48), 0 14px 28px rgba(0,0,0,.38);
 }
+/* 원화가 있으면 액자를 통째로 채운다 — 액자 안에 작은 그림을 또 끼우지 않는다. */
+.iforge-illust.has-art { justify-content: flex-end; padding: 0; }
+.iforge-illust-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.iforge-illust-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.iforge-illust.has-art .iforge-illust-copy {
+  padding: 46px 22px 22px;
+  background: linear-gradient(to top, rgba(12, 8, 16, .92) 34%, rgba(12, 8, 16, .6) 66%, transparent);
+}
 .iforge-illust .glint { font-size: 15px; letter-spacing: 5px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .iforge-illust .art { width: 152px; height: 152px; margin: 16px 0 10px; color: var(--gold); filter: drop-shadow(0 0 18px rgba(255, 210, 122, 0.5)); animation: float 3s ease-in-out infinite; }
-.iforge-illust .iname { font-size: 32px; font-weight: 900; color: #fff6e2; }
+.iforge-illust .iname { margin-top: 8px; font-size: 32px; font-weight: 900; color: #fff6e2; text-shadow: 0 3px 10px rgba(0, 0, 0, .7); }
 .iforge-illust .grade { margin-top: 4px; font-size: 15px; color: var(--ink-dim); }
-.iforge-stats { border-radius: 22px; padding: 22px 26px; display: flex; flex-direction: column; }
-.iforge-stats .stat-list { gap: 10px; }
-.iforge-stats .stat .sl { font-size: 18px; font-weight: 700; color: var(--ink); }
-.iforge-stats .stat .sv { margin-left: auto; font-size: 22px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
+/* 스탯표는 일러스트 높이를 억지로 따라가지 않는다 — 다섯 줄에 맞는 만큼만 쓴다. */
+.iforge-stats { align-self: start; border-radius: 22px; padding: 16px 20px 14px; display: flex; flex-direction: column; }
+.iforge-stats .stat-list { gap: 5px; }
+.iforge-stats .stat { padding: 6px 14px; border-radius: 10px; }
+.iforge-stats .stat .sl { font-size: 17px; font-weight: 700; color: var(--ink); }
+.iforge-stats .stat .sv { margin-left: auto; font-size: 20px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
 .iforge-stats .stat .sv .up { color: var(--heal); font-size: 15px; margin-left: 6px; }
-.iforge-flavor { margin-top: auto; padding-top: 16px; font-size: 16px; font-style: italic; color: var(--ink-faint); }
+.iforge-flavor { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 235, 195, .12); font-size: 15px; font-style: italic; color: var(--ink-faint); }
 
 /* 하단 순차 텍스트 선택 */
 .iforge-choose { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
-.iforge-choose .undo-btn { margin-top: 4px; }
 /* 좌상단 모서리 5회 클릭으로 여는 개발 치트. */
 .dev-cheat-shell {
   position: absolute;
@@ -6967,18 +7006,99 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   position: absolute;
   z-index: 290;
   left: 50%;
-  top: 132px;
-  width: 700px;
-  height: 250px;
+  top: 172px;
+  width: 860px;
   transform: translateX(-50%);
   pointer-events: none;
   animation: victory-clear-in .7s cubic-bezier(.18, 1.15, .3, 1) both;
 }
-.victory-clear-banner img {
+/*
+ * 찢어진 종이 — 원화의 종이는 글자 바로 밑에서 끊겨 짧았다. 종이는 이 겹이 맡아
+ * 글자보다 넓고 길게 깔리고, 아래로 갈수록 완전히 풀린다.
+ */
+.vc-paper {
+  position: absolute;
+  left: 50%;
+  top: -26px;
+  width: 104%;
+  height: 620px;
+  transform: translateX(-50%);
+  border-radius: 20px 28px 0 0;
+  /* 양옆도 함께 풀어 준다 — 곧게 잘린 세로선이 남으면 종이가 아니라 패널로 읽힌다. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 41px, rgba(120, 84, 58, .06) 42px 43px),
+    linear-gradient(180deg,
+      rgba(253, 251, 245, .96) 0%,
+      rgba(255, 250, 234, .92) 30%,
+      rgba(255, 244, 216, .58) 58%,
+      rgba(255, 241, 209, .2) 80%,
+      transparent 100%);
+}
+/*
+ * 원화에서는 글자만 쓴다. 오른쪽 작은 요정과 아래 찢긴 선은 마스크로 풀어 내고,
+ * 빵빠레는 아래 vc-token이 크게 맡는다(마스크 비율은 원화 720×372 기준으로 잰 값).
+ */
+.vc-art {
+  position: relative;
+  display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  -webkit-mask-image:
+    linear-gradient(to right, #000 55%, transparent 60%),
+    linear-gradient(to bottom, #000 84%, transparent 91%);
+  mask-image:
+    linear-gradient(to right, #000 55%, transparent 60%),
+    linear-gradient(to bottom, #000 84%, transparent 91%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  filter: drop-shadow(0 6px 10px rgba(92, 58, 30, .16));
+}
+/* 빵빠레 토큰 — 종이 밖으로 솟아 나와 나팔을 불며 흔들린다. */
+.vc-token {
+  position: absolute;
+  right: -18px;
+  top: -78px;
+  width: 372px;
+  height: 372px;
   object-fit: contain;
-  filter: drop-shadow(0 18px 24px rgba(0, 0, 0, .5)) drop-shadow(0 0 32px rgba(255, 224, 133, .3));
+  transform-origin: 42% 78%;
+  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, .42)) drop-shadow(0 0 34px rgba(255, 224, 133, .45));
+  animation: vc-token-toot 1.05s ease-in-out .34s infinite alternate;
+}
+@keyframes vc-token-toot {
+  from { transform: rotate(-4.5deg) translateY(0) scale(1); }
+  55% { transform: rotate(1deg) translateY(-8px) scale(1.035); }
+  to { transform: rotate(5deg) translateY(-2px) scale(1.01); }
+}
+/* 사각 종이 조각 — 나팔 쪽에서 터져 나와 돌면서 떨어진다. */
+.vc-confetti {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+}
+.vc-confetti i {
+  position: absolute;
+  left: var(--x);
+  top: 30px;
+  width: var(--w);
+  height: calc(var(--w) * .72);
+  border-radius: 2px;
+  background: var(--gold-hi);
+  opacity: 0;
+  animation: vc-confetti-fall 2.6s cubic-bezier(.3, .5, .5, 1) var(--d) forwards;
+}
+.vc-confetti i:nth-child(3n) { background: #ffb0d2; }
+.vc-confetti i:nth-child(3n + 1) { background: #a8e3ff; }
+.vc-confetti i:nth-child(5n) { background: #c8f0a8; }
+@keyframes vc-confetti-fall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--t)); }
+  12% { opacity: 1; }
+  74% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, var(--f), 0) rotate(var(--r)); }
 }
 @keyframes victory-clear-in {
   from { opacity: 0; transform: translateX(-50%) translateY(28px) scale(.78); filter: blur(5px); }
@@ -6986,7 +7106,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); filter: blur(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .victory-clear-banner { animation: none; }
+  .victory-clear-banner,
+  .vc-token,
+  .vc-confetti i { animation: none; }
+  .vc-confetti i { opacity: 0; }
 }
 .grade-badge.finale::after {
   content: '전리품에 적용!';

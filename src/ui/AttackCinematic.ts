@@ -318,12 +318,21 @@ export function attackCutFor(
   wipesAll: boolean,
 ): AttackCut | null {
   if (encounterHp <= 0 || dmg <= 0) return null
-  if (dmg / encounterHp < PUMP_RATIO) return null
+  const ratio = dmg / encounterHp
+  if (ratio < PUMP_RATIO) return null
   if (mult < PUMP_MULT) return null
-  return wipesAll ? 'wipe' : 'pump'
+  // 쓸어버림은 "마침 마지막 하나가 남아 있었다"가 아니라 판을 통째로 지워 낸 한 방일 때만이다.
+  // 남은 적을 정리하는 마무리 일격은 대개 이 문턱을 넘지 못하고 펌핑 컷으로 내려간다.
+  return wipesAll && ratio >= WIPE_RATIO && mult >= WIPE_MULT ? 'wipe' : 'pump'
 }
 
 /** 이 판의 몇 할을 한 문장으로 지워야 컷이 붙는가. */
 export const PUMP_RATIO = 0.45
 /** 그와 동시에 배율이 이만큼은 실려 있어야 '펌핑'이라 부를 수 있다. */
 export const PUMP_MULT = 2
+/**
+ * 2번 컷(쓸어버림)은 1번 위에 한 단 더 있다. 문턱이 같으면 마지막 적을 정리하는
+ * 평범한 일격까지 전부 2번으로 흘러 1번 컷을 볼 일이 없어진다.
+ */
+export const WIPE_RATIO = 0.8
+export const WIPE_MULT = 3

@@ -54,7 +54,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { REWARD_ART, SKILL_ART, SPRITES } from '@/assets'
+import { REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
@@ -254,6 +254,20 @@ interface Tally {
   kind: 'dmg' | 'guard' | 'heal'
 }
 
+/**
+ * 승리 피날레에 흩날리는 사각 종이 조각. 배치는 한 번만 정해 두고 매 승리마다 다시
+ * 쓴다 — 굴릴 때마다 달라져 봐야 알아보는 사람은 없고, 승리 순간에 난수를 스무 번
+ * 굴리는 값만 든다.
+ */
+const CONFETTI_PIECES = Array.from({ length: 18 }, (_, i) => ({
+  x: Math.round(((i * 37) % 100) * 10) / 10,
+  delay: (i % 6) * 90 + (i % 3) * 40,
+  spin: 220 + ((i * 53) % 320),
+  size: 9 + ((i * 7) % 8),
+  tilt: -30 + ((i * 41) % 60),
+  fall: 320 + ((i * 29) % 180),
+}))
+
 export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
@@ -294,6 +308,8 @@ export class BattleView {
   private timers: number[] = []
   private cardHand!: CardHand
   private introDialogue: IntroDialogue | null = null
+  /** 적이 등장 연출을 마치고 실제 전장에 선 뒤에야 거미줄이 날아간다. */
+  private spiderCastReady = false
   // 정보창 유지용 — 클릭 중 호버가 잠깐 풀려도 패널이 꺼지지 않게 붙잡는다.
   // 배율 릴 세대 — 새 선택이 들어오면 이전 릴은 조용히 물러난다.
   private multReelToken = 0
@@ -541,6 +557,22 @@ export class BattleView {
       playCharacterAnimation(foe, 'walk')
       this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), FOE_WALK_MS))
     })
+    this.timers.push(window.setTimeout(() => this.onEnemiesArrived(), FOE_WALK_MS))
+  }
+
+  /**
+   * 적이 제자리에 선 순간 — 등장 동안 미뤄 둔 첫 거미줄을 여기서 쏜다.
+   * 등장하는 사이에 칸이 넘어갔으면 지금 열린 칸으로 옮겨 묶는다. 이번 문장에서
+   * 한 장은 반드시 봉인된다는 규칙은 등장 연출 때문에 건너뛰지 않는다.
+   */
+  private onEnemiesArrived() {
+    if (this.spiderCastReady) return
+    this.spiderCastReady = true
+    const pending = this.pendingSpiderSeal
+    if (!pending) return
+    const current = this.order()[this.slotIndex]
+    if (current) pending.slotKey = current
+    this.castPendingSpiderWeb(pending.slotKey)
   }
 
   private mount() {
@@ -1874,6 +1906,9 @@ export class BattleView {
   private castPendingSpiderWeb(slotKey: string) {
     const pending = this.pendingSpiderSeal
     if (!pending || pending.slotKey !== slotKey) return
+    // 적이 아직 걸어 들어오는 중이면(보스는 그 앞에 암전까지 있다) 쏘지 않는다.
+    // 화면에 없는 거미가 거미줄만 날리면 어디서 날아온 건지 읽을 수가 없다.
+    if (!this.spiderCastReady) return
     this.pendingSpiderSeal = null
     const sealed = this.cardHand.sealRandom(pending.maxSealed)
     if (sealed) this.playSpiderWebProjectile(pending.enemyIdx, sealed.instanceId)
@@ -3740,7 +3775,15 @@ export class BattleView {
     const scene = this.q('.scene.battle')
     const clearBanner = document.createElement('div')
     clearBanner.className = 'victory-clear-banner'
-    clearBanner.innerHTML = `<img src="${REWARD_ART.clear}" alt="CLEAR! 보상" />`
+    // 원화는 글자와 찢어진 종이만 쓰고(오른쪽 요정은 마스크로 풀어 낸다), 빵빠레 토큰은
+    // 따로 크게 세워 혼자 흔들리게 한다. 종이는 아래로 길게 늘여 그라데이션으로 푼다.
+    clearBanner.innerHTML = `
+      <span class="vc-paper" aria-hidden="true"></span>
+      <img class="vc-art" src="${REWARD_ART.clear}" alt="CLEAR! 보상" />
+      <img class="vc-token" src="${TOKEN_FACES.party}" alt="" aria-hidden="true" />
+      <span class="vc-confetti" aria-hidden="true">${CONFETTI_PIECES.map((piece) =>
+        `<i style="--x:${piece.x}%;--d:${piece.delay}ms;--r:${piece.spin}deg;--w:${piece.size}px;--t:${piece.tilt}deg;--f:${piece.fall}px"></i>`,
+      ).join('')}</span>`
     scene.appendChild(clearBanner)
     GameAudio.play('win')
     const b = badge.getBoundingClientRect()

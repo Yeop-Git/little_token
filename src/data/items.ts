@@ -75,6 +75,10 @@ export function exclaimModsFor(
 
 // 감탄 슬롯: 감탄(느낌) → 정도(강조) → 평가(가치판단).
 // 기본 보정은 스탯 +1씩(체력만 +2). 실제 획득량은 위 등급별 슬롯 배수를 적용한다.
+//
+// 칸마다 다섯 스탯을 한 장씩 모두 갖춘다. 재련마다 이 중 EXCLAIM_CHOICES장만
+// 무작위로 열리므로(rollExclaimChoices), 어느 칸이 비어도 특정 스탯만 계속
+// 고르게 되는 편향이 생기지 않는다.
 export const EXCLAIM_SLOTS: ExclaimSlot[] = [
   {
     key: 'excl',
@@ -84,6 +88,7 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
       { id: 'hmm', text: '음?', mods: { guard: 1 }, note: '방어 +1' },
       { id: 'oh', text: '오,', mods: { heal: 1 }, note: '회복 +1' },
       { id: 'gasp', text: '헉!', mods: { hp: 2 }, note: '체력 +2' },
+      { id: 'huh', text: '어라?', mods: { luck: 1 }, note: '운 +1' },
     ],
   },
   {
@@ -94,6 +99,7 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
       { id: 'kinda', text: '살짝', mods: { luck: 1 }, note: '운 +1' },
       { id: 'really', text: '정말', mods: { heal: 1 }, note: '회복 +1' },
       { id: 'full', text: '한가득', mods: { hp: 2 }, note: '체력 +2' },
+      { id: 'firmly', text: '단단히', mods: { guard: 1 }, note: '방어 +1' },
     ],
   },
   {
@@ -104,9 +110,32 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
       { id: 'strong', text: '튼튼해!', mods: { guard: 1 }, note: '방어 +1' },
       { id: 'pretty', text: '예뻐!', mods: { luck: 1 }, note: '운 +1' },
       { id: 'hearty', text: '든든해!', mods: { hp: 2 }, note: '체력 +2' },
+      { id: 'warm', text: '따뜻해!', mods: { heal: 1 }, note: '회복 +1' },
     ],
   },
 ]
+
+/** 재련 한 번에 칸마다 열리는 감탄사 수. 남는 장은 이번 아이템에서 안 나온다. */
+export const EXCLAIM_CHOICES = 3
+
+/**
+ * 이번 재련의 선택지를 칸마다 무작위로 뽑는다. 화면 입장에서 한 번만 굴리고
+ * 재련이 끝날 때까지 같은 목록을 유지한다 — 같은 아이템을 오가며 다시 굴리면
+ * 마음에 드는 조합이 나올 때까지 새로고침하는 게임이 된다.
+ */
+export function rollExclaimChoices(rng: () => number = Math.random): Record<string, ExclaimWord[]> {
+  const out: Record<string, ExclaimWord[]> = {}
+  for (const slot of EXCLAIM_SLOTS) {
+    const pool = [...slot.words]
+    const picked: ExclaimWord[] = []
+    while (picked.length < Math.min(EXCLAIM_CHOICES, slot.words.length) && pool.length) {
+      picked.push(pool.splice(Math.floor(rng() * pool.length), 1)[0])
+    }
+    // 원본 순서를 되살려 칸마다 감탄사가 늘 같은 자리 감각으로 읽히게 한다.
+    out[slot.key] = slot.words.filter((word) => picked.includes(word))
+  }
+  return out
+}
 
 export const STAT_LABEL: Record<StatKey, string> = {
   hp: '체력',

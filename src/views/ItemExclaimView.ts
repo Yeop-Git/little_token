@@ -6,9 +6,10 @@
  */
 
 import type { ItemDef, StatKey } from '@data/items'
-import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimMultipliers } from '@data/items'
+import type { ExclaimWord } from '@data/items'
+import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers } from '@data/items'
 import type { OwnedItem } from '@core/player'
-import { BACKGROUNDS } from '@/assets'
+import { BACKGROUNDS, ITEM_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { RARITY_LABEL } from '@core/types'
 
@@ -38,6 +39,8 @@ export class ItemExclaimView {
   private finalizing = false
   private timers: number[] = []
   private rarityMultipliers: [number, number, number]
+  /** 이번 재련에서만 열리는 칸별 감탄사. 입장할 때 한 번 굴리고 끝까지 유지한다. */
+  private choices: Record<string, ExclaimWord[]>
   // 행운 감탄 — 이 화면에서 추가 스탯이 붙은 단어들. 키는 `슬롯:단어id`.
   private blessed = new Map<string, { stat: StatKey; n: number }>()
   // 팅! 연출은 처음 드러날 때 한 번만.
@@ -45,10 +48,11 @@ export class ItemExclaimView {
 
   constructor(private root: HTMLElement, private opts: Opts) {
     this.rarityMultipliers = rollExclaimMultipliers(opts.item.rarity)
+    this.choices = rollExclaimChoices()
     // 입장 시 한 번만 굴린다 — 슬롯을 오가도 붙은 자리는 그대로다.
     const chance = Math.min(0.4, (opts.grade ?? 0) * BLESS_CHANCE_PER_GRADE)
     for (const slot of EXCLAIM_SLOTS)
-      for (const w of slot.words)
+      for (const w of this.choices[slot.key] ?? [])
         if (Math.random() < chance) {
           this.blessed.set(`${slot.key}:${w.id}`, BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)])
         }
@@ -77,17 +81,25 @@ export class ItemExclaimView {
 
   private mount() {
     const item = this.opts.item
+    // 아이템 원화가 있으면 패널을 통째로 채운다 — 액자 안에 작은 그림을 또 끼우지 않는다.
+    const art = ITEM_ART[item.art]
+    const illust = art
+      ? `<img class="iforge-illust-art" src="${art}" alt="" aria-hidden="true">`
+      : `<div class="art">${itemArt(item.art)}</div>`
     this.root.innerHTML = `
       <div class="scene item-scene" style="background-image:url(${BACKGROUNDS.bg001})">
+        <div class="slot-step iforge-steps" id="esteps"></div>
         <div class="iforge">
           <div class="iforge-chain" id="chain"></div>
 
           <div class="iforge-top">
-            <div class="iforge-illust glass">
-              <div class="glint">✦ 새 아이템 ✦</div>
-              <div class="art">${itemArt(item.art)}</div>
-              <div class="iname">${item.name}</div>
-              <div class="grade">등급 · ${RARITY_LABEL[item.rarity]}</div>
+            <div class="iforge-illust glass${art ? ' has-art' : ''}">
+              ${illust}
+              <div class="iforge-illust-copy">
+                <div class="glint">✦ 새 아이템 ✦</div>
+                <div class="iname">${item.name}</div>
+                <div class="grade">등급 · ${RARITY_LABEL[item.rarity]}</div>
+              </div>
             </div>
             <div class="iforge-stats glass">
               <div class="dock-title">감정된 스탯</div>
@@ -97,20 +109,12 @@ export class ItemExclaimView {
           </div>
 
           <div class="iforge-choose">
-            <div class="slot-step" id="esteps"></div>
             <div class="word-row" id="egrid"></div>
-            <button class="undo-btn" id="undo">되돌리기</button>
           </div>
         </div>
       </div>`
 
-    // 확정 버튼 없음 — 단어 선택처럼 모두 고르면 자동 확정(반짝 후 발동).
-    this.root.querySelector('#undo')!.addEventListener('click', () => {
-      if (this.finalizing) return
-      this.picks = {}
-      this.slotIndex = 0
-      this.refresh()
-    })
+    // 확정 버튼도 되돌리기도 없다 — 단어 선택처럼 고른 즉시 확정되고, 셋을 다 고르면 발동한다.
     this.refresh()
   }
 
@@ -159,27 +163,15 @@ export class ItemExclaimView {
         <span class="sv">${totals[k]}${up ? `<span class="up">▲${up}</span>` : ''}</span></div>`
     }).join('')
 
-    // 슬롯 스텝
+    // 슬롯 스텝 — 지금 어느 마디를 고르는 중인지만 알린다. 고른 마디는 되돌리지 않는다.
     this.q('#esteps').innerHTML = EXCLAIM_SLOTS.map((s, i) => {
       const cls = i === this.slotIndex ? 'active' : this.picks[s.key] ? 'done' : ''
-      return `<button class="step ${cls}" data-i="${i}"><b>${i + 1}</b> ${s.label}</button>`
+      return `<span class="step ${cls}"><b>${i + 1}</b> ${s.label}</span>`
     }).join('<span class="sep">·</span>')
-    this.q('#esteps')
-      .querySelectorAll<HTMLElement>('.step')
-      .forEach((st) =>
-        st.addEventListener('click', () => {
-          const i = Number(st.dataset.i)
-          const filled = EXCLAIM_SLOTS.filter((s) => this.picks[s.key]).length
-          if (i <= filled) {
-            this.slotIndex = i
-            this.refresh()
-          }
-        }),
-      )
 
     // 현재 슬롯의 텍스트 선택지 — 행운 감탄이 붙은 칸은 금빛으로 빛나고, 첫 등장에만 팅!.
     const slot = EXCLAIM_SLOTS[this.slotIndex]
-    this.q('#egrid').innerHTML = slot.words
+    this.q('#egrid').innerHTML = (this.choices[slot.key] ?? [])
       .map((w) => {
         const picked = this.picks[slot.key] === w.id
         const key = `${slot.key}:${w.id}`
