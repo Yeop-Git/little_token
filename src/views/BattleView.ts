@@ -57,6 +57,7 @@ import {
 import { REWARD_ART, SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
+import { TooltipLayer } from '@/ui/TooltipLayer'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
@@ -202,12 +203,6 @@ const TOKEN_BOSS_LINES = [
  */
 const tip = (title: string, detail: string): string => `${title}\n${detail}`
 
-const clampNumber = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-/** 적 상태 아이콘 툴팁이 무대 모서리에서 띄울 여백과, 좁아질 수 있는 한계. */
-const INTEL_TIP_EDGE_PAD = 14
-const INTEL_TIP_MIN_W = 210
-const INTEL_TIP_MAX_W = 440
-
 export type TokenTone = 'calm' | 'warn' | 'relief'
 export interface TokenLine { text: string; tone: TokenTone }
 const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
@@ -287,6 +282,7 @@ export class BattleView {
    */
   private encounterHp = 0
   private attackCine: AttackCinematic | null = null
+  private tooltips: TooltipLayer | null = null
   private swordHitCount = 0
   /** 이번 판 배경과 직전 배경 — 직전 것이 있으면 그 위로 새 그림이 밀려 들어온다. */
   private bg: FieldBackground = { next: '', prev: null }
@@ -431,6 +427,7 @@ export class BattleView {
     this.cardHand.destroy()
     this.introDialogue?.destroy()
     this.attackCine?.destroy()
+    this.tooltips?.destroy()
     destroyCharacterModels(this.root)
     this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
@@ -619,12 +616,9 @@ export class BattleView {
     // 가장 짜릿해야 할 순간에 검은 사각형이 먼저 뜬다.
     this.attackCine = new AttackCinematic(this.q<HTMLElement>('.scene.battle'))
 
-    // 툴팁이 떠오르기 직전에 자리를 한 번 더 잰다 — 적이 걸어 들어오는 중에 그려진
-    // 아이콘은 그때의 위치로 폭이 잡혀 있어서, 자리를 잡은 뒤와 어긋난다.
-    this.q<HTMLElement>('.scene.battle').addEventListener('pointerover', (event) => {
-      const host = (event.target as Element | null)?.closest<HTMLElement>('.enemy-intel')
-      if (host) this.fitIntelTooltips(host)
-    })
+    // 아이콘 쪽지는 씬 맨 위 한 겹에서만 그린다 — 아이콘의 가상 요소로 두면 전장·HUD·
+    // 손패의 쌓임 맥락에 갇혀 무엇으로든 가려진다. 자리는 매 프레임 다시 잰다.
+    this.tooltips = new TooltipLayer(this.q<HTMLElement>('.scene.battle'))
 
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
@@ -1423,7 +1417,7 @@ export class BattleView {
     const weak = activePart?.def.weakness ?? (e.def.weakEmotion ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: e.def.weakEmotion } : null)
     const icons: string[] = []
     const add = (kind: string, glyph: string, tooltip: string) => {
-      icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}">${glyph}</span>`)
+      icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
     }
 
     const bossWeakness = e.def.boss
@@ -1485,25 +1479,6 @@ export class BattleView {
 
     host.hidden = icons.length === 0
     host.innerHTML = icons.join('')
-    this.fitIntelTooltips(host)
-  }
-
-  /**
-   * 상태 아이콘 툴팁은 아이콘 위에 가운데로 서므로, 무대 가장자리에 붙은 적일수록
-   * 그대로 두면 절반이 화면 밖으로 나간다. 남은 자리의 두 배를 최대 폭으로 줘서
-   * 가장자리에서는 좁고 길게, 가운데에서는 넓고 짧게 서게 한다.
-   * 적이 걸어 들어오는 동안에도 다시 재도록 호버 시점에 한 번 더 부른다.
-   */
-  private fitIntelTooltips(host: HTMLElement) {
-    const stageRect = this.root.getBoundingClientRect()
-    const scale = stageRect.width / Math.max(1, this.root.offsetWidth) || 1
-    const stageWidth = this.root.offsetWidth
-    host.querySelectorAll<HTMLElement>('.enemy-intel-icon').forEach((el) => {
-      const rect = el.getBoundingClientRect()
-      const centerX = (rect.left + rect.width / 2 - stageRect.left) / scale
-      const room = Math.min(centerX, stageWidth - centerX) - INTEL_TIP_EDGE_PAD
-      el.style.setProperty('--tip-max', `${Math.round(clampNumber(room * 2, INTEL_TIP_MIN_W, INTEL_TIP_MAX_W))}px`)
-    })
   }
 
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {

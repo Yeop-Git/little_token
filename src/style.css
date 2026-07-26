@@ -1060,26 +1060,30 @@ button {
 /* ── 아이콘 호버 툴팁 (공용) ──
    아이템·적 상태·플레이어 스탯이 같은 쪽지를 쓴다. 처음 하는 사람이 한 줄만 읽고
    무슨 뜻인지 알아야 하는 자리라, 작은 글씨로 규칙을 빼곡히 적지 않는다.
-   글자는 크게, 상자는 글자만큼만(줄바꿈은 wrap이 알아서), 테두리는 금빛에 바탕은
-   비쳐 보이게 둔다. 위치와 등장 transform만 각자 정한다. */
-.relic-icon::after,
-.hud-stat::after,
-.enemy-intel-icon::after {
-  z-index: 120;
+   글자는 크게, 상자는 글자만큼만(줄바꿈은 wrap이 알아서), 테두리는 금빛.
+
+   쪽지는 아이콘의 가상 요소가 아니라 씬 맨 위에 세운 한 겹(TooltipLayer)이다.
+   가상 요소는 자기 아이콘의 쌓임 맥락을 못 벗어나서, 전장 안(z 3)에 있는 적 상태
+   아이콘의 쪽지가 상단 HUD·손패·문장 진행표 아래로 깔렸다. 여기서 z를 올려도
+   그 맥락 안에서만 올라가므로 겹 자체를 밖으로 뺐다. */
+.tip-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1500;
   box-sizing: border-box;
   width: max-content;
-  /* 무대 가장자리에 붙은 아이콘은 자기 자리에 맞춰 좁아진다(--tip-max는 JS가 잰다).
-     가운데 정렬이라 좁히지 않으면 그대로 무대 밖으로 밀려 잘린다 — 줄이 한 줄
-     늘어나는 쪽이 글자가 잘려 못 읽는 것보다 낫다. */
-  max-width: var(--tip-max, 440px);
+  /* 자리는 JS가 무대 안으로 밀어 넣는다 — 잘려 못 읽느니 줄이 한 줄 느는 쪽이 낫다. */
+  max-width: 440px;
   padding: 11px 16px;
-  border: 1px solid rgba(255, 209, 128, .78);
+  border: 1px solid rgba(255, 209, 128, .82);
   border-radius: 14px;
   color: #fff6e2;
-  background: rgba(20, 13, 27, .62);
+  /* 배경은 살짝 더 진하게 — 밝은 배경 일러스트 위에서 너무 비쳐 글자가 묻혔다. */
+  background: rgba(18, 12, 25, .88);
   -webkit-backdrop-filter: blur(9px) saturate(1.1);
   backdrop-filter: blur(9px) saturate(1.1);
-  box-shadow: 0 0 18px rgba(255, 188, 92, .16), 0 10px 26px rgba(0, 0, 0, .55);
+  box-shadow: 0 0 14px rgba(255, 188, 92, .18), 0 8px 20px rgba(0, 0, 0, .58);
   font-size: 22px;
   font-weight: 800;
   line-height: 1.4;
@@ -1088,28 +1092,20 @@ button {
   text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
   opacity: 0;
   pointer-events: none;
+  transform: translateY(-4px);
   transition: opacity .14s ease, transform .14s ease;
 }
+.tip-bubble[data-place='above'] { transform: translateY(4px); }
+.tip-bubble.show { opacity: 1; transform: translateY(0); }
 /* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
-html[data-graphics='low'] .relic-icon::after,
-html[data-graphics='low'] .hud-stat::after,
-html[data-graphics='low'] .enemy-intel-icon::after {
+html[data-graphics='low'] .tip-bubble {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: rgba(20, 13, 27, .93);
+  background: rgba(18, 12, 25, .96);
 }
 
-.relic-icon::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 0;
-  top: calc(100% + 9px);
-  transform: translateY(-4px);
-}
 .relic-icon:hover,
 .relic-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.16); }
-.relic-icon:hover::after,
-.relic-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
 
 @media (prefers-reduced-motion: reduce) {
   .action-order-item { transition: none; }
@@ -1122,7 +1118,8 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   justify-self: end;
   align-self: start;
   position: relative;
-  right: -6px;
+  /* 무대 밖으로 6px 밀어 두면 그 아래 로그 줄의 그림자가 곧장 잘린다. */
+  right: 0;
   width: 372px;
   min-height: 74px;
   display: flex;
@@ -1202,14 +1199,6 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 .hud-stat .si { width: 22px; height: 22px; flex: none; }
 .hud-stat .si svg { width: 100%; height: 100%; }
 .hud-stat b { color: #fff0cb; font-size: 14px; font-weight: 900; white-space: nowrap; }
-.hud-stat::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: calc(100% + 9px);
-  left: 50%;
-  transform: translate(-50%, -4px);
-}
-.hud-stat:hover::after, .hud-stat:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 .hud-passive { width: 44px; color: var(--gold); font-size: 21px; }
 .hud-actions {
   display: flex;
@@ -2560,17 +2549,8 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 .enemy-intel-icon .emotion-face { width: 26px; height: 26px; object-fit: contain; }
 .enemy-intel-icon .emotion-symbol { font-size: 20px; }
 .enemy-intel-icon.magic > b { position: absolute; right: -5px; bottom: -5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; color: #2b1d3e; background: #e5d0ff; font: 900 10px/1 sans-serif; }
-.enemy-intel-icon::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translate(-50%, 4px);
-}
 .enemy-intel-icon:hover,
 .enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
-.enemy-intel-icon:hover::after,
-.enemy-intel-icon:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 .enemy-intel-icon.weak { color: #ffe69a; border-color: rgba(255, 220, 113, .7); }
 .enemy-intel-icon.weak.emotion-joy { color: #ffdf72; }
 .enemy-intel-icon.weak.emotion-anger { color: #ff9587; }
@@ -3057,35 +3037,43 @@ html[data-graphics='low'] .enemy-intel-icon::after {
    3단계는 액션 컷이 터지는 자리와 같아서, 판이 날뛰다 그대로 컷으로 이어진다.
    한 번 오른 단계는 안 내려간다 — 달아오른 판은 식지 않는다. */
 .tally[data-fever] .tally-slots {
-  transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1), filter 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 /* 열기는 화면 밖으로 팽창하지 않는 범위에서만 키운다. */
 .tally[data-fever='1'] { gap: 14px; }
 .tally[data-fever='2'] { gap: 18px; }
 .tally[data-fever='3'] { gap: 22px; }
-/* 1 — 커지고 노랗게 달아오르며 낮게 떤다 */
+/* 달아오른 빛은 drop-shadow가 아니라 상자의 box-shadow로 낸다.
+   슬롯에 filter를 걸면 그 필터 영역이 곧 가위가 된다 — 상자 밖으로 한참 피어오르는
+   화염(.tally-cell::after)이 위아래에서 반듯하게 잘려 나가고 있었다. */
 .tally[data-fever='1'] .tally-slots {
   transform: scale(1.05);
-  filter: drop-shadow(0 0 12px rgba(255, 208, 110, 0.48));
   animation: fever-shake 0.5s ease-in-out infinite;
   --shake: 1.4px;
   --tilt: 0.25deg;
 }
+.tally[data-fever='1'] .tally-box {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1), 0 12px 30px rgba(0, 0, 0, 0.28), 0 0 20px rgba(255, 208, 110, 0.48);
+}
 /* 2 — 더 커지고 주황빛이 번지며 떨림이 거칠어진다 */
 .tally[data-fever='2'] .tally-slots {
   transform: scale(1.1);
-  filter: drop-shadow(0 0 18px rgba(255, 168, 64, 0.58));
   animation: fever-shake 0.36s ease-in-out infinite;
   --shake: 3px;
   --tilt: 0.7deg;
 }
+.tally[data-fever='2'] .tally-box {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1), 0 12px 30px rgba(0, 0, 0, 0.28), 0 0 26px rgba(255, 168, 64, 0.58);
+}
 /* 3 — 불이 붙는다. 상자 뒤로 화염이 넘실대고 판 전체가 흔들린다 */
 .tally[data-fever='3'] .tally-slots {
   transform: scale(1.14);
-  filter: drop-shadow(0 0 22px rgba(255, 178, 72, 0.64));
   animation: fever-shake 0.32s ease-in-out infinite;
   --shake: 3.5px;
   --tilt: 0.9deg;
+}
+.tally[data-fever='3'] .tally-box {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 12px 30px rgba(0, 0, 0, 0.28), 0 0 30px rgba(255, 178, 72, 0.64);
 }
 .tally[data-fever='3'] { animation: fever-quake 0.38s ease-in-out infinite; }
 @keyframes fever-shake {
@@ -3298,11 +3286,13 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   box-shadow: 0 0 14px rgba(255, 200, 110, 0.95), 0 0 30px rgba(255, 160, 60, 0.6);
 }
 /* 총합 문턱 — 넘을수록 판이 화려하게 발광하고 커진다 */
-.tally.hot1 .tally-total { font-size: clamp(76px, 6.6vw, 100px); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 40px currentColor, 0 0 70px rgba(255, 140, 60, 0.5); }
+.tally.hot1 .tally-total { font-size: clamp(76px, 6.6vw, 100px); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 28px currentColor, 0 0 50px rgba(255, 140, 60, 0.62); }
+/* 총합의 화염은 이제 filter에 잘리지 않는다. 그래도 무대 밖까지 번지지는 않게
+   번짐 반경을 좁히고 알파를 올려, 좁은 대신 진하게 탄다. */
 .tally.hot2 .tally-total {
   font-size: clamp(84px, 7.1vw, 110px);
   color: #ffb04a;
-  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 46px currentColor, 0 0 90px rgba(255, 150, 50, 0.7);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 34px currentColor, 0 0 62px rgba(255, 150, 50, 0.82);
 }
 .tally.hot2 .tally-box { box-shadow: inset 0 0 0 2px rgba(255, 200, 110, 0.4), 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 26px rgba(255, 150, 50, 0.35); }
 .tally.hot3 .tally-total {
@@ -3312,8 +3302,8 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 }
 .tally.hot3 .tally-box { box-shadow: inset 0 0 0 2px rgba(255, 220, 130, 0.6), 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 44px rgba(255, 170, 60, 0.6); }
 @keyframes total-blaze {
-  from { text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 46px currentColor, 0 0 90px rgba(255, 160, 50, 0.75); }
-  to { text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 70px currentColor, 0 0 130px rgba(255, 190, 70, 0.95); transform: scale(1.04); }
+  from { text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 34px currentColor, 0 0 62px rgba(255, 160, 50, 0.85); }
+  to { text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 50px currentColor, 0 0 86px rgba(255, 190, 70, 1); transform: scale(1.04); }
 }
 
 /* 오버플로우 — 활활 타오르는 초과 피해 숫자 */
@@ -3422,19 +3412,21 @@ html[data-graphics='low'] .enemy-intel-icon::after {
 }
 /* 어느 배경 위에서도 읽히도록 은은한 어둠 스크림.
    레일 박스에 직접 깔면 border-radius 경계에서 그림자가 뚝 잘려(카드 설명 칩 아래가
-   특히 티가 난다) — 스크림만 레일보다 크게 뒤로 빼서 여백에서 자연히 사라지게 한다. */
+   특히 티가 난다) — 스크림만 레일보다 크게 뒤로 빼서 여백에서 자연히 사라지게 한다.
+   넓고 완만하게 퍼뜨리면 무대 가장자리에 닿아 잘리므로, 레일에 바짝 붙여 좁게
+   두고 대신 안쪽을 조금 더 진하게 깐다 — 같은 가독성을 절반 폭으로 낸다. */
 .chain-rail::before {
   content: '';
   position: absolute;
-  inset: -46px -110px;
+  inset: -32px -70px;
   z-index: -1;
   pointer-events: none;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(8, 6, 12, 0.62) 0%, rgba(8, 6, 12, 0.28) 58%, transparent 78%);
+  background: radial-gradient(ellipse at center, rgba(8, 6, 12, 0.68) 0%, rgba(8, 6, 12, 0.32) 60%, transparent 80%);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, #000 52%, transparent 78%);
-  mask-image: radial-gradient(ellipse at center, #000 0%, #000 52%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, #000 56%, transparent 80%);
+  mask-image: radial-gradient(ellipse at center, #000 0%, #000 56%, transparent 80%);
 }
 .chain-rail:empty::before { display: none; }
 .chain-word {
@@ -3552,12 +3544,14 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   color: var(--gold);
   text-shadow: 0 0 16px var(--glow);
 }
+/* 관용구 이름은 길어지면 무대 폭을 거의 다 쓴다. 발광을 넓게 두면 그 끝이
+   무대 밖에서 잘리므로 글자에 바짝 붙여 진하게 낸다. */
 .combo-flash .name {
   font-size: 76px;
   font-weight: 900;
   color: #fff6e2;
   -webkit-text-stroke: .6px rgba(24, 12, 16, .4);
-  text-shadow: 0 0 40px color-mix(in srgb, var(--glow) 72%, transparent), 0 8px 22px rgba(0, 0, 0, .38);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--glow) 84%, transparent), 0 6px 16px rgba(0, 0, 0, .42);
 }
 .combo-flash .mult {
   margin-top: 8px;
@@ -3592,7 +3586,7 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   border-radius: 999px;
   color: #fff7e8;
   background: linear-gradient(105deg, color-mix(in srgb, var(--resonance-color) 18%, rgba(10, 7, 16, .92)), rgba(10, 7, 16, .9));
-  box-shadow: inset 0 0 24px color-mix(in srgb, var(--resonance-color) 13%, transparent), 0 0 26px color-mix(in srgb, var(--resonance-color) 26%, transparent);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--resonance-color) 15%, transparent), 0 0 15px color-mix(in srgb, var(--resonance-color) 34%, transparent);
   pointer-events: none;
   opacity: 0;
 }
@@ -3611,12 +3605,21 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   100% { opacity: 0; transform: translate(-50%, -58%) scale(1.01); }
 }
 
+/* 문장이 꽂히는 순간 화면을 통째로 훑는 금빛 섬광.
+   담긴 상자(.stage-area)는 아래 350px을 손패에 내주고 끝난다. inset:0으로 두면
+   이 빛이 화면 한가운데 가로선에서 뚝 끊겨, 화면 전체가 아니라 위쪽 판때기만
+   빛나는 것처럼 보였다. 상자 밖으로 밀어 무대 네 변을 다 덮게 한다 — 가장자리에
+   닿기 전에 알파가 0이 되므로 무대 경계에서도 잘린 자국이 안 남는다. */
 .flash {
   position: absolute;
-  inset: 0;
+  left: -8%;
+  right: -8%;
+  top: -8%;
+  /* 350px(손패 자리) + 무대 아래로 조금 더. */
+  bottom: -430px;
   z-index: 82;
   pointer-events: none;
-  background: radial-gradient(circle at 62% 55%, var(--glow), transparent 55%);
+  background: radial-gradient(circle at 62% 42%, var(--glow), transparent 52%);
   opacity: 0;
 }
 .flash.go { animation: flash-go 0.5s ease; }
@@ -3637,6 +3640,9 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   align-items: flex-end;
   gap: 6px;
 }
+/* 로그 줄은 무대 오른쪽 끝에 붙어 뜬다. 넓게 번지는 그림자를 달면 그 빛이
+   그대로 무대 밖으로 나가 세로로 잘린다 — 좁고 진한 그림자로 바꿔 같은 무게를
+   상자 안에서 낸다. */
 .log-line {
   max-width: 100%;
   padding: 7px 16px;
@@ -3646,7 +3652,7 @@ html[data-graphics='low'] .enemy-intel-icon::after {
   color: var(--ink);
   background: var(--glass-strong);
   backdrop-filter: blur(8px);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-hi);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.58), inset 0 1px 0 var(--glass-hi);
   animation: log-in 0.4s ease, log-out 0.6s ease 2.4s forwards;
 }
 @keyframes log-in { from { transform: translateY(14px); opacity: 0; } }
@@ -4961,7 +4967,9 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 
 /* ───────── 오버레이(단어장/가방) ───────── */
-#overlay { position: absolute; inset: 0; z-index: 300; display: none; }
+/* 도감·설정 창은 전투 UI 전부(문장 진행표 950, 액션 컷 960) 위에 선다. 300에
+   두었더니 창을 열어도 좌하단 진행표가 창 위로 뚫고 올라와 있었다. */
+#overlay { position: absolute; inset: 0; z-index: 1400; display: none; }
 #overlay.open { display: block; }
 .ov-backdrop {
   position: absolute;
@@ -5736,7 +5744,9 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-align: center;
   text-shadow: 0 0 14px rgba(255, 194, 73, .55);
 }
-.discard-pick {
+/* 카드 겉모습은 후보(.discard-pick)와 미리보기(.discard-new-card)가 함께 쓰고,
+   고를 수 있는 반응은 버튼인 후보에만 붙인다. */
+.discard-card-face {
   position: relative; display: flex; flex-direction: column; width: 100%; height: var(--discard-card-height); min-height: 0;
   overflow: hidden; border-radius: 20px; color: #fff;
   background: #17111f; box-shadow: 0 12px 30px rgba(0,0,0,.55), inset 0 0 0 2px var(--wglow, var(--gold));
@@ -5744,19 +5754,22 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .discard-pick:hover, .discard-pick:focus-visible { transform: translateY(-9px); filter: brightness(1.12); }
 .discard-pick.is-chosen { transform: translateY(18px) rotate(-3deg); opacity: .35; }
+/* 미리보기는 누를 수 없다 — 손가락도, 떠오름도 주지 않는다. */
 .discard-new-card {
   height: calc(var(--discard-card-height) - 36px);
+  cursor: default;
+  pointer-events: none;
   box-shadow: 0 12px 30px rgba(0,0,0,.55), inset 0 0 0 3px var(--wglow, var(--gold)), 0 0 24px color-mix(in srgb, var(--wglow, var(--gold)) 28%, transparent);
 }
 .discard-new-card .discard-order { color: #fff1a8; }
 .discard-new-card .discard-action { background: rgba(53, 117, 83, .88); }
 .discard-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
 .discard-veil { position: absolute; inset: 0; background: linear-gradient(rgba(5,3,10,.28), rgba(5,3,10,.2) 42%, rgba(5,3,10,.96)); }
-.discard-order, .discard-copy, .discard-meta, .discard-pick strong, .discard-effect, .discard-action { position: relative; z-index: 1; display: block; }
+.discard-order, .discard-copy, .discard-meta, .discard-card-face strong, .discard-effect, .discard-action { position: relative; z-index: 1; display: block; }
 .discard-order { flex: none; margin: 14px; color: var(--gold); font-size: 14px; font-weight: 900; letter-spacing: 2px; }
 .discard-copy { display: flex; flex: none; flex-direction: column; align-items: center; margin-top: auto; padding: 0 12px 14px; }
 .discard-meta { color: #f4dfb6; font-size: 13px; font-weight: 800; }
-.discard-pick strong { margin: 6px 0 0; font-size: 26px; text-shadow: 0 0 16px var(--wglow, var(--gold)), 0 3px 8px #000; }
+.discard-card-face strong { margin: 6px 0 0; font-size: 26px; text-shadow: 0 0 16px var(--wglow, var(--gold)), 0 3px 8px #000; }
 .discard-effect { min-height: 40px; margin: 8px 6px; font-size: 14px; font-weight: 700; line-height: 1.4; }
 .discard-action { margin: 0 auto; width: max-content; padding: 7px 13px; border-radius: 99px; background: rgba(155,61,56,.82); font-size: 13px; font-weight: 900; }
 
@@ -6741,9 +6754,12 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 
 /* ── 체인 아래 "지금 배율" — 카드를 고르는 즉시 삐리릭 돌다가 팅! 하고 확정 ── */
+/* 무대 오른쪽 끝에서 52px밖에 안 떨어져 있었다. 뜨거워진 배율의 발광이 60px 가까이
+   번지므로 그 빛이 무대 밖으로 나가 세로로 잘렸다 — 자리를 안쪽으로 물리고 빛도
+   상자에 붙게 좁혔다. */
 .mult-now {
   position: absolute;
-  right: 52px;
+  right: 88px;
   top: 164px;
   z-index: 86;
   transform: none;
@@ -6794,7 +6810,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 배율이 크게 붙으면 계속 뜨겁게 타오른다 */
 .mult-now.hot .mn-mult {
   color: #ffb04a;
-  text-shadow: 0 0 30px rgba(255, 150, 50, 0.74), 0 0 58px rgba(255, 110, 30, 0.38), 0 5px 13px rgba(0, 0, 0, 0.36);
+  text-shadow: 0 0 22px rgba(255, 150, 50, 0.8), 0 0 34px rgba(255, 110, 30, 0.44), 0 5px 13px rgba(0, 0, 0, 0.36);
 }
 /* 동사 전 — 깡수치 자리는 숨기고 배율만 */
 .mult-now.no-flat .mn-flat,
@@ -6819,7 +6835,10 @@ html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: 
 .atk-cine {
   position: absolute;
   left: 0;
-  z-index: 98;
+  /* 문장 진행표(.slot-step, z 950)보다 위다. 화면 절반을 덮는 일격 컷이 좌하단
+     "주어 수식어 동사" 판때기만 못 덮고 비껴가면, 컷이 화면 위에 얹힌 판때기가
+     아니라 판때기 뒤로 지나가는 배경처럼 읽힌다. */
+  z-index: 960;
   /* 위아래를 꽉 채운 풀 일러스트. 원본이 1080×1080 정사각이라 높이를 무대에 맞추고
      너비는 비율로 따라오게 둔다 — 16:9로 잡으면 위아래가 잘리고, 4:3으로 잡으면
      좌우에 빈 띠가 생겨 오른쪽 흐림이 그림에 안 걸린다.
