@@ -55,6 +55,8 @@ export interface EnemyInst {
   summonHpRight: number[]
   /** 여왕벌 그로기 한 주기 안에서 지금까지 퇴치한 호위 수. */
   summonsDefeated: number
+  /** 호위 전멸 뒤 회복 턴을 보낸 다음, 새 묶음을 부를 수 있는 첫 턴. */
+  summonRespawnTurn: number
   /** 같은 전투 턴에 턴 시작 소환을 두 번 처리하지 않기 위한 표식. */
   lastSummonTurn: number
   /** 거미 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
@@ -140,6 +142,7 @@ export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1
     summonHpLeft: [],
     summonHpRight: [],
     summonsDefeated: 0,
+    summonRespawnTurn: 1,
     lastSummonTurn: 0,
     parts: (def.parts ?? []).map((part) => ({
       def: part,
@@ -209,6 +212,7 @@ export function summonAtTurnStart(state: BattleState): TurnSummon[] {
     const pattern = enemy.def.summonPattern
     if (!pattern || enemy.dead || enemy.lastSummonTurn === state.turn) return
     if (pattern.refillOnlyWhenEmpty && summonCount(enemy) > 0) return
+    if (state.turn < enemy.summonRespawnTurn) return
     enemy.lastSummonTurn = state.turn
     for (let i = 0; i < pattern.perTurn && summonCount(enemy) < pattern.max; i++) {
       const canLeft = enemy.summonsLeft < pattern.maxPerSide
@@ -598,6 +602,7 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
 interface SummonDisperseResult {
   count: number
   damage: number
+  remainingDamage: number
   backlashDamage: number
   focusedBacklash: boolean
   groggyTriggered: boolean
@@ -614,7 +619,7 @@ function disperseTargetSummons(
 ): SummonDisperseResult {
   const enemy = state.enemies[target]
   if (!enemy || enemy.dead || !enemy.def.summonPattern) {
-    return { count: 0, damage: 0, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+    return { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   }
   const pattern = enemy.def.summonPattern
   const available = summonCount(enemy)
@@ -664,9 +669,12 @@ function disperseTargetSummons(
   if (groggyTriggered) {
     enemy.groggyUntilTurn = state.turn
     enemy.groggyDamageMult = pattern.groggyDamageMult ?? 1.5
+    // 다음 턴은 여왕이 정신을 차리는 데만 쓴다. 그 다음 턴 시작에야 새 일벌
+    // 네 마리가 한 묶음으로 돌아오며, 회복 턴 도중에는 공격도 소환도 하지 않는다.
+    enemy.summonRespawnTurn = state.turn + 2
     enemy.nextAttackTurn += 1
   }
-  return { count: dispersed, damage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
+  return { count: dispersed, damage, remainingDamage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
 }
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
@@ -691,8 +699,13 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
   const summonDisperse = dealsDamage
     ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions)
-    : { count: 0, damage: 0, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
-  const attack = dealsDamage && !summonDisperse.killed ? resolveAttack(state, plan) : { hits: [], killed: [], overflow: 0 }
+    : { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+  // 일벌과 본체는 한 줄의 킬체인이다. 같은 피해를 본체에 한 번 더 복제하지 않고,
+  // 일벌 체력을 차례로 소모하고 남은 초과분만 그로기된 본체까지 이어 보낸다.
+  const bodyPlan = { ...plan, dmg: summonDisperse.remainingDamage }
+  const attack = dealsDamage && !summonDisperse.killed && bodyPlan.dmg > 0
+    ? resolveAttack(state, bodyPlan)
+    : { hits: [], killed: [], overflow: 0 }
   const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
   let selfDmg = intent.recoil
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
@@ -720,7 +733,10 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
   if (!pending) return null
   state.pending = null
   const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard, pending.emotions)
-  const attack = summonDisperse.killed ? { hits: [], killed: [], overflow: 0 } : resolveAttack(state, pending)
+  const bodyPlan = { ...pending, dmg: summonDisperse.remainingDamage }
+  const attack = summonDisperse.killed || bodyPlan.dmg <= 0
+    ? { hits: [], killed: [], overflow: 0 }
+    : resolveAttack(state, bodyPlan)
   return {
     text: `${pending.sentence} → 예약 발동`,
     combos: [],
@@ -770,6 +786,9 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   engageFront(state)
   const enemy = state.enemies[front]
   if (enemy.initiativePhase !== phase || state.turn < enemy.nextAttackTurn) return strikes
+  // 일벌 전멸 직후의 한 턴은 여왕벌이 그로기에서 돌아오는 회복 턴이다.
+  // 새 호위를 부를 수 있는 다음 턴까지 공격을 포함한 모든 행동을 건너뛴다.
+  if (enemy.def.summonPattern && summonCount(enemy) === 0 && state.turn < enemy.summonRespawnTurn) return strikes
 
   const attackStep = nextEnemyAttackStep(enemy)
   const attackStage = bossAttackStage(enemy)
@@ -828,7 +847,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
       + (guardShattered ? ` (방어 ${absorbed} 전량 파괴)` : '')
       + (attackStep?.shatterGuard && !guardShattered && absorbed > 0 ? ` (방어 ${absorbed}/${guardRequired} · 그로기 실패)` : '')
       + (lifeStolen > 0 ? ` (흡혈 ${lifeStolen})` : '')
-      + (groggyEntered ? ` (그로기 · 받는 피해 ×${enemy.groggyDamageMult.toFixed(1)})` : '')
+      + (groggyEntered ? ` (그로기 · 받는 피해 ×${enemy.groggyDamageMult.toFixed(1)} · 다음 공격 한 턴 스킵)` : '')
       + (piercedGuard ? ' (방어 관통)' : absorbed && !guardShattered ? ` (방어 ${absorbed} 흡수)` : ''),
     dealt,
     idx: front,
@@ -859,6 +878,9 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     state.counterMultiplier = 0
   }
   enemy.nextAttackTurn = state.turn + enemy.def.every
+  // 강공격을 완전히 막아 낸 대가는 받는 피해 증가만으로는 체감되지 않았다. 휘청인
+  // 적은 예정된 다음 공격을 통째로 한 번 거른다 — 일벌 전멸 그로기와 같은 규칙이다.
+  if (groggyEntered) enemy.nextAttackTurn += Math.max(1, enemy.def.every)
   if (enemy.def.initiative === 'first') enemy.initiativePhase = phase === 'first' ? 'second' : 'first'
   if (enemy.dead) engageFront(state)
   return strikes

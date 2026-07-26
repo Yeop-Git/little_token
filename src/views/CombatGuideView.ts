@@ -376,7 +376,8 @@ export class CombatGuideView {
           <h3 class="g-h3">감정 공명</h3>
           <ul class="g-emotions">${emotionCards}</ul>
           <p>한 문장에 같은 감정이 <b>2장이면 ${mult(EMOTION_RESONANCE.pair)}</b>,
-            <b>3장이면 ${mult(EMOTION_RESONANCE.triple)}</b>가 곱해진다. 주어도 함께 센다.</p>
+            <b>3장이면 ${mult(EMOTION_RESONANCE.triple)}</b>가 곱해진다. 겹주어·겹동사로 더 모이면
+            한 장마다 <b>+${EMOTION_RESONANCE.perExtra.toFixed(2)}</b>씩 계속 쌓인다. 주어도 함께 센다.</p>
           <p class="g-note g-tight"><b>${EMOTION_LABEL.neutral}</b> 카드는 효과는 그대로지만 공명 수에는 세지 않는다.</p>
         </section>
         <section class="g-panel">

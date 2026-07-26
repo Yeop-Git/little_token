@@ -17,7 +17,12 @@ export const WEAKNESS_MULT = 1.25
 export const PART_WEAKNESS_MULT = 1.5
 
 /** 같은 감정 카드가 모였을 때의 공명 배율. 무감정 카드는 세지 않는다. */
-export const EMOTION_RESONANCE = { pair: 1.15, triple: 1.3 } as const
+export const EMOTION_RESONANCE = { pair: 1.15, triple: 1.3, perExtra: 0.15 } as const
+
+/** 겹주어·겹동사로 슬롯이 늘어나도 같은 감정 한 장마다 공명이 계속 자란다. */
+export function emotionResonanceFor(count: number): number {
+  return count >= 2 ? 1 + (count - 1) * EMOTION_RESONANCE.perExtra : 1
+}
 
 export type BossAttackStage = 1 | 2 | 3
 

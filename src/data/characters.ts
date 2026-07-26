@@ -270,11 +270,14 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.boss_mantis,
     animations: {
       idle: 'Armature|idle1|BaseLayer',
-      idle2: 'Armature|idle2|BaseLayer',
+      // 예고 대기 자세는 원본 GLB의 `hold`다. `idle2`는 몸을 낮추고 큰낫을 옆으로
+      // 뉘인 다른 대기라, 예고 한 턴 동안 사마귀가 갑자기 작아진 것처럼 보였다.
+      // `hold`만 idle1과 같은 키·정면 실루엣으로 큰낫을 머리 위에 세워 둔다.
+      idle2: 'Armature|hold|BaseLayer',
       walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack1|BaseLayer',
-      // 원본 GLB의 `attack`은 큰낫을 드는 준비 동작이며 끝 자세가 idle2의
-      // 첫 자세와 정확히 이어진다. 다음 턴의 attack3 전까지 idle2를 유지한다.
+      // 원본 GLB의 `attack`은 큰낫을 드는 준비 동작이다. 다음 턴의 attack3 전까지
+      // 그 끝 자세를 그대로 잇는 `hold`(idle2)를 유지한다.
       attack2: 'Armature|attack|BaseLayer',
       attack3: 'Armature|attack3|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
@@ -286,7 +289,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     cameraTargetY: 1.45,
     portrait2d: SPRITES.boss_mantis,
     title: '문장을 재단하는 큰낫',
-    description: '평범한 낫질 뒤 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청이며 빈틈을 보인다.',
+    description: '평범한 낫질 뒤 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청여 빈틈을 보이고 다음 공격을 한 턴 거른다.',
   },
   queenBee: {
     id: 'queenBee',

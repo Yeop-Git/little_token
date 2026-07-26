@@ -24,6 +24,7 @@ interface Opts {
   options: RewardOption[]
   phase: RewardPhase
   onPick: (opt: RewardOption) => void
+  onSkip: () => void
 }
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb: '동사', obj: '목적어', end: '어미' }
@@ -181,6 +182,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
 export class RewardView {
   private root: HTMLElement
   private opts: Opts
+  private locked = false
 
   constructor(root: HTMLElement, opts: Opts) {
     this.root = root
@@ -204,6 +206,7 @@ export class RewardView {
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
+            <button class="reward-skip" type="button" title="이번 단계의 보상을 받지 않고 넘어갑니다">보상 받지 않기</button>
           </div>
           <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
             <div class="rd-hint">카드의 <b>자세히보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
@@ -219,6 +222,10 @@ export class RewardView {
         this.showDetail(opts.options[i], el)
       })
     })
+    this.root.querySelector<HTMLButtonElement>('.reward-skip')?.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.skip()
+    })
   }
 
   private showDetail(opt: RewardOption, el: HTMLElement) {
@@ -231,8 +238,26 @@ export class RewardView {
   }
 
   private take(el: HTMLElement, opt: RewardOption) {
+    if (this.locked) return
+    this.locked = true
+    this.disableChoices()
     el.style.transform = 'translateY(-10px) scale(1.03)'
     window.setTimeout(() => this.opts.onPick(opt), 220)
+  }
+
+  private skip() {
+    if (this.locked) return
+    this.locked = true
+    this.disableChoices()
+    window.setTimeout(() => this.opts.onSkip(), 120)
+  }
+
+  private disableChoices() {
+    this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
+      pick.setAttribute('aria-disabled', 'true')
+    })
+    const skip = this.root.querySelector<HTMLButtonElement>('.reward-skip')
+    if (skip) skip.disabled = true
   }
 
   destroy() {}

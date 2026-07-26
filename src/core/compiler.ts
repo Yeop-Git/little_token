@@ -6,7 +6,7 @@
  * 슬롯을 4칸/6칸으로 바꿔도 컴파일러는 그대로 동작한다.
  */
 
-import { EMOTION_RESONANCE } from './combatRules'
+import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
@@ -230,9 +230,7 @@ export function compile(
   const emotionCounts = new Map<Emotion, number>()
   emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
   const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-  const emotionResonance = repeatedEmotion?.[1] === 3
-    ? EMOTION_RESONANCE.triple
-    : repeatedEmotion?.[1] === 2 ? EMOTION_RESONANCE.pair : 1
+  const emotionResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
   if (emotionResonance !== 1) {
     mults.push({
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} 공명`,

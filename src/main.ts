@@ -624,8 +624,9 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
   }
 }
 
-function advanceReward(grade: number, phase: RewardPhase, pick: RewardPickRef) {
-  const picks = [...(run.reward?.picks ?? []), pick]
+function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
+  const picks = [...(run.reward?.picks ?? [])]
+  if (pick) picks.push(pick)
   if (phase === 'subject') {
     run.reward = { day: run.day, grade, phase: 'item', picks }
     saveRun(run)
@@ -692,6 +693,7 @@ function goReward(
         goItem(opt.item, grade, phase, pick)
       }
     },
+    onSkip: () => advanceReward(grade, phase),
   })
   mountMeta('reward')
 }

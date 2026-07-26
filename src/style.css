@@ -2348,8 +2348,8 @@ html[data-graphics='low'] .tip-bubble {
   bottom: 35px;
   z-index: 1;
   /* 여왕벌 날개 바깥으로 두 겹의 호위가 펼쳐지되 하단 카드 안전선을 넘지 않는다. */
-  width: 1100px;
-  height: 390px;
+  width: 1200px;
+  height: 420px;
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -2357,8 +2357,8 @@ html[data-graphics='low'] .tip-bubble {
   position: absolute;
   bottom: 0;
   display: block;
-  width: 200px;
-  height: 272px;
+  width: 230px;
+  height: 310px;
   transform-origin: center bottom;
   filter: drop-shadow(0 0 10px rgba(255, 200, 71, .46)) drop-shadow(0 10px 12px rgba(30, 18, 6, .32));
 }
@@ -2371,42 +2371,32 @@ html[data-graphics='low'] .tip-bubble {
 }
 .queen-worker .queen-worker-nameplate {
   position: absolute;
-  top: -2px;
+  top: -4px;
   bottom: auto;
   left: 50%;
   z-index: 4;
   display: block;
-  width: 108px;
+  width: 150px;
   margin: 0;
-  padding: 5px 7px 7px;
-  border: 1px solid rgba(255, 225, 181, .32);
-  border-radius: 10px;
-  background: rgba(26, 17, 24, .82);
-  box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 4px 12px rgba(0, 0, 0, .5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   transform: translateX(-50%);
-}
-.queen-worker .queen-worker-nameplate .row {
-  margin-bottom: 3px;
-}
-.queen-worker .queen-worker-nameplate .nm {
-  font-size: 11px;
-  letter-spacing: .03em;
-}
-.queen-worker .queen-worker-nameplate .hpn {
-  font-size: 9px;
 }
 .queen-worker-hp {
   position: relative;
+  display: block;
   width: 100%;
-  height: 10px;
+  height: 14px;
 }
 .queen-worker-hp > .fill {
   width: 100%;
 }
-.queen-worker.left[data-slot='1'] { left: 230px; bottom: 64px; }
-.queen-worker.left[data-slot='2'] { left: 15px; bottom: 10px; }
-.queen-worker.right[data-slot='1'] { right: 230px; bottom: 64px; }
-.queen-worker.right[data-slot='2'] { right: 15px; bottom: 10px; }
+.queen-worker.left[data-slot='1'] { left: 260px; bottom: 64px; }
+.queen-worker.left[data-slot='2'] { left: 10px; bottom: 10px; }
+.queen-worker.right[data-slot='1'] { right: 260px; bottom: 64px; }
+.queen-worker.right[data-slot='2'] { right: 10px; bottom: 10px; }
 .queen-worker.left { transform: rotate(-4deg); }
 .queen-worker.right { transform: scaleX(-1) rotate(-4deg); }
 /* 오른쪽 일벌의 모델만 바라보는 방향을 뒤집고, 이름표 글자는 다시 정방향으로 돌린다. */
@@ -2660,8 +2650,10 @@ html[data-graphics='low'] .tip-bubble {
 
 /* 타격점 — 칼이 몸에 닿은 그 자리. 정지 프레임에 붙들릴 그림이라 48ms 안에 피어야 한다. */
 .impact-flash {
-  width: calc(84px * var(--power, 1));
-  height: calc(84px * var(--power, 1));
+  /* 큰 피해의 성장감은 짧은 화면 축의 34%까지 열어 두되, 고해상도에서도 기준 면이
+     320px을 넘지 않게 해 바깥 링·사선이 만드는 합성 영역의 폭증을 막는다. */
+  width: min(calc(84px * var(--power, 1)), 34vmin, 320px);
+  height: min(calc(84px * var(--power, 1)), 34vmin, 320px);
   transform: translate(-50%, -50%);
 }
 /* 접점 — 미리 구운 폭발 스프라이트. 백열 심·프리즘 링·십자 섬광이 한 장에 들어 있어
@@ -4048,6 +4040,156 @@ html[data-graphics='low'] .tip-bubble {
 }
 /* 보스전은 전경의 프롬과 손패가 겹치지 않게 카드 축을 더 오른쪽으로 물린다. */
 .scene.battle[data-boss='true'] .word-zone { left: 620px; right: 72px; }
+
+/* 우하단 전투 메모 — 손패가 비워 둔 끝 여백에 물음표만 두고, 눌렀을 때 종이 쪽지가
+   위로 살짝 펼쳐진다. 전투를 가리는 모달이 아니라 문장을 고르며 곁눈질하는 메모다. */
+.battle-help {
+  position: absolute;
+  right: 30px;
+  bottom: 27px;
+  z-index: 952;
+}
+.battle-help-button {
+  position: relative;
+  z-index: 2;
+  width: 54px;
+  height: 54px;
+  border: 2px solid rgba(255, 226, 168, .68);
+  border-radius: 50% 44% 48% 42%;
+  color: #fff3cf;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, .18), transparent 26%),
+    linear-gradient(145deg, rgba(54, 38, 48, .96), rgba(22, 15, 27, .94));
+  box-shadow: inset 0 0 0 3px rgba(255, 247, 220, .055), 0 8px 22px rgba(0, 0, 0, .52), 0 0 16px rgba(255, 202, 110, .15);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 210, 122, .55);
+  transform: rotate(2deg);
+  transition: color .18s ease, transform .22s cubic-bezier(.2, 1.2, .3, 1), box-shadow .18s ease;
+}
+.battle-help-button:hover,
+.battle-help-button:focus-visible,
+.battle-help.is-open .battle-help-button {
+  color: #fff;
+  transform: rotate(-3deg) scale(1.08);
+  box-shadow: inset 0 0 0 3px rgba(255, 247, 220, .08), 0 10px 26px rgba(0, 0, 0, .56), 0 0 24px rgba(255, 202, 110, .34);
+}
+.battle-help-button:focus-visible { outline: 3px solid rgba(255, 229, 170, .72); outline-offset: 4px; }
+.battle-help-note {
+  position: absolute;
+  right: 2px;
+  bottom: 70px;
+  width: 488px;
+  min-height: 286px;
+  padding: 24px 25px 23px 142px;
+  border: 1px solid rgba(119, 82, 50, .38);
+  border-radius: 9px 17px 11px 15px;
+  color: #4a3528;
+  background:
+    linear-gradient(92deg, rgba(122, 76, 43, .055) 1px, transparent 1px) 0 0 / 24px 100%,
+    linear-gradient(rgba(255, 255, 255, .22), rgba(235, 213, 172, .1)),
+    #f2dfb9;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .48), inset 0 0 28px rgba(113, 72, 39, .13);
+  filter: drop-shadow(0 0 9px rgba(255, 218, 151, .12));
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(14px) rotate(1.5deg) scale(.96);
+  transform-origin: right bottom;
+  transition: opacity .18s ease, transform .3s cubic-bezier(.2, 1, .3, 1);
+}
+.battle-help-token {
+  position: absolute;
+  left: -50px;
+  bottom: 7px;
+  width: 205px;
+  height: 245px;
+  pointer-events: none;
+  transform: rotate(-7deg);
+}
+.battle-help-token img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+.battle-help-token-main {
+  z-index: 1;
+  filter: drop-shadow(0 10px 17px rgba(66, 39, 22, .3)) drop-shadow(0 0 18px rgba(255, 220, 128, .38));
+}
+.battle-help-token-shadow {
+  z-index: 0;
+  opacity: .2;
+  filter: blur(1px) brightness(.62) saturate(.72);
+  transform: translate(-18px, 8px);
+}
+.battle-help.is-open .battle-help-token {
+  animation: battle-help-token-greet .58s cubic-bezier(.2, 1.4, .3, 1) .08s both;
+}
+@keyframes battle-help-token-greet {
+  from { opacity: 0; transform: translateY(15px) rotate(-13deg) scale(.88); }
+  to { opacity: 1; transform: translateY(0) rotate(-7deg) scale(1); }
+}
+.battle-help-note::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  bottom: -12px;
+  width: 24px;
+  height: 24px;
+  border-right: 1px solid rgba(119, 82, 50, .38);
+  border-bottom: 1px solid rgba(119, 82, 50, .38);
+  background: #ecd8b1;
+  transform: rotate(45deg);
+}
+.battle-help.is-open .battle-help-note {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0) rotate(-.6deg) scale(1);
+}
+.battle-help-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 13px;
+  border-bottom: 2px dashed rgba(111, 74, 47, .25);
+}
+.battle-help-heading > span { color: #c17a31; font-size: 28px; transform: rotate(-12deg); }
+.battle-help-heading small {
+  display: block;
+  color: #9b6b46;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .13em;
+}
+.battle-help-heading h2 { margin-top: 1px; color: #4b3224; font-size: 23px; line-height: 1.2; }
+.battle-help-note ul { display: grid; gap: 10px; margin-top: 15px; list-style: none; }
+.battle-help-note li { display: grid; grid-template-columns: 48px 1fr; align-items: center; gap: 11px; }
+.battle-help-note li i {
+  padding: 5px 4px;
+  border-radius: 10px 5px 9px 6px;
+  color: #fff5dc;
+  background: #a66a3b;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+  transform: rotate(-2deg);
+}
+.battle-help-note li:nth-child(2) i { background: #b45d70; transform: rotate(2deg); }
+.battle-help-note li:nth-child(3) i { background: #587c82; }
+.battle-help-note li:nth-child(4) i { background: #bd5b37; transform: rotate(3deg); }
+.battle-help-note li span { font-size: 16px; font-weight: 750; line-height: 1.35; }
+.battle-help-note li b { color: #9b452b; font-weight: 950; }
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-help-button,
+  .battle-help-note { transition: none; }
+  .battle-help.is-open .battle-help-token { animation: none; }
+}
 
 /* 슬롯 진행 스텝 — 카드 레일에서 분리해 일반전 좌하단에 고정한다.
    보스전에서는 같은 자리를 플레이어 체력이 쓰므로 그 오른쪽에 이어 붙인다. */
@@ -5793,6 +5935,29 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
   animation: page-turn 0.7s cubic-bezier(0.3, 0.9, 0.3, 1);
 }
+.reward-skip {
+  position: absolute;
+  right: 22px;
+  bottom: 12px;
+  z-index: 4;
+  padding: 7px 12px;
+  border-radius: 9px 3px 9px 3px;
+  color: rgba(255, 246, 226, .62);
+  background: rgba(255, 255, 255, .045);
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 226, .14);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  transition: color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.reward-skip:hover,
+.reward-skip:focus-visible {
+  color: #fff2da;
+  background: rgba(255, 255, 255, .09);
+  box-shadow: inset 0 0 0 1px rgba(255, 222, 154, .42), 0 0 12px rgba(255, 210, 122, .12);
+  transform: translateY(-2px) rotate(-.5deg);
+}
+.reward-skip:disabled { opacity: .42; }
 .reward-art-head {
   height: 190px;
   display: grid;
@@ -7198,6 +7363,96 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-shadow: 0 4px 11px rgba(0, 0, 0, 0.38);
 }
 .mult-now:empty { display: none; }
+/* 같은 감정이 둘 이상 모이면 총배율 앞의 빈 칸에 공명 출처가 핀 배지처럼 피어난다.
+   공용 emotion-* 팔레트를 그대로 써 카드 → 문장 → 배율이 한 색으로 이어진다. */
+.mn-emotion-badge {
+  --badge-color: var(--emotion-color, #ffd27a);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 5px -2px -7px;
+  padding: 5px 13px 5px 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--badge-color) 74%, transparent);
+  border-radius: 999px 15px 15px 999px;
+  color: var(--badge-color);
+  background:
+    radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--badge-color) 26%, transparent), transparent 34px),
+    linear-gradient(115deg, color-mix(in srgb, var(--badge-color) 16%, rgba(15, 10, 20, .96)), rgba(10, 7, 16, .94));
+  box-shadow:
+    inset 0 1px color-mix(in srgb, var(--badge-color) 34%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--badge-color) 12%, transparent),
+    0 0 18px color-mix(in srgb, var(--badge-color) 28%, transparent);
+  text-shadow: none;
+}
+.mn-emotion-face {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--badge-color) 13%, rgba(7, 5, 11, .88));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--badge-color) 52%, transparent);
+}
+.mn-emotion-face .emotion-face {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--badge-color) 52%, transparent));
+}
+.mn-emotion-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.mn-emotion-copy small {
+  margin-bottom: 3px;
+  color: color-mix(in srgb, var(--badge-color) 68%, #fff);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.mn-emotion-copy b {
+  color: var(--badge-color);
+  font-size: 21px;
+  font-weight: 950;
+  text-shadow: 0 0 13px color-mix(in srgb, var(--badge-color) 68%, transparent);
+}
+.mn-emotion-spark {
+  position: absolute;
+  z-index: 0;
+  top: -45%;
+  left: -30%;
+  width: 24px;
+  height: 190%;
+  transform: rotate(19deg);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--badge-color) 72%, #fff), transparent);
+  opacity: 0;
+}
+.mn-emotion-badge.bloom {
+  animation: mn-emotion-bloom .58s cubic-bezier(.18, 1.45, .34, 1);
+}
+.mn-emotion-badge.bloom .mn-emotion-spark {
+  animation: mn-emotion-sweep .7s ease-out;
+}
+@keyframes mn-emotion-bloom {
+  0% { transform: translateX(18px) scale(.68) rotate(3deg); opacity: 0; }
+  58% { transform: translateX(-3px) scale(1.08) rotate(-1deg); opacity: 1; }
+  100% { transform: translateX(0) scale(1) rotate(0); opacity: 1; }
+}
+@keyframes mn-emotion-sweep {
+  0% { left: -30%; opacity: 0; }
+  22% { opacity: .65; }
+  100% { left: 118%; opacity: 0; }
+}
 .mult-now .mn-lane {
   font-size: 13px;
   letter-spacing: 0.14em;

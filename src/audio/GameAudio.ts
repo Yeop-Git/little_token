@@ -152,12 +152,19 @@ class GameAudioController {
     return Promise.all([...buffered, ...this.preloadPreparedStreams()]).then(() => undefined)
   }
 
-  playResonance(emotions: readonly Emotion[]) {
-    const resonant = (Object.keys(RESONANCE_EFFECT) as Emotion[]).find(
-      (emotion) => emotions.filter((entry) => entry === emotion).length >= 2,
-    )
-    const effect = resonant ? RESONANCE_EFFECT[resonant] : undefined
-    if (effect) this.play(effect)
+  /**
+   * 문장이 완성된 순간 주 감정의 짧은 테마를 재생한다.
+   *
+   * 같은 감정이 최소 두 장이면서 전체 감정 카드의 과반수일 때만 그 감정음을 쓴다.
+   * 모든 감정이 다르거나 어느 쪽도 과반을 차지하지 못하면 공용 완성음으로 돌아간다.
+   */
+  playSentenceComplete(emotions: readonly Emotion[]) {
+    const counts = new Map<Emotion, number>()
+    emotions.forEach((emotion) => counts.set(emotion, (counts.get(emotion) ?? 0) + 1))
+    const dominant = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    const isMajority = dominant && dominant[1] >= 2 && dominant[1] > emotions.length / 2
+    const effect = isMajority ? RESONANCE_EFFECT[dominant[0]] : undefined
+    this.play(effect ?? 'sentenceComplete')
   }
 
   playDefeatBgm() {
