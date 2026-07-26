@@ -1,4 +1,5 @@
 import { comboLeads, compile } from '@core/compiler'
+import { bossTurnPressureMultiplier } from '@core/combatRules'
 import { DECK_LIMITS, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
 import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
@@ -163,6 +164,28 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(r.hits[0].barOverflow === 20 && r.hits[0].barOverflowPassed, 'penetrating boss overflow is exposed to the hp-bar effect')
 }
 { const boss = makeEnemy(foe('phased', { boss: true, hp: 30, atk: 10 }), 1, 1, 3); const s = state([boss]); let r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 1 && r.dealt === 10, 'boss starts with attack1 and base damage'); boss.hp = 60; boss.nextAttackTurn = 1; r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 2 && r.dealt === 13, 'boss uses attack2 and x1.25 damage at two-thirds hp'); boss.hp = 30; boss.nextAttackTurn = 1; r = enemyTurn(s, () => 0, 'second')[0]; assert(r.attackStage === 3 && r.dealt === 15, 'boss uses attack3 and x1.5 damage at one-third hp') }
+{
+  const normal = makeEnemy(foe('normal-pressure', { atk: 10 }))
+  const boss = makeEnemy(foe('boss-pressure', { boss: true, atk: 10 }))
+  assert(bossTurnPressureMultiplier(normal, 30) === 1, 'long-fight pressure never applies outside boss stages')
+  assert(bossTurnPressureMultiplier(boss, 6) === 1 && bossTurnPressureMultiplier(boss, 7) === 1.05, 'boss pressure starts after six grace turns')
+  const s = state([boss])
+  s.turn = 7
+  const strike = enemyTurn(s, () => 0, 'second')[0]
+  assert(strike.dealt === 11, 'boss attack damage rises with the current battle turn')
+}
+{
+  const webBoss = makeEnemy(foe('web-pressure', {
+    boss: true,
+    atk: 100,
+    pierceGuard: true,
+    webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
+  }))
+  const s = state([webBoss])
+  s.turn = 10
+  const strike = enemyTurn(s, () => 0, 'second')[0]
+  assert(strike.dealt === 7, 'long-fight pressure raises the elder spider damage limit instead of being swallowed by it')
+}
 assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '1,2,3', 'mantis data keeps distinct normal, telegraph, and strong pattern stages')
 {
   const modifiers = [...EARLY_WORDS.adv, ...REWARD_WORDS.filter((word) => word.slot === 'adv')]

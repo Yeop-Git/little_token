@@ -37,6 +37,7 @@ import {
   applyPreparation,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
+  bossTurnPressureMultiplier,
   enemyGuardBreakRequirement,
   enemyTurn,
   engageFront,
@@ -1153,7 +1154,7 @@ export class BattleView {
     const imminent = mantis && !!nextEnemyAttackStep(mantis)?.shatterGuard
     cue.hidden = !imminent
     if (!mantis || !imminent) return
-    const required = enemyGuardBreakRequirement(mantis)
+    const required = enemyGuardBreakRequirement(mantis, this.state.turn)
     const current = Math.min(this.state.guard, required)
     cue.querySelector<HTMLElement>('em')!.textContent = `${current}/${required}`
     cue.classList.toggle('ready', current >= required)
@@ -1591,7 +1592,7 @@ export class BattleView {
     const attackStage = bossAttackStage(e)
     const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
     const attackStep = nextEnemyAttackStep(e)
-    const requiredGuard = enemyGuardBreakRequirement(e)
+    const requiredGuard = enemyGuardBreakRequirement(e, this.state.turn)
     const groggy = this.state.turn <= e.groggyUntilTurn
     const partWeakness = activePart?.def.weakness
     const partWeaknessHtml = partWeakness?.kind === 'emotion'
@@ -1705,6 +1706,7 @@ export class BattleView {
       const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
       const attackStage = enemy ? bossAttackStage(enemy) : 1
       const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
+      const pressureMultiplier = enemy ? bossTurnPressureMultiplier(enemy, this.state.turn) : 1
       const attackStep = enemy ? nextEnemyAttackStep(enemy) : null
       const summonPattern = enemy?.def.summonPattern
       const summons = enemy ? summonCount(enemy) : 0
@@ -1712,8 +1714,8 @@ export class BattleView {
       const attackBonus = (attackStep?.bonusAtk ?? 0)
         + summons * (summonPattern?.attackBonusPerUnit ?? 0)
       const attackScale = attackStep?.damageScale ?? 1
-      const attackLow = enemy ? Math.round((enemy.def.atk + attackBonus) * enemy.atkMult * attackMultiplier * attackScale) : 0
-      const attackHigh = enemy ? Math.round((enemy.def.atk + attackBonus + 2) * enemy.atkMult * attackMultiplier * attackScale) : 0
+      const attackLow = enemy ? Math.round((enemy.def.atk + attackBonus) * enemy.atkMult * attackMultiplier * attackScale * pressureMultiplier) : 0
+      const attackHigh = enemy ? Math.round((enemy.def.atk + attackBonus + 2) * enemy.atkMult * attackMultiplier * attackScale * pressureMultiplier) : 0
       stats = enemy
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],

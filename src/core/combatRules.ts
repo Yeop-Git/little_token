@@ -33,6 +33,22 @@ export const BOSS_ATTACK_MULTIPLIER: Record<BossAttackStage, number> = {
   3: 1.5,
 }
 
+/** 보스전이 늘어질 때만 적용되는 상한 없는 장기전 압박. 초반 패턴을 읽을 시간은 준다. */
+export const BOSS_TURN_PRESSURE = {
+  graceTurns: 6,
+  perTurn: 0.05,
+} as const
+
+/** 일반 적은 항상 1이며, 보스만 유예 턴 뒤부터 전투 턴마다 공격이 누적 상승한다. */
+export function bossTurnPressureMultiplier(
+  enemy: { def: { boss?: boolean } },
+  turn: number,
+): number {
+  if (!enemy.def.boss) return 1
+  const pressuredTurns = Math.max(0, Math.floor(turn) - BOSS_TURN_PRESSURE.graceTurns)
+  return 1 + pressuredTurns * BOSS_TURN_PRESSURE.perTurn
+}
+
 /** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
 export function playerGuardLimit(playerMax: number): number {
   return Math.max(0, Math.round(playerMax))

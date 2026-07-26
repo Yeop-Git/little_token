@@ -4,6 +4,7 @@
  */
 import {
   BOSS_ATTACK_MULTIPLIER,
+  bossTurnPressureMultiplier,
   PART_WEAKNESS_MULT,
   playerGuardLimit,
   TARGET_FALLOFF,
@@ -15,7 +16,7 @@ import type { Emotion, EnemyDef, EnemyPartDef, Intent, TargetCount } from '@core
 
 // 규칙 상수의 원본은 core/combatRules.ts다(도움말 화면이 같은 값을 읽는다).
 // 기존 소비처가 계속 sim에서 가져다 쓸 수 있도록 여기서 그대로 다시 내보낸다.
-export { BOSS_ATTACK_MULTIPLIER, playerGuardLimit, type BossAttackStage }
+export { BOSS_ATTACK_MULTIPLIER, bossTurnPressureMultiplier, playerGuardLimit, type BossAttackStage }
 
 export interface EnemyPartInst {
   def: EnemyPartDef
@@ -76,12 +77,14 @@ export function bossAttackStage(enemy: Pick<EnemyInst, 'def' | 'hp' | 'maxHp'>):
 /** RNG 최고치까지 막아야 그로기가 열리므로 플레이어에게 항상 같은 목표값을 보여 준다. */
 export function enemyGuardBreakRequirement(
   enemy: Pick<EnemyInst, 'def' | 'atkMult' | 'hp' | 'maxHp'>,
+  turn = 1,
 ): number {
   const step = enemy.def.attackPattern?.find((candidate) => candidate.shatterGuard)
   if (!step) return 0
   const stageMult = BOSS_ATTACK_MULTIPLIER[bossAttackStage(enemy)]
+  const pressureMult = bossTurnPressureMultiplier(enemy, turn)
   return Math.max(1, Math.round(
-    (enemy.def.atk + step.bonusAtk + 2) * enemy.atkMult * stageMult * (step.damageScale ?? 1),
+    (enemy.def.atk + step.bonusAtk + 2) * enemy.atkMult * stageMult * pressureMult * (step.damageScale ?? 1),
   ))
 }
 
@@ -794,6 +797,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const attackStage = bossAttackStage(enemy)
   const animationStage = attackStep?.animationStage ?? attackStage
   const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
+  const turnPressureMultiplier = bossTurnPressureMultiplier(enemy, state.turn)
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
@@ -808,16 +812,17 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   // 방어막을 타고 넘는 대신 한 방을 최대 체력의 1/5로 묶어, 여러 턴에 걸쳐
   // 조여드는 압박으로 만든다.
   const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
-  const raw = enemy.def.webPattern
+  const pressureBase = enemy.def.webPattern
     ? Math.min(uncappedRaw, webShowCap)
     : uncappedRaw
+  const raw = Math.round(pressureBase * turnPressureMultiplier)
   // 모여든 호위가 한꺼번에 돌격하면 방패 위로 넘어 들어온다. 넷이 모이기 전에
   // 넓은 문장으로 흩어 놓는 것이 유일한 대응이고, 방어로 버티기는 답이 아니다.
   const piercedGuard = !!enemy.def.pierceGuard
     || summonsReleased > 0
     || (!!summonPattern?.pierceWhileEscorted && escorts > 0)
   const immune = !!state.damageImmune
-  const guardRequired = enemyGuardBreakRequirement(enemy)
+  const guardRequired = enemyGuardBreakRequirement(enemy, state.turn)
   const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard >= guardRequired
   const absorbed = immune ? 0 : guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)
   const dealt = immune ? 0 : guardShattered ? 0 : piercedGuard ? raw : Math.max(0, raw - state.guard)
