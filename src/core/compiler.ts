@@ -6,6 +6,7 @@
  * 슬롯을 4칸/6칸으로 바꿔도 컴파일러는 그대로 동작한다.
  */
 
+import { EMOTION_RESONANCE } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
@@ -229,7 +230,9 @@ export function compile(
   const emotionCounts = new Map<Emotion, number>()
   emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
   const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-  const emotionResonance = repeatedEmotion?.[1] === 3 ? 1.3 : repeatedEmotion?.[1] === 2 ? 1.15 : 1
+  const emotionResonance = repeatedEmotion?.[1] === 3
+    ? EMOTION_RESONANCE.triple
+    : repeatedEmotion?.[1] === 2 ? EMOTION_RESONANCE.pair : 1
   if (emotionResonance !== 1) {
     mults.push({
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} 공명`,
@@ -285,10 +288,10 @@ export function compile(
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.
 export const ROULETTE = { crit: 1.5, fail: 0.25 } as const
-const LUCK_MULT = 0.02 // 운 1당 기본 배율 +2% (그리 드라마틱하지 않게)
-const CRIT_STAT_K = 0.01 // 맥락 스탯 1당 대성공 +1%
+export const LUCK_MULT = 0.02 // 운 1당 기본 배율 +2% (그리 드라마틱하지 않게)
+export const CRIT_STAT_K = 0.01 // 맥락 스탯 1당 대성공 +1%
 const FAIL_STAT_K = 0.01 // 맥락 스탯 1당 실패 −1%
-const CRIT_CAP = 0.6 // 아무리 높아도 대성공은 60%에서 수렴(실패가 없어진 만큼 천장을 올렸다)
+export const CRIT_CAP = 0.6 // 아무리 높아도 대성공은 60%에서 수렴(실패가 없어진 만큼 천장을 올렸다)
 const FAIL_FLOOR = 0.05 // 실패는 0%로 수렴하지 않는다
 
 export type RouletteOutcome = 'crit' | 'normal' | 'fail'

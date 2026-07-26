@@ -2,8 +2,20 @@
  * Headless combat simulation. Rendering reads the results returned here; no battle
  * rule is defined in BattleView.
  */
+import {
+  BOSS_ATTACK_MULTIPLIER,
+  PART_WEAKNESS_MULT,
+  playerGuardLimit,
+  TARGET_FALLOFF,
+  WEAKNESS_MULT,
+  type BossAttackStage,
+} from '@core/combatRules'
 import { effectiveBase, isDamageIntent } from '@core/compiler'
 import type { Emotion, EnemyDef, EnemyPartDef, Intent, TargetCount } from '@core/types'
+
+// 규칙 상수의 원본은 core/combatRules.ts다(도움말 화면이 같은 값을 읽는다).
+// 기존 소비처가 계속 sim에서 가져다 쓸 수 있도록 여기서 그대로 다시 내보낸다.
+export { BOSS_ATTACK_MULTIPLIER, playerGuardLimit, type BossAttackStage }
 
 export interface EnemyPartInst {
   def: EnemyPartDef
@@ -49,15 +61,6 @@ export interface EnemyInst {
   parts: EnemyPartInst[]
   webTurns: number
   lastWebTurn: number
-}
-
-export type BossAttackStage = 1 | 2 | 3
-
-/** 보스는 남은 체력이 2/3, 1/3 경계를 지날 때 공격 동작과 피해가 함께 강해진다. */
-export const BOSS_ATTACK_MULTIPLIER: Record<BossAttackStage, number> = {
-  1: 1,
-  2: 1.25,
-  3: 1.5,
 }
 
 export function bossAttackStage(enemy: Pick<EnemyInst, 'def' | 'hp' | 'maxHp'>): BossAttackStage {
@@ -326,11 +329,6 @@ export interface OverkillTransferResult {
   overflow: number
 }
 
-/** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
-export function playerGuardLimit(playerMax: number): number {
-  return Math.max(0, Math.round(playerMax))
-}
-
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
   const guardAttempted = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
   const guardGain = Math.min(guardAttempted, Math.max(0, playerGuardLimit(state.playerMax) - state.guard))
@@ -354,8 +352,6 @@ interface AttackPlan {
   /** 현재 약점과 관용구가 함께 맞았을 때만 부위 너머로 남은 피해를 보낸다. */
   comboMatched: boolean
 }
-
-const TARGET_FALLOFF = [1, 0.7, 0.5] as const
 
 /** 일반 보스에서 한 타격이 이 막 수만큼 강하면 막 경계를 넘어간다. */
 export const BOSS_MULTI_BAR_HIT_BARS = 2
@@ -401,7 +397,8 @@ function damageEnemy(
     ? activePartWeak(enemy, emotions, tags)
     : !!enemy.def.weakEmotion && emotions.includes(enemy.def.weakEmotion)
   const groggyMult = state.turn <= enemy.groggyUntilTurn ? enemy.groggyDamageMult : 1
-  const raw = Math.max(0, Math.round(dmg * (weak ? (part ? 1.5 : 1.25) : 1) * groggyMult))
+  const weakMult = weak ? (part ? PART_WEAKNESS_MULT : WEAKNESS_MULT) : 1
+  const raw = Math.max(0, Math.round(dmg * weakMult * groggyMult))
   if (enemy.def.summonPattern && summonCount(enemy) > 0) {
     return {
       target,

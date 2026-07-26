@@ -10,7 +10,6 @@ import bg004 from './backgrounds/bg_004.webp'
 import bg005 from './backgrounds/bg_005.webp'
 import bg006 from './backgrounds/bg_006.webp'
 import backgroundDark from './backgrounds/backgroundDark.webp'
-import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
 import rewardSubjectModifier from './ui/reward_subject_modifier.webp'
@@ -194,8 +193,6 @@ export const FIELD_BACKGROUNDS: string[] = [bg001, bg002, bg003, bg004, bg005]
 
 /** 보스방 배경 — 일반 풀에 섞이지 않는다. */
 export const BOSS_BACKGROUND = bg006
-
-export const GUIDE_ART = { combat: combatGuide }
 
 // 타이틀 화면 — 배경 일러스트 + 발광 로고
 export const TITLE = {

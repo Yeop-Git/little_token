@@ -1,7 +1,11 @@
-import { SKILL_ART, SPRITES } from '@/assets'
+import { SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
-import { icon } from '@/ui/Icons'
+import { cardTitleStyle, wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
+
+// 카드 앞면 마크업의 원본은 ui/WordCardFace.ts다. 도움말 화면이 같은 함수를
+// 쓰므로 여기서 다시 내보내 기존 소비처(BattleView 도감)의 경로를 유지한다.
+export { cardTitleStyle }
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -54,19 +58,6 @@ export const CARD_HAND_CONFIG = {
 export interface LineTransform {
   translateX: number
   zIndex: number
-}
-
-/** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
-export function cardTitleStyle(text: string, illustrated = false): string {
-  const maxSize = illustrated ? 27 : 24
-  const availableWidth = illustrated ? 140 : 126
-  const widthUnits = Array.from(text).reduce((sum, char) => {
-    if (/\s/.test(char)) return sum + 0.35
-    if (/[\u0000-\u00ff]/.test(char)) return sum + 0.62
-    return sum + 1
-  }, 0)
-  const fittedSize = Math.max(12, Math.min(maxSize, (availableWidth * 0.92) / Math.max(1, widthUnits)))
-  return `style="--card-title-size:${fittedSize.toFixed(1)}px"`
 }
 
 /** DOM과 무관한 일렬 손패 좌표 계산. 카드 묶음의 중심을 항상 화면 중앙에 맞춘다. */
@@ -555,7 +546,7 @@ export class CardHand {
       const drawing = this.drawingId === card.instanceId
       const rarity = card.word.rarity ?? 'common'
       const emotionKey = emotionOrNeutral(card.word.emotion)
-      button.className = `word-card mood-${this.moodOf(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
+      button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !!unavailable
       button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`)
@@ -588,37 +579,17 @@ export class CardHand {
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
     const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${card.word.note}`
-    const artUrl = card.word.art ? SKILL_ART[card.word.art] : undefined
-    const level = card.word.level ?? 1
-    // 대상 범위 대신 등급·강화 단계를 보여준다 — 카드에서 알고 싶은 건 이쪽이다.
     const rarity = card.word.rarity ?? 'common'
     const emotion = emotionOrNeutral(card.word.emotion)
-    const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
-    const actionBadge = this.verbActionBadge(card.word)
     // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.
     const webOverlay = `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>`
-    // 풀 일러스트 카드 — 일러스트 위에 kind별 색감 틴트 + 중앙에 발광·깊은 그림자 글자.
-    const front = artUrl
-      ? `<span class="card-face card-front art">
-          <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
-          <span class="card-tint" aria-hidden="true"></span>
-          <span class="card-veil" aria-hidden="true"></span>
-          <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${actionBadge}
-          <strong class="card-title" ${cardTitleStyle(card.word.text, true)}>${card.word.text}</strong>
-          <span class="card-note">${unavailable ?? card.word.note}</span>
-          ${webOverlay}
-        </span>`
-      : `<span class="card-face card-front">
-          <span class="card-foil" aria-hidden="true"></span>
-          ${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${actionBadge}
-          <span class="card-art" aria-hidden="true"><i></i><b>${this.artGlyph(card.word)}</b></span>
-          <strong class="card-title" ${cardTitleStyle(card.word.text)}>${card.word.text}</strong>
-          <span class="card-note">${unavailable ?? card.word.note}</span>
-          <small>${sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD'}</small>
-          ${webOverlay}
-        </span>`
-    return `<button class="word-card mood-${this.moodOf(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
+    // 앞면은 손패 밖 화면과 같은 함수로 그린다(ui/WordCardFace.ts).
+    const front = wordCardFrontHtml(card.word, {
+      note: unavailable ?? card.word.note,
+      footer: sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD',
+      overlay: webOverlay,
+    })
+    return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${unavailable ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
@@ -626,37 +597,6 @@ export class CardHand {
         ${front}
       </span></span>
     </button>`
-  }
-
-  /** 동사는 카드 문구를 읽기 전에도 공격·방어·회복 역할을 알아볼 수 있게 한다. */
-  private verbActionBadge(word: Word): string {
-    if (word.slot !== 'verb' && word.slot !== 'verb2') return ''
-    const action = word.kind === 'heal' || word.effects?.heal
-      ? { cls: 'heal', label: '회복', glyph: 'cross' }
-      : word.kind === 'guard' || word.effects?.guard
-        ? { cls: 'guard', label: '방어', glyph: 'shield' }
-        : { cls: 'attack', label: '공격', glyph: 'sword' }
-    return `<span class="card-action action-${action.cls}" title="${action.label}" aria-hidden="true">${icon(action.glyph)}</span>`
-  }
-
-  // 카드 색감(--wglow): 공격=붉음 · 방어=파랑 · 회복=초록 · 도박=보라.
-  // TODO(기획): 보라색 '혼돈(chaos)' 종류 — 무슨 효과가 터질지 모르는 카드. 추후 추가.
-  private moodOf(word: Word): string {
-    if (word.variance) return 'gamble'
-    if (word.kind === 'heal' || word.effects?.heal) return 'heal'
-    if (word.kind === 'guard' || word.effects?.guard) return 'guard'
-    if (word.kind === 'attack' || (word.power ?? 0) > 0) return 'attack'
-    if (word.effects?.recoil) return 'sacrifice'
-    return 'buff'
-  }
-
-  private artGlyph(word: Word): string {
-    if (word.variance) return '✧'
-    if (word.kind === 'heal' || word.effects?.heal) return '✚'
-    if (word.kind === 'guard' || word.effects?.guard) return '◇'
-    if (word.kind === 'attack' || word.power) return '↗'
-    if (word.effects?.recoil) return '※'
-    return '✦'
   }
 
   // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.

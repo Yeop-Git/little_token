@@ -79,7 +79,7 @@ void preloadUpcomingBattle().catch(() => undefined)
 type CurrentView = { destroy?: () => void } & Partial<Pick<BattleViewType,
   'debugDefeat' | 'debugSetCombatModes' | 'debugSpawnCard'>>
 let current: CurrentView | null = null
-type SceneName = 'title' | 'intro' | 'battle' | 'reward' | 'item' | 'ending' | 'defeat'
+type SceneName = 'title' | 'guide' | 'intro' | 'battle' | 'reward' | 'item' | 'ending' | 'defeat'
 // 디버그 지급 후 어느 씬으로 되돌아갈지.
 let lastScene: SceneName = 'battle'
 // 저장 파일과 실제 밸런스에는 남기지 않는, 이번 실행 동안만 쓰는 전투 치트다.
@@ -188,7 +188,7 @@ function mountDevCheat(active: SceneName) {
   const normalItems = Object.values(ALL_ITEMS).filter((item) => !item.passive)
   const ruleItems = Object.values(ALL_ITEMS).filter((item) => item.passive)
   const stagePresets = [1, 5, 10, 15]
-  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', intro: '인트로', battle: '전투', reward: '보상', item: '감탄', ending: '엔딩' }
+  const sceneLabel: Record<Exclude<SceneName, 'defeat'>, string> = { title: '타이틀', guide: '설명서', intro: '인트로', battle: '전투', reward: '보상', item: '감탄', ending: '엔딩' }
   const itemButton = (def: ItemDef) =>
     `<button type="button" class="dev-cheat-item${def.passive ? ' passive' : ''}${owned.has(def.id) ? ' owned' : ''}" data-item="${def.id}">
       <b>${def.name}</b><span>${def.passive ? '문장 규칙' : '스탯 아이템'}${owned.has(def.id) ? ' · 보유 중' : ''}</span>
@@ -286,6 +286,7 @@ function mountDevCheat(active: SceneName) {
   }
   const goScene = (scene: SceneName) => {
     if (scene === 'title') goTitle()
+    else if (scene === 'guide') goCombatGuide()
     else if (scene === 'intro') goBattle(true)
     else if (scene === 'battle') goBattle()
     else if (scene === 'reward') goReward()
@@ -426,14 +427,18 @@ function resetAllRecordsAndStart() {
  * 첫 부팅에서만 오프닝 시네마틱을 얹는다. 타이틀을 먼저 다 그려 둔 위에 덮고,
  * 영상이 끝나기 전에 걷히게 해서 마지막 장면이 타이틀 배경으로 포개지게 한다.
  * '홈으로'처럼 다시 타이틀에 올 때는 틀지 않는다 — 매번 보면 지겹다.
+ *
+ * 이 함수는 버튼 핸들러로도 불릴 자리가 많다. 그때 넘어오는 이벤트 객체가
+ * 곧 "시네마틱을 켜라"로 읽히지 않도록 인자를 true인지로만 판단한다.
  */
-function goTitle(withIntro = false) {
+function goTitle(withIntro: unknown = false) {
+  const playIntro = withIntro === true
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
   const title = new TitleView(stage, {
     hasSave: CONTINUE_ENABLED && !!loadRun(),
-    holdUi: withIntro,
+    holdUi: playIntro,
     onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
@@ -451,7 +456,7 @@ function goTitle(withIntro = false) {
   })
   current = title
   mountMeta('title')
-  if (!withIntro) return
+  if (!playIntro) return
   // 영상이 배경으로 다 포개진 뒤 잠깐 둔다 — 방금 본 장면이 타이틀이 됐다는 걸
   // 알아볼 시간을 주고 나서 제목과 메뉴를 올린다.
   let holdTimer = 0
@@ -483,8 +488,9 @@ function goCombatGuide() {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  current = new CombatGuideView(stage, { onBack: goTitle })
-  mountMeta('title')
+  // 클릭 이벤트가 인자로 새어 들어가면 로비로 돌아올 때마다 오프닝이 다시 돈다.
+  current = new CombatGuideView(stage, { onBack: () => goTitle() })
+  mountMeta('guide')
 }
 
 /**
@@ -760,5 +766,6 @@ else if (start === 'ending') goEnding()
 else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
+else if (start === 'guide') goCombatGuide()
 // 부팅으로 들어온 타이틀에서만 오프닝 시네마틱을 튼다(?scene=title이면 검수용이라 건너뛴다).
 else goTitle(!params.get('scene'))

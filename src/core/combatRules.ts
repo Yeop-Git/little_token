@@ -1,0 +1,34 @@
+/**
+ * 화면에 그대로 설명되는 전투 규칙 상수.
+ *
+ * 시뮬레이션(`sim/reference.ts`)과 컴파일러가 실제로 계산에 쓰는 값이자,
+ * 도움말(`views/CombatGuideView.ts`)이 읽어서 표시하는 값이다. 규칙 설명과
+ * 실제 결과가 어긋나지 않도록 두 곳이 같은 상수를 본다 — 숫자를 바꾸면
+ * 설명서도 같이 바뀐다.
+ */
+
+/** 다중 대상 공격의 앞줄부터의 피해 비율. 배열 길이를 넘는 대상은 마지막 값을 쓴다. */
+export const TARGET_FALLOFF = [1, 0.7, 0.5] as const
+
+/** 적 HP바 옆 감정을 문장에 실었을 때의 피해 배율. */
+export const WEAKNESS_MULT = 1.25
+
+/** 부위 보스(장로거미)의 지금 드러난 부위 약점을 맞혔을 때의 피해 배율. */
+export const PART_WEAKNESS_MULT = 1.5
+
+/** 같은 감정 카드가 모였을 때의 공명 배율. 무감정 카드는 세지 않는다. */
+export const EMOTION_RESONANCE = { pair: 1.15, triple: 1.3 } as const
+
+export type BossAttackStage = 1 | 2 | 3
+
+/** 보스는 남은 체력이 2/3, 1/3 경계를 지날 때 공격 동작과 피해가 함께 강해진다. */
+export const BOSS_ATTACK_MULTIPLIER: Record<BossAttackStage, number> = {
+  1: 1,
+  2: 1.25,
+  3: 1.5,
+}
+
+/** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
+export function playerGuardLimit(playerMax: number): number {
+  return Math.max(0, Math.round(playerMax))
+}
