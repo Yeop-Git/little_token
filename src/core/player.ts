@@ -33,7 +33,7 @@ export interface OwnedItem {
   art: string // Icons.itemArt 키
   line: string // 감탄 문장
   stats: Partial<PlayerStats>
-  /** 규칙을 바꾸는 패시브(전설 아이템 전용). 스탯 아이템은 없다. */
+  /** 규칙을 바꾸는 패시브(영웅·전설 아이템 전용). 스탯 아이템은 없다. */
   passive?: PassiveId
 }
 
@@ -61,8 +61,8 @@ export function defaultPlayer(): PlayerState {
   return {
     stats: { ...STARTING_COMBAT_STATS },
     items: [
-      { id: 'candle', name: '몽당 양초', rarity: 'common', art: 'candle', line: '와! 정말 예뻐!', stats: { atk: 3, heal: 2, luck: 2 } },
-      { id: 'ribbon', name: '낡은 리본', rarity: 'common', art: 'ribbon', line: '음? 살짝 튼튼해!', stats: { hp: 2, guard: 4, luck: 2 } },
+      { id: 'candle', name: '소년의 몽당연필', rarity: 'common', art: 'pencil', line: '와! 정말 예뻐!', stats: { atk: 1, heal: 1, luck: 1 } },
+      { id: 'ribbon', name: '아버지의 낡은 이야기책', rarity: 'common', art: 'book', line: '음? 살짝 튼튼해!', stats: { guard: 2, luck: 1 } },
     ],
     deck: WORDS,
   }

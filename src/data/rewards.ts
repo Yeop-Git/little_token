@@ -1,5 +1,5 @@
 /**
- * 스테이지 클리어 보상 — 주어 → 수식어·아이템 → 동사 순서로 각각 3택한다.
+ * 스테이지 클리어 보상 — 주어·수식어 → 아이템 → 동사 순서로 각각 3택한다.
  * 전투 등급에 15층 사이클 진행 보정을 더해 뒤로 갈수록 단어 보상의 높은 희귀도가
  * 자주 나온다. 1~4층 노멀, 5~9층 희귀, 10~15층 영웅이 중심이며 각 구간에서
  * 다음 등급 확률이 상승한다. 10층에는 전설 아이템을, 15층에는 전설 스킬을
@@ -12,7 +12,7 @@ import type { RewardPhase } from '@core/run'
 import { GRADE_MAX, startGrade } from '@core/grade'
 import { floorInCycle, STORY_FLOORS } from './stages'
 import { ALL_REWARD_WORDS } from './earlyWords'
-import { ITEMS, LEGENDARY_ITEMS, type ItemDef } from './items'
+import { ITEMS, PASSIVE_ITEMS, type ItemDef } from './items'
 import { tacticalCardIdsForRewardDay } from './tacticalCards'
 
 export interface RewardOption {
@@ -163,20 +163,20 @@ const toItemOption = (item: ItemDef): RewardOption => ({
   kind: 'item',
   rarity: item.rarity,
   name: item.name,
-  desc: item.passive ? '문장의 규칙이 바뀐다' : '감탄사로 스탯을 올린다',
+  desc: item.passive ? '고유효과 · 감탄사로 스탯 선택' : '감탄사로 스탯 선택',
   art: 'gift',
   item,
 })
 
 function itemOptions(player: PlayerState): RewardOption[] {
   const owned = new Set(player.items.map((item) => item.id))
-  const unownedLegendary = Object.values(LEGENDARY_ITEMS).filter((item) => !owned.has(item.id))
-  const legendary = unownedLegendary.length ? unownedLegendary : Object.values(LEGENDARY_ITEMS)
-  return [...Object.values(ITEMS), ...legendary].map(toItemOption)
+  const unownedPassives = Object.values(PASSIVE_ITEMS).filter((item) => !owned.has(item.id))
+  const passives = unownedPassives.length ? unownedPassives : Object.values(PASSIVE_ITEMS)
+  return [...Object.values(ITEMS), ...passives].map(toItemOption)
 }
 
 function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb'): RewardOption[] {
-  const slots = phase === 'subject' ? ['subj'] : ['verb']
+  const slots = phase === 'subject' ? ['subj', 'adv'] : ['verb']
   const all = wordOptions(player, slots)
   const used = new Set<string>()
   const picks: RewardOption[] = []
@@ -186,6 +186,14 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   if (bossRarity) {
     const option = pickOne(all, grade, day, used, bossRarity)
     if (option) picks.push(option)
+  }
+  // 첫 단계는 세 장이 한 문법에 몰리지 않도록 주어와 수식어를 한 장씩 보장한다.
+  if (phase === 'subject') {
+    for (const slot of slots) {
+      if (picks.some((entry) => entry.word?.slot === slot)) continue
+      const option = pickOne(all.filter((entry) => entry.word?.slot === slot), grade, day, used)
+      if (option) picks.push(option)
+    }
   }
   // A boss-eve verb reward always includes one card that interacts with the next boss's rule.
   // Already-owned cards remain useful here because the reward becomes a reinforcement.
@@ -202,21 +210,20 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   return shuffle(picks)
 }
 
-function generateModifierItemRewards(player: PlayerState, grade: number, day: number): RewardOption[] {
-  const words = wordOptions(player, ['adv'])
+function generateItemRewards(player: PlayerState, grade: number, day: number): RewardOption[] {
   const items = itemOptions(player)
-  const all = [...words, ...items]
   const used = new Set<string>()
   const picks: RewardOption[] = []
 
-  // 가운데 3택은 어느 한 종류로 몰리지 않게 수식어와 아이템을 최소 한 장씩 둔다.
-  const word = pickOne(words, grade, day, used, bossRewardRarity(day) ?? undefined)
-  if (word) picks.push(word)
+  // 단어 카드와 같은 pickOne/희귀도 곡선을 사용한다. 10층 확정 전설만 추가 예외다.
+  // 10층에는 매 사이클 전설 규칙 아이템을 최소 한 장 선택할 수 있게 둔다.
   const forceLegendaryItem = floorInCycle(day) === GUARANTEED_LEGENDARY_ITEM_FLOOR
-  const item = pickOne(items, grade, day, used, forceLegendaryItem ? 'legendary' : undefined)
-  if (item) picks.push(item)
+  if (forceLegendaryItem) {
+    const item = pickOne(items, grade, day, used, 'legendary')
+    if (item) picks.push(item)
+  }
   while (picks.length < 3) {
-    const option = pickOne(all, grade, day, used)
+    const option = pickOne(items, grade, day, used)
     if (!option) break
     picks.push(option)
   }
@@ -230,6 +237,6 @@ export function genRewards(
   phase: RewardPhase = 'subject',
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
-  if (phase === 'item') return generateModifierItemRewards(player, effectiveGrade, day)
+  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day)
   return generateWordRewards(player, effectiveGrade, day, phase)
 }

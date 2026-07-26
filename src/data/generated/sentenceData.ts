@@ -1250,7 +1250,7 @@ export const PUNCT_WORDS: Word[] = [
   }
 ]
 
-/** 무럭무럭 — '잭과 숙주나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
+/** 무럭무럭 — '잭의 하늘나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
 export const GROW_WORDS: Word[] = [
   {
     "id": "gr",

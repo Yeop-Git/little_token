@@ -25,8 +25,8 @@ const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 const PHASE_NO: Record<RewardPhase, number> = { subject: 1, item: 2, verb: 3 }
 const PHASE_ALT: Record<RewardPhase, string> = {
-  subject: '이야기의 주어를 고르자!',
-  item: '소품과 수식어를 고르자!',
+  subject: '주어와 수식어를 고르자!',
+  item: '이야기의 소품을 고르자!',
   verb: '마지막 동사를 고르자!',
 }
 

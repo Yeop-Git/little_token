@@ -6,7 +6,7 @@
  */
 
 import type { ItemDef, StatKey } from '@data/items'
-import { EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
+import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor } from '@data/items'
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -58,13 +58,14 @@ export class ItemExclaimView {
 
   private totals() {
     const t: Record<StatKey, number> = { ...this.opts.item.base }
-    for (const slot of EXCLAIM_SLOTS) {
+    EXCLAIM_SLOTS.forEach((slot, slotIndex) => {
       const w = slot.words.find((x) => x.id === this.picks[slot.key])
-      if (!w) continue
-      for (const k of STAT_ORDER) t[k] += w.mods[k] ?? 0
+      if (!w) return
+      const mods = exclaimModsFor(this.opts.item.rarity, slotIndex, w.mods)
+      for (const k of STAT_ORDER) t[k] += mods[k] ?? 0
       const bless = this.blessed.get(`${slot.key}:${w.id}`)
       if (bless) t[bless.stat] += bless.n
-    }
+    })
     return t
   }
 
@@ -121,7 +122,7 @@ export class ItemExclaimView {
       window.setTimeout(() => {
         const totals = this.totals()
         const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
-        // 최종 스탯(기본+감탄사) 전체가 플레이어 스탯에 더해진다(스펙업).
+        // 감탄사 선택과 행운 감탄으로 확정된 스탯이 플레이어 스탯에 더해진다.
         this.opts.onDone({
           id: item.id,
           name: item.name,
@@ -188,8 +189,12 @@ export class ItemExclaimView {
         const blessHtml = bless
           ? `<span class="bless">${STAT_LABEL[bless.stat]} +${bless.n}</span>`
           : ''
+        const effectiveMods = exclaimModsFor(this.opts.item.rarity, this.slotIndex, w.mods)
+        const effectiveNote = Object.entries(effectiveMods)
+          .map(([stat, value]) => `${STAT_LABEL[stat as StatKey]} +${value}`)
+          .join(' · ')
         return `<button class="word-cell rarity-common ${picked ? 'picked' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
-          <span class="w">${w.text}</span><span class="n">${w.note}</span>${blessHtml}
+          <span class="w">${w.text}</span><span class="n">${effectiveNote}</span>${blessHtml}
         </button>`
       })
       .join('')

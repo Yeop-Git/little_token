@@ -9,6 +9,7 @@ import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
 import { bossRewardRarity, genRewards, rewardGradeForDay, rewardRarityWeights } from '@data/rewards'
+import { ALL_ITEMS, EXCLAIM_RARITY_MULTS } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
   activeEnemyPart,
@@ -38,6 +39,19 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
 { const player = defaultPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'battle fallback starts at hp 52 and guard 3') }
+{
+  const expectedBudget = { common: 3, rare: 4, epic: 4, legendary: 5 } as const
+  const counts = { common: 0, rare: 0, epic: 0, legendary: 0 }
+  for (const item of Object.values(ALL_ITEMS)) {
+    counts[item.rarity]++
+    assert(Object.values(item.base).every((value) => value === 0), `${item.name} has no fixed base stats`)
+    assert((item.rarity === 'epic' || item.rarity === 'legendary') === !!item.passive, `${item.name} passive matches rarity tier`)
+  }
+  for (const [rarity, multipliers] of Object.entries(EXCLAIM_RARITY_MULTS)) {
+    assert(multipliers.reduce((sum, value) => sum + value, 0) === expectedBudget[rarity as keyof typeof expectedBudget], `${rarity} exclaim budget stays fixed`)
+  }
+  assert(Math.abs(counts.common - counts.rare) <= 1 && Math.abs(counts.epic - counts.legendary) <= 1, 'item rarities remain evenly distributed')
+}
 {
   const legacy = { player: { ...startingPlayer(), stats: { hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 } }, day: 4, endless: false, endingSeen: false } as Omit<RunState, 'balanceVersion'>
   assert(migrateCombatBalance(legacy as RunState) && legacy.player.stats.hp === 52 && legacy.player.stats.guard === 3, 'legacy base stats migrate once')
@@ -326,8 +340,8 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   const first = genRewards(player, 5, 1, 'subject')
   const second = genRewards(player, 5, 1, 'item')
   const third = genRewards(player, 5, 1, 'verb')
-  assert(first.length === 3 && first.every((option) => option.word?.slot === 'subj'), 'first reward offers three subjects')
-  assert(second.length === 3 && second.some((option) => option.word?.slot === 'adv') && second.some((option) => option.kind === 'item'), 'second reward mixes modifiers and items')
+  assert(first.length === 3 && first.every((option) => option.kind === 'word') && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward mixes subjects and modifiers')
+  assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
   assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
   const rarityCurve = [1, 4, 5, 9, 10, 15].map((day) => rewardRarityWeights(5, day))
   assert(rarityCurve[0].common > rarityCurve[0].rare && rarityCurve[1].common > rarityCurve[1].rare, 'floors one to four remain normal-dominant')
@@ -337,7 +351,7 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(rarityCurve[1].rare > rarityCurve[0].rare, 'rare chance rises through floors one to four')
   for (const [day, rarity] of [[5, 'rare'], [10, 'epic'], [15, 'legendary']] as const) {
     assert(bossRewardRarity(day) === rarity, `boss floor ${day} uses its milestone rarity`)
-    for (const phase of ['subject', 'item', 'verb'] as const) {
+    for (const phase of ['subject', 'verb'] as const) {
       const reward = genRewards(player, 5, day, phase)
       assert(reward.some((option) => option.kind === 'word' && option.rarity === rarity), `boss floor ${day} ${phase} reward includes a ${rarity} skill`)
     }

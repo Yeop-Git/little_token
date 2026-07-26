@@ -13,8 +13,8 @@ import backgroundDark from './backgrounds/backgroundDark.webp'
 import combatGuide from './backgrounds/combat_guide.webp'
 import titleBg from './backgrounds/tt_001.webp'
 import titleLogo from './backgrounds/tt_002.webp'
-import rewardSubject from './ui/reward_subject.webp'
-import rewardModifierItem from './ui/reward_modifier_item.webp'
+import rewardSubjectModifier from './ui/reward_subject_modifier.webp'
+import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
 import player001 from './sprites/player_001.webp'
@@ -128,6 +128,19 @@ import itemPino from './sprites/items/item_010.webp'
 import itemBeanstalk from './sprites/items/item_011.webp'
 import itemBook from './sprites/items/item_012.webp'
 import itemPencil from './sprites/items/item_013.webp'
+import itemBugSpray from './sprites/items/item_014.webp'
+import itemBrush from './sprites/items/item_015.webp'
+import itemShell from './sprites/items/item_016.webp'
+import itemPaperShield from './sprites/items/item_017.webp'
+import itemTelescope from './sprites/items/item_018.webp'
+import itemMap from './sprites/items/item_019.webp'
+import itemInkwell from './sprites/items/item_020.webp'
+import itemHourglass from './sprites/items/item_021.webp'
+import itemRemedy from './sprites/items/item_022.webp'
+import itemStarLantern from './sprites/items/item_023.webp'
+import itemOilLantern from './sprites/items/item_024.webp'
+import itemCompass from './sprites/items/item_025.webp'
+import itemSatchel from './sprites/items/item_026.webp'
 import cinematic from './video/cinematic.webm'
 import bossCinematic001 from './video/bosscinematic_001.webm'
 import attack001 from './video/attack_001.webm'
@@ -192,8 +205,8 @@ export const TITLE = {
 
 /** 스테이지 클리어 3단계 보상 머리말과 최종 정산 원화. */
 export const REWARD_ART = {
-  subject: rewardSubject,
-  item: rewardModifierItem,
+  subject: rewardSubjectModifier,
+  item: rewardItem,
   verb: rewardVerb,
   clear: rewardClear,
 }
@@ -342,19 +355,32 @@ export const SKILL_ART: Record<string, string> = {
  * 여기 없는 키는 Icons.itemArt의 SVG 폴백으로 떨어진다(노멀 아이템 2종).
  */
 export const ITEM_ART: Record<string, string> = {
-  snack: itemSnack, // 맛동사
+  snack: itemSnack, // 두 겹의 문장과자
   chime: itemChime, // 누댕의 메아리
-  mirror: itemMirror, // 미녀의 거울
-  shoe: itemShoe, // 백설공주의 구두
+  mirror: itemMirror, // 미녀의 은빛 거울
+  shoe: itemShoe, // 백설공주의 유리구두
   apple: itemApple, // 신데렐라의 황금사과
   carrot: itemCarrot, // 올림프의 당근
-  match: itemMatch, // 빨간망토의 성냥
-  cloak: itemCloak, // 성냥팔이 소녀의 망토
-  bbq: itemBbq, // 아기돼지 바베큐
-  pino: itemPino, // 피노키오의 미아핑
-  beanstalk: itemBeanstalk, // 잭과 숙주나물
+  match: itemMatch, // 빨간망토의 불씨
+  cloak: itemCloak, // 성냥팔이의 붉은 망토
+  bbq: itemBbq, // 아기돼지의 숯불화로
+  pino: itemPino, // 피노키오의 물음표
+  beanstalk: itemBeanstalk, // 잭의 하늘나물
   book: itemBook, // 낡은 책 — 시작 지급
   pencil: itemPencil, // 짜리몽땅 연필 — 시작 지급
+  bugSpray: itemBugSpray,
+  brush: itemBrush,
+  shell: itemShell,
+  paperShield: itemPaperShield,
+  telescope: itemTelescope,
+  map: itemMap,
+  inkwell: itemInkwell,
+  hourglass: itemHourglass,
+  remedy: itemRemedy,
+  starLantern: itemStarLantern,
+  oilLantern: itemOilLantern,
+  compass: itemCompass,
+  satchel: itemSatchel,
 }
 
 // 영상 — 오프닝 시네마틱과 공격 액션 컷.
