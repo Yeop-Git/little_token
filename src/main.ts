@@ -18,7 +18,7 @@ import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { floorInCycle, stageFor } from '@data/stages'
-import { genRewards, type RewardOption } from '@data/rewards'
+import { genRewards, rewardGradeForDay, type RewardOption } from '@data/rewards'
 import { newRun, registerWord, applyItemReward, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
@@ -669,6 +669,8 @@ function goReward(
   const options = genRewards(run.player, grade, run.day, phase)
   current = new RewardView(stage, {
     day: run.day,
+    deck: run.player.deck,
+    grade: rewardGradeForDay(grade, run.day),
     phase,
     options,
     onPick: (opt) => {

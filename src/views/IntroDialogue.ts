@@ -44,6 +44,7 @@ const SCRIPT: ScriptLine[] = [
   { kind: 'player', words: ['아무것도', '기억이', '안 나.'] },
   { kind: 'token', portrait: 'neutral', text: '내가 다시 차근차근 알려줄게.' },
   { kind: 'token', portrait: 'smile', text: '우린 최고의 파트너니까!' },
+  { kind: 'token', portrait: 'smile', text: '같은 색 감정을 모으면 강력한 힘이 나가!' },
   { kind: 'token', portrait: 'smile', text: '우선 눈 앞에 이야기를 좀먹는 녀석들을 처리해야해!' },
   { kind: 'player', words: ['그게', '누군데?'] },
 ]

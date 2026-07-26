@@ -5,15 +5,22 @@
 
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import type { RewardOption } from '@data/rewards'
-import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
+import { gradeTier } from '@core/grade'
+import { reinforceWord } from '@core/run'
+import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
+import { critText, multText, wordValueLines } from '@core/wordText'
+import { comboHintHtml } from '@/ui/ComboHint'
 
 interface Opts {
   day: number
+  deck?: Record<string, Word[]>
+  grade: number
   options: RewardOption[]
   phase: RewardPhase
   onPick: (opt: RewardOption) => void
@@ -24,10 +31,10 @@ const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식', verb
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
 const PHASE_NO: Record<RewardPhase, number> = { subject: 1, item: 2, verb: 3 }
-const PHASE_ALT: Record<RewardPhase, string> = {
-  subject: '주어와 수식어를 고르자!',
-  item: '이야기의 소품을 고르자!',
-  verb: '마지막 동사를 고르자!',
+const PHASE_TITLE: Record<RewardPhase, string> = {
+  subject: '주어와 수식어를 고르자',
+  item: '이야기의 소품을 고르자',
+  verb: '마지막 동사를 고르자',
 }
 
 function moodOf(w: Word): string {
@@ -64,6 +71,59 @@ function emotionBadge(opt: RewardOption): string {
   if (opt.kind !== 'word' || !opt.word) return ''
   const emotion = emotionOrNeutral(opt.word.emotion)
   return emotionIconBadge(emotion, 'rp-emotion')
+}
+
+function influenceNote(w: Word): string {
+  const parts: string[] = []
+  if (w.kind === 'heal' || w.effects?.heal) parts.push('회복')
+  if (w.kind === 'guard' || w.effects?.guard) parts.push('방어')
+  if (w.kind === 'attack' || w.power) parts.push('공격')
+  if (w.crit || w.fail) parts.push('룰렛(맥락 스탯+운)')
+  return parts.length ? `<div class="wd-inf">영향 스탯: ${parts.join(' · ')}</div>` : ''
+}
+
+function reinforceDeltas(w: Word): string {
+  const after: Word = {
+    ...w,
+    tags: [...w.tags],
+    effects: w.effects ? { ...w.effects } : undefined,
+    variance: w.variance ? { ...w.variance } : undefined,
+  }
+  reinforceWord(after)
+  const rows: string[] = [`단계 Lv.${w.level ?? 1} → <b>Lv.${after.level}</b>`]
+  if (w.power != null) rows.push(`위력 ${w.power} → <b>${after.power}</b>`)
+  if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
+  if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
+  if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
+  if (w.crit != null) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
+  return `<div class="rf-deltas"><div class="rf-h">강화하면</div>${rows.map((row) => `<div class="rf-row">${row}</div>`).join('')}</div>`
+}
+
+function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
+  if (opt.kind === 'item' && opt.item) {
+    const item = opt.item
+    const rows = STAT_ORDER.filter((key) => item.base[key])
+      .map((key) => `<div class="idrow"><span>${STAT_LABEL[key]}</span><span class="iv">+${item.base[key]}</span></div>`)
+      .join('')
+    const passive = item.passive ? PASSIVES[item.passive] : null
+    return `
+      <div class="wd-name">${item.name}</div>
+      <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[item.rarity]}</div>
+      ${passive ? `<div class="id-passive"><b>${passive.name}</b><span>${passive.desc}</span></div>` : ''}
+      <div class="id-stats">${rows}</div>
+      <div class="wd-inf">${passive ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '감탄사를 조립해 추가 스탯이 붙는다.'}</div>
+      <div class="wd-flavor">${item.flavor}</div>
+      <div class="id-art">${itemArt(item.art)}</div>`
+  }
+  const word = opt.word!
+  const values = wordValueLines(word)
+  return `
+    <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(word.emotion), 'wd-emotion')}<div class="wd-name">${word.text}</div></div>
+    <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${word.level ?? 1}` : ' · 새 단어'}</div>
+    <div class="wd-values">${values.map((value) => `<div class="v ${value.cls}">${value.text}</div>`).join('')}</div>
+    ${comboHintHtml(word, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}
+    ${opt.reinforce ? reinforceDeltas(word) : ''}
+    ${influenceNote(word)}`
 }
 
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채운다. 아직 그림이 없는 단어도 공용 아이콘을
@@ -103,7 +163,10 @@ function rewardPickHtml(p: RewardOption, i: number): string {
       <div class="rp-foot">
         <div class="rp-name">${p.name}</div>
         <div class="rp-effect">${mainEffect(p)}</div>
-        <div class="rp-actions"><span class="rp-take">고르기 →</span></div>
+        <div class="rp-actions">
+          <button class="rp-detail" type="button">자세히보기</button>
+          <span class="rp-take">고르기 →</span>
+        </div>
       </div>
     </div>`
 }
@@ -119,21 +182,45 @@ export class RewardView {
       <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
           <div class="reward-card">
-            <header class="reward-art-head">
-              <img src="${REWARD_ART[opts.phase]}" alt="${PHASE_ALT[opts.phase]}" />
-              <span class="sr-only">${opts.day}일차 클리어 · 보상 ${PHASE_NO[opts.phase]}단계 / 3단계</span>
+            <div class="reward-token" aria-hidden="true">
+              <img class="reward-token-shadow" src="${TOKEN_FACES.crown}" alt="" />
+              <img class="reward-token-main" src="${TOKEN_FACES.crown}" alt="" />
+            </div>
+            <header class="reward-head">
+              <div class="k">${opts.day}스테이지 클리어</div>
+              <div class="t hand">${PHASE_TITLE[opts.phase]}</div>
+              <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
+                ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
+              </div>
+              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade.toFixed(1)}</b></div>
             </header>
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
           </div>
+          <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
+            <div class="rd-hint">카드의 <b>자세히보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
+          </aside>
         </div>
       </div>`
 
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((el) => {
       const i = Number(el.dataset.i)
       el.addEventListener('click', () => this.take(el, opts.options[i]))
+      el.querySelector<HTMLElement>('.rp-detail')?.addEventListener('click', (event) => {
+        event.stopPropagation()
+        this.showDetail(opts.options[i], el)
+      })
     })
+  }
+
+  private showDetail(opt: RewardOption, el: HTMLElement) {
+    const dock = this.root.querySelector<HTMLElement>('#rdetail')!
+    const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
+    dock.className = `info-dock glass reward-dock mood-${mood}`
+    dock.innerHTML = detailHtml(opt, this.opts.deck)
+    this.root.querySelectorAll('.reward-pick').forEach((pick) => pick.classList.remove('detailing'))
+    el.classList.add('detailing')
   }
 
   private take(el: HTMLElement, opt: RewardOption) {

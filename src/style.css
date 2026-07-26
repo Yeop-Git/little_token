@@ -1294,6 +1294,10 @@ html[data-graphics='low'] .tip-bubble {
   --boss-display-scale: 1.55;
   --boss-bottom: -165px;
 }
+.actor.foe.boss[data-character='mantis'] {
+  /* 모델 중심보다 오른쪽에 모인 발 실루엣을 무대 중앙에 맞춘다. */
+  --boss-stage-offset-x: -84px;
+}
 .actor.foe.boss[data-character='queenBee'] {
   --boss-display-scale: 1.45;
   --boss-bottom: -165px;
@@ -4304,12 +4308,6 @@ html[data-graphics='low'] .tip-bubble {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity-color) 62%, transparent);
   animation: rare-foil-idle 5.2s ease-in-out infinite alternate;
 }
-/* 큰 보상 카드 여러 장에서 background-position과 filter를 계속 바꾸면 매 프레임
-   카드 표면이 다시 래스터링된다. 은빛은 정지 상태로 두고 호버 때만 한 번 쓸어 준다. */
-.reward-pick.rarity-rare .rp-foil {
-  animation: none;
-  background-position: 24% 0;
-}
 .word-card.rarity-epic .card-foil,
 .deck-hover-card.rarity-epic .card-foil,
 .reward-pick.rarity-epic .rp-foil {
@@ -5664,7 +5662,14 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
 .rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.rp-detail {
+  padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #fff;
+  background: rgba(8, 6, 14, 0.5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); transition: box-shadow 0.15s;
+}
+.rp-detail:hover { box-shadow: inset 0 0 0 1px var(--wglow, var(--gold)), 0 0 12px color-mix(in srgb, var(--wglow, var(--gold)) 50%, transparent); }
 .rp-take { font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 5px rgba(0, 0, 0, 0.95); }
+.reward-pick.detailing { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 45%, transparent), inset 0 1px 0 var(--glass-hi); }
 
 /* 아이템은 단어 카드의 둥근 사각 프레임과 다른 비대칭 이중 금속 프레임을 쓴다. */
 .reward-pick.is-item { border-radius: 30px 9px 30px 9px; box-shadow: 0 12px 30px rgba(0,0,0,.54), inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 7px rgba(65,43,35,.58); }
@@ -5682,6 +5687,28 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
 .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
 .reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+
+/* 우측 상세 칸은 참고 화면의 카드 선택 구성을 복원한다. 날씨·다음 날 안내는 두지 않는다. */
+.reward-dock {
+  position: static;
+  inset: auto;
+  width: 322px;
+  flex: none;
+  align-self: stretch;
+  min-height: 468px;
+  max-height: 80vh;
+  padding: 26px 24px;
+  overflow: auto;
+}
+.reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
+.rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
+.rd-hint b { color: var(--gold); }
+.rf-deltas {
+  margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 30%, transparent);
+}
+.rf-h { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); margin-bottom: 6px; }
 
 /* 덱 상한 교체 — 보유 카드 전체를 보여 주되, 8장에서는 카드 영역만 스크롤한다. */
 .discard-scene { box-sizing: border-box; padding: 18px 0; }

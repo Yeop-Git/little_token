@@ -64,7 +64,7 @@ import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL, type StatKey } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
-import { CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
+import { CARD_HAND_CONFIG, CardHand, cardTitleStyle, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { GameAudio } from '@/audio/GameAudio'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_MULT, PUMP_RATIO, type AttackCut } from '@/ui/AttackCinematic'
@@ -1342,10 +1342,11 @@ export class BattleView {
     // 세우고, 배경별 차이는 가로 자리와 간격에만 남긴다.
     const st = currentFieldStage()
     if (this.isBoss && e.def.boss) {
-      // 보스마다 뷰포트 폭이 달라도 배우의 실루엣 중심은 항상 무대 정중앙에 둔다.
+      // 보스마다 뷰포트 폭이 달라도 배우의 발 실루엣 중심은 항상 무대 정중앙에 둔다.
+      // 모델 고유의 비대칭은 CSS의 캐릭터별 오프셋으로 보정한다.
       // 개별 translate 속성은 공격·피격의 transform 애니메이션과 서로 덮어쓰지 않는다.
       el.style.right = 'auto'
-      el.style.translate = '-50% 0'
+      el.style.translate = 'calc(-50% + var(--boss-stage-offset-x, 0px)) 0'
       el.style.left = '50%'
     } else {
       el.style.left = 'auto'
@@ -1830,7 +1831,17 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     // 테이블 목록을 먼저 본다 — 덱에 없는 유령 카드(무럭무럭·문장부호)가 여기에만 있다.
     // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
-    const words = this.t.words[key] ?? this.player.deck[key] ?? []
+    const slotWords = this.t.words[key] ?? this.player.deck[key] ?? []
+    // 체력이 가득 찬 턴에는 순수 회복 동사를 드로우 풀에서도 뺀다. 다만 현재 문맥에서
+    // 선택 가능한 비회복 동사가 기본 네 장보다 적으면 소프트락을 피하려고 회복도 허용한다.
+    const verbSlot = key === 'verb' || key === 'verb2'
+    const usableNonHealCount = verbSlot
+      ? slotWords.filter((word) => word.kind !== 'heal' && !conflictReason(word, this.slotIndex, this.sel, this.t)).length
+      : 0
+    const hideHealVerbs = this.state.playerHp >= this.state.playerMax
+      && verbSlot
+      && usableNonHealCount >= CARD_HAND_CONFIG.verbInitialHand
+    const words = hideHealVerbs ? slotWords.filter((word) => word.kind !== 'heal') : slotWords
     const front = this.state.enemies[frontIdx(this.state)]
     const needsQueenAnswer = front?.def.id === 'queenBee'
       && summonCount(front) > 0

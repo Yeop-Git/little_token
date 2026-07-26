@@ -259,13 +259,9 @@ class FoilShaderRenderer {
     requestAnimationFrame(this.frame)
     if (document.hidden) return
     const reduced = this.reducedMotion.matches
-    // 가만히 있는 포일은 30fps로도 충분히 유려하다. 포인터가 올라가거나 카드가
-    // 사용되는 순간만 60fps로 올려, 여러 영웅/전설 카드의 GPU→2D 복사를 반으로 줄인다.
-    const interactive = [...this.surfaces.keys()].some((host) => {
-      const card = host.closest<HTMLElement>('.word-card, .reward-pick, .deck-hover-card')
-      return card?.classList.contains('commit-ghost') || card?.matches(':hover')
-    })
-    const interval = reduced ? 500 : 1000 / (interactive ? 60 : 30)
+    // 고급 모드의 호일은 대기 중에도 60fps로 갱신한다. 영웅의 별빛과 전설의
+    // 프리즘 조각은 정지 상태에서도 계속 흐르는 것이 등급 판별의 핵심이다.
+    const interval = reduced ? 500 : 1000 / 60
     if (now - this.lastFrame < interval) return
     this.lastFrame = now
     if (this.scanQueued) this.scan()

@@ -13,6 +13,13 @@ import { FIELDS } from './fields'
 export const MAX_ENCOUNTER = 8
 export const STORY_FLOORS = 15
 const ENEMY_ORDER = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito'] as const
+const EARLY_STORY_LAST_FLOOR = 10
+const EARLY_STORY_HP_MULT = 0.94
+const EARLY_STORY_ATK_MULT = 0.92
+const EARLY_STORY_BOSS_HP_MULT = 0.9
+const EARLY_STORY_BOSS_ATK_MULT = 0.75
+const EARLY_STORY_QUEEN_ATK_MULT = 0.69
+const FIRST_STORY_SPIDER_ATK_MULT = 0.12
 
 /** 15층짜리 한 권 안의 보스 배치. 엔드리스에서는 이 한 권을 더 강하게 반복한다. */
 export const BOSS_BY_FLOOR: Record<number, string> = {
@@ -65,9 +72,23 @@ export function stageFor(day: number): Stage {
   // 둘이 동시에 뚫리면 "웬만한 콤보"로는 필드가 안 비고, 진짜 잭팟만 올클을 낸다.
   // 그래도 개체 하나하나는 계속 물어서(한 방에 여럿 관통) 파바바박 손맛은 남긴다.
   const count = Math.min(1 + floor, MAX_ENCOUNTER)
-  const hpMult = 1 + (day - 1) * 0.26
+  // 첫 권의 1~10층만 원래 성장 곡선보다 살짝 낮춘다. 개별 적 원본값과 엔드리스
+  // 반복은 유지해 후반 정체성을 건드리지 않고, 초반에는 덜 정교한 선택도 버틴다.
+  const earlyStory = endlessCycle === 0 && floor <= EARLY_STORY_LAST_FLOOR
+  const earlyBoss = earlyStory && isBoss
+  const firstStorySpider = endlessCycle === 0 && boss === 'elderSpider'
+  const earlyBossAtkMult = boss === 'queenBee'
+    ? EARLY_STORY_QUEEN_ATK_MULT
+    : EARLY_STORY_BOSS_ATK_MULT
+  const hpMult = (1 + (day - 1) * 0.26)
+    * (earlyStory ? EARLY_STORY_HP_MULT : 1)
+    * (earlyBoss ? EARLY_STORY_BOSS_HP_MULT : 1)
   // 압력은 뒤로 갈수록 가팔라진다(초반은 완만, 후반에 조여든다).
-  const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1) * (field.enemyAtkMult ?? 1)
+  const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1)
+    * (field.enemyAtkMult ?? 1)
+    * (earlyStory ? EARLY_STORY_ATK_MULT : 1)
+    * (earlyBoss ? earlyBossAtkMult : 1)
+    * (firstStorySpider ? FIRST_STORY_SPIDER_ATK_MULT : 1)
   if (boss) return {
     day,
     field,
