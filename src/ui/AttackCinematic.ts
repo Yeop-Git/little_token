@@ -29,10 +29,13 @@ const OUT_MS = 260
 /**
  * 영상을 얼마나 보여줄지(최대). 컷이 이보다 짧으면 아래 END_LEAD_MS 규칙이 먼저 걸린다.
  * 전투 한 턴에 끼어드는 연출이라 길면 흐름이 끊긴다.
+ *
+ * 3.5초짜리 컷을 0.78초에 끊었더니 "떴다" 싶은 순간 바로 멈춰서, 연출이 시작하다
+ * 만 것처럼 읽혔다. 컷이 한창 오르는 구간까지는 보여 주고 끊는다.
  */
-const HOLD_MS = 780
+const HOLD_MS = 1500
 /** 끝나기 이만큼 전에 끊는다 — 마지막 프레임까지 보여주면 힘이 빠진 채로 나간다. */
-const END_LEAD_MS = 420
+const END_LEAD_MS = 520
 
 export class AttackCinematic {
   private el: HTMLElement
@@ -333,6 +336,9 @@ export const PUMP_MULT = 2
 /**
  * 2번 컷(쓸어버림)은 1번 위에 한 단 더 있다. 문턱이 같으면 마지막 적을 정리하는
  * 평범한 일격까지 전부 2번으로 흘러 1번 컷을 볼 일이 없어진다.
+ *
+ * 이 판 전체 체력에 맞먹는 피해를 한 문장에 실어 남은 적을 통째로 지웠을 때만 연다.
+ * 어지간해선 안 뜨는 자리이고, 그 아래는 전부 1번 컷이 받는다.
  */
-export const WIPE_RATIO = 0.8
-export const WIPE_MULT = 3
+export const WIPE_RATIO = 0.95
+export const WIPE_MULT = 3.5
