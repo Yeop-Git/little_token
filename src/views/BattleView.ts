@@ -85,6 +85,7 @@ import {
   mountCharacterModel,
   playCharacterAnimation,
   suspendCharacterModel,
+  type BattleAnimation,
 } from '@views/BattleCharacterModel'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -4068,9 +4069,15 @@ export class BattleView {
   private async enemyPhase(phase: 'first' | 'second') {
     for (const st of enemyTurn(this.state, Math.random, phase)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
+      const enemy = this.state.enemies[st.idx]
       // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
-      playCharacterAnimation(foe ?? null, st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`)
+      // 사마귀의 강공격 예고는 준비 동작(attack2)을 거치지 않고 큰낫을 든
+      // 대기 자세(idle2)로 곧바로 전환해 다음 내려베기까지 유지한다.
+      const animation: BattleAnimation = enemy?.def.id === 'mantis' && st.telegraphText
+        ? 'idle2'
+        : st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`
+      playCharacterAnimation(foe ?? null, animation)
       if (!st.telegraphText) GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(

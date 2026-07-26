@@ -4049,6 +4049,10 @@ html[data-graphics='low'] .tip-bubble {
   bottom: 27px;
   z-index: 952;
 }
+/* 첫 전투 대화 중에는 같은 우하단을 쓰는 건너뛰기 버튼만 남긴다. */
+.scene.battle.is-tutorial-dialogue .battle-help {
+  display: none;
+}
 .battle-help-button {
   position: relative;
   z-index: 2;

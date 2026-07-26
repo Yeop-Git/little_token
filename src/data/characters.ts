@@ -276,12 +276,10 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       idle2: 'Armature|hold|BaseLayer',
       walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack1|BaseLayer',
-      // 원본 GLB의 `attack`은 큰낫을 드는 준비 동작이다. 다음 턴의 attack3 전까지
-      // 그 끝 자세를 그대로 잇는 `hold`(idle2)를 유지한다.
-      attack2: 'Armature|attack|BaseLayer',
+      // 강공격 예고는 준비 동작을 재생하지 않고 `hold`(idle2)로 바로 전환한다.
       attack3: 'Armature|attack3|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
-      durationsMs: { attack: 440, attack2: 440, attack3: 440, defeat: 560 },
+      durationsMs: { attack: 440, attack3: 440, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: BOSS_MODEL_YAW,

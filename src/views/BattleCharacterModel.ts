@@ -13,6 +13,8 @@ const MODEL_FIT_HEIGHT = 2.78
 const COMPANION_FIT_HEIGHT = 0.72
 const TRANSITION_SECONDS = 0.18
 const LOOP_BLEND_SAMPLE_RATE = 30
+const MODEL_YAW_RETURN_SPEED = 9
+const MODEL_YAW_RETURN_EPSILON = 0.001
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['appear', 'attack', 'attack2', 'attack3', 'heal', 'shield'])
 
 type BattleWeather = 'sunny' | 'rain' | 'night'
@@ -463,6 +465,7 @@ class BattleCharacterModel {
   private dragStartX = 0
   private dragStartYaw = 0
   private dragDistance = 0
+  private returningToDefaultYaw = false
   private suppressClick = false
   private disposed = false
   private active = true
@@ -1212,6 +1215,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   private onPointerDown = (event: PointerEvent) => {
     if (!this.model || event.button !== 0) return
+    this.returningToDefaultYaw = false
     this.dragPointerId = event.pointerId
     this.dragStartX = event.clientX
     this.dragStartYaw = this.model.rotation.y
@@ -1233,6 +1237,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     if (this.shell.hasPointerCapture(event.pointerId)) this.shell.releasePointerCapture(event.pointerId)
     this.dragPointerId = null
     delete this.shell.dataset.modelDragging
+    this.returningToDefaultYaw = true
     if (this.dragDistance > 4) {
       this.suppressClick = true
       window.setTimeout(() => { this.suppressClick = false }, 0)
@@ -1303,6 +1308,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     delete this.shell.dataset.modelLastAction
     this.stopEffect()
     this.restoreSpiderParts()
+    this.returningToDefaultYaw = false
+    if (this.model) this.model.rotation.y = this.visual.modelYaw ?? 0
 
     const idle = this.actions.idle
     if (!idle) return
@@ -1419,6 +1426,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.lastRenderedAt = now
     const motionDelta = this.frozen ? 0 : frameDelta
     this.mixer?.update(motionDelta)
+    this.updateModelYawReturn(frameDelta)
     this.updateCompanion(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
@@ -1436,6 +1444,19 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       this.firstFrameRendered = true
       this.shell.dataset.modelStatus = 'ready-3d'
     }
+  }
+
+  private updateModelYawReturn(delta: number) {
+    if (!this.model || !this.returningToDefaultYaw || this.dragPointerId !== null) return
+    const target = this.visual.modelYaw ?? 0
+    const difference = THREE.MathUtils.euclideanModulo(target - this.model.rotation.y + Math.PI, Math.PI * 2) - Math.PI
+    if (Math.abs(difference) <= MODEL_YAW_RETURN_EPSILON) {
+      this.model.rotation.y = target
+      this.returningToDefaultYaw = false
+      return
+    }
+    const blend = 1 - Math.exp(-delta * MODEL_YAW_RETURN_SPEED)
+    this.model.rotation.y += difference * blend
   }
 
   isReadyForOutput() {
