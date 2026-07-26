@@ -91,6 +91,33 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const transfer = applyOverkillTransfer(s, 1, r.overflow)
   assert(transfer.dealt === 5 && rear.hp === 5 && !rear.dead, 'multihit overkill reaches the rear enemy')
 }
+{
+  const front = makeEnemy(foe('early-multihit-front', { hp: 5 }))
+  const rear = makeEnemy(foe('early-multihit-rear', { hp: 20 }))
+  const s = state([front, rear])
+  const r = applyIntent(s, attack({ hitCount: 2 }), 1, 0)
+  assert(r.overflow === 15, 'multihit keeps the killing blow excess and every unused hit')
+  const transfer = applyOverkillTransfer(s, 1, r.overflow)
+  assert(transfer.dealt === 15 && rear.hp === 5, 'unused multihits join the kill chain')
+}
+{
+  const front = makeEnemy(foe('range-front', { hp: 5 }))
+  const middle = makeEnemy(foe('range-middle', { hp: 5 }))
+  const rear = makeEnemy(foe('range-rear', { hp: 20 }))
+  const s = state([front, middle, rear])
+  const r = applyIntent(s, attack({ targetCount: 2 }), 1, 0)
+  assert(r.killed.length === 2 && r.overflow === 7, 'range attack combines contiguous overkill into a chain')
+  const transfer = applyOverkillTransfer(s, 2, r.overflow)
+  assert(transfer.dealt === 7 && rear.hp === 13, 'range overkill reaches the next enemy')
+}
+{
+  const shieldedFront = makeEnemy(foe('range-shield-front', { hp: 5, magicShield: 1 }))
+  const rear = makeEnemy(foe('range-shield-rear', { hp: 5 }))
+  const s = state([shieldedFront, rear])
+  const r = applyIntent(s, attack({ base: 100, targetCount: 2 }), 1, 0)
+  assert(r.hits[0].magicShieldBroken && shieldedFront.hp === 5, 'front magic shield erases the complete incoming hit')
+  assert(rear.dead && r.overflow === 0, 'rear overkill cannot flow backward through a surviving shielded front enemy')
+}
 { const s = state([makeEnemy(foe('guard', { guard: 8, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].guard === 8, 'pierce guard') }
 {
   const shielded = makeEnemy(foe('overkill-shielded', { guard: 99, magicShield: 3, hp: 15 }))
@@ -214,7 +241,9 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 // 장로거미는 방패를 넘어 오지만 한 방이 최대 체력의 1/5을 넘지 않는다.
 {
   const stage = stageFor(15)
-  const spider = makeEnemy(ENEMIES.elderSpider, stage.atkMult, stage.hpMult, stage.bossHealthBars)
+  // 본편 첫 장로거미는 밸런스 배율상 상한보다 약하므로, 상한 자체를 검증할 때는
+  // 충분히 큰 원시 공격력을 주어 반드시 제한선에 닿게 한다.
+  const spider = makeEnemy({ ...ENEMIES.elderSpider, atk: 200 }, stage.atkMult, stage.hpMult, stage.bossHealthBars)
   const s = state([spider]); s.playerHp = s.playerMax = 100; s.guard = 400
   const r = enemyTurn(s, () => .999, 'first')[0]
   assert(r.piercedGuard && r.absorbed === 0 && s.guard === 400, 'spider web goes over the shield instead of consuming it')

@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.5.48",
+  "version": "0.5.49",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "sweep": "npm run data:generate && tsx src/tools/sweep.ts",
     "check": "npm run data:generate && tsx src/tools/check-tables.ts",
     "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts",
-    "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts"
+    "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts",
+    "run:sim": "npm run data:generate && tsx src/tools/run-sim.ts"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",

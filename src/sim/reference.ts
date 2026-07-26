@@ -555,8 +555,10 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
     if (state.enemies[hit.target]?.dead && !killed.includes(hit.target)) killed.push(hit.target)
   }
 
-  // 연타도 각 타격은 일반 단일 공격과 같은 오버킬 규칙을 따른다. 앞 타격으로
-  // 체력을 깎고 마지막 타격이 적을 쓰러뜨렸다면, 그 타격의 초과분을 뒷줄로 넘긴다.
+  // 연타도 각 타격은 일반 단일 공격과 같은 오버킬 규칙을 따른다. 도중에 적을
+  // 쓰러뜨리면 그 타격의 초과분뿐 아니라 아직 휘두르지 않은 타격도 같은 줄기를
+  // 타고 뒷줄로 넘어간다. 매직실드가 막은 타격은 피해가 0이므로 체인에 보태지지
+  // 않지만, 남은 연타는 계속 실드를 벗기거나 체력을 노릴 수 있다.
   if (plan.hitCount > 1 && plan.targetCount === 1) {
     for (let i = 0; i < plan.hitCount; i++) {
       if (state.enemies[plan.target]?.dead) break
@@ -564,7 +566,8 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
       const hit = damageEnemy(state, plan.target, plan.dmg, plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
       record(hit)
       if (hit && state.enemies[plan.target].dead) {
-        return { hits, killed, overflow: Math.max(0, hit.dmg - before) }
+        const unusedHits = plan.hitCount - i - 1
+        return { hits, killed, overflow: Math.max(0, hit.dmg - before) + hit.dmg * unusedHits }
       }
     }
     return { hits, killed, overflow: 0 }
@@ -573,17 +576,26 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
   const targets = plan.targetCount === 'all'
     ? aliveIdx(state)
     : aliveIdx(state).filter((index) => index >= plan.target).slice(0, plan.targetCount)
+  const targetOverflow = new Map<number, number>()
   for (let rank = 0; rank < targets.length; rank++) {
     const target = targets[rank]
     const before = state.enemies[target].hp
     const scale = plan.targetCount === 1 || plan.targetCount === 'all' ? 1 : TARGET_FALLOFF[rank] ?? TARGET_FALLOFF[2]
     const hit = damageEnemy(state, target, Math.round(plan.dmg * scale), plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
     record(hit)
-    if (plan.targetCount === 1 && hit && state.enemies[target].dead) {
-      return { hits, killed, overflow: Math.max(0, hit.dmg - before) }
+    if (hit && state.enemies[target].dead) {
+      targetOverflow.set(target, Math.max(0, hit.dmg - before))
     }
   }
-  return { hits, killed, overflow: 0 }
+
+  // 범위 공격의 각 갈래에서 남은 피해도 전열부터 끊기지 않고 쓰러진 구간만 한
+  // 줄기로 합쳐 다음 적에게 넘긴다. 앞 적이 매직실드 등으로 살아 있으면 뒤 적의
+  // 초과분이 앞으로 역류해 실드를 우회하지 못하고 그 자리에서 소멸한다.
+  const nextFront = frontIdx(state)
+  const overflow = targets
+    .filter((target) => state.enemies[target].dead && (nextFront < 0 || target < nextFront))
+    .reduce((sum, target) => sum + (targetOverflow.get(target) ?? 0), 0)
+  return { hits, killed, overflow }
 }
 
 interface SummonDisperseResult {
