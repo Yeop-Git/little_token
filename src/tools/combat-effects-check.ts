@@ -9,7 +9,7 @@ import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
 import { bossRewardRarity, genRewards, rewardGradeForDay, rewardRarityWeights } from '@data/rewards'
-import { ALL_ITEMS, EXCLAIM_RARITY_MULTS } from '@data/items'
+import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
   activeEnemyPart,
@@ -40,16 +40,20 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
 { const player = defaultPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'battle fallback starts at hp 52 and guard 3') }
 {
-  const expectedBudget = { common: 3, rare: 4, epic: 4, legendary: 5 } as const
+  const expectedBonus = { common: 0, rare: 1, epic: 2, legendary: 3 } as const
   const counts = { common: 0, rare: 0, epic: 0, legendary: 0 }
   for (const item of Object.values(ALL_ITEMS)) {
     counts[item.rarity]++
     assert(Object.values(item.base).every((value) => value === 0), `${item.name} has no fixed base stats`)
     assert((item.rarity === 'epic' || item.rarity === 'legendary') === !!item.passive, `${item.name} passive matches rarity tier`)
   }
-  for (const [rarity, multipliers] of Object.entries(EXCLAIM_RARITY_MULTS)) {
-    assert(multipliers.reduce((sum, value) => sum + value, 0) === expectedBudget[rarity as keyof typeof expectedBudget], `${rarity} exclaim budget stays fixed`)
+  for (const [rarity, bonus] of Object.entries(EXCLAIM_RARITY_BONUS)) {
+    const multipliers = rollExclaimMultipliers(rarity as keyof typeof EXCLAIM_RARITY_BONUS, () => 0)
+    assert(multipliers.reduce((sum, value) => sum + value, 0) === 3 + bonus, `${rarity} exclaim budget stays fixed`)
+    assert(multipliers.every((value) => value >= 1), `${rarity} keeps at least one point on every exclaim choice`)
+    assert(multipliers.reduce((sum, value) => sum + value - 1, 0) === expectedBonus[rarity as keyof typeof expectedBonus], `${rarity} exclaim rarity bonus stays fixed`)
   }
+  assert(rollExclaimMultipliers('rare', () => 0).join(',') !== rollExclaimMultipliers('rare', () => 0.99).join(','), 'rare exclaim bonus can appear in different slots')
   assert(Math.abs(counts.common - counts.rare) <= 1 && Math.abs(counts.epic - counts.legendary) <= 1, 'item rarities remain evenly distributed')
 }
 {

@@ -47,20 +47,29 @@ export const ITEMS: Record<string, ItemDef> = STAT_ITEMS
 export const PASSIVE_ITEMS: Record<string, ItemDef> = RULE_ITEMS
 export const ALL_ITEMS: Record<string, ItemDef> = { ...ITEMS, ...PASSIVE_ITEMS }
 
-/** 감탄/정도/평가 슬롯별 스탯 배수. 행운 감탄을 제외한 총예산은 3/4/4/5점이다. */
-export const EXCLAIM_RARITY_MULTS: Record<Rarity, readonly [number, number, number]> = {
-  common: [1, 1, 1],
-  rare: [1, 1, 2],
-  epic: [1, 1, 2],
-  legendary: [1, 2, 2],
+/** 모든 선택의 기본 1점 위에 무작위 슬롯으로 흩어지는 등급 보너스 총량. */
+export const EXCLAIM_RARITY_BONUS: Record<Rarity, number> = {
+  common: 0,
+  rare: 1,
+  epic: 2,
+  legendary: 3,
+}
+
+/** 화면 입장 시 한 번 굴리고, 감탄사를 완성할 때까지 같은 배치를 유지한다. */
+export function rollExclaimMultipliers(rarity: Rarity, rng: () => number = Math.random): [number, number, number] {
+  const multipliers: [number, number, number] = [1, 1, 1]
+  const open = [0, 1, 2]
+  for (let i = 0; i < EXCLAIM_RARITY_BONUS[rarity]; i++) {
+    const pick = Math.min(open.length - 1, Math.floor(rng() * open.length))
+    multipliers[open.splice(pick, 1)[0]]++
+  }
+  return multipliers
 }
 
 export function exclaimModsFor(
-  rarity: Rarity,
-  slotIndex: number,
+  multiplier: number,
   mods: Partial<Record<StatKey, number>>,
 ): Partial<Record<StatKey, number>> {
-  const multiplier = EXCLAIM_RARITY_MULTS[rarity][slotIndex] ?? 1
   return Object.fromEntries(Object.entries(mods).map(([stat, value]) => [stat, value * multiplier]))
 }
 

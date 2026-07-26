@@ -6,7 +6,7 @@
  */
 
 import type { ItemDef, StatKey } from '@data/items'
-import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor } from '@data/items'
+import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimMultipliers } from '@data/items'
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -37,12 +37,14 @@ export class ItemExclaimView {
   private slotIndex = 0
   private finalizing = false
   private timers: number[] = []
+  private rarityMultipliers: [number, number, number]
   // 행운 감탄 — 이 화면에서 추가 스탯이 붙은 단어들. 키는 `슬롯:단어id`.
   private blessed = new Map<string, { stat: StatKey; n: number }>()
   // 팅! 연출은 처음 드러날 때 한 번만.
   private revealed = new Set<string>()
 
   constructor(private root: HTMLElement, private opts: Opts) {
+    this.rarityMultipliers = rollExclaimMultipliers(opts.item.rarity)
     // 입장 시 한 번만 굴린다 — 슬롯을 오가도 붙은 자리는 그대로다.
     const chance = Math.min(0.4, (opts.grade ?? 0) * BLESS_CHANCE_PER_GRADE)
     for (const slot of EXCLAIM_SLOTS)
@@ -61,7 +63,7 @@ export class ItemExclaimView {
     EXCLAIM_SLOTS.forEach((slot, slotIndex) => {
       const w = slot.words.find((x) => x.id === this.picks[slot.key])
       if (!w) return
-      const mods = exclaimModsFor(this.opts.item.rarity, slotIndex, w.mods)
+      const mods = exclaimModsFor(this.rarityMultipliers[slotIndex], w.mods)
       for (const k of STAT_ORDER) t[k] += mods[k] ?? 0
       const bless = this.blessed.get(`${slot.key}:${w.id}`)
       if (bless) t[bless.stat] += bless.n
@@ -189,12 +191,17 @@ export class ItemExclaimView {
         const blessHtml = bless
           ? `<span class="bless">${STAT_LABEL[bless.stat]} +${bless.n}</span>`
           : ''
-        const effectiveMods = exclaimModsFor(this.opts.item.rarity, this.slotIndex, w.mods)
+        const rarityMultiplier = this.rarityMultipliers[this.slotIndex]
+        const effectiveMods = exclaimModsFor(rarityMultiplier, w.mods)
         const effectiveNote = Object.entries(effectiveMods)
           .map(([stat, value]) => `${STAT_LABEL[stat as StatKey]} +${value}`)
           .join(' · ')
-        return `<button class="word-cell rarity-common ${picked ? 'picked' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
-          <span class="w">${w.text}</span><span class="n">${effectiveNote}</span>${blessHtml}
+        const rarityBoosted = rarityMultiplier > 1
+        const rarityBonusHtml = rarityBoosted
+          ? '<span class="rarity-bonus">등급 보너스 +1점</span>'
+          : ''
+        return `<button class="word-cell rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
+          <span class="w">${w.text}</span><span class="n">${effectiveNote}</span>${rarityBonusHtml}${blessHtml}
         </button>`
       })
       .join('')
