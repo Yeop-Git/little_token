@@ -7006,99 +7006,18 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   position: absolute;
   z-index: 290;
   left: 50%;
-  top: 172px;
-  width: 860px;
+  top: 132px;
+  width: 700px;
+  height: 250px;
   transform: translateX(-50%);
   pointer-events: none;
   animation: victory-clear-in .7s cubic-bezier(.18, 1.15, .3, 1) both;
 }
-/*
- * 찢어진 종이 — 원화의 종이는 글자 바로 밑에서 끊겨 짧았다. 종이는 이 겹이 맡아
- * 글자보다 넓고 길게 깔리고, 아래로 갈수록 완전히 풀린다.
- */
-.vc-paper {
-  position: absolute;
-  left: 50%;
-  top: -26px;
-  width: 104%;
-  height: 620px;
-  transform: translateX(-50%);
-  border-radius: 20px 28px 0 0;
-  /* 양옆도 함께 풀어 준다 — 곧게 잘린 세로선이 남으면 종이가 아니라 패널로 읽힌다. */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
-  background:
-    repeating-linear-gradient(0deg, transparent 0 41px, rgba(120, 84, 58, .06) 42px 43px),
-    linear-gradient(180deg,
-      rgba(253, 251, 245, .96) 0%,
-      rgba(255, 250, 234, .92) 30%,
-      rgba(255, 244, 216, .58) 58%,
-      rgba(255, 241, 209, .2) 80%,
-      transparent 100%);
-}
-/*
- * 원화에서는 글자만 쓴다. 오른쪽 작은 요정과 아래 찢긴 선은 마스크로 풀어 내고,
- * 빵빠레는 아래 vc-token이 크게 맡는다(마스크 비율은 원화 720×372 기준으로 잰 값).
- */
-.vc-art {
-  position: relative;
-  display: block;
+.victory-clear-banner img {
   width: 100%;
-  height: auto;
-  -webkit-mask-image:
-    linear-gradient(to right, #000 55%, transparent 60%),
-    linear-gradient(to bottom, #000 84%, transparent 91%);
-  mask-image:
-    linear-gradient(to right, #000 55%, transparent 60%),
-    linear-gradient(to bottom, #000 84%, transparent 91%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-  filter: drop-shadow(0 6px 10px rgba(92, 58, 30, .16));
-}
-/* 빵빠레 토큰 — 종이 밖으로 솟아 나와 나팔을 불며 흔들린다. */
-.vc-token {
-  position: absolute;
-  right: -18px;
-  top: -78px;
-  width: 372px;
-  height: 372px;
+  height: 100%;
   object-fit: contain;
-  transform-origin: 42% 78%;
-  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, .42)) drop-shadow(0 0 34px rgba(255, 224, 133, .45));
-  animation: vc-token-toot 1.05s ease-in-out .34s infinite alternate;
-}
-@keyframes vc-token-toot {
-  from { transform: rotate(-4.5deg) translateY(0) scale(1); }
-  55% { transform: rotate(1deg) translateY(-8px) scale(1.035); }
-  to { transform: rotate(5deg) translateY(-2px) scale(1.01); }
-}
-/* 사각 종이 조각 — 나팔 쪽에서 터져 나와 돌면서 떨어진다. */
-.vc-confetti {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 0;
-}
-.vc-confetti i {
-  position: absolute;
-  left: var(--x);
-  top: 30px;
-  width: var(--w);
-  height: calc(var(--w) * .72);
-  border-radius: 2px;
-  background: var(--gold-hi);
-  opacity: 0;
-  animation: vc-confetti-fall 2.6s cubic-bezier(.3, .5, .5, 1) var(--d) forwards;
-}
-.vc-confetti i:nth-child(3n) { background: #ffb0d2; }
-.vc-confetti i:nth-child(3n + 1) { background: #a8e3ff; }
-.vc-confetti i:nth-child(5n) { background: #c8f0a8; }
-@keyframes vc-confetti-fall {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--t)); }
-  12% { opacity: 1; }
-  74% { opacity: 1; }
-  100% { opacity: 0; transform: translate3d(0, var(--f), 0) rotate(var(--r)); }
+  filter: drop-shadow(0 18px 24px rgba(0, 0, 0, .5)) drop-shadow(0 0 32px rgba(255, 224, 133, .3));
 }
 @keyframes victory-clear-in {
   from { opacity: 0; transform: translateX(-50%) translateY(28px) scale(.78); filter: blur(5px); }
@@ -7106,10 +7025,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); filter: blur(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .victory-clear-banner,
-  .vc-token,
-  .vc-confetti i { animation: none; }
-  .vc-confetti i { opacity: 0; }
+  .victory-clear-banner { animation: none; }
 }
 .grade-badge.finale::after {
   content: '전리품에 적용!';

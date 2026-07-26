@@ -54,7 +54,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
-import { REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
+import { REWARD_ART, SKILL_ART, SPRITES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
@@ -253,20 +253,6 @@ interface Tally {
   total: number
   kind: 'dmg' | 'guard' | 'heal'
 }
-
-/**
- * 승리 피날레에 흩날리는 사각 종이 조각. 배치는 한 번만 정해 두고 매 승리마다 다시
- * 쓴다 — 굴릴 때마다 달라져 봐야 알아보는 사람은 없고, 승리 순간에 난수를 스무 번
- * 굴리는 값만 든다.
- */
-const CONFETTI_PIECES = Array.from({ length: 18 }, (_, i) => ({
-  x: Math.round(((i * 37) % 100) * 10) / 10,
-  delay: (i % 6) * 90 + (i % 3) * 40,
-  spin: 220 + ((i * 53) % 320),
-  size: 9 + ((i * 7) % 8),
-  tilt: -30 + ((i * 41) % 60),
-  fall: 320 + ((i * 29) % 180),
-}))
 
 export class BattleView {
   private t: Tables = TABLES
@@ -3775,15 +3761,7 @@ export class BattleView {
     const scene = this.q('.scene.battle')
     const clearBanner = document.createElement('div')
     clearBanner.className = 'victory-clear-banner'
-    // 원화는 글자와 찢어진 종이만 쓰고(오른쪽 요정은 마스크로 풀어 낸다), 빵빠레 토큰은
-    // 따로 크게 세워 혼자 흔들리게 한다. 종이는 아래로 길게 늘여 그라데이션으로 푼다.
-    clearBanner.innerHTML = `
-      <span class="vc-paper" aria-hidden="true"></span>
-      <img class="vc-art" src="${REWARD_ART.clear}" alt="CLEAR! 보상" />
-      <img class="vc-token" src="${TOKEN_FACES.party}" alt="" aria-hidden="true" />
-      <span class="vc-confetti" aria-hidden="true">${CONFETTI_PIECES.map((piece) =>
-        `<i style="--x:${piece.x}%;--d:${piece.delay}ms;--r:${piece.spin}deg;--w:${piece.size}px;--t:${piece.tilt}deg;--f:${piece.fall}px"></i>`,
-      ).join('')}</span>`
+    clearBanner.innerHTML = `<img src="${REWARD_ART.clear}" alt="CLEAR! 보상" />`
     scene.appendChild(clearBanner)
     GameAudio.play('win')
     const b = badge.getBoundingClientRect()
