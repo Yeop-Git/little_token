@@ -50,6 +50,10 @@ export class TitleView {
   private confirmTimer = 0
   private warpTimer = 0
   private settleTimer = 0
+  private onFirstAudioGesture = () => {
+    GameAudio.startBgm()
+    this.removeAudioGestureListeners()
+  }
   /** 얼렸다 풀 때 같은 루프를 이어 돌리려고 들고 있는다(freezeAmbient/thawAmbient). */
   private flyTick: ((now: number) => void) | null = null
   private flyLast = 0
@@ -71,10 +75,20 @@ export class TitleView {
     clearTimeout(this.confirmTimer)
     clearTimeout(this.warpTimer)
     clearTimeout(this.settleTimer)
+    this.removeAudioGestureListeners()
     window.removeEventListener('resize', this.onResize)
   }
 
+  private removeAudioGestureListeners() {
+    document.removeEventListener('click', this.onFirstAudioGesture, true)
+    document.removeEventListener('keydown', this.onFirstAudioGesture, true)
+  }
+
   private mount() {
+    // 브라우저 자동재생 정책상 진입 즉시 BGM을 틀 수 없다. 타이틀에서 발생한 첫
+    // 클릭이나 키 입력으로 오디오 잠금을 푼 뒤, 화면을 떠나기 전에 타이틀 곡을 시작한다.
+    document.addEventListener('click', this.onFirstAudioGesture, true)
+    document.addEventListener('keydown', this.onFirstAudioGesture, true)
     this.root.innerHTML = `
       <main class="scene title-scene">
         <svg class="title-warp-defs" aria-hidden="true" width="0" height="0">

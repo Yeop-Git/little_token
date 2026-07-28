@@ -8,6 +8,7 @@ type EffectName =
   | 'paper'
   | 'cardHover'
   | 'wordSelect'
+  | 'forgeHit'
   | 'pencil'
   | 'button'
   | 'resonanceJoy'
@@ -33,6 +34,7 @@ const EFFECT_VOLUME: Record<EffectName, number> = {
   paper: 0.46,
   cardHover: 0.28,
   wordSelect: 0.4,
+  forgeHit: 0.54,
   pencil: 0.34,
   button: 0.36,
   resonanceJoy: 0.48,
@@ -217,27 +219,12 @@ class GameAudioController {
     bell.stop(bellStart + 0.24)
   }
 
-  /** A short, bright metal impact timed to the forge hammer contact. */
+  /** Play the recorded metal impact at the exact forge hammer contact frame. */
   playForgeHit(beat = 0) {
-    if (this.masterVolume <= 0 || !Howler.usingWebAudio) return
-    const ctx = Howler.ctx
-    void ctx.resume().catch(() => undefined)
-    const now = ctx.currentTime
-    const base = 760 + Math.max(0, beat) * 55
-    const partials = [1, 1.48, 2.31]
-    partials.forEach((ratio, index) => {
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.type = index === 0 ? 'triangle' : 'sine'
-      oscillator.frequency.setValueAtTime(base * ratio, now)
-      oscillator.frequency.exponentialRampToValueAtTime(base * ratio * 0.92, now + 0.28)
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime((0.13 / (index + 1)) * this.masterVolume, now + 0.004)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22 + index * 0.05)
-      oscillator.connect(gain).connect(ctx.destination)
-      oscillator.start(now)
-      oscillator.stop(now + 0.3 + index * 0.05)
-    })
+    const source = this.getEffect('forgeHit')
+    const voice = source.play()
+    source.volume(EFFECT_VOLUME.forgeHit, voice)
+    source.rate(Math.min(1.08, 1 + Math.max(0, beat) * 0.025), voice)
   }
 
   installButtonSounds() {
