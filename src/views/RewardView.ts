@@ -60,7 +60,7 @@ function mainEffect(opt: RewardOption): string {
   if (opt.kind === 'item' && opt.item) {
     // 전설(규칙) 아이템은 스탯이 0이다 — 대신 바뀌는 규칙을 그대로 적는다.
     if (opt.item.passive) return PASSIVES[opt.item.passive].desc
-    return '감탄 문장으로 스탯을 더할 수 있다'
+    return '제련 문장으로 스탯을 더할 수 있다'
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
   return wordNoteText(opt.word!)
@@ -130,7 +130,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
       <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[item.rarity]}</div>
       ${passive ? `<div class="id-passive"><b>${passive.name}</b><span>${passive.desc}</span></div>` : ''}
       <div class="id-stats">${rows}</div>
-      <div class="wd-inf">${passive ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '감탄사를 조립해 추가 스탯이 붙는다.'}</div>
+      <div class="wd-inf">${passive ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '제련 문장을 조립해 추가 스탯이 붙는다.'}</div>
       <div class="wd-flavor">${item.flavor}</div>
       <div class="id-art">${itemArt(item.art)}</div>`
   }

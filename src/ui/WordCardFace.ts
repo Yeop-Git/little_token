@@ -66,17 +66,19 @@ export interface WordCardFaceOpts {
   artUrl?: string
   /** 튜토리얼 대사처럼 레어도와 감정 정보가 의미 없는 카드에서 메타 배지를 숨긴다. */
   hideMeta?: boolean
+  /** 레어도는 남기되 감정 아이콘만 의미 없는 화면에서 숨긴다. */
+  hideEmotion?: boolean
 }
 
 /** 카드 앞면 한 겹. 일러스트가 있으면 원화 카드, 없으면 문양 카드로 그린다. */
 export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): string {
-  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false } = opts
+  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false, hideEmotion = false } = opts
   const artUrl = opts.artUrl ?? (word.art ? SKILL_ART[word.art] : undefined)
   const level = word.level ?? 1
   const rarity = word.rarity ?? 'common'
   const emotion = emotionOrNeutral(word.emotion)
   const levelBadge = hideMeta ? '' : `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
-  const emotionBadge = hideMeta ? '' : emotionIconBadge(emotion, 'card-emotion')
+  const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
   const badges = `${levelBadge}${emotionBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">

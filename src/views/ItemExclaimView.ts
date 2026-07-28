@@ -1,6 +1,6 @@
 /**
- * 아이템 감탄사(재련) 뷰 — 전투와 같은 패턴.
- *  · 상단: 감탄 문장이 점차 완성되는 체인
+ * 아이템 제련 뷰 — 감탄 문장을 망치질하듯 완성하는 전투와 같은 패턴.
+ *  · 상단: 제련 문장이 점차 완성되는 체인
  *  · 그 아래: 아이템 일러스트(좌) + 감정 스탯표(우, ▲로 증가 표시)
  *  · 하단: 감탄/정도/평가 선택지를 "텍스트"로 순차 선택(버튼 아님, 인게임 스타일)
  */
@@ -97,19 +97,20 @@ export class ItemExclaimView {
             <div class="iforge-illust glass${art ? ' has-art' : ''}">
               ${illust}
               <div class="iforge-illust-copy">
-                <div class="glint">✦ 새 아이템 ✦</div>
+                <div class="glint">✦ 제련할 아이템 ✦</div>
                 <div class="iname">${item.name}</div>
                 <div class="grade">등급 · ${RARITY_LABEL[item.rarity]}</div>
               </div>
             </div>
             <div class="iforge-stats glass">
-              <div class="dock-title">감정된 스탯</div>
+              <div class="dock-title">제련 스탯</div>
               <div class="stat-list" id="stats"></div>
               <div class="iforge-flavor">“${item.flavor}”</div>
             </div>
           </div>
 
           <div class="iforge-choose">
+            <div class="iforge-choose-title"><b>제련 문장</b><span>세 마디를 골라 아이템에 힘을 새긴다</span></div>
             <div class="word-row" id="egrid"></div>
           </div>
         </div>
@@ -218,13 +219,14 @@ export class ItemExclaimView {
           : ''
         // 아이템 등급을 word-card 호스트에 직접 붙여 공용 희귀/영웅/전설 포일과
         // 전역 FoilShader 관찰자가 전투 카드와 같은 방식으로 이 선택지도 처리한다.
-        return `<button class="word-cell iforge-word-card word-card mood-${mood} emotion-neutral rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}"
+        return `<button class="word-cell iforge-word-card word-card mood-${mood} rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}"
           style="--card-x:0px;--card-z:1" data-id="${w.id}" aria-label="${w.text}, ${accessibleNote} 선택">
           ${wordCardInnerHtml(cardWord, {
             note: cardNote,
             footer: slot.label,
             overlay: bonuses,
             artUrl: ITEM_ART[this.opts.item.art],
+            hideEmotion: true,
           })}
         </button>`
       })
