@@ -51,6 +51,7 @@ import {
   spiderWebTension,
   summonAtTurnStart,
   summonCount,
+  type ApplyResult,
   type TurnSummon,
   type BattleState,
   type EnemyInst,
@@ -2893,12 +2894,6 @@ export class BattleView {
     await this.strike(res, sweep, heavy)
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
     if (res.summonDamage > 0) {
-      // 원격의 새 일벌 피해 표시를 쓰되, 강타에서는 기다리지 않는다 — 일벌이 흩어지는
-      // 것과 검기가 뻗는 건 같은 순간에 벌어져야 한다. 기다리면 정지 뒤에 텀이 하나 더 생긴다.
-      const dispersal = this.playSummonDispersal(
-        this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered,
-      )
-      if (!heavy) await dispersal
       this.log(`문장이 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     const rouletteNote = resolved.outcome === 'crit' ? ' · 대성공!' : resolved.outcome === 'fail' ? ' · 실패…' : ''
@@ -2960,6 +2955,7 @@ export class BattleView {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
             this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
             if ((hit.barOverflow ?? 0) > 0) this.playBossBarOverkill(hit.target, hit.barOverflow ?? 0, !!hit.barOverflowPassed)
+            if ((hit.barsBroken ?? 0) > 0) this.playBossBarBreak(hit.target, hit.barsBroken ?? 1, !!hit.barOverflowPassed)
           }
         }
         if (result.summonDamage > 0) {
@@ -3066,7 +3062,6 @@ export class BattleView {
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
     await this.strike(res, sweep, heavy)
     if (res.summonDamage > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered)
       this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
@@ -3079,33 +3074,15 @@ export class BattleView {
 
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
-    res: {
-      hits: {
-        target: number
-        dmg: number
-        magicShieldBroken: boolean
-        magicShieldRemaining: number
-        summonShieldBlocked?: boolean
-        weak?: boolean
-        barsBroken?: number
-        barOverflow?: number
-        barOverflowPassed?: boolean
-        partId?: string
-        partName?: string
-        webCut?: boolean
-        webBurst?: boolean
-        tensionReduced?: number
-      }[]
-      selfDmg: number
-      heal: number
-      killed: number[]
-      supportWebCut?: { target: number; tensionReduced: number } | null
-    },
+    res: ApplyResult,
     sweep = false,
     heavy: AttackCut | null = null,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
-    const attacking = res.hits.length > 0
+    // 여왕벌은 피해를 먼저 일벌 킬체인에 소비하므로 본체 hit가 0건일 수 있다.
+    // 그 경우에도 실제 공격은 일어났다. hit만 보면 정확히 30/60/120 피해에서 프롬이
+    // 가만히 선 채 일벌만 뒤늦게 사라지는 역전된 그림이 된다.
+    const attacking = res.hits.length > 0 || res.summonDamage > 0
     this.swordHitCount = 0
     if (heavy && attacking && this.heavyHeld) {
       // 이미 칼을 들어올린 채 멈춰 있다. 돌진을 먼저 출발시켜 내리치는 프레임에
@@ -3134,6 +3111,51 @@ export class BattleView {
       this.q('#actors').classList.add('rail-rush')
     }
 
+    const stopMs = Math.min(112, 62 + res.killed.length * 14 + (sweep ? 20 : 0))
+    let firstHitStopped = heavy ? this.heavyStopUsed : false
+    const stopFirstHit = async () => {
+      if (firstHitStopped) return
+      firstHitStopped = true
+      if (heavy) {
+        this.heavyStopUsed = true
+        const tier = this.heavyTier()
+        await sleep(HEAVY_FLASH_BLOOM_MS)
+        await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
+        this.shakeStage(1 + tier * .7)
+        this.endSlowmo()
+      } else {
+        await this.attackHitStop(you, stopMs)
+      }
+    }
+
+    const chainContinuesToBody = res.summonDamage > 0 && res.hits.some((hit) => hit.dmg > 0)
+    if (res.summonDamage > 0) {
+      // 일벌 킬체인의 첫 접촉이 이 공격의 유일한 히트스톱이다. 먼저 한 마리에
+      // 충격점을 만든 뒤 멈추고, 풀린 다음 나머지 일벌과 본체까지는 절대 다시 멈추지 않는다.
+      const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
+        `.actor.foe[data-i="${this.target}"] .queen-worker:not([hidden])`,
+      )]
+      const firstWorker = res.summonsDispersed > 0
+        ? visibleWorkers[Math.max(0, visibleWorkers.length - res.summonsDispersed)]
+        : visibleWorkers[visibleWorkers.length - 1]
+      if (firstWorker) {
+        GameAudio.playSwordHit(this.swordHitCount++)
+        SquareBurst.playOn(firstWorker, 'damage', { spread: heavy ? 150 : 92 })
+        this.hitOne(firstWorker)
+      }
+      await stopFirstHit()
+      await this.playSummonDispersal(
+        this.target,
+        res.summonsDispersed,
+        res.summonDamage,
+        res.summonBacklashDamage,
+        res.summonFocusedBacklash,
+        res.summonGroggyTriggered,
+        chainContinuesToBody,
+        false,
+      )
+    }
+
     let remainingSwordHits = res.hits.filter((hit) =>
       hit.dmg > 0 && !hit.summonShieldBlocked && !hit.magicShieldBroken,
     ).length
@@ -3144,6 +3166,7 @@ export class BattleView {
       }
       if (h.magicShieldBroken) {
         await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
+        await stopFirstHit()
         continue
       }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
@@ -3159,35 +3182,17 @@ export class BattleView {
       }
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
+      if ((h.barsBroken ?? 0) > 0) this.playBossBarBreak(h.target, h.barsBroken ?? 1, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
+      await stopFirstHit()
       if (remainingSwordHits > 0) await sleep(SWORD_HIT_GAP_MS)
     }
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
-    const hitTargets = res.hits
-      .filter((hit) => hit.dmg > 0)
-      .map((hit) => this.q<HTMLElement>(`#actors .actor.foe[data-i="${hit.target}"]`))
-      .filter((actor): actor is HTMLElement => !!actor)
-    if (hitTargets.length > 0) {
-      const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
-      // 프레임 정지는 **발동당 딱 한 번**이다. 처음 검을 내리치는 그 프레임에만 붙고,
-      // 관통이나 메아리에서는 두 번 다시 멈추지 않는다 — 검기가 지나가는 흐름을
-      // 토막토막 끊으면 "슝" 하고 훑는 한 줄기가 안 된다.
-      if (heavy && !this.heavyStopUsed) {
-        // 섬광이 피어날 한 프레임을 준 다음 화면째로 끊는다. 정지가 풀리는 순간
-        // 흔들림과 함께 확대가 풀려서 "팡" 하고 뒤로 물러나는 것처럼 보인다.
-        // 배율이 높을수록 더 오래 끊고 더 세게 흔든다 — 잘 쌓은 문장의 몫이다.
-        this.heavyStopUsed = true
-        const tier = this.heavyTier()
-        await sleep(HEAVY_FLASH_BLOOM_MS)
-        await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
-        this.shakeStage(1 + tier * 0.7)
-        this.endSlowmo()
-      } else if (!heavy) {
-        await this.attackHitStop(you, stopMs)
-      }
-    }
+    // 보호막·무적 등으로 위 분기에서 접촉 연출이 없었더라도 공격 동작 자체에는
+    // 첫 타격 정지를 한 번 보장한다. 이후 resolveOverflow 킬체인은 정지 함수를 호출하지 않는다.
+    if (attacking && !firstHitStopped) await stopFirstHit()
     // 강타는 정지가 풀리는 순간 곧바로 검기가 나가야 한다. 여기서부터 아래는 전부
     // 기다리지 않는다 — 돌진 마무리도, 수치가 날아가는 것도, 쓰러지는 것도 뒤에서
     // 저절로 일어난다. 정지 한 순간 말고 텀이 하나라도 더 끼면 "탕→촥"이 안 된다.
@@ -3260,6 +3265,44 @@ export class BattleView {
     fx.setAttribute('aria-hidden', 'true')
     bar.append(fx)
     this.timers.push(window.setTimeout(() => fx.remove(), 700))
+  }
+
+  /** 보스 체력 막이 실제로 깨진 결과를 화면 중앙과 체력바 양쪽에서 동시에 읽힌다. */
+  private playBossBarBreak(enemyIdx: number, count: number, passed: boolean) {
+    if (count <= 0 || !this.state.enemies[enemyIdx]?.def.boss) return
+    const hud = this.root.querySelector<HTMLElement>('#boss-health-hud')
+    const pbox = this.q<HTMLElement>('#pbox')
+    if (!hud) return
+
+    hud.classList.remove('boss-bar-breaking', 'boss-bar-pierced')
+    void hud.offsetWidth
+    hud.classList.add(passed && count > 1 ? 'boss-bar-pierced' : 'boss-bar-breaking')
+
+    const banner = document.createElement('div')
+    banner.className = `boss-bar-break-banner${passed && count > 1 ? ' pierced' : ''}`
+    banner.innerHTML = passed && count > 1
+      ? `<small>한 번에 돌파</small><b>체력 막 ×${count} 관통!</b>`
+      : '<small>경계 파괴</small><b>체력 막 파괴!</b>'
+    pbox.append(banner)
+
+    const bar = hud.querySelector<HTMLElement>('.hpbar.foe')
+    if (bar) {
+      for (let i = 0; i < Math.min(12, 5 + count * 3); i++) {
+        const shard = document.createElement('i')
+        shard.className = 'boss-bar-shard'
+        shard.style.setProperty('--x', `${(Math.random() - .5) * (180 + count * 35)}px`)
+        shard.style.setProperty('--y', `${(Math.random() - .5) * 90}px`)
+        shard.style.setProperty('--r', `${(Math.random() - .5) * 150}deg`)
+        shard.style.setProperty('--delay', `${Math.random() * 55}ms`)
+        bar.append(shard)
+        this.timers.push(window.setTimeout(() => shard.remove(), 720))
+      }
+    }
+    this.shakeStage(passed && count > 1 ? 1.45 : .72)
+    this.timers.push(window.setTimeout(() => {
+      banner.remove()
+      hud.classList.remove('boss-bar-breaking', 'boss-bar-pierced')
+    }, 880))
   }
 
   private playSpiderWebCut(enemyIdx: number, _reduced: number) {
@@ -4006,11 +4049,16 @@ export class BattleView {
     backlashDamage = 0,
     focusedBacklash = false,
     groggyTriggered = false,
+    carriesToBody = false,
+    renderAfter = true,
   ) {
     const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
       `.actor.foe[data-i="${enemyIdx}"] .queen-worker:not([hidden])`,
     )]
     const workers = count > 0 ? visibleWorkers.slice(-count) : []
+    const queen = this.root.querySelector<HTMLElement>(
+      `.actor.foe[data-i="${enemyIdx}"] > .model-shell`,
+    )
     workers.forEach((worker, index) => {
       playCharacterAnimation(worker, 'defeat')
       worker.animate(
@@ -4018,11 +4066,18 @@ export class BattleView {
           { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
           { transform: `translate(${index % 2 ? 105 : -105}px, -110px) rotate(${index % 2 ? 24 : -24}deg) scale(.55)`, opacity: 0 },
         ],
-        { duration: 280, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
+        { duration: 240, delay: index * 34, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
       )
+      SquareBurst.playOn(worker, 'damage', { spread: 72 + index * 10 })
     })
     this.popAt(enemyIdx, count > 0 ? `일벌 ${damage} 피해 · ${count}마리 퇴치` : `일벌 ${damage} 피해`, count > 0 ? 'guard big' : 'dmg')
-    await sleep(count > 0 ? 300 : 160)
+    await sleep(count > 0 ? Math.min(250, 130 + count * 28) : 120)
+    if (carriesToBody && queen) {
+      const from = workers[workers.length - 1] ?? queen
+      this.playQueenChainLink(from, queen)
+      this.popAt(enemyIdx, '연쇄 관통 → 본체!', 'dmg big weak')
+      await sleep(90)
+    }
     if (backlashDamage > 0) {
       this.popAt(enemyIdx, focusedBacklash ? `분노 집중! 본체 ${backlashDamage}` : `본체 ${backlashDamage}`, 'dmg big')
       this.log(`${focusedBacklash ? '분노 단일 공격으로 반동이 2배가 되어, 쓰러진' : '쓰러진'} 일벌이 여왕벌 본체에 ${backlashDamage} 피해를 되돌렸다.`)
@@ -4033,8 +4088,24 @@ export class BattleView {
       this.resolveBossPattern(say('지금이 빈틈이에요!!', 'relief'))
       await sleep(260)
     }
-    this.renderActors()
+    if (renderAfter) this.renderActors()
     if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
+  }
+
+  /** 마지막 일벌에서 여왕 본체까지 남은 피해가 같은 검기로 이어지는 경로를 그린다. */
+  private playQueenChainLink(fromEl: HTMLElement, toEl: HTMLElement) {
+    const from = this.toStageCenter(fromEl.getBoundingClientRect())
+    const to = this.toStageCenter(toEl.getBoundingClientRect())
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const link = document.createElement('i')
+    link.className = 'queen-chain-link'
+    link.style.left = `${from.x}px`
+    link.style.top = `${from.y}px`
+    link.style.width = `${Math.max(1, Math.hypot(dx, dy))}px`
+    link.style.setProperty('--angle', `${Math.atan2(dy, dx) * 180 / Math.PI}deg`)
+    this.q('#pbox').append(link)
+    this.timers.push(window.setTimeout(() => link.remove(), 520))
   }
 
   private async playSwarmRelease(enemyIdx: number): Promise<void> {
@@ -4090,8 +4161,13 @@ export class BattleView {
           ],
           { duration: 520, easing: 'cubic-bezier(.25,.8,.3,1)' },
         )
+        if (enemy?.def.boss) this.playBossSignatureEffect(enemy.def.id, 'telegraph', foe ?? null)
       } else {
         foe?.classList.add('lunge')
+        if (enemy?.def.boss) {
+          const signature = st.summonsReleased > 0 ? 'swarm' : st.animationStage >= 3 ? 'heavy' : 'attack'
+          this.playBossSignatureEffect(enemy.def.id, signature, foe ?? null)
+        }
       }
       const swarmFlight = st.summonsReleased > 0
         ? this.playSwarmRelease(st.idx)
@@ -4157,6 +4233,47 @@ export class BattleView {
       if (!st.telegraphText) foe?.classList.remove('lunge')
     }
     this.renderActors()
+  }
+
+  /** 세 보스의 핵심 공격을 같은 사각 블라스트 대신 고유한 실루엣으로 읽히게 한다. */
+  private playBossSignatureEffect(
+    enemyId: string,
+    phase: 'telegraph' | 'attack' | 'heavy' | 'swarm',
+    foe: HTMLElement | null,
+  ) {
+    if (this.motionOff()) return
+    const pbox = this.q<HTMLElement>('#pbox')
+    const player = this.root.querySelector<HTMLElement>('.actor.you > .model-shell')
+    const target = player ? this.toStageCenter(player.getBoundingClientRect()) : { x: pbox.offsetWidth * .28, y: pbox.offsetHeight * .62 }
+    const source = foe ? this.toStageCenter((foe.querySelector<HTMLElement>(':scope > .model-shell') ?? foe).getBoundingClientRect()) : target
+    const fx = document.createElement('div')
+
+    if (enemyId === 'mantis') {
+      fx.className = `boss-signature-fx mantis-${phase === 'telegraph' ? 'telegraph' : phase === 'heavy' ? 'cleave' : 'slash'}`
+      const at = phase === 'telegraph' ? source : target
+      fx.style.left = `${at.x}px`
+      fx.style.top = `${at.y}px`
+      fx.innerHTML = phase === 'telegraph'
+        ? '<i class="sickle"></i><b>큰낫이 빛난다</b>'
+        : '<i class="blade"></i><i class="blade echo"></i><i class="cut-ring"></i>'
+    } else if (enemyId === 'queenBee') {
+      fx.className = `boss-signature-fx queen-${phase === 'swarm' ? 'swarm' : 'sting'}`
+      fx.style.left = `${target.x}px`
+      fx.style.top = `${target.y}px`
+      fx.innerHTML = phase === 'swarm'
+        ? '<i class="hex h1"></i><i class="hex h2"></i><i class="sting s1"></i><i class="sting s2"></i><i class="sting s3"></i><b>벌떼 돌격</b>'
+        : '<i class="sting s1"></i><i class="sting s2"></i>'
+    } else if (enemyId === 'elderSpider') {
+      fx.className = 'boss-signature-fx spider-bind'
+      fx.style.left = `${target.x}px`
+      fx.style.top = `${target.y}px`
+      fx.innerHTML = '<i class="web-ring r1"></i><i class="web-ring r2"></i><i class="web-cross"></i><b>방어 관통</b>'
+    } else {
+      return
+    }
+
+    pbox.append(fx)
+    this.timers.push(window.setTimeout(() => fx.remove(), phase === 'telegraph' ? 920 : 760))
   }
 
   // 중앙 총합 카운트업(띠리리릭).
