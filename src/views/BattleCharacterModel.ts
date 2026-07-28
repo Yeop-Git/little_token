@@ -645,6 +645,9 @@ class BattleCharacterModel {
     const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
+      // Imported actors never receive runtime shadow maps. Their softer baked AO
+      // remains part of the illustration-style surface treatment below.
+      object.receiveShadow = false
       const originals = Array.isArray(object.material) ? object.material : [object.material]
       const replacements = originals.map((material) => {
         const source = material as THREE.MeshStandardMaterial
@@ -709,7 +712,9 @@ uniform float uBattleGroundMix;
 uniform float uBattleExposure;
 uniform float uPartDissolve;
 varying float vBattleHeight;`)
-        .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;
+        // The stepped directional term exposes individual low-poly faces. Keep
+        // ambient/AO darkness and emissive texture color, but omit only that term.
+        .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.indirectDiffuse + totalEmissiveRadiance;
 float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBattleGroundMix;
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);

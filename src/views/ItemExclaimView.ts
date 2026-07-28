@@ -13,6 +13,7 @@ import { BACKGROUNDS, ITEM_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { wordCardInnerHtml } from '@/ui/WordCardFace'
+import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
 
 interface Opts {
   item: ItemDef
@@ -39,6 +40,12 @@ export class ItemExclaimView {
   private slotIndex = 0
   private finalizing = false
   private timers: number[] = []
+  private transientEffects: HTMLElement[] = []
+  private forgeImpactSerial = 0
+  private pendingForgeStrikes = 0
+  private completionShown = false
+  private forgeStrikeRunning = false
+  private forgeStrikeQueue: { stats: StatKey[]; beat: number }[] = []
   private rarityMultipliers: [number, number, number]
   /** 이번 재련에서만 열리는 칸별 감탄사. 입장할 때 한 번 굴리고 끝까지 유지한다. */
   private choices: Record<string, ExclaimWord[]>
@@ -61,6 +68,8 @@ export class ItemExclaimView {
   }
   destroy() {
     this.timers.forEach((t) => clearTimeout(t))
+    this.transientEffects.forEach((effect) => effect.remove())
+    this.transientEffects = []
   }
 
   private totals() {
@@ -96,6 +105,17 @@ export class ItemExclaimView {
           <div class="iforge-top">
             <div class="iforge-illust glass${art ? ' has-art' : ''}">
               ${illust}
+              <div class="iforge-enchantment" id="forge-core" aria-hidden="true">
+                <i class="forge-orbit orbit-a"></i>
+                <i class="forge-orbit orbit-b"></i>
+                <span class="forge-core-mark">✦</span>
+                <span class="forge-sparks"></span>
+              </div>
+              <div class="forge-hammer" aria-hidden="true">
+                <i class="forge-hammer-head"></i>
+                <i class="forge-hammer-handle"></i>
+              </div>
+              <span class="forge-impact-word" aria-hidden="true">쾅!</span>
               <div class="iforge-illust-copy">
                 <div class="glint">✦ 제련할 아이템 ✦</div>
                 <div class="iname">${item.name}</div>
@@ -109,9 +129,13 @@ export class ItemExclaimView {
             </div>
           </div>
 
+          <div class="iforge-complete" id="forge-complete" aria-live="polite">
+            <span>✦</span><b>제련 완료</b><em>세 마디의 힘이 아이템에 새겨졌다</em><span>✦</span>
+          </div>
+
           <div class="iforge-choose">
-            <div class="iforge-choose-title"><b>제련 문장</b><span>세 마디를 골라 아이템에 힘을 새긴다</span></div>
             <div class="word-row" id="egrid"></div>
+            <div class="iforge-choose-title"><b>제련 문장</b><span>세 마디를 골라 아이템에 힘을 새긴다</span></div>
           </div>
         </div>
       </div>`
@@ -120,28 +144,149 @@ export class ItemExclaimView {
     this.refresh()
   }
 
-  // 모든 감탄사를 고르면 자동으로 확정 — 상단 체인이 반짝인 뒤 스탯이 확정된다.
+  /** 선택 카드의 수치를 빛 조각으로 바꿔 실제 아이템 중심까지 운반한다. */
+  private playForgeTransfer(source: HTMLElement, gains: Partial<Record<StatKey, number>>, beat: number) {
+    const target = this.q('#forge-core').getBoundingClientRect()
+    const from = source.getBoundingClientRect()
+    const entries = STAT_ORDER.filter((stat) => (gains[stat] ?? 0) > 0)
+    if (!entries.length) return
+    this.pendingForgeStrikes += 1
+    entries.forEach((stat, index) => {
+      const value = gains[stat] ?? 0
+      const mote = document.createElement('span')
+      mote.className = `forge-mote forge-mote-${stat}`
+      mote.innerHTML = `<i>✦</i><b>${STAT_LABEL[stat]} +${value}</b>`
+      mote.style.left = `${from.left + from.width / 2 - 34 + index * 12}px`
+      mote.style.top = `${from.top + from.height * 0.34 + index * 14}px`
+      document.body.append(mote)
+      this.transientEffects.push(mote)
+
+      const dx = target.left + target.width / 2 - (from.left + from.width / 2)
+      const dy = target.top + target.height / 2 - (from.top + from.height * 0.34)
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const delay = reducedMotion ? index * 15 : index * 60
+      const duration = reducedMotion ? 150 : 650
+      mote.animate([
+        { transform: 'translate3d(0, 0, 0) scale(.72) rotate(-8deg)', opacity: 0 },
+        { transform: 'translate3d(0, -24px, 0) scale(1.12) rotate(3deg)', opacity: 1, offset: .18 },
+        { transform: `translate3d(${dx * .52}px, ${dy * .22 - 70}px, 0) scale(1.02) rotate(-4deg)`, opacity: 1, offset: .52 },
+        { transform: `translate3d(${dx * .9}px, ${dy * .86}px, 0) scale(.92) rotate(7deg)`, opacity: 1, offset: .86 },
+        { transform: `translate3d(${dx}px, ${dy}px, 0) scale(.16) rotate(12deg)`, opacity: .12 },
+      ], { duration, delay, easing: 'cubic-bezier(.28,.72,.22,1)', fill: 'forwards' })
+
+      this.timers.push(window.setTimeout(() => {
+        mote.remove()
+        this.transientEffects = this.transientEffects.filter((effect) => effect !== mote)
+        if (index === entries.length - 1) this.igniteForgeCore(entries, beat)
+      }, duration + delay - 20))
+    })
+  }
+
+  /** 빠르게 카드를 골라도 카드별 타격이 겹쳐 사라지지 않도록 한 번씩 순서대로 보낸다. */
+  private igniteForgeCore(stats: StatKey[], beat: number) {
+    this.forgeStrikeQueue.push({ stats, beat })
+    this.runNextForgeStrike()
+  }
+
+  /** 한 카드의 빛 조각을 망치 한 번과 폭발 한 번으로 함께 적용한다. */
+  private runNextForgeStrike() {
+    if (this.forgeStrikeRunning) return
+    const strike = this.forgeStrikeQueue.shift()
+    if (!strike) return
+    this.forgeStrikeRunning = true
+    const { stats, beat } = strike
+    const core = this.q('#forge-core')
+    const panel = this.q('.iforge-illust')
+    const scene = this.q('.item-scene')
+    const statRows = stats
+      .map((stat) => this.root.querySelector<HTMLElement>(`.iforge-stats [data-stat="${stat}"]`))
+      .filter((row): row is HTMLElement => Boolean(row))
+    const beatKey = String(beat + 1)
+    const impactKey = String(++this.forgeImpactSerial)
+    core.dataset.stat = stats[0]
+    core.dataset.beat = beatKey
+    core.dataset.impact = impactKey
+    panel.dataset.impact = impactKey
+    statRows.forEach((row) => { row.dataset.impact = impactKey })
+    panel.classList.remove('forge-hammering', 'forge-impact')
+    core.classList.remove('impact')
+    statRows.forEach((row) => row.classList.remove('forge-gained'))
+    void panel.offsetWidth
+    panel.classList.add('forge-hammering')
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const contactDelay = reducedMotion ? 20 : 310
+    this.timers.push(window.setTimeout(() => {
+      if (panel.dataset.impact !== impactKey) return
+      const panelRect = panel.getBoundingClientRect()
+      const coreRect = core.getBoundingClientRect()
+      const scaleX = panelRect.width / panel.offsetWidth || 1
+      const scaleY = panelRect.height / panel.offsetHeight || 1
+      const color = getComputedStyle(core).getPropertyValue('--forge-impact-color').trim() || '#ffd276'
+      spawnCardCommitBurst(
+        panel,
+        (coreRect.left + coreRect.width / 2 - panelRect.left) / scaleX,
+        (coreRect.top + coreRect.height / 2 - panelRect.top) / scaleY,
+        color,
+      ).classList.add('forge-card-burst')
+
+      core.classList.remove('impact')
+      panel.classList.remove('forge-impact')
+      scene.classList.remove('forge-screen-hit')
+      statRows.forEach((row) => row.classList.remove('forge-gained'))
+      void core.offsetWidth
+      core.classList.add('impact')
+      panel.classList.add('forge-impact')
+      scene.classList.add('forge-screen-hit')
+      statRows.forEach((row) => row.classList.add('forge-gained'))
+      this.timers.push(window.setTimeout(() => scene.classList.remove('forge-screen-hit'), reducedMotion ? 20 : 320))
+    }, contactDelay))
+
+    this.timers.push(window.setTimeout(() => {
+      if (core.dataset.impact === impactKey) core.classList.remove('impact')
+      if (panel.dataset.impact === impactKey) panel.classList.remove('forge-hammering', 'forge-impact')
+      statRows.forEach((row) => {
+        if (row.dataset.impact === impactKey) row.classList.remove('forge-gained')
+      })
+      this.pendingForgeStrikes = Math.max(0, this.pendingForgeStrikes - 1)
+      this.forgeStrikeRunning = false
+      this.runNextForgeStrike()
+      if (this.finalizing && this.pendingForgeStrikes === 0) this.finishForging()
+    }, reducedMotion ? 90 : 780))
+  }
+
+  /** 대기 중인 마지막 카드별 망치질까지 끝난 뒤에만 완료 봉인과 실제 획득을 진행한다. */
+  private finishForging() {
+    if (this.completionShown) return
+    this.completionShown = true
+    const item = this.opts.item
+    const scene = this.q('.item-scene')
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    scene.classList.add('is-forged')
+    this.q('#forge-complete').classList.add('show')
+    this.timers.push(window.setTimeout(() => {
+      const totals = this.totals()
+      const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
+      this.opts.onDone({
+        id: item.id,
+        name: item.name,
+        rarity: item.rarity,
+        art: item.art,
+        line,
+        stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
+        passive: item.passive,
+      })
+    }, reducedMotion ? 360 : 560))
+  }
+
+  // 모든 감탄사를 고르면 자동 확정하되, 아직 날아가는 힘과 망치질이 있으면 끝까지 기다린다.
   private finalize() {
     if (this.finalizing || !this.complete()) return
     this.finalizing = true
-    const item = this.opts.item
+    const scene = this.q('.item-scene')
+    scene.classList.add('is-finalizing')
     this.q('#chain').classList.add('sparkle')
-    this.timers.push(
-      window.setTimeout(() => {
-        const totals = this.totals()
-        const line = EXCLAIM_SLOTS.map((s) => s.words.find((x) => x.id === this.picks[s.key])?.text ?? '').join(' ')
-        // 감탄사 선택과 행운 감탄으로 확정된 스탯이 플레이어 스탯에 더해진다.
-        this.opts.onDone({
-          id: item.id,
-          name: item.name,
-          rarity: item.rarity,
-          art: item.art,
-          line,
-          stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
-          passive: item.passive,
-        })
-      }, 340),
-    )
+    if (this.pendingForgeStrikes === 0) this.finishForging()
   }
 
   private q<T extends HTMLElement = HTMLElement>(s: string): T {
@@ -161,7 +306,7 @@ export class ItemExclaimView {
     const totals = this.totals()
     this.q('#stats').innerHTML = STAT_ORDER.map((k) => {
       const up = totals[k] - this.opts.item.base[k]
-      return `<div class="stat"><span class="sl">${STAT_LABEL[k]}</span>
+      return `<div class="stat" data-stat="${k}"><span class="sl">${STAT_LABEL[k]}</span>
         <span class="sv">${totals[k]}${up ? `<span class="up">▲${up}</span>` : ''}</span></div>`
     }).join('')
 
@@ -173,8 +318,9 @@ export class ItemExclaimView {
 
     // 현재 슬롯의 텍스트 선택지 — 행운 감탄이 붙은 칸은 금빛으로 빛나고, 첫 등장에만 팅!.
     const slot = EXCLAIM_SLOTS[this.slotIndex]
+    const refilling = Object.values(this.picks).some(Boolean) && !this.complete()
     this.q('#egrid').innerHTML = (this.choices[slot.key] ?? [])
-      .map((w) => {
+      .map((w, choiceIndex) => {
         const picked = this.picks[slot.key] === w.id
         const key = `${slot.key}:${w.id}`
         const bless = this.blessed.get(key)
@@ -219,8 +365,8 @@ export class ItemExclaimView {
           : ''
         // 아이템 등급을 word-card 호스트에 직접 붙여 공용 희귀/영웅/전설 포일과
         // 전역 FoilShader 관찰자가 전투 카드와 같은 방식으로 이 선택지도 처리한다.
-        return `<button class="word-cell iforge-word-card word-card mood-${mood} rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}"
-          style="--card-x:0px;--card-z:1" data-id="${w.id}" aria-label="${w.text}, ${accessibleNote} 선택">
+        return `<button class="word-cell iforge-word-card word-card mood-${mood} rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''} ${refilling ? 'forge-refill' : ''}"
+          style="--card-x:0px;--card-z:1;--refill-index:${choiceIndex}" data-id="${w.id}" aria-label="${w.text}, ${accessibleNote} 선택">
           ${wordCardInnerHtml(cardWord, {
             note: cardNote,
             footer: slot.label,
@@ -237,6 +383,13 @@ export class ItemExclaimView {
         btn.addEventListener('click', () => {
           if (this.finalizing) return
           this.picks[slot.key] = btn.dataset.id
+          const pickedWord = slot.words.find((word) => word.id === btn.dataset.id)
+          if (pickedWord) {
+            const gains: Partial<Record<StatKey, number>> = { ...exclaimModsFor(this.rarityMultipliers[this.slotIndex], pickedWord.mods) }
+            const bless = this.blessed.get(`${slot.key}:${pickedWord.id}`)
+            if (bless) gains[bless.stat] = (gains[bless.stat] ?? 0) + bless.n
+            this.playForgeTransfer(btn, gains, this.slotIndex)
+          }
           // 다음 빈 슬롯으로 진행
           let next = this.slotIndex + 1
           while (next < EXCLAIM_SLOTS.length && this.picks[EXCLAIM_SLOTS[next].key]) next++
