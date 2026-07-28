@@ -45,7 +45,9 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const counts = { common: 0, rare: 0, epic: 0, legendary: 0 }
   for (const item of Object.values(ALL_ITEMS)) {
     counts[item.rarity]++
-    assert(Object.values(item.base).every((value) => value === 0), `${item.name} has no fixed base stats`)
+    const baseBudget = item.base.hp / 2 + item.base.atk + item.base.guard + item.base.heal + item.base.luck
+    const expectedBaseBudget = item.rarity === 'common' ? 1 : item.rarity === 'rare' ? 2 : 0
+    assert(baseBudget === expectedBaseBudget, `${item.name} keeps its ${expectedBaseBudget}-point base stat budget`)
     assert((item.rarity === 'epic' || item.rarity === 'legendary') === !!item.passive, `${item.name} passive matches rarity tier`)
   }
   for (const [rarity, bonus] of Object.entries(EXCLAIM_RARITY_BONUS)) {

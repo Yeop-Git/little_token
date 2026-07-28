@@ -1201,6 +1201,7 @@ export class BattleView {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
           </span>
         </div>
+        <div class="boss-intel enemy-intel" aria-label="${bossName} 전투 정보" hidden></div>
       </section>`
   }
 
@@ -1336,6 +1337,7 @@ export class BattleView {
             Array.from({ length: summonPattern.maxPerSide }, (_, slot) =>
               `<span class="queen-worker ${side}" data-side="${side}" data-slot="${slot + 1}" hidden>
                 <span class="queen-worker-nameplate nameplate glass" aria-label="일벌 체력 ${summonPattern.hp ?? 1} / ${summonPattern.hp ?? 1}">
+                  <span class="queen-worker-tag"><b>적</b><span>${summonPattern.name}</span><em>${summonPattern.hp ?? 1}/${summonPattern.hp ?? 1}</em></span>
                   <span class="queen-worker-hp hpbar foe"><i class="fill"></i></span>
                 </span>
                 <span class="model-shell" data-model-status="${workerVisual.model3d ? 'preparing-3d' : 'fallback-2d'}">
@@ -1390,8 +1392,10 @@ export class BattleView {
           ?? 1
         const maxHp = enemy.def.summonPattern?.hp ?? 1
         const nameplate = worker.querySelector<HTMLElement>('.queen-worker-nameplate')
+        const hpText = worker.querySelector<HTMLElement>('.queen-worker-tag > em')
         const fill = worker.querySelector<HTMLElement>('.queen-worker-hp > .fill')
         nameplate?.setAttribute('aria-label', `일벌 체력 ${hp} / ${maxHp}`)
+        if (hpText) hpText.textContent = `${hp}/${maxHp}`
         if (fill) fill.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`
         this.queueDeferredCharacterModel(worker, CHARACTER_VISUALS.workerBee, 2)
       } else {
@@ -1476,7 +1480,9 @@ export class BattleView {
 
   /** 적 모델을 가리지 않는 작은 상태 아이콘. 숫자와 규칙은 호버 툴팁에서만 풀어 쓴다. */
   private updateEnemyIntel(el: HTMLElement, e: EnemyInst) {
-    const host = el.querySelector<HTMLElement>('.enemy-intel')!
+    const host = e.def.boss
+      ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-intel')!
+      : el.querySelector<HTMLElement>('.enemy-intel')!
     const activePart = activeEnemyPart(e)
     const attackStep = nextEnemyAttackStep(e)
     const summonPattern = e.def.summonPattern
@@ -1500,17 +1506,11 @@ export class BattleView {
           ? '<strong aria-hidden="true">!</strong><b>약점</b>'
           : ''
     }
-    // 보스의 머리 위에는 상태 아이콘을 두지 않는다. 현재 약점은 상단 체력바 바로
-    // 오른쪽에 붙이고, 나머지 규칙은 상세 카드와 연출이 맡는다.
-    if (e.def.boss) {
-      host.hidden = true
-      host.innerHTML = ''
-      return
-    }
-
-    if (weak?.kind === 'emotion') {
+    // 보스 약점은 체력바 옆 전용 배지가 이미 보여 준다. 아래 정보 배지는 다음 행동과
+    // 전투 규칙만 간결하게 붙여 같은 내용을 두 번 읽게 하지 않는다.
+    if (!e.def.boss && weak?.kind === 'emotion') {
       add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), tip(`약점 · ${weak.label}`, `${weak.label} 카드로 때리면 피해 1.5배`))
-    } else if (weak) {
+    } else if (!e.def.boss && weak) {
       add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
     }
     if (attackStep) {
@@ -1573,8 +1573,8 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
-    // 보스 상단 HUD는 체력바와 약점만 갱신한다. 선공은 배우 옆 공용 경고 표식이
-    // 실제 initiativePhase가 first일 때만 맡고, 패턴/단계/방어 텍스트는 출력하지 않는다.
+    // 보스 상단 HUD의 체력과 호위 규칙을 갱신한다. 세부 전투 정보는 바로 아래의
+    // 공용 아이콘 배지가 맡아 긴 텍스트가 체력바 폭을 밀어내지 않게 한다.
     if (bossHud) {
       const mark = plate.querySelector<HTMLElement>('.boss-health-mark')
       const escortedQueen = e.def.id === 'queenBee' && summonCount(e) > 0
@@ -2395,7 +2395,7 @@ export class BattleView {
   }
 
   private codexItemDetailHtml(item: (typeof ALL_ITEMS)[keyof typeof ALL_ITEMS]): string {
-    // 모든 아이템의 고정 기본 스탯은 0이다 — 실제 수치는 감탄 문장으로 확정된 보유분에 있다.
+    // 보유품은 기본 스탯과 감탄 문장 보너스가 합쳐진 확정 수치를 보여 준다.
     // 도감은 보유한 아이템만 상세를 여니, 그 판에서 정말 오른 값을 그대로 적는다.
     const owned = this.player.items.find((entry) => entry.id === item.id)
     const stats = owned?.stats ?? item.base

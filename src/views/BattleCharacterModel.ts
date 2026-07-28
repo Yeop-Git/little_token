@@ -15,6 +15,10 @@ const TRANSITION_SECONDS = 0.18
 const LOOP_BLEND_SAMPLE_RATE = 30
 const MODEL_YAW_RETURN_SPEED = 9
 const MODEL_YAW_RETURN_EPSILON = 0.001
+const HIGH_PIXEL_RATIO_CAP = 2
+const LOW_PIXEL_RATIO_CAP = 1
+const BOSS_EXPOSURE_BOOST = 1.14
+const BOSS_EMISSIVE_BOOST = 0.12
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['appear', 'attack', 'attack2', 'attack3', 'heal', 'shield'])
 
 type BattleWeather = 'sunny' | 'rain' | 'night'
@@ -157,77 +161,12 @@ const modelLoader = new GLTFLoader()
 const normalizedClipCache = new WeakMap<THREE.AnimationClip, Map<string, THREE.AnimationClip>>()
 // 모든 배우가 한 WebGL 컨텍스트를 공유한다. 배우마다 컨텍스트를 만들면 여왕벌전에서
 // 같은 텍스처·셰이더를 일곱 번 GPU에 올려 첫 출력마다 수 초씩 메인 스레드가 멎는다.
-const SHARED_RENDER_SIZE = 1024
+const SHARED_RENDER_SIZE = 2048
 let sharedRenderer: THREE.WebGLRenderer | null = null
-// 출력 캔버스 DPR 1.5는 픽셀 작업량이 2.25배가 된다.
-// 카툰 셰이더의 계단은 1.25에서도 거의 보이지 않으며, 전투 중 지속 GPU 부하는
-// 1.5 대비 약 31% 줄어든다. 뒤쪽 적은 흐림·축소 연출이 있어 1배면 충분하다.
-const FOREGROUND_PIXEL_RATIO_CAP = 1.25
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
 let animationFrame = 0
 let previousFrame = 0
-let slowFramePressure = 0
-let adaptiveRenderReduction = false
-let stableFrameTime = 0
-let fullRatePressure = 0
-let adaptiveFullRate = false
-
-function syncModelPerformanceMode() {
-  if (adaptiveRenderReduction) document.documentElement.dataset.modelPerformance = 'reduced'
-  else if (adaptiveFullRate) document.documentElement.dataset.modelPerformance = 'full-rate'
-  else delete document.documentElement.dataset.modelPerformance
-}
-
-function updateAdaptiveRenderBudget(frameMs: number) {
-  // 일시적인 탭 전환·개발자 도구 정지는 품질 변경 근거로 삼지 않는다.
-  if (frameMs <= 0 || frameMs >= 100) return
-
-  const highQuality = document.documentElement.dataset.graphics !== 'low'
-  if (!highQuality && adaptiveFullRate) {
-    adaptiveFullRate = false
-    stableFrameTime = 0
-    fullRatePressure = 0
-    syncModelPerformanceMode()
-  }
-
-  // 60Hz 기준으로 약 2.5초간 안정적인 프레임 여유가 확인되면 전경 idle 제한을
-  // 30→60fps로 푼다. 해제 뒤 부하가 생기면 짧은 히스테리시스를 거쳐 즉시 원래
-  // 제한으로 돌아가며, 다시 시험하기 전에는 충분한 안정 구간을 요구한다.
-  if (!adaptiveRenderReduction && highQuality && activeModels.size >= 2) {
-    if (adaptiveFullRate) {
-      fullRatePressure = frameMs > 21
-        ? Math.min(20, fullRatePressure + Math.max(0.75, (frameMs - 18) / 8))
-        : Math.max(0, fullRatePressure - 0.5)
-      if (fullRatePressure >= 10) {
-        adaptiveFullRate = false
-        stableFrameTime = -3_000
-        fullRatePressure = 0
-        syncModelPerformanceMode()
-      }
-    } else {
-      stableFrameTime = frameMs <= 20 && slowFramePressure < 5
-        ? Math.min(2_500, stableFrameTime + frameMs)
-        : Math.max(-3_000, stableFrameTime - frameMs * 2)
-      if (stableFrameTime >= 2_500) {
-        adaptiveFullRate = true
-        fullRatePressure = 0
-        syncModelPerformanceMode()
-      }
-    }
-  }
-
-  // 배우가 둘 이상인 실제 전투에서 24ms 초과 프레임이 오래 누적되면 해제 여부와
-  // 관계없이 기존 저사양 보호 단계까지 내린다.
-  if (activeModels.size < 2) return
-  slowFramePressure = frameMs > 24
-    ? Math.min(45, slowFramePressure + Math.max(0.5, (frameMs - 20) / 16.67))
-    : Math.max(0, slowFramePressure - 0.35)
-  if (adaptiveRenderReduction || slowFramePressure < 30) return
-  adaptiveRenderReduction = true
-  adaptiveFullRate = false
-  syncModelPerformanceMode()
-}
 
 function loadModel(url: string): Promise<GLTF> {
   const cached = modelLoads.get(url)
@@ -264,16 +203,11 @@ function runAnimationFrame(now: number) {
   const delta = Math.min(frameMs / 1000, 0.1)
   previousFrame = now
   if (!document.hidden) {
-    updateAdaptiveRenderBudget(frameMs)
     const models = [...activeModels]
-    const budget = adaptiveRenderReduction && models.length >= 3
-      ? models.length >= 6 ? 2 : 1
-      : models.length
     const allowed = new Set(
       models
         .filter((model) => model.wantsRender(now))
         .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
-        .slice(0, budget),
     )
     models.forEach((model) => model.render(delta, now, allowed.has(model)))
   }
@@ -292,12 +226,7 @@ function removeFromAnimationFrame(model: BattleCharacterModel) {
   if (animationFrame) cancelAnimationFrame(animationFrame)
   animationFrame = 0
   previousFrame = 0
-  slowFramePressure = 0
-  adaptiveRenderReduction = false
-  stableFrameTime = 0
-  fullRatePressure = 0
-  adaptiveFullRate = false
-  syncModelPerformanceMode()
+  delete document.documentElement.dataset.modelPerformance
   sharedRenderer?.renderLists.dispose()
 }
 
@@ -474,6 +403,8 @@ class BattleCharacterModel {
   private pendingRenderDelta = 0
   private lastRenderedAt = 0
   private renderedPixelRatio = 0
+  private compositedScale = 1
+  private readonly onWindowResize = () => this.resize()
   private readonly brokenSpiderParts = new Set<string>()
   private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
   private spiderPartDissolves: SpiderPartDissolve[] = []
@@ -512,6 +443,7 @@ class BattleCharacterModel {
     this.shell.addEventListener('pointerup', this.onPointerUp)
     this.shell.addEventListener('pointercancel', this.onPointerUp)
     this.shell.addEventListener('click', this.onClickCapture, true)
+    window.addEventListener('resize', this.onWindowResize)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(shell)
@@ -533,7 +465,11 @@ class BattleCharacterModel {
       this.scene.add(model)
       this.model = model
       this.brokenSpiderParts.forEach((partId) => this.startSpiderPartDissolve(partId, true))
-      if (fittedBounds) this.setupEffects(fittedBounds)
+      // 회복·방어 이펙트는 해당 동작이 있는 배우만 만든다. 적과 보스마다 보이지 않는
+      // 파편 71개와 방어 구체를 미리 만들던 비용을 없애되 실제 연출은 그대로 보존한다.
+      if (fittedBounds && (this.visual.animations?.heal || this.visual.animations?.shield)) {
+        this.setupEffects(fittedBounds)
+      }
       this.mixer = new THREE.AnimationMixer(model)
       this.actions = {
         idle: this.actionFor(gltf, 'idle'),
@@ -706,6 +642,7 @@ class BattleCharacterModel {
   private useBattleMaterials(model: THREE.Object3D) {
     const weather = battleWeatherOf(this.shell)
     const atmosphere = BATTLE_ATMOSPHERES[weather]
+    const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const originals = Array.isArray(object.material) ? object.material : [object.material]
@@ -725,7 +662,7 @@ class BattleCharacterModel {
           bumpScale: source.bumpScale,
           emissive: baseColor,
           emissiveMap: source.map ?? null,
-          emissiveIntensity: atmosphere.emissiveIntensity,
+          emissiveIntensity: atmosphere.emissiveIntensity + (boss ? BOSS_EMISSIVE_BOOST : 0),
           gradientMap: BATTLE_TOON_GRADIENT,
           transparent: material.transparent,
           opacity: material.opacity,
@@ -752,7 +689,8 @@ class BattleCharacterModel {
       shader.uniforms.uBattleGroundTint = { value: atmosphere.groundTint }
       shader.uniforms.uBattleSkyMix = { value: atmosphere.skyMix }
       shader.uniforms.uBattleGroundMix = { value: atmosphere.groundMix }
-      shader.uniforms.uBattleExposure = { value: atmosphere.exposure }
+      const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
+      shader.uniforms.uBattleExposure = { value: atmosphere.exposure * (boss ? BOSS_EXPOSURE_BOOST : 1) }
       shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
 
       shader.vertexShader = shader.vertexShader
@@ -1334,20 +1272,19 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   }
 
   private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
-    if (adaptiveRenderReduction) return 0.75
-    if (document.documentElement.dataset.graphics === 'low' || waitingEnemy) return 1
-    return Math.min(window.devicePixelRatio, FOREGROUND_PIXEL_RATIO_CAP)
+    const lowQuality = document.documentElement.dataset.graphics === 'low'
+    const cap = lowQuality ? LOW_PIXEL_RATIO_CAP : HIGH_PIXEL_RATIO_CAP
+    const deviceRatio = Math.min(window.devicePixelRatio || 1, cap)
+    // 고급 모드는 전경·후경 모두 실제 화면 합성 크기에 맞춘다. 절전 모드의 후경만
+    // 명시적으로 1배를 쓰며, 자동 성능 감지로 사용자가 고른 품질을 몰래 내리지 않는다.
+    const baseRatio = lowQuality && waitingEnemy ? 1 : deviceRatio
+    return baseRatio * this.compositedScale
   }
 
   private targetFps() {
-    const idle = this.requestedAnimation === 'idle' || this.requestedAnimation === 'idle2'
     const waitingEnemy = this.isWaitingEnemy()
-    const boss = this.shell.parentElement?.classList.contains('boss') ?? false
     const lowQuality = document.documentElement.dataset.graphics === 'low'
-    return adaptiveRenderReduction
-      ? waitingEnemy ? 12 : boss ? idle ? 24 : 30 : idle ? 12 : 24
-      : waitingEnemy ? adaptiveFullRate && !lowQuality ? 30 : 24
-        : lowQuality || idle && !adaptiveFullRate ? 30 : 60
+    return lowQuality ? waitingEnemy ? 24 : 30 : 60
   }
 
   wantsRender(now: number) {
@@ -1369,6 +1306,10 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   private resize(waitingEnemy = this.isWaitingEnemy()) {
     const width = Math.max(1, this.shell.clientWidth)
     const height = Math.max(1, this.shell.clientHeight)
+    const rect = this.shell.getBoundingClientRect()
+    const scaleX = rect.width > 0 ? rect.width / width : 1
+    const scaleY = rect.height > 0 ? rect.height / height : 1
+    this.compositedScale = Math.max(0.25, scaleX, scaleY)
     const pixelRatio = this.desiredPixelRatio(waitingEnemy)
     this.renderedPixelRatio = pixelRatio
     this.outputCanvas.dataset.pixelRatio = String(pixelRatio)
@@ -1415,8 +1356,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
     if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy)
 
-    // 기본 idle은 30fps, 뒤 레일은 24fps로 시작한다. 실제 프레임 여유가 이어지면
-    // 전경 idle은 60fps, 뒤 레일은 30fps로 올리고 부하가 감지되면 자동 복귀한다.
+    // 고급 모드는 idle과 공격을 모두 60fps로 유지한다. 절전 모드만 사용자의 명시적
+    // 선택에 따라 24~30fps를 쓰며, 느린 한 구간이 전투 전체 품질을 고정 강등하지 않는다.
     const targetFps = this.targetFps()
     this.outputCanvas.dataset.renderFps = String(targetFps)
     if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return
@@ -1492,6 +1433,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.disposed = true
     removeFromAnimationFrame(this)
     this.resizeObserver.disconnect()
+    window.removeEventListener('resize', this.onWindowResize)
     this.shell.removeEventListener('pointerdown', this.onPointerDown)
     this.shell.removeEventListener('pointermove', this.onPointerMove)
     this.shell.removeEventListener('pointerup', this.onPointerUp)

@@ -7,6 +7,8 @@
  */
 
 import { TOKEN_FACES } from '@/assets'
+import type { Word } from '@core/types'
+import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 
 export interface IntroDialogueHandlers {
   /** 마지막 대사 후(또는 SKIP) 딤이 걷히고 대화창이 사라진 뒤 호출된다. */
@@ -268,10 +270,24 @@ export class IntroDialogue {
     this.choiceEl.innerHTML = ''
     this.choiceEl.classList.remove('is-leaving')
     const chips = words.map((word, i) => {
+      const cardWord: Word = {
+        id: `tutorial-dialogue-${i}`,
+        text: word,
+        slot: 'dialogue',
+        tags: [],
+        emotion: 'neutral',
+        note: '문장에 넣기',
+        rarity: 'common',
+      }
       const chip = document.createElement('button')
       chip.type = 'button'
-      chip.className = 'intro-word-chip is-entering'
-      chip.textContent = word
+      chip.className = `intro-word-chip word-card mood-${wordMood(cardWord)} emotion-neutral rarity-common is-entering`
+      chip.dataset.word = word
+      chip.setAttribute('aria-label', `${word} 선택`)
+      chip.innerHTML = wordCardInnerHtml(cardWord, {
+        note: '문장에 넣기',
+        footer: `${i + 1}번째 단어`,
+      })
       chip.disabled = true
       chip.style.setProperty('--chip-delay', `${i * 90}ms`)
       // 이 런에서 처음 마주하는 선택 — 칩 위에 큰 화살표가 점멸하며 내려찍는다.
@@ -297,7 +313,8 @@ export class IntroDialogue {
           chip.classList.remove('is-next')
           chip.classList.add('is-done')
           delete chip.dataset.hint // 한 번 눌렀으면 손가락질은 그만둔다
-          const text = picked === 0 ? chip.textContent ?? '' : ` ${chip.textContent ?? ''}`
+          const selectedWord = chip.dataset.word ?? ''
+          const text = picked === 0 ? selectedWord : ` ${selectedWord}`
           picked++
           await this.typeText(text)
           resolve()

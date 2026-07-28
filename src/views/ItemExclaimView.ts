@@ -11,7 +11,8 @@ import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExcl
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS, ITEM_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { RARITY_LABEL } from '@core/types'
+import { RARITY_LABEL, type Word } from '@core/types'
+import { wordCardInnerHtml } from '@/ui/WordCardFace'
 
 interface Opts {
   item: ItemDef
@@ -192,8 +193,30 @@ export class ItemExclaimView {
         const rarityBonusHtml = rarityBoosted
           ? '<span class="rarity-bonus">등급 보너스 +1점</span>'
           : ''
-        return `<button class="word-cell rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}" data-id="${w.id}">
-          <span class="w">${w.text}</span><span class="n">${effectiveNote}</span>${rarityBonusHtml}${blessHtml}
+        const primaryStat = Object.keys(w.mods)[0] as StatKey | undefined
+        const mood = primaryStat === 'atk'
+          ? 'attack'
+          : primaryStat === 'guard'
+            ? 'guard'
+            : primaryStat === 'heal'
+              ? 'heal'
+              : primaryStat === 'luck' ? 'gamble' : 'buff'
+        const cardWord: Word = {
+          id: `item-exclaim-${slot.key}-${w.id}`,
+          text: w.text,
+          slot: slot.key,
+          tags: [],
+          emotion: 'neutral',
+          note: effectiveNote,
+          rarity: this.opts.item.rarity,
+          kind: primaryStat === 'atk' ? 'attack' : primaryStat === 'guard' ? 'guard' : primaryStat === 'heal' ? 'heal' : undefined,
+        }
+        const bonuses = rarityBonusHtml || blessHtml
+          ? `<span class="item-card-bonuses">${rarityBonusHtml}${blessHtml}</span>`
+          : ''
+        return `<button class="word-cell iforge-word-card word-card mood-${mood} emotion-neutral rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}"
+          style="--card-x:0px;--card-z:1" data-id="${w.id}" aria-label="${w.text}, ${effectiveNote} 선택">
+          ${wordCardInnerHtml(cardWord, { note: effectiveNote, footer: slot.label, overlay: bonuses })}
         </button>`
       })
       .join('')

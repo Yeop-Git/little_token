@@ -8,7 +8,7 @@ import type { RewardOption } from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { PASSIVES } from '@core/passives'
-import { STAT_LABEL, type StatKey } from '@data/items'
+import { STAT_LABEL, type ItemDef, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
 import { gradeTier } from '@core/grade'
@@ -60,11 +60,22 @@ function mainEffect(opt: RewardOption): string {
   if (opt.kind === 'item' && opt.item) {
     // 전설(규칙) 아이템은 스탯이 0이다 — 대신 바뀌는 규칙을 그대로 적는다.
     if (opt.item.passive) return PASSIVES[opt.item.passive].desc
-    const s = STAT_ORDER.filter((k) => opt.item!.base[k]).map((k) => `${STAT_LABEL[k]} +${opt.item!.base[k]}`)
-    return s.join(' · ') || '스탯 상승'
+    return '감탄 문장으로 스탯을 더할 수 있다'
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
   return wordNoteText(opt.word!)
+}
+
+/** 아이템 카드 앞면에서 상세창 없이 비교하는 고유 기본 스탯 칩. */
+function itemBaseStatsHtml(item?: ItemDef): string {
+  if (!item) return ''
+  const stats = STAT_ORDER.filter((key) => item.base[key])
+  if (!stats.length) return ''
+  const label = stats.map((key) => `${STAT_LABEL[key]} +${item.base[key]}`).join(', ')
+  return `<div class="rp-base-stats" aria-label="고유 기본 스탯: ${label}">
+    <span class="rp-base-label">고유 기본</span>
+    ${stats.map((key) => `<span class="rp-base-stat stat-${key}"><b>${STAT_LABEL[key]}</b> +${item.base[key]}</span>`).join('')}
+  </div>`
 }
 
 /** 보상 선택 단계에서도 감정을 즉시 읽게 한다. 상세 창을 열 필요가 없다. */
@@ -170,6 +181,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
       </div>
       <div class="rp-foot">
         <div class="rp-name">${p.name}</div>
+        ${p.kind === 'item' ? itemBaseStatsHtml(p.item) : ''}
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
           <button class="rp-detail" type="button">자세히보기</button>
