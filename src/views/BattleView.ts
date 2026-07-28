@@ -3113,18 +3113,18 @@ export class BattleView {
 
     const stopMs = Math.min(112, 62 + res.killed.length * 14 + (sweep ? 20 : 0))
     let firstHitStopped = heavy ? this.heavyStopUsed : false
-    const stopFirstHit = async () => {
+    const stopFirstHit = async (target: HTMLElement | null) => {
       if (firstHitStopped) return
       firstHitStopped = true
       if (heavy) {
         this.heavyStopUsed = true
         const tier = this.heavyTier()
         await sleep(HEAVY_FLASH_BLOOM_MS)
-        await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
+        await this.attackHitStop(you, target, stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
         this.shakeStage(1 + tier * .7)
         this.endSlowmo()
       } else {
-        await this.attackHitStop(you, stopMs)
+        await this.attackHitStop(you, target, stopMs)
       }
     }
 
@@ -3143,7 +3143,7 @@ export class BattleView {
         SquareBurst.playOn(firstWorker, 'damage', { spread: heavy ? 150 : 92 })
         this.hitOne(firstWorker)
       }
-      await stopFirstHit()
+      if (firstWorker) await stopFirstHit(firstWorker)
       await this.playSummonDispersal(
         this.target,
         res.summonsDispersed,
@@ -3165,8 +3165,9 @@ export class BattleView {
         continue
       }
       if (h.magicShieldBroken) {
+        const shieldTarget = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
         await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
-        await stopFirstHit()
+        if (shieldTarget) await stopFirstHit(shieldTarget)
         continue
       }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
@@ -3186,13 +3187,12 @@ export class BattleView {
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
-      await stopFirstHit()
+      if (el) await stopFirstHit(el)
       if (remainingSwordHits > 0) await sleep(SWORD_HIT_GAP_MS)
     }
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
-    // 보호막·무적 등으로 위 분기에서 접촉 연출이 없었더라도 공격 동작 자체에는
-    // 첫 타격 정지를 한 번 보장한다. 이후 resolveOverflow 킬체인은 정지 함수를 호출하지 않는다.
-    if (attacking && !firstHitStopped) await stopFirstHit()
+    // 실제로 attack 애니메이션이 닿은 첫 대상만 붙든다. 보호막·무적 때문에 대상 연출이
+    // 없거나 이후 resolveOverflow로 이어지는 연쇄 타격에는 히트스톱을 만들지 않는다.
     // 강타는 정지가 풀리는 순간 곧바로 검기가 나가야 한다. 여기서부터 아래는 전부
     // 기다리지 않는다 — 돌진 마무리도, 수치가 날아가는 것도, 쓰러지는 것도 뒤에서
     // 저절로 일어난다. 정지 한 순간 말고 텀이 하나라도 더 끼면 "탕→촥"이 안 된다.
@@ -3569,31 +3569,6 @@ export class BattleView {
       + (step >= 3 ? '<i class="if-ring late"></i><i class="if-shards"></i>' : '')
     this.q('#pbox').appendChild(flash)
     this.timers.push(window.setTimeout(() => flash.remove(), 900))
-  }
-
-  /**
-   * 씬 전체 프레임 정지. 지금까지의 히트스탑은 **때린 사람만** 얼렸다 — 맞는 적은
-   * 계속 흔들리고 숫자도 계속 떠올라서, 정지가 정지로 안 읽혔다. 3D 클립과 CSS
-   * 애니메이션을 같은 순간에 통째로 붙들어야 한 프레임이 끊긴 것처럼 보인다.
-   */
-  private async sceneHitStop(ms: number) {
-    if (this.motionOff()) return
-    const scene = this.q('.scene.battle')
-    const actors = [...this.root.querySelectorAll<HTMLElement>('.actor, .boss-token')]
-    // 방금 붙인 애니메이션은 첫 프레임을 커밋하기 전까지 pending이라 playState가 아직
-    // 'running'이 아니다. running만 잡으면 정작 붙들어야 할 타격점 섬광이 정지 중에도
-    // 계속 피어난다(실측으로 그랬다).
-    const running = scene.getAnimations({ subtree: true })
-      .filter((a) => a.playState === 'running' || a.pending)
-    actors.forEach((actor) => freezeCharacterAnimation(actor, true))
-    running.forEach((animation) => animation.pause())
-    scene.classList.add('hit-stop')
-    await sleep(ms)
-    scene.classList.remove('hit-stop')
-    running.forEach((animation) => {
-      if (animation.playState === 'paused') animation.play()
-    })
-    actors.forEach((actor) => freezeCharacterAnimation(actor, false))
   }
 
   // ── 런 기록 ── 결과 화면의 찢어진 종이에 적힐 값들을 여기서만 손댄다.
@@ -4345,15 +4320,18 @@ export class BattleView {
     el.classList.add('hit')
   }
 
-  /** 첫 타격 프레임에서 주인공의 공격 클립과 돌진만 붙들며, 관통 연쇄에는 적용하지 않는다. */
-  private async attackHitStop(actor: HTMLElement, durationMs: number) {
-    const animations = actor.getAnimations()
-      .filter((animation) => animation.playState === 'running')
+  /** attack 애니메이션이 직접 닿은 첫 대상과 공격자만 붙든다. 관통 연쇄에는 적용하지 않는다. */
+  private async attackHitStop(actor: HTMLElement, target: HTMLElement | null, durationMs: number) {
+    if (this.motionOff()) return
+    const stoppedActors = target && target !== actor ? [actor, target] : [actor]
+    // 방금 붙인 피격 셰이크는 첫 프레임을 커밋하기 전까지 pending일 수 있다.
+    const animations = stoppedActors.flatMap((stoppedActor) => stoppedActor.getAnimations({ subtree: true }))
+      .filter((animation) => animation.playState === 'running' || animation.pending)
 
-    freezeCharacterAnimation(actor, true)
+    stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, true))
     animations.forEach((animation) => animation.pause())
     await sleep(durationMs)
-    freezeCharacterAnimation(actor, false)
+    stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, false))
     animations.forEach((animation) => {
       if (animation.playState === 'paused') animation.play()
     })
