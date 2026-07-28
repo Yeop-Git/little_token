@@ -8,6 +8,7 @@
 
 import type { PlayerState } from './player'
 import type { CompileMods } from './types'
+import { currentLocale } from '@/localization'
 
 export type PassiveId =
   | 'echo' // 누댕의 메아리 — 대성공하면 그 문장이 한 번 더 발동한다
@@ -31,7 +32,7 @@ export const BBQ_PER_KILL = 0.05
 /** 피노키오의 미아핑 — "…근데?" 한 번의 배율 상한(1.0 ~ 1+이 값). */
 export const DOUBT_RANGE = 0.3
 /** 완성한 문장 끝에 항상 붙는 말. 문장에 그대로 들어가므로 로그·체인에 함께 보인다. */
-export const DOUBT_SUFFIX = '…근데?'
+export const DOUBT_SUFFIX = currentLocale === 'en' ? '…but?' : currentLocale === 'ja' ? '…でも？' : currentLocale === 'ru' ? '…но?' : currentLocale === 'zh-Hans' ? '……但是？' : currentLocale === 'zh-Hant' ? '……但是？' : '…근데?'
 
 export interface PassiveDef {
   id: PassiveId

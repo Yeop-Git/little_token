@@ -78,6 +78,7 @@ import {
   type FieldBackground,
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
+import { t } from '@/localization'
 import {
   characterAnimationOf,
   destroyCharacterModels,
@@ -1049,7 +1050,7 @@ export class BattleView {
     })
     const playerEntry: OrderEntry = {
       key: 'player',
-      name: '프롬',
+      name: t('playerName', '프롬'),
       portrait: CHARACTER_VISUALS.player.portrait2d,
       side: 'player',
       timing: 'player',
@@ -1133,9 +1134,9 @@ export class BattleView {
   private playerHtml(): string {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
-      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="${t('playerName', '프롬')}과 도우미 ${t('tokenName', '토큰')} 상세 보기">
         ${this.isBoss ? '' : `<div class="nameplate glass">
-          <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
+          <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>`}
         <div class="shadow"></div>
@@ -1143,7 +1144,7 @@ export class BattleView {
           <span class="mantis-guard-shield" aria-hidden="true">◈</span>
           <span><b>방어 필수</b><em></em></span>
         </div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="${t('playerName', '프롬')}"></div>
       </div>`
   }
 
@@ -1175,8 +1176,8 @@ export class BattleView {
 
   private bossPlayerHudHtml(): string {
     return `
-      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="프롬 체력">
-        <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
+      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="${t('playerName', '프롬')} 체력">
+        <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
         <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
       </section>`
   }
@@ -2159,7 +2160,7 @@ export class BattleView {
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
     this.q('#stats').innerHTML =
-      '<span class="hud-player-name" aria-label="주인공 이름 프롬">프롬</span>' +
+      `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])

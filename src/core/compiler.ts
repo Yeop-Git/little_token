@@ -32,6 +32,18 @@ export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
           ? { atk: '攻擊', guard: '防禦', heal: '恢復', luck: '幸運' }
           : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
+const CORE_TEXT = currentLocale === 'en'
+  ? { pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions' }
+  : currentLocale === 'ja'
+    ? { pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情' }
+    : currentLocale === 'ru'
+      ? { pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций' }
+      : currentLocale === 'zh-Hans'
+        ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪' }
+        : currentLocale === 'zh-Hant'
+          ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒' }
+          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바베큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
+
 // 단어 하나가 만드는 깡수치. 스탯 비례 단어는 "스탯 × 계수", 아니면 고정 위력.
 // 성냥팔이 소녀의 망토(verbLuck)를 들면 어떤 동사든 운 스탯만큼을 더 받는다.
 export function wordFlat(w: Word, stats: StatBlock, mods: CompileMods = {}): number {
@@ -207,21 +219,21 @@ export function compile(
   // 보너스 풀은 가산이다 — 단어마다 칩을 하나씩 세우면 화면이 곱셈으로 읽히고
   // (1+0.2)×(1+0.15) ≠ 1+0.35 만큼 집계판이 실제 피해와 어긋난다. 한 칩으로 합쳐 세운다.
   if (bonusPool) {
-    mults.push({ label: '배율 풀', value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · ') })
+    mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · ') })
   }
 
   // 백설공주의 구두 — 피해 동사가 하나라도 있으면 문장 끝에 고정 깡수치를 한 번 얹는다.
   // 동사마다가 아니라 문장당 한 번이라 겹동사와 곱해져 폭발하지 않는다.
   if (base > 0 && mods.verbFlat) {
     base += mods.verbFlat
-    flats.push({ label: '무거운 구두', value: mods.verbFlat, source: 'word', lane: 'damage' })
+    flats.push({ label: CORE_TEXT.shoe, value: mods.verbFlat, source: 'word', lane: 'damage' })
   }
 
   // 피해 깡수치가 실제로 쌓였으면 회복/방어 동사가 뒤에 와도 공격 문장이다.
   if (base > 0 && damageKind) kind = damageKind
 
   const comboMult = combos.reduce((m, c) => m * c.mult, 1)
-  for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: '완벽한 맥락' })
+  for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: CORE_TEXT.perfect })
 
   // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
   const allTags = order.flatMap((k) => (sel[k] ? sel[k]!.tags : []))
@@ -231,13 +243,13 @@ export function compile(
     if (allTags.includes(d.a) && allTags.includes(d.b)) {
       coherence *= d.penalty
       penalties.push(d.reason)
-      mults.push({ label: '어긋남', value: d.penalty, source: 'coherence', hint: d.reason })
+      mults.push({ label: CORE_TEXT.mismatch, value: d.penalty, source: 'coherence', hint: d.reason })
     }
   }
 
   // 아기돼지 바베큐 — 이번 전투에서 잡은 수만큼 문장 전체가 세진다.
   const stageMult = mods.stageMult ?? 1
-  if (stageMult !== 1) mults.push({ label: '바베큐', value: stageMult, source: 'combo', hint: '잡은 만큼 세진다' })
+  if (stageMult !== 1) mults.push({ label: CORE_TEXT.bbq, value: stageMult, source: 'combo', hint: CORE_TEXT.kills })
 
   // 천장 없음 — 배율은 상한 없이 곱해진다(벌레 스웜을 오버킬로 관통하는 쾌감).
   // 등급제 폐지 — 희귀도 보너스 없음(다양성 + 반복강화로 대체 예정).
@@ -251,10 +263,10 @@ export function compile(
   const emotionResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
   if (emotionResonance !== 1) {
     mults.push({
-      label: `${EMOTION_LABEL[repeatedEmotion![0]]} 공명`,
+      label: `${EMOTION_LABEL[repeatedEmotion![0]]} ${CORE_TEXT.resonance}`,
       value: emotionResonance,
       source: 'emotion',
-      hint: `같은 감정 ${repeatedEmotion![1]}장`,
+      hint: `${CORE_TEXT.sameEmotion} ${repeatedEmotion![1]}`,
     })
   }
 

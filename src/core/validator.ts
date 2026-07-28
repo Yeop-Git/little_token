@@ -10,6 +10,7 @@
  */
 
 import type { Conflict, Selection, SlotDef, Tables, Word } from './types'
+import { currentLocale } from '@/localization'
 
 function tagsBefore(sel: Selection, slotIndex: number, order: string[]): string[] {
   const out: string[] = []
@@ -24,7 +25,12 @@ function tagsBefore(sel: Selection, slotIndex: number, order: string[]): string[
 export function roleReason(word: Word, slot: SlotDef | undefined): string | null {
   if (!slot) return null
   if (slot.role === 'subject' && word.person && word.person !== 'first')
-    return '일기의 주어는 나·우리다 (상대는 목적어로)'
+    return currentLocale === 'en' ? 'The diary subject must be I or We (others belong in the object slot)'
+      : currentLocale === 'ja' ? '日記の主語は「ぼく・ぼくたち」だけ（相手は目的語へ）'
+        : currentLocale === 'ru' ? 'Подлежащее дневника — только «я» или «мы» (остальные идут в дополнение)'
+          : currentLocale === 'zh-Hans' ? '日记主语只能是“我／我们”（其他角色应放入宾语槽）'
+            : currentLocale === 'zh-Hant' ? '日記主語只能是「我／我們」（其他角色應放入受詞槽）'
+              : '일기의 주어는 나·우리다 (상대는 목적어로)'
   return null
 }
 

@@ -43,6 +43,8 @@ import { BOSS_BY_FLOOR, bossHealthBarsForFloor, MAX_ENCOUNTER, STORY_FLOORS } fr
 import { CARD_HAND_CONFIG } from '@/ui/CardHand'
 import { emotionBadgeContent } from '@/ui/EmotionBadge'
 import { wordCardHtml } from '@/ui/WordCardFace'
+import { currentLocale } from '@/localization'
+import { localizedGuidePages } from '@/localization/guide'
 
 interface Opts {
   onBack: () => void
@@ -89,14 +91,14 @@ function cardSlot(word: Word | null, caption?: string): string {
 }
 
 export class CombatGuideView {
-  private chapters: Chapter[] = [
+  private chapters: Chapter[] = currentLocale === 'ko' ? [
     { key: 'flow', title: '전투의 흐름', hint: '한 턴에 벌어지는 일', body: () => this.pageFlow() },
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
     { key: 'damage', title: '피해가 정해지는 순서', hint: '깡수치 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
     { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
-  ]
+  ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body }))
 
   private active = 0
 

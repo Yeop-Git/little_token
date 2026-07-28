@@ -34,8 +34,9 @@ import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 import { CustomCursor } from '@/ui/CustomCursor'
 import { ClickScribble } from '@/ui/ClickScribble'
-import { applyLocaleToDocument } from '@/localization'
+import { applyLocaleToDocument, currentLocale } from '@/localization'
 import { applyContentLocalization } from '@/localization/content'
+import { applyDetailedContentLocalization } from '@/localization/contentDetails'
 import { installDomLocalization } from '@/localization/dom'
 
 const STAGE_W = 1920
@@ -57,6 +58,7 @@ let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0
 applyLocaleToDocument()
 applyContentLocalization()
+if (currentLocale !== 'ko') applyDetailedContentLocalization(currentLocale)
 installDomLocalization()
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()

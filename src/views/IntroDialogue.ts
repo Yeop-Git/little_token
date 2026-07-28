@@ -9,6 +9,7 @@
 import { TOKEN_FACES, TUTORIAL_CARD_ART } from '@/assets'
 import type { Word } from '@core/types'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
+import { currentLocale, t, type LocaleCode } from '@/localization'
 
 export interface IntroDialogueHandlers {
   /** 마지막 대사 후(또는 SKIP) 딤이 걷히고 대화창이 사라진 뒤 호출된다. */
@@ -22,8 +23,31 @@ type ScriptLine =
   /** 플레이어 대사 — 단어 칩을 순서대로 골라 문장을 조립한다. */
   | { kind: 'player'; words: string[] }
 
-const TOKEN_NAME = '토큰'
-const PLAYER_NAME = '프롬'
+const TOKEN_NAME = t('tokenName', '토큰')
+const PLAYER_NAME = t('playerName', '프롬')
+
+const PLAYER_LINES: Record<LocaleCode, string[][]> = {
+  ko: [['. . . 여긴 어디야?'], ['기억을', '잃다니', '무슨', '소리야.'], ['아무것도', '기억이', '안 나.'], ['그게', '누군데?']],
+  en: [['. . . Where am I?'], ['What do', 'you mean,', 'lost', 'my memory?'], ["I don't", 'remember', 'anything.'], ['Who', 'are they?']],
+  ja: [['. . . ここはどこ？'], ['記憶を', 'なくしたって', 'どういう', 'こと？'], ['何も', '思い出せ', 'ない。'], ['それって', '誰？']],
+  ru: [['. . . Где я?'], ['Что значит', 'я потерял', 'свою', 'память?'], ['Я ничего', 'не', 'помню.'], ['Кто', 'это?']],
+  'zh-Hans': [['. . . 这里是哪里？'], ['失忆', '到底是', '什么', '意思？'], ['我什么', '都不', '记得。'], ['那是', '谁？']],
+  'zh-Hant': [['. . . 這裡是哪裡？'], ['失憶', '到底是', '什麼', '意思？'], ['我什麼', '都不', '記得。'], ['那是', '誰？']],
+}
+
+const TOKEN_LINES: Record<LocaleCode, string[]> = {
+  ko: ['어서 일어나!','이런... 설마 또 기억을 잃은 거야?','젠장... 또 이야기를 빼앗겼다니!','괜찮아...','다시 되찾을 수 있으니까. 매번 그래왔잖아 그치?','내가 다시 차근차근 알려줄게.','우린 최고의 파트너니까!','같은 색 감정을 모으면 강력한 힘이 나가!','우선 눈 앞에 이야기를 좀먹는 녀석들을 처리해야해!'],
+  en: ['Wake up!','Oh no... Did you lose your memory again?','Darn... They stole the story again!','It’s okay...','We can take it back. We always do, right?','I’ll teach you again, one step at a time.','Because we’re the best partners!','Gather emotions of the same color to unleash great power!','First, deal with those bugs eating the story!'],
+  ja: ['早く起きて！','まさか…また記憶をなくしたの？','くそっ…また物語を奪われた！','大丈夫…','また取り戻せるよ。いつもそうしてきたでしょ？','ぼくがまた一つずつ教えるよ。','ぼくらは最高の相棒だから！','同じ色の感情を集めると強い力が出るよ！','まずは目の前で物語を蝕むやつらを片づけよう！'],
+  ru: ['Просыпайся!','О нет... Ты снова потерял память?','Вот же... Историю снова украли!','Всё хорошо...','Мы вернём её. У нас всегда получалось, правда?','Я снова всё объясню, шаг за шагом.','Ведь мы лучшие напарники!','Собирай эмоции одного цвета — и высвободишь огромную силу!','Сначала разберёмся с теми, кто пожирает историю!'],
+  'zh-Hans': ['快醒醒！','不会吧……你又失忆了吗？','可恶……故事又被抢走了！','没关系……','我们还能夺回来。每次都做到了，对吧？','我会再一步步教你。','因为我们是最棒的搭档！','聚集同色的情绪，就能释放强大的力量！','先解决眼前这些啃食故事的家伙！'],
+  'zh-Hant': ['快醒醒！','不會吧……你又失憶了嗎？','可惡……故事又被搶走了！','沒關係……','我們還能奪回來。每次都做到了，對吧？','我會再一步步教你。','因為我們是最棒的搭檔！','聚集同色的情緒，就能釋放強大的力量！','先解決眼前這些啃食故事的傢伙！'],
+}
+
+let playerLineIndex = 0
+const playerLine = (): string[] => PLAYER_LINES[currentLocale][playerLineIndex++]
+let tokenLineIndex = 0
+const tokenLine = (): string => TOKEN_LINES[currentLocale][tokenLineIndex++]
 
 // 타자 속도와, 다 출력된 뒤 클릭 진행 게이트: ADVANCE_LOCK_MS 동안 무시 →
 // 이후 클릭 또는 ADVANCE_TIMEOUT_MS 경과 시 다음 대사.
@@ -36,19 +60,19 @@ const PORTRAIT_SWAP_OUT_MS = 110
 const PORTRAIT_SWAP_IN_MS = 260
 
 const SCRIPT: ScriptLine[] = [
-  { kind: 'token', portrait: 'neutral', text: '어서 일어나!' },
-  { kind: 'player', words: ['. . . 여긴 어디야?'] },
-  { kind: 'token', portrait: 'neutral', text: '이런... 설마 또 기억을 잃은 거야?' },
-  { kind: 'player', words: ['기억을', '잃다니', '무슨', '소리야.'] },
-  { kind: 'token', portrait: 'sad', text: '젠장... 또 이야기를 빼앗겼다니!' },
-  { kind: 'token', portrait: 'sad', text: '괜찮아...' },
-  { kind: 'token', portrait: 'neutral', text: '다시 되찾을 수 있으니까. 매번 그래왔잖아 그치?' },
-  { kind: 'player', words: ['아무것도', '기억이', '안 나.'] },
-  { kind: 'token', portrait: 'neutral', text: '내가 다시 차근차근 알려줄게.' },
-  { kind: 'token', portrait: 'smile', text: '우린 최고의 파트너니까!' },
-  { kind: 'token', portrait: 'smile', text: '같은 색 감정을 모으면 강력한 힘이 나가!' },
-  { kind: 'token', portrait: 'smile', text: '우선 눈 앞에 이야기를 좀먹는 녀석들을 처리해야해!' },
-  { kind: 'player', words: ['그게', '누군데?'] },
+  { kind: 'token', portrait: 'neutral', text: tokenLine() },
+  { kind: 'player', words: playerLine() },
+  { kind: 'token', portrait: 'neutral', text: tokenLine() },
+  { kind: 'player', words: playerLine() },
+  { kind: 'token', portrait: 'sad', text: tokenLine() },
+  { kind: 'token', portrait: 'sad', text: tokenLine() },
+  { kind: 'token', portrait: 'neutral', text: tokenLine() },
+  { kind: 'player', words: playerLine() },
+  { kind: 'token', portrait: 'neutral', text: tokenLine() },
+  { kind: 'token', portrait: 'smile', text: tokenLine() },
+  { kind: 'token', portrait: 'smile', text: tokenLine() },
+  { kind: 'token', portrait: 'smile', text: tokenLine() },
+  { kind: 'player', words: playerLine() },
 ]
 
 function wait(ms: number): Promise<void> {
