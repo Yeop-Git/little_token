@@ -9,7 +9,7 @@ import type { ItemDef, StatKey } from '@data/items'
 import type { ExclaimWord } from '@data/items'
 import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers } from '@data/items'
 import type { OwnedItem } from '@core/player'
-import { BACKGROUNDS, ITEM_ART } from '@/assets'
+import { BACKGROUNDS, FORGE_HAMMER_ART, ITEM_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { wordCardInnerHtml } from '@/ui/WordCardFace'
@@ -111,10 +111,7 @@ export class ItemExclaimView {
                 <span class="forge-core-mark">✦</span>
                 <span class="forge-sparks"></span>
               </div>
-              <div class="forge-hammer" aria-hidden="true">
-                <i class="forge-hammer-head"></i>
-                <i class="forge-hammer-handle"></i>
-              </div>
+              <img class="forge-hammer" src="${FORGE_HAMMER_ART}" alt="" aria-hidden="true">
               <span class="forge-impact-word" aria-hidden="true">쾅!</span>
               <div class="iforge-illust-copy">
                 <div class="glint">✦ 제련할 아이템 ✦</div>

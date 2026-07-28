@@ -45,9 +45,8 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
-/** 출시 빌드에서 닫아 둔 임시 기능. 다시 열 때는 타이틀 흐름과 저장 마이그레이션을 함께 검수한다. */
+/** 출시 빌드에서 닫아 둔 임시 기능. */
 const DEV_CHEAT_ENABLED = false
-const CONTINUE_ENABLED = false
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
@@ -70,9 +69,9 @@ function fit() {
 window.addEventListener('resize', fit)
 fit()
 
-// 이어하기가 닫힌 동안에는 기기에 남은 런을 부팅 상태로 불러오지 않는다.
-// 저장 코드는 런 도중의 체크포인트 형식을 보존하지만 타이틀에서는 접근할 수 없다.
-let run = CONTINUE_ENABLED ? loadRun() ?? newRun() : newRun()
+// 저장된 런이 있으면 그 다음 전투를 예열한다. 항상 새 런부터 예열하면 이어하기에서
+// 1층 모델을 받은 직후 현재 층 모델을 또 받아 네트워크·파싱 비용이 두 번 든다.
+let run = loadRun() ?? newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
 void preloadUpcomingBattle().catch(() => undefined)
@@ -437,13 +436,13 @@ function goTitle(withIntro: unknown = false) {
   reset()
   stage.setAttribute('data-theme', 'day')
   const title = new TitleView(stage, {
-    hasSave: CONTINUE_ENABLED && !!loadRun(),
+    hasSave: !!loadRun(),
     holdUi: playIntro,
     onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
-      if (!CONTINUE_ENABLED || fresh) clearRun()
-      const saved = CONTINUE_ENABLED && !fresh ? loadRun() : null
+      if (fresh) clearRun()
+      const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()

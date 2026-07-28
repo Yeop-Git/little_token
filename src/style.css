@@ -6744,61 +6744,31 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .forge-sparks::before { left: 4px; top: 14px; }
 .forge-sparks::after { right: 2px; bottom: 12px; font-size: 11px; }
-/* 빛 조각이 닿으면 망치가 위에서 한 번 크게 내려친다. 머리와 손잡이는 CSS 도형으로
-   그려 아이템 원화가 달라도 같은 그림일기 제련 도구를 쓴다. */
+/* 빛 조각이 닿으면 공용 그림일기 망치 스프라이트가 손잡이 끝을 축으로 내려친다. */
 .forge-hammer {
   position: absolute;
   left: calc(50% + 126px);
   top: 43%;
   z-index: 8;
-  width: 116px;
-  height: 150px;
+  width: 172px;
+  height: 172px;
+  object-fit: contain;
   opacity: 0;
-  transform-origin: 50% 8px;
+  transform-origin: 22% 81%;
+  filter: drop-shadow(3px 7px 5px rgba(0,0,0,.48));
   pointer-events: none;
-}
-.forge-hammer-head {
-  position: absolute;
-  left: 14px;
-  bottom: 10px;
-  width: 88px;
-  height: 38px;
-  border: 3px solid #543520;
-  border-radius: 13px 7px 9px 12px;
-  background:
-    linear-gradient(90deg, rgba(255,244,186,.52), transparent 25% 72%, rgba(68,35,20,.42)),
-    linear-gradient(#d99d4b, #8f552d 58%, #633821);
-  box-shadow: inset 0 4px rgba(255,235,164,.35), inset 0 -5px rgba(61,30,18,.42), 0 5px 8px rgba(0,0,0,.42);
-}
-.forge-hammer-head::after {
-  content: '';
-  position: absolute;
-  inset: 7px 25px;
-  border: 2px dashed rgba(255,224,145,.42);
-  border-radius: 5px;
-}
-.forge-hammer-handle {
-  position: absolute;
-  left: 51px;
-  top: 4px;
-  width: 15px;
-  height: 113px;
-  border: 2px solid #402819;
-  border-radius: 8px 8px 4px 4px;
-  background: linear-gradient(90deg, #6c3d22, #d39147 38%, #7b4526 78%);
-  box-shadow: inset 3px 0 rgba(255,220,145,.22), 2px 4px 6px rgba(0,0,0,.35);
 }
 .iforge-illust.forge-hammering .forge-hammer {
   animation: forge-hammer-strike .5s cubic-bezier(.16,.8,.16,1) both;
 }
 @keyframes forge-hammer-strike {
-  0% { opacity: 0; transform: translate(-50%, -50%) rotate(150deg) scale(.92); }
-  14% { opacity: 1; transform: translate(-50%, -50%) rotate(150deg) scale(1); }
-  34% { opacity: 1; transform: translate(-50%, -50%) rotate(145deg) scale(1.03); }
-  63% { opacity: 1; transform: translate(-50%, -50%) rotate(90deg) scale(1.05); }
-  68% { opacity: 1; transform: translate(calc(-50% - 7px), -50%) rotate(90deg) scale(.94, 1.07); }
-  84% { opacity: 1; transform: translate(calc(-50% + 8px), -50%) rotate(79deg) scale(1); }
-  100% { opacity: 0; transform: translate(calc(-50% + 15px), -50%) rotate(72deg) scale(.94); }
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-75deg) scale(.92); }
+  14% { opacity: 1; transform: translate(-50%, -50%) rotate(-75deg) scale(1); }
+  34% { opacity: 1; transform: translate(-50%, -50%) rotate(-80deg) scale(1.03); }
+  63% { opacity: 1; transform: translate(-50%, -50%) rotate(-135deg) scale(1.05); }
+  68% { opacity: 1; transform: translate(calc(-50% - 7px), -50%) rotate(-135deg) scale(.94, 1.07); }
+  84% { opacity: 1; transform: translate(calc(-50% + 8px), -50%) rotate(-146deg) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-50% + 15px), -50%) rotate(-153deg) scale(.94); }
 }
 .forge-impact-word {
   position: absolute;

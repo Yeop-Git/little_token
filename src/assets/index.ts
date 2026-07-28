@@ -143,6 +143,7 @@ import itemStarLantern from './sprites/items/item_023.webp'
 import itemOilLantern from './sprites/items/item_024.webp'
 import itemCompass from './sprites/items/item_025.webp'
 import itemSatchel from './sprites/items/item_026.webp'
+import forgeHammer from './sprites/items/hammer_sprite.webp'
 import cinematic from './video/cinematic.webm'
 import bossCinematic001 from './video/bosscinematic_001.webm'
 import attack001 from './video/attack_001.webm'
@@ -385,6 +386,9 @@ export const ITEM_ART: Record<string, string> = {
   compass: itemCompass,
   satchel: itemSatchel,
 }
+
+/** 아이템 제련 타격 연출에 공통으로 쓰는 투명 망치 스프라이트. */
+export const FORGE_HAMMER_ART = forgeHammer
 
 // 영상 — 오프닝 시네마틱과 공격 액션 컷.
 // attack1은 수치가 크게 부풀었을 때, attack2는 그 일격이 판을 통째로 쓸어버릴 때.

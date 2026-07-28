@@ -729,9 +729,13 @@ float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBatt
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleSkyTint, battleSkyWeight);
-// Broad paper-illustration shading follows the whole silhouette instead of
-// mesh normals, so low-poly face boundaries stay invisible.
-float battleSoftLight = mix(1.045, 0.965, vBattleSide) * mix(0.985, 1.035, vBattleHeight);
+// Three broad tonal zones follow the whole silhouette instead of mesh normals.
+// Wide smoothstep overlaps blur both boundaries, keeping low-poly faces hidden.
+float battleRampPosition = clamp((1.0 - vBattleSide) * 0.7 + vBattleHeight * 0.3, 0.0, 1.0);
+float battleShadowToMid = smoothstep(0.12, 0.5, battleRampPosition);
+float battleMidToLight = smoothstep(0.5, 0.9, battleRampPosition);
+float battleSoftLight = mix(0.94, 1.0, battleShadowToMid);
+battleSoftLight = mix(battleSoftLight, 1.05, battleMidToLight);
 outgoingLight *= uBattleExposure * battleSoftLight;
 vec3 battleTintedAlbedo = diffuseColor.rgb;
 battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleGroundTint, battleGroundWeight * 0.3);
