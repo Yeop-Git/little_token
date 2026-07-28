@@ -6306,9 +6306,12 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 /* 덱 상한 교체 — 보유 카드 전체를 보여 주되, 8장에서는 카드 영역만 스크롤한다. */
 .discard-scene { box-sizing: border-box; padding: 18px 0; }
 .discard-card {
-  width: min(1600px, calc(100vw - 112px));
-  height: calc(100vh - 36px);
-  max-height: calc(100vh - 36px);
+  /* 게임은 1920×1080 고정 무대를 통째로 축소·확대한다. 여기서 vh/vw를 쓰면
+     2K·4K 창에서 패널만 무대보다 커져 잘리고, 목록은 넘치지 않았다고 계산되어
+     스크롤도 생기지 않는다. 씬의 패딩을 뺀 무대 영역을 기준으로 맞춘다. */
+  width: min(1600px, 100%);
+  height: 100%;
+  max-height: none;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -6338,8 +6341,10 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   padding: 4px 10px 18px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   scrollbar-color: rgba(255, 220, 140, .65) rgba(255, 255, 255, .06);
 }
+.discard-grid:focus-visible { outline: 2px solid rgba(255, 220, 140, .78); outline-offset: -2px; }
 .discard-preview {
   position: relative;
   flex: 0 0 min(280px, 19vw);

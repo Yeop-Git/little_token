@@ -6,7 +6,7 @@
  * 표시/연출 전담 — 전투 상태는 건드리지 않고 끝나면 onComplete만 부른다.
  */
 
-import { TOKEN_FACES } from '@/assets'
+import { TOKEN_FACES, TUTORIAL_CARD_ART } from '@/assets'
 import type { Word } from '@core/types'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 
@@ -287,7 +287,7 @@ export class IntroDialogue {
       chip.innerHTML = wordCardInnerHtml(cardWord, {
         note: '문장에 넣기',
         footer: `${i + 1}번째 단어`,
-        artUrl: TOKEN_FACES.smile,
+        artUrl: TUTORIAL_CARD_ART[i % TUTORIAL_CARD_ART.length],
         hideMeta: true,
       })
       chip.disabled = true

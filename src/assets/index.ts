@@ -35,6 +35,9 @@ import token003 from './sprites/token/token_003.webp'
 import token004 from './sprites/token/token_004.webp'
 import token005 from './sprites/token/token_005.webp'
 import token006 from './sprites/token/token_006.webp'
+import tutorialCard01 from './sprites/tutorial/tutorial_card_01.webp'
+import tutorialCard02 from './sprites/tutorial/tutorial_card_02.webp'
+import tutorialCard03 from './sprites/tutorial/tutorial_card_03.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
 import enemyFlea from './sprites/enemy_flea.webp'
 import enemyTermite from './sprites/enemy_termite.webp'
@@ -218,6 +221,9 @@ export const TOKEN_FACES = {
   party: token005, // 고깔모자에 나팔 — 축하 자리
   gloom: token006, // 파랗게 질려 고개를 떨굼 — 패배·손실 자리
 }
+
+/** 튜토리얼 대사 선택 카드 원화. 요청한 3 → 2 → 1 순서로 카드 위치에 배치한다. */
+export const TUTORIAL_CARD_ART: readonly string[] = [tutorialCard01, tutorialCard02, tutorialCard03]
 
 // 카드 감정 뱃지 — 사용자 제공 수채화 캐릭터를 런타임 WebP로 최적화한 아이콘.
 export const EMOTION_FACES: Record<string, string> = {

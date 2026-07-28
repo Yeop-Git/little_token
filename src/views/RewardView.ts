@@ -204,8 +204,8 @@ export class RewardView {
         <div class="reward-stage">
           <div class="reward-card">
             <div class="reward-token" aria-hidden="true">
-              <img class="reward-token-shadow" src="${TOKEN_FACES.crown}" alt="" />
-              <img class="reward-token-main" src="${TOKEN_FACES.crown}" alt="" />
+              <img class="reward-token-shadow" src="${TOKEN_FACES.party}" alt="" />
+              <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
             </div>
             <header class="reward-head">
               <div class="k">${opts.day}스테이지 클리어</div>
