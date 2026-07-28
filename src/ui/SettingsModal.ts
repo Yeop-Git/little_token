@@ -1,5 +1,5 @@
 import { GameAudio } from '@/audio/GameAudio'
-import { GraphicsSettings, type GraphicsQuality } from '@/ui/GameSettings'
+import { GraphicsSettings, type AntiAliasingQuality, type GraphicsQuality } from '@/ui/GameSettings'
 import { icon } from '@/ui/Icons'
 
 /** 전투와 타이틀이 같은 저장값·마크업을 쓰는 공용 설정 모달. */
@@ -12,6 +12,7 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
   }
   const volume = Math.round(GameAudio.getVolume() * 100)
   const graphics = GraphicsSettings.get()
+  const antiAliasing = GraphicsSettings.getAntiAliasing()
   host.innerHTML = `
     <div class="ov-backdrop"></div>
     <section class="ov-panel glass settings-panel" aria-label="설정">
@@ -22,10 +23,20 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
         <p>배경음악과 효과음의 전체 크기를 조절합니다.</p>
       </div>
       <div class="settings-group">
-        <div class="settings-label"><b>그래픽</b><span>효과 품질</span></div>
+        <div class="settings-label"><b>그래픽</b><span>전반적인 품질</span></div>
         <div class="graphics-options" role="group" aria-label="그래픽 품질">
-          <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>고급</b><span>블러·포일·배경 효과</span></button>
-          <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>절전</b><span>효과를 줄여 가볍게</span></button>
+          <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>낮음</b><span>효과 최소화 · 30 FPS</span></button>
+          <button type="button" data-quality="medium" class="${graphics === 'medium' ? 'on' : ''}"><b>보통</b><span>균형 잡힌 효과 · 45 FPS</span></button>
+          <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>높음</b><span>풍부한 효과 · 60 FPS</span></button>
+          <button type="button" data-quality="ultra" class="${graphics === 'ultra' ? 'on' : ''}"><b>울트라</b><span>최대 해상도 · 60 FPS</span></button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-label"><b>안티앨리어싱</b><span>캐릭터 가장자리</span></div>
+        <div class="graphics-options antialiasing-options" role="group" aria-label="안티앨리어싱 품질">
+          <button type="button" data-aa="off" class="${antiAliasing === 'off' ? 'on' : ''}"><b>끔</b><span>추가 샘플링 없음</span></button>
+          <button type="button" data-aa="medium" class="${antiAliasing === 'medium' ? 'on' : ''}"><b>보통</b><span>1.35배 선명화</span></button>
+          <button type="button" data-aa="high" class="${antiAliasing === 'high' ? 'on' : ''}"><b>높음</b><span>1.7배 선명화</span></button>
         </div>
       </div>
       <div class="settings-group records-reset-group">
@@ -53,6 +64,13 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
     button.addEventListener('click', () => {
       GraphicsSettings.set(button.dataset.quality as GraphicsQuality)
       host!.querySelectorAll('[data-quality]').forEach((item) => item.classList.remove('on'))
+      button.classList.add('on')
+    })
+  })
+  host.querySelectorAll<HTMLButtonElement>('[data-aa]').forEach((button) => {
+    button.addEventListener('click', () => {
+      GraphicsSettings.setAntiAliasing(button.dataset.aa as AntiAliasingQuality)
+      host!.querySelectorAll('[data-aa]').forEach((item) => item.classList.remove('on'))
       button.classList.add('on')
     })
   })

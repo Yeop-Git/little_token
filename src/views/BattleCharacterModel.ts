@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
+import { GraphicsSettings } from '@/ui/GameSettings'
 
 export type BattleAnimation = 'idle' | 'idle2' | 'walk' | 'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 /** 한 번만 재생하고 끝나는 동작. idle 계열과 walk는 계속 도는 클립이라 여기 안 든다. */
@@ -15,8 +16,6 @@ const TRANSITION_SECONDS = 0.18
 const LOOP_BLEND_SAMPLE_RATE = 30
 const MODEL_YAW_RETURN_SPEED = 9
 const MODEL_YAW_RETURN_EPSILON = 0.001
-const HIGH_PIXEL_RATIO_CAP = 2
-const LOW_PIXEL_RATIO_CAP = 1
 const BOSS_EXPOSURE_BOOST = 1.14
 const BOSS_EMISSIVE_BOOST = 0.12
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['appear', 'attack', 'attack2', 'attack3', 'heal', 'shield'])
@@ -185,7 +184,9 @@ function acquireRenderer(): THREE.WebGLRenderer {
   sharedRenderer?.dispose()
   const renderer = new THREE.WebGLRenderer({
     alpha: true,
-    antialias: true,
+    // Native MSAA cannot be changed after this shared context is created.
+    // Adjustable supersampling is applied per actor output canvas instead.
+    antialias: false,
     powerPreference: 'high-performance',
     preserveDrawingBuffer: false,
   })
@@ -1277,19 +1278,18 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   }
 
   private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
-    const lowQuality = document.documentElement.dataset.graphics === 'low'
-    const cap = lowQuality ? LOW_PIXEL_RATIO_CAP : HIGH_PIXEL_RATIO_CAP
-    const deviceRatio = Math.min(window.devicePixelRatio || 1, cap)
-    // 고급 모드는 전경·후경 모두 실제 화면 합성 크기에 맞춘다. 절전 모드의 후경만
-    // 명시적으로 1배를 쓰며, 자동 성능 감지로 사용자가 고른 품질을 몰래 내리지 않는다.
-    const baseRatio = lowQuality && waitingEnemy ? 1 : deviceRatio
-    return baseRatio * this.compositedScale
+    const profile = GraphicsSettings.profile()
+    const deviceRatio = Math.max(1, window.devicePixelRatio || 1)
+    const baseRatio = Math.min(deviceRatio, profile.pixelRatioCap)
+    const waitingScale = waitingEnemy && profile.waitingFps < profile.activeFps ? 0.9 : 1
+    const antialiasing = GraphicsSettings.antiAliasingScale()
+    return Math.min(2.5, baseRatio * waitingScale * antialiasing) * this.compositedScale
   }
 
   private targetFps() {
     const waitingEnemy = this.isWaitingEnemy()
-    const lowQuality = document.documentElement.dataset.graphics === 'low'
-    return lowQuality ? waitingEnemy ? 24 : 30 : 60
+    const profile = GraphicsSettings.profile()
+    return waitingEnemy ? profile.waitingFps : profile.activeFps
   }
 
   wantsRender(now: number) {

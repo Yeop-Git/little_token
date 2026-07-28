@@ -5735,7 +5735,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .ov-close svg { width: 100%; height: 100%; }
 .ov-close:hover { color: var(--gold); background: rgba(255, 255, 255, 0.06); }
 
-.settings-panel { width: 620px; }
+.settings-panel { width: 720px; max-height: min(92vh, 760px); overflow-y: auto; }
 .settings-group { padding: 18px 20px; border-radius: 16px; background: rgba(255,255,255,.045); }
 .settings-group + .settings-group { margin-top: 14px; }
 .settings-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -5743,7 +5743,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .settings-label span { color: var(--gold); font-size: 14px; font-weight: 900; }
 .settings-group p { margin-top: 8px; color: var(--ink-faint); font-size: 13px; }
 #volume-range { width: 100%; accent-color: var(--gold); cursor: pointer; }
-.graphics-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.graphics-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.graphics-options.antialiasing-options { grid-template-columns: repeat(3, 1fr); }
 .graphics-options button {
   padding: 13px 15px;
   display: flex;
@@ -5756,6 +5757,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .graphics-options button b { font-size: 17px; }
 .graphics-options button span { margin-top: 2px; font-size: 12px; }
+.graphics-options button:hover { color: #fff3d3; background: rgba(255,255,255,.09); }
 .graphics-options button.on { color: #2b1e10; background: var(--gold); box-shadow: 0 0 18px rgba(255,207,118,.32); }
 .settings-reset-btn {
   width: 100%;
@@ -8111,6 +8113,12 @@ html[data-graphics='low'] .card-foil::after,
 html[data-graphics='low'] .rp-foil,
 html[data-graphics='low'] .rp-foil::before,
 html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: none !important; }
+/* 보통은 핵심 장식은 남기고 합성 비용이 큰 블러만 절반 수준으로 낮춘다. */
+html[data-graphics='medium'] .glass,
+html[data-graphics='medium'] .ov-backdrop {
+  backdrop-filter: blur(5px) saturate(1.05);
+  -webkit-backdrop-filter: blur(5px) saturate(1.05);
+}
 
 /* ── 공격 액션 컷 ──
    왼쪽 화면 밖에 접어 두었다가, 크게 부푼 일격에만 정보 패널처럼 밀려 들어온다.
