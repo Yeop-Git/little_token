@@ -18,6 +18,8 @@ import {
   MULT_BUDGET,
   expectedMult,
   hasBudget,
+  tacticalVerbBudget,
+  tacticalVerbPower,
   verbCoefBudget,
 } from '@core/budget'
 import { numericNoteParts, wordNoteText } from '@core/wordText'
@@ -122,18 +124,21 @@ function checkBudget(): string[] {
   const out: string[] = []
   const early = Object.entries(EARLY_WORDS).flatMap(([slot, list]) => list.map((w) => ({ slot, w, pool: '초기' })))
   const reward = REWARD_WORDS.map((w) => ({ slot: w.slot, w, pool: '보상' }))
+  const special = SPECIAL_REWARD_WORDS.map((w) => ({ slot: w.slot, w, pool: '규칙' }))
   console.log(`\n등급 예산 검사 — 노멀 ${MULT_BUDGET.common} · 희귀 ${MULT_BUDGET.rare} · 영웅 ${MULT_BUDGET.epic}`)
 
-  for (const { slot, w, pool } of [...early, ...reward]) {
+  for (const { slot, w, pool } of [...early, ...reward, ...special]) {
     const rarity = w.rarity ?? 'common'
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
     if (slot === 'verb' || slot === 'verb2') {
       if (w.statMult == null) continue
-      const want = verbCoefBudget(rarity, w.aoe)
-      const off = Math.abs(w.statMult - want)
+      const isTactical = pool === '규칙'
+      const got = isTactical ? tacticalVerbPower(w) : w.statMult
+      const want = isTactical ? tacticalVerbBudget(w, rarity) : verbCoefBudget(rarity, w.aoe)
+      const off = Math.abs(got - want)
       if (off > BUDGET_TOLERANCE) {
-        out.push(`${pool}/${w.text}: 계수 ×${w.statMult} ≠ ${RARITY_LABEL[rarity]} 예산 ×${want}`)
-        console.log(`  위반  ${pool} · ${w.text} — 계수 ×${w.statMult}, ${RARITY_LABEL[rarity]} 예산은 ×${want}`)
+        out.push(`${pool}/${w.text}: 실전 총량 ×${got.toFixed(3)} ≠ ${RARITY_LABEL[rarity]} 예산 ×${want}`)
+        console.log(`  위반  ${pool} · ${w.text} — 실전 총량 ×${got.toFixed(3)}, ${RARITY_LABEL[rarity]} 예산은 ×${want}`)
       }
       continue
     }
@@ -155,7 +160,7 @@ function checkBudget(): string[] {
   }
 
   // 카드 문구가 수치를 빠뜨리면 화면과 실제가 어긋난다 — 표기도 계약이다.
-  for (const { w, pool } of [...early, ...reward]) {
+  for (const { w, pool } of [...early, ...reward, ...special]) {
     const missing = numericNoteParts(w).filter((part) => !w.note.includes(part))
     if (missing.length) {
       out.push(`${pool}/${w.text}: note에 ${missing.join(' · ')} 없음`)

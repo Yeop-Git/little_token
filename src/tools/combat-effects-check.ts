@@ -66,6 +66,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 {
   const legacy = {
+    schemaVersion: 0,
     player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } },
     combat: { hp: 68, guard: 0 },
     day: 9,

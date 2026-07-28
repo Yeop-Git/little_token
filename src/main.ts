@@ -17,7 +17,7 @@ import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
-import { floorInCycle, stageFor } from '@data/stages'
+import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardGradeForDay, type RewardOption } from '@data/rewards'
 import { newRun, registerWord, applyItemReward, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
@@ -49,8 +49,8 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
-/** 출시 빌드에서 닫아 둔 임시 기능. */
-const DEV_CHEAT_ENABLED = false
+/** 개발 서버에서만 열리는 검수 기능. 프로덕션 번들에서는 Vite가 분기를 제거한다. */
+const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
@@ -66,7 +66,7 @@ installFoilShaders()
 CustomCursor.install()
 ClickScribble.install()
 
-if (new URLSearchParams(window.location.search).get('profile') === '1') {
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('profile') === '1') {
   void import('@/ui/RuntimeProfiler').then(({ startRuntimeProfiler }) => startRuntimeProfiler())
 }
 
@@ -594,7 +594,7 @@ function handleBattleWin(grade: number, resources: { hp: number; guard: number }
   run.combat = resources
   // 넘긴 날 — 결과 종이가 "어디까지 갔는지"로 읽는 값이다.
   run.record.daysCleared += 1
-  if (run.day === 15 && !run.endingSeen) {
+  if (floorInCycle(run.day) === STORY_FLOORS && !run.endless && !run.endingSeen) {
     goEnding(grade)
     return
   }
@@ -762,7 +762,7 @@ function goDefeat() {
 }
 
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
-const params = new URLSearchParams(location.search)
+const params = import.meta.env.DEV ? new URLSearchParams(location.search) : new URLSearchParams()
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)

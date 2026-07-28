@@ -11,6 +11,9 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'es2020',
     sourcemap: false,
+    // Three.js 전장 렌더러는 첫 전투에서만 동적 로드되고 gzip 약 163KB다.
+    // 원본 크기 경고 대신 scripts/check-bundle-budget.ts의 전송 크기 예산을 사용한다.
+    chunkSizeWarningLimit: 700,
   },
   resolve: {
     alias: {

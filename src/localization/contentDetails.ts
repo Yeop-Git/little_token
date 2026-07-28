@@ -1,4 +1,4 @@
-import type { LocaleCode } from './index'
+import { PROPER_NAMES, type LocaleCode } from './index'
 import { CHARACTER_VISUALS } from '@data/characters'
 import { ENEMIES } from '@data/enemies'
 import { ALL_ITEMS, EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
@@ -11,23 +11,23 @@ type TextPair = readonly [title: string, description: string]
 
 const CHARACTER_TEXT: Record<ForeignLocale, Record<string, TextPair>> = {
   en: {
-    player:['The boy who protects stories','Holding his rain-soaked diary close, he protects each story with the right sentence.'], token:['An anxious story guide','Token circles From and signals frantically whenever a dangerous scribble appears.'],
+    player:['The boy who protects stories','Holding his rain-soaked diary close, he protects each story with the right sentence.'], token:['An anxious story guide','Token circles Prompt and signals frantically whenever a dangerous scribble appears.'],
     termite:['White teeth in the paper','It folds its clear wings and steadily gnaws through the fibers of old sentences.'], moth:['Dust sweeper between pages','Its dusty brush erases the edges of sentences piece by piece.'], flea:['A paper predator that strikes first','It flies in before the sentence is finished and tears at the scraps.'], roach:['A hard stain between sentences','Its thick shell endures attacks while it burrows deep into the diary.'], pillbug:['A shell that erases one hit','It curls up and lets the first blow roll away completely.'], mosquito:['A needle through the shield','Its long proboscis reaches the HP behind Guard.'], workerBee:['Escort of the queen’s sentence','The workers guard both sides of the Queen Bee and make her invulnerable until they fall.'], mantis:['The great scythe that trims sentences','After ordinary cuts, it raises its scythe to telegraph a heavy attack. Blocking it opens a long gap.'], queenBee:['Queen of the torn-paper hive','Sweet ink and wax turn every blank space into a honeycomb.'], elderSpider:['The old editor who stitches endings','An old diary and webbing bind the story to a false ending.'],
   },
   ja: {
-    player:['物語を守る少年','雨に濡れた日記を抱き、正しい文で物語を守る。'], token:['心配性な物語の案内役','フロムのそばを飛び回り、危険な落書きに慌ただしく合図する。'],
+    player:['物語を守る少年','雨に濡れた日記を抱き、正しい文で物語を守る。'], token:['心配性な物語の案内役','トークンはプロンプトのそばを飛び回り、危険な落書きに慌ただしく合図する。'],
     termite:['紙の中の白い歯','透明な羽をたたみ、古い文の繊維から少しずつかじる。'], moth:['本棚のほこり掃除屋','ほこりまみれの刷毛で文の端を少しずつ消す。'], flea:['先に飛び込む紙の捕食者','文が完成する前に飛来し、紙片を先に食いちぎる。'], roach:['文の間の固い染み','厚い殻で耐えながら日記の奥へ潜り込む。'], pillbug:['一撃を消す甲羅','体を丸めて最初の一撃を丸ごと受け流す。'], mosquito:['防御の隙間を刺す針','長い針で防御の奥の体力を直接削る。'], workerBee:['女王の文を守る護衛','女王蜂の両側を守り、全滅するまで本体を無敵にする。'], mantis:['文を裁つ大鎌','通常攻撃の後に大鎌を掲げて強攻撃を予告する。防げば大きな隙ができる。'], queenBee:['破れ紙の巣の女王','甘いインクと蜜蝋で空欄を蜂の巣に変える。'], elderSpider:['結末を縫う古い編集者','古い日記と蜘蛛の糸で物語を偽の結末へ縛る。'],
   },
   ru: {
-    player:['Мальчик — хранитель историй','Прижимая промокший дневник, он защищает историю правильными фразами.'], token:['Тревожный проводник по истории','Токен кружит рядом с Фромом и подаёт сигналы при опасных каракулях.'],
+    player:['Мальчик — хранитель историй','Прижимая промокший дневник, он защищает историю правильными фразами.'], token:['Тревожный проводник по истории','Токен кружит рядом с Промптом и подаёт сигналы при опасных каракулях.'],
     termite:['Белые зубы внутри бумаги','Сложив прозрачные крылья, он медленно грызёт волокна старых фраз.'], moth:['Пыльный уборщик книжных полок','Стирает края фраз пыльной щёткой, кусочек за кусочком.'], flea:['Бумажный хищник первого хода','Прилетает до завершения фразы и рвёт бумажные обрывки.'], roach:['Твёрдое пятно между фразами','Толстый панцирь помогает ему пробраться вглубь дневника.'], pillbug:['Панцирь, стирающий один удар','Сворачивается и полностью отводит первый удар.'], mosquito:['Игла сквозь щит','Длинный хоботок достаёт здоровье за Защитой.'], workerBee:['Охрана фразы королевы','Рабочие пчёлы делают матку неуязвимой, пока не будут побеждены.'], mantis:['Большая коса — редактор фраз','После обычных взмахов поднимает косу, предупреждая о мощном ударе. Успешная защита открывает уязвимость.'], queenBee:['Королева улья из рваной бумаги','Сладкие чернила и воск превращают пробелы в соты.'], elderSpider:['Старый редактор, сшивающий финалы','Старый дневник и паутина привязывают историю к ложному финалу.'],
   },
   'zh-Hans': {
-    player:['守护故事的少年','怀抱被雨淋湿的日记，用正确的句子守护故事。'], token:['焦急的故事向导','托肯盘旋在弗洛姆身旁，发现危险涂鸦时慌忙发出信号。'],
+    player:['守护故事的少年','怀抱被雨淋湿的日记，用正确的句子守护故事。'], token:['焦急的故事向导','词元盘旋在提示词身旁，发现危险涂鸦时慌忙发出信号。'],
     termite:['纸中的白色牙齿','收起透明翅膀，从旧句子的纤维开始慢慢啃食。'], moth:['书架间的灰尘清洁工','用沾满灰尘的刷子一点点擦掉句子边缘。'], flea:['抢先飞来的纸张捕食者','在句子写完前飞来，先撕咬纸屑。'], roach:['句子之间的坚硬污点','凭厚壳支撑，钻入日记深处。'], pillbug:['抹去一次攻击的甲壳','蜷起身体，完全化解第一次攻击。'], mosquito:['刺入护盾缝隙的针','用长针直接啃噬防御后的生命。'], workerBee:['守护蜂后句子的护卫','守在蜂后两侧，使本体保持无敌，全部击倒后蜂后会露出破绽。'], mantis:['裁剪句子的巨镰','普通挥砍后举起巨镰预告强攻；成功格挡会让它长时间露出破绽。'], queenBee:['破纸蜂巢的女王','用甜蜜墨水与蜂蜡把空白堵成蜂巢。'], elderSpider:['缝合结局的古老编辑','用旧日记与蛛网把故事强行绑在错误结局上。'],
   },
   'zh-Hant': {
-    player:['守護故事的少年','懷抱被雨淋濕的日記，用正確的句子守護故事。'], token:['焦急的故事嚮導','托肯盤旋在弗洛姆身旁，發現危險塗鴉時慌忙發出信號。'],
+    player:['守護故事的少年','懷抱被雨淋濕的日記，用正確的句子守護故事。'], token:['焦急的故事嚮導','詞元盤旋在提示詞身旁，發現危險塗鴉時慌忙發出信號。'],
     termite:['紙中的白色牙齒','收起透明翅膀，從舊句子的纖維開始慢慢啃食。'], moth:['書架間的灰塵清潔工','用沾滿灰塵的刷子一點點擦掉句子邊緣。'], flea:['搶先飛來的紙張捕食者','在句子寫完前飛來，先撕咬紙屑。'], roach:['句子之間的堅硬污點','憑厚殼支撐，鑽入日記深處。'], pillbug:['抹去一次攻擊的甲殼','蜷起身體，完全化解第一次攻擊。'], mosquito:['刺入護盾縫隙的針','用長針直接啃噬防禦後的生命。'], workerBee:['守護蜂后句子的護衛','守在蜂后兩側，使本體保持無敵，全部擊倒後蜂后會露出破綻。'], mantis:['裁剪句子的巨鐮','普通揮砍後舉起巨鐮預告強攻；成功格擋會讓它長時間露出破綻。'], queenBee:['破紙蜂巢的女王','用甜蜜墨水與蜂蠟把空白堵成蜂巢。'], elderSpider:['縫合結局的古老編輯','用舊日記與蛛網把故事強行綁在錯誤結局上。'],
   },
 }
@@ -75,8 +75,8 @@ export function applyDetailedContentLocalization(locale: ForeignLocale): void {
     const enemyName = ENEMIES[id]?.name
     if (enemyName) visual.name = enemyName
   }
-  CHARACTER_VISUALS.player.name = locale === 'en' ? 'From' : locale === 'ja' ? 'フロム' : locale === 'ru' ? 'Фром' : '弗洛姆'
-  CHARACTER_VISUALS.token.name = locale === 'en' ? 'Token' : locale === 'ja' ? 'トークン' : locale === 'ru' ? 'Токен' : '托肯'
+  CHARACTER_VISUALS.player.name = PROPER_NAMES[locale].player
+  CHARACTER_VISUALS.token.name = PROPER_NAMES[locale].token
   if (CHARACTER_VISUALS.player.companion) CHARACTER_VISUALS.player.companion.name = CHARACTER_VISUALS.token.name
 
   for (const [id, enemy] of Object.entries(ENEMIES)) {

@@ -1,9 +1,18 @@
-import { COMBAT_BALANCE_VERSION, DECK_LIMITS, emptyRunRecord, reinforceWord, type RunState } from './run'
+import {
+  COMBAT_BALANCE_VERSION,
+  DECK_LIMITS,
+  RUN_SAVE_SCHEMA_VERSION,
+  emptyRunRecord,
+  reinforceWord,
+  type RunState,
+} from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
+import { ALL_ITEMS } from '@data/items'
 import type { Emotion, Word } from './types'
 import type { PlayerStats } from './player'
 
 const SAVE_KEY = 'little-token.run.v1'
+const CORRUPT_SAVE_KEY = 'little-token.run.corrupt.v1'
 // v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
 // 세이브가 있으면 튜토리얼을 영구히 놓칠 수 있었다. 완료 시점에 기록하는 v2로
 // 한 번 갱신해 해당 사용자도 복구된 오프닝을 볼 수 있게 한다.
@@ -70,7 +79,7 @@ function migrateCardDefinitions(run: RunState): boolean {
 
 /** 삭제된 아이템은 기존 런에서도 보유 목록과 누적 스탯을 함께 거두어 들인다. */
 function migrateRemovedItems(run: RunState): boolean {
-  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id))
+  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id) || !ALL_ITEMS[item.id])
   if (!removed.length) return false
 
   for (const item of removed) {
@@ -78,7 +87,7 @@ function migrateRemovedItems(run: RunState): boolean {
       run.player.stats[key] = Math.max(0, run.player.stats[key] - (item.stats[key] ?? 0))
     }
   }
-  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id))
+  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id) && !!ALL_ITEMS[item.id])
   return true
 }
 
@@ -111,10 +120,9 @@ function isRunState(value: unknown): value is RunState {
   )
 }
 
-export function loadRun(): RunState | null {
+/** 저장소 없이도 회귀 테스트할 수 있는 순수 역직렬화 경계. */
+export function deserializeRun(raw: string): RunState | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
-    if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     if (!isRunState(parsed)) return null
 
@@ -167,8 +175,34 @@ export function loadRun(): RunState | null {
     }
     migrated = migrateCardDefinitions(parsed) || migrated
     migrated = migrateRemovedItems(parsed) || migrated
-    if (migrated) saveRun(parsed)
+    if (parsed.schemaVersion !== RUN_SAVE_SCHEMA_VERSION) {
+      parsed.schemaVersion = RUN_SAVE_SCHEMA_VERSION
+      migrated = true
+    }
     return parsed
+  } catch {
+    return null
+  }
+}
+
+/** 저장 포맷 버전이 빠질 수 없도록 하는 순수 직렬화 경계. */
+export function serializeRun(run: RunState): string {
+  return JSON.stringify({ ...run, schemaVersion: RUN_SAVE_SCHEMA_VERSION })
+}
+
+export function loadRun(): RunState | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    if (!raw) return null
+    const run = deserializeRun(raw)
+    if (!run) {
+      localStorage.setItem(CORRUPT_SAVE_KEY, raw)
+      localStorage.removeItem(SAVE_KEY)
+      return null
+    }
+    const normalized = serializeRun(run)
+    if (normalized !== raw) localStorage.setItem(SAVE_KEY, normalized)
+    return run
   } catch {
     return null
   }
@@ -176,7 +210,7 @@ export function loadRun(): RunState | null {
 
 export function saveRun(run: RunState): void {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(run))
+    localStorage.setItem(SAVE_KEY, serializeRun(run))
   } catch {
     // 저장 공간을 사용할 수 없는 브라우저에서도 게임 진행은 유지한다.
   }

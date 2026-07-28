@@ -44,6 +44,14 @@ const CORE_TEXT = currentLocale === 'en'
           ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒' }
           : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바베큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
 
+const sameEmotionHint = (count: number): string => currentLocale === 'ko'
+  ? `${CORE_TEXT.sameEmotion} ${count}장`
+  : currentLocale === 'en'
+    ? `${CORE_TEXT.sameEmotion} ${count} cards`
+    : currentLocale === 'ru'
+      ? `${CORE_TEXT.sameEmotion}: ${count}`
+      : `${CORE_TEXT.sameEmotion} ${count}枚`
+
 // 단어 하나가 만드는 깡수치. 스탯 비례 단어는 "스탯 × 계수", 아니면 고정 위력.
 // 성냥팔이 소녀의 망토(verbLuck)를 들면 어떤 동사든 운 스탯만큼을 더 받는다.
 export function wordFlat(w: Word, stats: StatBlock, mods: CompileMods = {}): number {
@@ -266,7 +274,7 @@ export function compile(
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} ${CORE_TEXT.resonance}`,
       value: emotionResonance,
       source: 'emotion',
-      hint: `${CORE_TEXT.sameEmotion} ${repeatedEmotion![1]}`,
+      hint: sameEmotionHint(repeatedEmotion![1]),
     })
   }
 

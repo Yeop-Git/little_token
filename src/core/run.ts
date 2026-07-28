@@ -40,6 +40,8 @@ export type DefeatCause =
   | { kind: 'self'; sentence: string }
 
 export interface RunState {
+  /** 저장 포맷 마이그레이션 버전. 전투 밸런스 버전과 독립적으로 올린다. */
+  schemaVersion: number
   player: PlayerState
   /** 스테이지를 넘어 유지되는 현재 생존 자원. 최대 체력은 player.stats.hp가 기준이다. */
   combat: RunCombatState
@@ -83,6 +85,7 @@ export interface PendingReward {
 }
 
 export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
+export const RUN_SAVE_SCHEMA_VERSION = 2
 export const COMBAT_BALANCE_VERSION = 1
 
 function cloneDeck(d: Record<string, Word[]>): Record<string, Word[]> {
@@ -103,6 +106,7 @@ export function startingPlayer(): PlayerState {
 export function newRun(): RunState {
   const player = startingPlayer()
   return {
+    schemaVersion: RUN_SAVE_SCHEMA_VERSION,
     player,
     combat: { hp: player.stats.hp, guard: 0 },
     day: 1,

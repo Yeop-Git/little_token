@@ -14,6 +14,7 @@ import { itemArt } from '@/ui/Icons'
 import { RARITY_LABEL, type Word } from '@core/types'
 import { wordCardInnerHtml } from '@/ui/WordCardFace'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
+import { GameAudio } from '@/audio/GameAudio'
 
 interface Opts {
   item: ItemDef
@@ -215,6 +216,7 @@ export class ItemExclaimView {
     const contactDelay = reducedMotion ? 20 : 310
     this.timers.push(window.setTimeout(() => {
       if (panel.dataset.impact !== impactKey) return
+      GameAudio.playForgeHit(beat)
       const panelRect = panel.getBoundingClientRect()
       const coreRect = core.getBoundingClientRect()
       const scaleX = panelRect.width / panel.offsetWidth || 1

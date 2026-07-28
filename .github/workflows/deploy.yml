@@ -5,7 +5,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/diary-word-battle-game-cuhivh]
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,25 +16,31 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm install
-      - name: Type-check
-        run: npm run type-check
+          node-version: 22
+          cache: npm
+      - name: Reproducible install
+        run: npm ci
+      - name: Quality gate
+        run: npm test
       - name: Build
         run: npm run build
         env:
           GITHUB_PAGES: '1'
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
@@ -40,7 +48,7 @@ jobs:
   # (기능 브랜치 푸시는 build/type-check까지만 돌고 배포는 건너뛴다 → 거부 오류 방지.)
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

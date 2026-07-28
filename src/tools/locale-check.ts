@@ -1,13 +1,26 @@
 import { localizationCoverageErrors, wordTextFor } from '@/localization/content'
 import { EARLY_WORDS } from '@data/earlyWords'
-import { SUPPORTED_LOCALES } from '@/localization'
+import { PROPER_NAMES, SUPPORTED_LOCALES } from '@/localization'
 import { localizedGuidePages } from '@/localization/guide'
 import { missingLocalizationTexts, translateText } from '@/localization/dom'
 
 const errors = localizationCoverageErrors()
 const samples = Object.values(EARLY_WORDS).flat()
+const EXPECTED_PROPER_NAMES = {
+  ko: { player: '프롬', token: '토큰' },
+  en: { player: 'Prompt', token: 'Token' },
+  ja: { player: 'プロンプト', token: 'トークン' },
+  ru: { player: 'Промпт', token: 'Токен' },
+  'zh-Hans': { player: '提示词', token: '词元' },
+  'zh-Hant': { player: '提示詞', token: '詞元' },
+} as const
 
 for (const locale of SUPPORTED_LOCALES) {
+  const expectedNames = EXPECTED_PROPER_NAMES[locale]
+  if (PROPER_NAMES[locale].player !== expectedNames.player) errors.push(`${locale}: player proper name is not ${expectedNames.player}`)
+  if (PROPER_NAMES[locale].token !== expectedNames.token) errors.push(`${locale}: token proper name is not ${expectedNames.token}`)
+  if (locale !== 'ko' && translateText('프롬', locale) !== expectedNames.player) errors.push(`${locale}: player name translation is not canonical`)
+  if (locale !== 'ko' && translateText('토큰', locale) !== expectedNames.token) errors.push(`${locale}: token name translation is not canonical`)
   const rendered = samples.map((word) => wordTextFor(locale, word))
   if (rendered.some((text) => !text.trim())) errors.push(`${locale}: empty starting word`)
   console.log(`${locale.padEnd(7)} 시작 카드 ${rendered.length}장 · ${rendered.slice(0, 3).join(' / ')}`)

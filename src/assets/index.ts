@@ -154,6 +154,7 @@ import sentenceComplete from './audio/sentence-complete.mp3'
 import paperAttack from './audio/paper-attack.mp3'
 import paper from './audio/paper.mp3'
 import cardHover from './audio/cardhover.mp3'
+import wordSelect from './audio/word-select.mp3'
 import pencil from './audio/pencil.mp3'
 import button from './audio/button.mp3'
 import battleStoryEatingBugs from './audio/battle-story-eating-bugs.mp3'
@@ -408,6 +409,7 @@ export const AUDIO = {
   paperAttack,
   paper,
   cardHover,
+  wordSelect,
   pencil,
   button,
   battleStoryEatingBugs,
