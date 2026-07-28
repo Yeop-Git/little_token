@@ -6530,6 +6530,24 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   box-shadow: 0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 56%, transparent);
   text-shadow: 0 1px 4px #000;
 }
+.iforge-word-card .card-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.12;
+}
+.item-card-main-stat {
+  color: inherit;
+}
+.item-card-extra-stat {
+  color: #9a5a12;
+  font-size: .86em;
+  font-weight: 950;
+  letter-spacing: -.01em;
+  text-shadow: 0 0 8px rgba(255, 193, 82, .38);
+}
 /* 좌상단 모서리 5회 클릭으로 여는 개발 치트. */
 .dev-cheat-shell {
   position: absolute;
@@ -7417,36 +7435,14 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
   font-weight: 900;
   text-shadow: 0 0 12px color-mix(in srgb, var(--rarity-color, #ffe0a0) 72%, transparent);
 }
-/* 추가 스탯은 테두리 없이 수치만 금빛으로 빛난다 — 딱지처럼 칸을 두르면 글자가
-   아니라 상자가 먼저 읽히고, "팅!" 같은 군말이 붙으면 정작 수치가 묻힌다. */
-.word-cell.blessed .bless {
-  display: block;
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: #ffe0a0;
-  text-shadow:
-    0 0 6px rgba(255, 214, 130, 0.95),
-    0 0 16px rgba(255, 186, 82, 0.7),
-    0 0 30px rgba(255, 150, 48, 0.4);
-}
 /* 첫 등장에만 튀어오르는 팅! — 이후 재렌더에서는 잔잔한 금빛만 남는다 */
 .word-cell.blessed.fresh {
   animation: bless-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
-}
-.word-cell.blessed.fresh .bless {
-  animation: bless-pop 0.55s ease-out;
 }
 @keyframes bless-in {
   0% { transform: scale(0.94); }
   55% { transform: scale(1.05); }
   100% { transform: scale(1); }
-}
-@keyframes bless-pop {
-  0% { opacity: 0; transform: translateY(5px) scale(0.8); }
-  45% { opacity: 1; transform: translateY(-2px) scale(1.15); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ── 체인 아래 "지금 배율" — 카드를 고르는 즉시 삐리릭 돌다가 팅! 하고 확정 ── */

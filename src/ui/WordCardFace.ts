@@ -62,17 +62,22 @@ export interface WordCardFaceOpts {
   footer?: string
   /** 거미줄 봉인처럼 앞면 위에 덮는 겹. */
   overlay?: string
+  /** 스킬 카드 외의 화면에서 공용 앞면에 넣을 별도 일러스트 URL. */
+  artUrl?: string
+  /** 튜토리얼 대사처럼 레어도와 감정 정보가 의미 없는 카드에서 메타 배지를 숨긴다. */
+  hideMeta?: boolean
 }
 
 /** 카드 앞면 한 겹. 일러스트가 있으면 원화 카드, 없으면 문양 카드로 그린다. */
 export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): string {
-  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '' } = opts
-  const artUrl = word.art ? SKILL_ART[word.art] : undefined
+  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false } = opts
+  const artUrl = opts.artUrl ?? (word.art ? SKILL_ART[word.art] : undefined)
   const level = word.level ?? 1
   const rarity = word.rarity ?? 'common'
   const emotion = emotionOrNeutral(word.emotion)
-  const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
-  const badges = `${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${wordActionBadge(word)}`
+  const levelBadge = hideMeta ? '' : `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
+  const emotionBadge = hideMeta ? '' : emotionIconBadge(emotion, 'card-emotion')
+  const badges = `${levelBadge}${emotionBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />

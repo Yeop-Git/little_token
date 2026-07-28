@@ -281,12 +281,14 @@ export class IntroDialogue {
       }
       const chip = document.createElement('button')
       chip.type = 'button'
-      chip.className = `intro-word-chip word-card mood-${wordMood(cardWord)} emotion-neutral rarity-common is-entering`
+      chip.className = `intro-word-chip word-card mood-${wordMood(cardWord)} is-entering`
       chip.dataset.word = word
       chip.setAttribute('aria-label', `${word} 선택`)
       chip.innerHTML = wordCardInnerHtml(cardWord, {
         note: '문장에 넣기',
         footer: `${i + 1}번째 단어`,
+        artUrl: TOKEN_FACES.smile,
+        hideMeta: true,
       })
       chip.disabled = true
       chip.style.setProperty('--chip-delay', `${i * 90}ms`)

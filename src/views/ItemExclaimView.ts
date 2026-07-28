@@ -181,14 +181,16 @@ export class ItemExclaimView {
         if (fresh) {
           this.revealed.add(key)
         }
-        const blessHtml = bless
-          ? `<span class="bless">${STAT_LABEL[bless.stat]} +${bless.n}</span>`
-          : ''
         const rarityMultiplier = this.rarityMultipliers[this.slotIndex]
         const effectiveMods = exclaimModsFor(rarityMultiplier, w.mods)
         const effectiveNote = Object.entries(effectiveMods)
           .map(([stat, value]) => `${STAT_LABEL[stat as StatKey]} +${value}`)
           .join(' · ')
+        const extraNote = bless ? `${STAT_LABEL[bless.stat]} +${bless.n}` : ''
+        const cardNote = `<span class="item-card-main-stat">${effectiveNote}</span>${extraNote
+          ? `<span class="item-card-extra-stat">✦ ${extraNote}</span>`
+          : ''}`
+        const accessibleNote = [effectiveNote, extraNote].filter(Boolean).join(', ')
         const rarityBoosted = rarityMultiplier > 1
         const rarityBonusHtml = rarityBoosted
           ? '<span class="rarity-bonus">등급 보너스 +1점</span>'
@@ -211,12 +213,19 @@ export class ItemExclaimView {
           rarity: this.opts.item.rarity,
           kind: primaryStat === 'atk' ? 'attack' : primaryStat === 'guard' ? 'guard' : primaryStat === 'heal' ? 'heal' : undefined,
         }
-        const bonuses = rarityBonusHtml || blessHtml
-          ? `<span class="item-card-bonuses">${rarityBonusHtml}${blessHtml}</span>`
+        const bonuses = rarityBonusHtml
+          ? `<span class="item-card-bonuses">${rarityBonusHtml}</span>`
           : ''
+        // 아이템 등급을 word-card 호스트에 직접 붙여 공용 희귀/영웅/전설 포일과
+        // 전역 FoilShader 관찰자가 전투 카드와 같은 방식으로 이 선택지도 처리한다.
         return `<button class="word-cell iforge-word-card word-card mood-${mood} emotion-neutral rarity-${this.opts.item.rarity} ${picked ? 'picked' : ''} ${rarityBoosted ? 'rarity-boosted' : ''} ${bless ? 'blessed' : ''} ${fresh ? 'fresh' : ''}"
-          style="--card-x:0px;--card-z:1" data-id="${w.id}" aria-label="${w.text}, ${effectiveNote} 선택">
-          ${wordCardInnerHtml(cardWord, { note: effectiveNote, footer: slot.label, overlay: bonuses })}
+          style="--card-x:0px;--card-z:1" data-id="${w.id}" aria-label="${w.text}, ${accessibleNote} 선택">
+          ${wordCardInnerHtml(cardWord, {
+            note: cardNote,
+            footer: slot.label,
+            overlay: bonuses,
+            artUrl: ITEM_ART[this.opts.item.art],
+          })}
         </button>`
       })
       .join('')
