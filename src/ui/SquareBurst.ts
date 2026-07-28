@@ -1,3 +1,5 @@
+import { GraphicsSettings } from '@/ui/GameSettings'
+
 /**
  * SquareBurst — 언멜팅의 사각형 블라스트 이펙트를 가져와 적용.
  * 원점에서 16~20개의 단색 사각형이 흩어지며 터진다. 피격/방어/회복 등
@@ -103,7 +105,8 @@ export const SquareBurst = {
     ensureStyles()
     const overlay = getOverlay()
     const palette = PALETTES[theme]
-    const count = opts.count ?? Math.floor(rand(16, 21))
+    const requestedCount = opts.count ?? Math.floor(rand(16, 21))
+    const count = Math.max(4, Math.round(requestedCount * GraphicsSettings.profile().effectScale))
     const spread = opts.spread ?? 130
     const duration = opts.duration ?? 560
     const sizeRange = opts.size ?? [10, 22]

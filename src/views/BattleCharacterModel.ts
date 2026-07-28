@@ -34,6 +34,7 @@ interface BattleAtmosphere {
   keyLightPosition: readonly [number, number, number]
   emissiveIntensity: number
   exposure: number
+  shadowFloor: number
 }
 
 /**
@@ -84,12 +85,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0xffe9bd),
     keyLight: new THREE.Color(0xffedc7),
     skyMix: 0.07,
-    groundMix: 0.28,
+    groundMix: 0.18,
     skyLightIntensity: 0.56,
     keyLightIntensity: 1.5,
     keyLightPosition: [-3.5, 6, 5],
-    emissiveIntensity: 0.38,
-    exposure: 0.96,
+    emissiveIntensity: 0.44,
+    exposure: 1.02,
+    shadowFloor: 0.5,
   },
   rain: {
     skyTint: new THREE.Color(0xaec8d0),
@@ -97,12 +99,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0xb8d0d7),
     keyLight: new THREE.Color(0xd7e4df),
     skyMix: 0.12,
-    groundMix: 0.36,
+    groundMix: 0.22,
     skyLightIntensity: 0.4,
     keyLightIntensity: 1.02,
     keyLightPosition: [-1.5, 7, 4],
-    emissiveIntensity: 0.28,
-    exposure: 0.84,
+    emissiveIntensity: 0.38,
+    exposure: 0.96,
+    shadowFloor: 0.48,
   },
   night: {
     skyTint: new THREE.Color(0x8998c4),
@@ -110,12 +113,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0x7188bd),
     keyLight: new THREE.Color(0xffc879),
     skyMix: 0.17,
-    groundMix: 0.46,
+    groundMix: 0.26,
     skyLightIntensity: 0.24,
     keyLightIntensity: 0.82,
     keyLightPosition: [-4, 3.2, 5.5],
-    emissiveIntensity: 0.14,
-    exposure: 0.7,
+    emissiveIntensity: 0.32,
+    exposure: 0.9,
+    shadowFloor: 0.44,
   },
 }
 
@@ -695,14 +699,17 @@ class BattleCharacterModel {
       shader.uniforms.uBattleGroundMix = { value: atmosphere.groundMix }
       const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
       shader.uniforms.uBattleExposure = { value: atmosphere.exposure * (boss ? BOSS_EXPOSURE_BOOST : 1) }
+      shader.uniforms.uBattleShadowFloor = { value: atmosphere.shadowFloor }
       shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
-varying float vBattleHeight;`)
+varying float vBattleHeight;
+varying float vBattleSide;`)
         .replace('#include <project_vertex>', `#include <project_vertex>
 vec4 battleWorldPosition = modelMatrix * vec4(transformed, 1.0);
-vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);`)
+vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);
+vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);`)
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
@@ -711,8 +718,10 @@ uniform vec3 uBattleGroundTint;
 uniform float uBattleSkyMix;
 uniform float uBattleGroundMix;
 uniform float uBattleExposure;
+uniform float uBattleShadowFloor;
 uniform float uPartDissolve;
-varying float vBattleHeight;`)
+varying float vBattleHeight;
+varying float vBattleSide;`)
         // The stepped directional term exposes individual low-poly faces. Keep
         // ambient/AO darkness and emissive texture color, but omit only that term.
         .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.indirectDiffuse + totalEmissiveRadiance;
@@ -720,7 +729,14 @@ float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBatt
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleSkyTint, battleSkyWeight);
-outgoingLight *= uBattleExposure;
+// Broad paper-illustration shading follows the whole silhouette instead of
+// mesh normals, so low-poly face boundaries stay invisible.
+float battleSoftLight = mix(1.045, 0.965, vBattleSide) * mix(0.985, 1.035, vBattleHeight);
+outgoingLight *= uBattleExposure * battleSoftLight;
+vec3 battleTintedAlbedo = diffuseColor.rgb;
+battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleGroundTint, battleGroundWeight * 0.3);
+battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleSkyTint, battleSkyWeight * 0.3);
+outgoingLight = max(outgoingLight, battleTintedAlbedo * uBattleShadowFloor);
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
@@ -1279,8 +1295,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
     const profile = GraphicsSettings.profile()
-    const deviceRatio = Math.max(1, window.devicePixelRatio || 1)
-    const baseRatio = Math.min(deviceRatio, profile.pixelRatioCap)
+    const baseRatio = profile.resolutionScale
     const waitingScale = waitingEnemy && profile.waitingFps < profile.activeFps ? 0.9 : 1
     const antialiasing = GraphicsSettings.antiAliasingScale()
     return Math.min(2.5, baseRatio * waitingScale * antialiasing) * this.compositedScale

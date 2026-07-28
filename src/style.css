@@ -1445,7 +1445,7 @@ button {
 .tip-bubble[data-place='above'] { transform: translateY(4px); }
 .tip-bubble.show { opacity: 1; transform: translateY(0); }
 /* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
-html[data-graphics='low'] .tip-bubble {
+html[data-postprocessing='off'] .tip-bubble {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(18, 12, 25, .96);
@@ -5221,17 +5221,17 @@ html[data-graphics='low'] .tip-bubble {
   border-radius: inherit;
   filter: saturate(1.18) contrast(1.04);
 }
-html[data-graphics='low'].foil-shader-ready .word-card.rarity-epic .card-foil,
-html[data-graphics='low'].foil-shader-ready .deck-hover-card.rarity-epic .card-foil,
-html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-epic .rp-foil,
-html[data-graphics='low'].foil-shader-ready .word-card.rarity-legendary .card-foil,
-html[data-graphics='low'].foil-shader-ready .deck-hover-card.rarity-legendary .card-foil,
-html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foil {
+html[data-effects='low'].foil-shader-ready .word-card.rarity-epic .card-foil,
+html[data-effects='low'].foil-shader-ready .deck-hover-card.rarity-epic .card-foil,
+html[data-effects='low'].foil-shader-ready .reward-pick.rarity-epic .rp-foil,
+html[data-effects='low'].foil-shader-ready .word-card.rarity-legendary .card-foil,
+html[data-effects='low'].foil-shader-ready .deck-hover-card.rarity-legendary .card-foil,
+html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foil {
   opacity: .32;
 }
-html[data-graphics='low'].foil-shader-ready .word-card.rarity-epic .card-foil,
-html[data-graphics='low'].foil-shader-ready .deck-hover-card.rarity-epic .card-foil,
-html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-epic .rp-foil {
+html[data-effects='low'].foil-shader-ready .word-card.rarity-epic .card-foil,
+html[data-effects='low'].foil-shader-ready .deck-hover-card.rarity-epic .card-foil,
+html[data-effects='low'].foil-shader-ready .reward-pick.rarity-epic .rp-foil {
   background:
     radial-gradient(circle at 22% 28%, #78f8ff 0 1px, transparent 3px),
     radial-gradient(circle at 68% 20%, #ff8eea 0 1.5px, transparent 3.5px),
@@ -5239,9 +5239,9 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-epic .rp-foil {
     radial-gradient(circle at 82% 64%, #9f8cff 0 1.5px, transparent 3.5px),
     radial-gradient(circle at 50% 48%, rgba(174, 116, 255, .26), transparent 70%);
 }
-html[data-graphics='low'].foil-shader-ready .word-card.rarity-legendary .card-foil,
-html[data-graphics='low'].foil-shader-ready .deck-hover-card.rarity-legendary .card-foil,
-html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foil {
+html[data-effects='low'].foil-shader-ready .word-card.rarity-legendary .card-foil,
+html[data-effects='low'].foil-shader-ready .deck-hover-card.rarity-legendary .card-foil,
+html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foil {
   background: conic-gradient(from 18deg at 52% 46%, rgba(91,238,255,.42), rgba(255,104,216,.38), rgba(255,236,106,.42), rgba(105,255,202,.40), rgba(91,238,255,.42));
 }
 
@@ -5735,7 +5735,30 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .ov-close svg { width: 100%; height: 100%; }
 .ov-close:hover { color: var(--gold); background: rgba(255, 255, 255, 0.06); }
 
-.settings-panel { width: 720px; max-height: min(92vh, 760px); overflow-y: auto; }
+.settings-panel { width: 780px; max-height: min(92vh, 780px); overflow: hidden; }
+.settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: -4px 0 16px;
+  padding: 5px;
+  border-radius: 14px;
+  background: rgba(12, 9, 18, .48);
+}
+.settings-tabs button {
+  padding: 11px 16px;
+  border-radius: 10px;
+  color: var(--ink-dim);
+  font-size: 17px;
+  font-weight: 900;
+}
+.settings-tabs button:hover { color: #fff3d3; background: rgba(255,255,255,.06); }
+.settings-tabs button[aria-selected='true'] { color: #2b1e10; background: var(--gold); box-shadow: 0 0 16px rgba(255,207,118,.3); }
+.settings-tab-panel { max-height: min(68vh, 610px); overflow-y: auto; padding-right: 5px; }
+.settings-tab-panel[hidden] { display: none; }
+.graphics-settings-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.graphics-settings-panel .settings-group { margin: 0; }
+.graphics-settings-panel .settings-wide { grid-column: 1 / -1; }
 .settings-group { padding: 18px 20px; border-radius: 16px; background: rgba(255,255,255,.045); }
 .settings-group + .settings-group { margin-top: 14px; }
 .settings-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -5745,6 +5768,8 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 #volume-range { width: 100%; accent-color: var(--gold); cursor: pointer; }
 .graphics-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .graphics-options.antialiasing-options { grid-template-columns: repeat(3, 1fr); }
+.graphics-options.triple-options { grid-template-columns: repeat(3, 1fr); }
+.graphics-options.compact-options { grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .graphics-options button {
   padding: 13px 15px;
   display: flex;
@@ -5757,6 +5782,7 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 }
 .graphics-options button b { font-size: 17px; }
 .graphics-options button span { margin-top: 2px; font-size: 12px; }
+.graphics-options.compact-options button { align-items: center; padding: 12px 6px; }
 .graphics-options button:hover { color: #fff3d3; background: rgba(255,255,255,.09); }
 .graphics-options button.on { color: #2b1e10; background: var(--gold); box-shadow: 0 0 18px rgba(255,207,118,.32); }
 .settings-reset-btn {
@@ -8103,22 +8129,47 @@ html[data-graphics='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-fo
 .mult-now.no-flat .mn-x { display: none; }
 
 /* 그래픽 절전 — 규칙 전달에 필요한 캐릭터 오라는 유지하고 장식 비용만 낮춘다. */
-html[data-graphics='low'] .glass,
-html[data-graphics='low'] .ov-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
-html[data-graphics='low'] .weather-wash,
-html[data-graphics='low'] .title-fireflies { display: none; }
-html[data-graphics='low'] .card-foil,
-html[data-graphics='low'] .card-foil::before,
-html[data-graphics='low'] .card-foil::after,
-html[data-graphics='low'] .rp-foil,
-html[data-graphics='low'] .rp-foil::before,
-html[data-graphics='low'] .rp-foil::after { animation: none !important; filter: none !important; }
+html[data-postprocessing='off'] .glass,
+html[data-postprocessing='off'] .ov-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-effects='low'] .weather-wash,
+html[data-effects='low'] .title-fireflies { display: none; }
+html[data-effects='low'] .card-foil,
+html[data-effects='low'] .card-foil::before,
+html[data-effects='low'] .card-foil::after,
+html[data-effects='low'] .rp-foil,
+html[data-effects='low'] .rp-foil::before,
+html[data-effects='low'] .rp-foil::after { animation: none !important; filter: none !important; }
 /* 보통은 핵심 장식은 남기고 합성 비용이 큰 블러만 절반 수준으로 낮춘다. */
-html[data-graphics='medium'] .glass,
-html[data-graphics='medium'] .ov-backdrop {
+html[data-postprocessing='medium'] .glass,
+html[data-postprocessing='medium'] .ov-backdrop {
   backdrop-filter: blur(5px) saturate(1.05);
   -webkit-backdrop-filter: blur(5px) saturate(1.05);
 }
+
+/* 세부 이펙트 품질 — 수치·약점·타격점은 유지하고 장식 파편 밀도만 줄인다. */
+html[data-effects='low'] .title-fireflies,
+html[data-effects='low'] .forge-sparks,
+html[data-effects='low'] .tally-spark:nth-child(n+3),
+html[data-effects='low'] .spark:nth-child(n+3),
+html[data-effects='low'] .boss-bar-shard:nth-child(n+4),
+html[data-effects='low'] .spellshield-shard:nth-child(n+4),
+html[data-effects='low'] .card-commit-burst > i:nth-of-type(n+6) { display: none !important; }
+html[data-effects='medium'] .boss-bar-shard:nth-child(n+8),
+html[data-effects='medium'] .spellshield-shard:nth-child(n+8),
+html[data-effects='medium'] .card-commit-burst > i:nth-of-type(n+12) { display: none !important; }
+
+/* 후처리는 게임 규칙을 전달하지 않는 화면 합성층만 조절한다. */
+html[data-postprocessing='off'] .glass,
+html[data-postprocessing='off'] .ov-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-postprocessing='off'] .storybook-grade,
+html[data-postprocessing='off'] .battle .vignette,
+html[data-postprocessing='off'] .title-vignette { display: none !important; }
+html[data-postprocessing='medium'] .storybook-grade,
+html[data-postprocessing='medium'] .battle .vignette,
+html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 
 /* ── 공격 액션 컷 ──
    왼쪽 화면 밖에 접어 두었다가, 크게 부푼 일격에만 정보 패널처럼 밀려 들어온다.

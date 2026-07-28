@@ -3652,7 +3652,7 @@ export class BattleView {
 
   /** 저사양이나 동작 최소화 설정에서는 확대·정지·흔들림을 건너뛴다. */
   private motionOff(): boolean {
-    return document.documentElement.dataset.graphics === 'low'
+    return document.documentElement.dataset.effects === 'low'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches
   }
 

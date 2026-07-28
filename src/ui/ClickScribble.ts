@@ -159,7 +159,7 @@ function markFor(target: EventTarget | null): Mark {
 
 function spawnMark(overlay: HTMLElement, x: number, y: number, mark: Mark): void {
   const tone = TONES[mark]
-  const lowGraphics = document.documentElement.dataset.graphics === 'low'
+  const lowGraphics = document.documentElement.dataset.effects === 'low'
   const d = mark === 'blocked' ? crossPath(tone.radius) : ringPath(tone.radius)
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
