@@ -9,6 +9,7 @@ import {
   type ResolutionScale,
 } from '@/ui/GameSettings'
 import { icon } from '@/ui/Icons'
+import { currentLocale, LOCALE_NAMES, setLocale, SUPPORTED_LOCALES, t, type LocaleCode } from '@/localization'
 
 type SettingsTab = 'graphics' | 'sound' | 'other'
 
@@ -30,72 +31,79 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
 
   host.innerHTML = `
     <div class="ov-backdrop"></div>
-    <section class="ov-panel glass settings-panel" aria-label="설정">
-      <div class="ov-head"><div class="ov-title">${icon('settings')} 설정</div><button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button></div>
-      <div class="settings-tabs" role="tablist" aria-label="설정 분류">
-        <button type="button" role="tab" data-settings-tab="graphics" aria-selected="true">그래픽</button>
-        <button type="button" role="tab" data-settings-tab="sound" aria-selected="false">사운드</button>
-        <button type="button" role="tab" data-settings-tab="other" aria-selected="false">기타</button>
+    <section class="ov-panel glass settings-panel" aria-label="${t('settings', '설정')}">
+      <div class="ov-head"><div class="ov-title">${icon('settings')} ${t('settings', '설정')}</div><button class="ov-close" id="ov-x" type="button" aria-label="${t('close', '닫기')}">${icon('close')}</button></div>
+      <div class="settings-tabs" role="tablist" aria-label="${t('settingsCategories', '설정 분류')}">
+        <button type="button" role="tab" data-settings-tab="graphics" aria-selected="true">${t('graphics', '그래픽')}</button>
+        <button type="button" role="tab" data-settings-tab="sound" aria-selected="false">${t('sound', '사운드')}</button>
+        <button type="button" role="tab" data-settings-tab="other" aria-selected="false">${t('other', '기타')}</button>
       </div>
       <div class="settings-tab-panel graphics-settings-panel" data-settings-panel="graphics" role="tabpanel">
         <div class="settings-group settings-wide">
-          <div class="settings-label"><b>품질 프리셋</b><span>세부 항목을 한 번에 설정</span></div>
+          <div class="settings-label"><b>${t('qualityPreset', '품질 프리셋')}</b><span>${t('qualityPresetHint', '세부 항목을 한 번에 설정')}</span></div>
           <div class="graphics-options" role="group" aria-label="그래픽 품질">
-            <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>낮음</b><span>가볍고 빠르게</span></button>
-            <button type="button" data-quality="medium" class="${graphics === 'medium' ? 'on' : ''}"><b>보통</b><span>성능과 품질 균형</span></button>
-            <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>높음</b><span>선명하고 풍부하게</span></button>
-            <button type="button" data-quality="ultra" class="${graphics === 'ultra' ? 'on' : ''}"><b>울트라</b><span>모든 품질 최대</span></button>
+            <button type="button" data-quality="low" class="${graphics === 'low' ? 'on' : ''}"><b>${t('low', '낮음')}</b></button>
+            <button type="button" data-quality="medium" class="${graphics === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b></button>
+            <button type="button" data-quality="high" class="${graphics === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b></button>
+            <button type="button" data-quality="ultra" class="${graphics === 'ultra' ? 'on' : ''}"><b>${t('ultra', '울트라')}</b></button>
           </div>
         </div>
         <div class="settings-group">
-          <div class="settings-label"><b>해상도</b><span>캐릭터 렌더 배율</span></div>
+          <div class="settings-label"><b>${t('resolution', '해상도')}</b><span>${t('resolutionHint', '캐릭터 렌더 배율')}</span></div>
           <div class="graphics-options compact-options" role="group" aria-label="해상도 배율">
             ${['75', '100', '125', '150'].map((value) => `<button type="button" data-resolution="${value}" class="${resolution === value ? 'on' : ''}"><b>${value}%</b></button>`).join('')}
           </div>
         </div>
         <div class="settings-group">
-          <div class="settings-label"><b>최대 FPS</b><span>렌더 갱신 빈도</span></div>
+          <div class="settings-label"><b>${t('maxFps', '최대 FPS')}</b><span>${t('fpsHint', '렌더 갱신 빈도')}</span></div>
           <div class="graphics-options compact-options" role="group" aria-label="최대 FPS">
-            ${['30', '45', '60', 'unlimited'].map((value) => `<button type="button" data-fps="${value}" class="${fps === value ? 'on' : ''}"><b>${value === 'unlimited' ? '무제한' : value}</b></button>`).join('')}
+            ${['30', '45', '60', 'unlimited'].map((value) => `<button type="button" data-fps="${value}" class="${fps === value ? 'on' : ''}"><b>${value === 'unlimited' ? t('unlimited', '무제한') : value}</b></button>`).join('')}
           </div>
         </div>
         <div class="settings-group">
-          <div class="settings-label"><b>이펙트</b><span>파편·불꽃 밀도</span></div>
+          <div class="settings-label"><b>${t('effects', '이펙트')}</b><span>${t('effectsHint', '파편·불꽃 밀도')}</span></div>
           <div class="graphics-options triple-options" role="group" aria-label="이펙트 품질">
-            <button type="button" data-effects="low" class="${effects === 'low' ? 'on' : ''}"><b>낮음</b></button>
-            <button type="button" data-effects="medium" class="${effects === 'medium' ? 'on' : ''}"><b>보통</b></button>
-            <button type="button" data-effects="high" class="${effects === 'high' ? 'on' : ''}"><b>높음</b></button>
+            <button type="button" data-effects="low" class="${effects === 'low' ? 'on' : ''}"><b>${t('low', '낮음')}</b></button>
+            <button type="button" data-effects="medium" class="${effects === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b></button>
+            <button type="button" data-effects="high" class="${effects === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b></button>
           </div>
         </div>
         <div class="settings-group">
-          <div class="settings-label"><b>후처리</b><span>블러·색감·비네팅</span></div>
+          <div class="settings-label"><b>${t('postprocessing', '후처리')}</b><span>${t('postprocessingHint', '블러·색감·비네팅')}</span></div>
           <div class="graphics-options triple-options" role="group" aria-label="후처리 품질">
-            <button type="button" data-postprocessing="off" class="${postprocessing === 'off' ? 'on' : ''}"><b>끔</b></button>
-            <button type="button" data-postprocessing="medium" class="${postprocessing === 'medium' ? 'on' : ''}"><b>보통</b></button>
-            <button type="button" data-postprocessing="high" class="${postprocessing === 'high' ? 'on' : ''}"><b>높음</b></button>
+            <button type="button" data-postprocessing="off" class="${postprocessing === 'off' ? 'on' : ''}"><b>${t('off', '끔')}</b></button>
+            <button type="button" data-postprocessing="medium" class="${postprocessing === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b></button>
+            <button type="button" data-postprocessing="high" class="${postprocessing === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b></button>
           </div>
         </div>
         <div class="settings-group settings-wide">
-          <div class="settings-label"><b>안티앨리어싱</b><span>캐릭터 가장자리</span></div>
+          <div class="settings-label"><b>${t('antialiasing', '안티앨리어싱')}</b><span>${t('antialiasingHint', '캐릭터 가장자리')}</span></div>
           <div class="graphics-options triple-options" role="group" aria-label="안티앨리어싱 품질">
-            <button type="button" data-aa="off" class="${antiAliasing === 'off' ? 'on' : ''}"><b>끔</b><span>추가 샘플링 없음</span></button>
-            <button type="button" data-aa="medium" class="${antiAliasing === 'medium' ? 'on' : ''}"><b>보통</b><span>1.35배 선명화</span></button>
-            <button type="button" data-aa="high" class="${antiAliasing === 'high' ? 'on' : ''}"><b>높음</b><span>1.7배 선명화</span></button>
+            <button type="button" data-aa="off" class="${antiAliasing === 'off' ? 'on' : ''}"><b>${t('off', '끔')}</b></button>
+            <button type="button" data-aa="medium" class="${antiAliasing === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b><span>×1.35</span></button>
+            <button type="button" data-aa="high" class="${antiAliasing === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b><span>×1.7</span></button>
           </div>
         </div>
       </div>
       <div class="settings-tab-panel" data-settings-panel="sound" role="tabpanel" hidden>
         <div class="settings-group">
-          <div class="settings-label"><b>마스터 볼륨</b><span id="volume-value">${volume}%</span></div>
+          <div class="settings-label"><b>${t('masterVolume', '마스터 볼륨')}</b><span id="volume-value">${volume}%</span></div>
           <input id="volume-range" type="range" min="0" max="100" step="5" value="${volume}" aria-label="마스터 볼륨">
-          <p>배경음악과 효과음의 전체 크기를 조절합니다.</p>
+          <p>${t('volumeHint', '배경음악과 효과음의 전체 크기를 조절합니다.')}</p>
         </div>
       </div>
       <div class="settings-tab-panel" data-settings-panel="other" role="tabpanel" hidden>
+        <div class="settings-group language-settings-group">
+          <div class="settings-label"><b>${t('language', '언어')}</b><span>${LOCALE_NAMES[currentLocale]}</span></div>
+          <select id="language-select" class="settings-select" aria-label="${t('language', '언어')}">
+            ${SUPPORTED_LOCALES.map((locale) => `<option value="${locale}"${locale === currentLocale ? ' selected' : ''}>${LOCALE_NAMES[locale]}</option>`).join('')}
+          </select>
+          <p>${t('languageHint', '언어를 변경하면 페이지를 새로 불러옵니다.')}</p>
+        </div>
         <div class="settings-group records-reset-group">
-          <div class="settings-label"><b>플레이 기록</b><span>처음부터 다시 쓰기</span></div>
-          <button id="records-reset" class="settings-reset-btn" type="button">모든 기록 삭제하고 새 게임</button>
-          <p id="records-reset-note" aria-live="polite">진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.</p>
+          <div class="settings-label"><b>${t('playRecords', '플레이 기록')}</b><span>${t('startOver', '처음부터 다시 쓰기')}</span></div>
+          <button id="records-reset" class="settings-reset-btn" type="button">${t('resetAll', '모든 기록 삭제하고 새 게임')}</button>
+          <p id="records-reset-note" aria-live="polite">${t('resetNote', '진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.')}</p>
         </div>
       </div>
     </section>`
@@ -113,6 +121,13 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
     host!.querySelectorAll<HTMLElement>('[data-settings-tab]').forEach((button) => button.setAttribute('aria-selected', String(button.dataset.settingsTab === tab)))
   }
   host.querySelectorAll<HTMLButtonElement>('[data-settings-tab]').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.settingsTab as SettingsTab)))
+
+  host.querySelector<HTMLSelectElement>('#language-select')!.addEventListener('change', (event) => {
+    const locale = (event.currentTarget as HTMLSelectElement).value as LocaleCode
+    if (locale === currentLocale) return
+    setLocale(locale)
+    window.location.reload()
+  })
 
   const syncGraphicsSelection = () => {
     const values: Record<string, string> = {
@@ -145,12 +160,12 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
   recordsReset.addEventListener('click', () => {
     if (!recordsReset.classList.contains('is-danger')) {
       recordsReset.classList.add('is-danger')
-      recordsReset.textContent = '정말 모두 삭제할까요?'
-      host!.querySelector<HTMLElement>('#records-reset-note')!.textContent = '한 번 더 누르면 삭제 후 새 게임을 시작합니다.'
+      recordsReset.textContent = t('resetConfirm', '정말 모두 삭제할까요?')
+      host!.querySelector<HTMLElement>('#records-reset-note')!.textContent = t('resetConfirmNote', '한 번 더 누르면 삭제 후 새 게임을 시작합니다.')
       resetConfirmTimer = window.setTimeout(() => {
         recordsReset.classList.remove('is-danger')
-        recordsReset.textContent = '모든 기록 삭제하고 새 게임'
-        host?.querySelector<HTMLElement>('#records-reset-note')?.replaceChildren('진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.')
+        recordsReset.textContent = t('resetAll', '모든 기록 삭제하고 새 게임')
+        host?.querySelector<HTMLElement>('#records-reset-note')?.replaceChildren(t('resetNote', '진행 중인 일기와 튜토리얼 기록을 모두 삭제하고, 튜토리얼부터 바로 시작합니다.'))
       }, 3400)
       return
     }

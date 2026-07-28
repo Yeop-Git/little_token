@@ -1,6 +1,7 @@
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 import { GraphicsSettings } from '@/ui/GameSettings'
+import { t } from '@/localization'
 import { preloadImages } from '@/ui/ResourceLibrary'
 
 interface Opts {
@@ -101,16 +102,16 @@ export class TitleView {
             <img class="title-logo" src="${TITLE.logo}" alt="Little Token" />
           </div>
           <h1 class="sr-only">Little Token</h1>
-          <nav class="title-menu" aria-label="타이틀 메뉴">
+          <nav class="title-menu" aria-label="${t('titleMenu', '타이틀 메뉴')}">
             ${
               this.opts.hasSave
-                ? `<button class="tmenu-btn" type="button" data-act="continue">이어하기</button>
-            <button class="tmenu-btn" type="button" data-act="fresh">새로하기</button>`
-                : `<button class="tmenu-btn" type="button" data-act="continue">시작하기</button>`
+                ? `<button class="tmenu-btn" type="button" data-act="continue">${t('continue', '이어하기')}</button>
+            <button class="tmenu-btn" type="button" data-act="fresh">${t('newGame', '새로하기')}</button>`
+                : `<button class="tmenu-btn" type="button" data-act="continue">${t('start', '시작하기')}</button>`
             }
-            <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
-            <button class="tmenu-btn" type="button" data-act="guide">도움말</button>
-            <button class="tmenu-btn is-exit" type="button" data-act="exit">나가기</button>
+            <button class="tmenu-btn" type="button" data-act="settings">${t('settingsAction', '설정하기')}</button>
+            <button class="tmenu-btn" type="button" data-act="guide">${t('help', '도움말')}</button>
+            <button class="tmenu-btn is-exit" type="button" data-act="exit">${t('exit', '나가기')}</button>
           </nav>
           <div class="title-toast" id="title-toast" aria-live="polite"></div>
           <div class="title-loadmask" aria-hidden="true"></div>
@@ -234,7 +235,7 @@ export class TitleView {
     if (act === 'exit') {
       if (this.opts.onExit) return this.opts.onExit()
       window.close() // 스크립트로 연 창이 아니면 무시된다
-      this.toast('브라우저 탭을 닫아 주세요')
+      this.toast(t('closeTab', '브라우저 탭을 닫아 주세요'))
     }
   }
 
@@ -253,12 +254,12 @@ export class TitleView {
     if (!btn) return
     if (btn.classList.contains('is-danger')) return this.start(true)
     btn.classList.add('is-danger')
-    btn.textContent = '정말 새로할까요?'
-    this.toast('여태 쓴 일기가 지워져요')
+    btn.textContent = t('confirmNew', '정말 새로할까요?')
+    this.toast(t('diaryWillErase', '여태 쓴 일기가 지워져요'))
     clearTimeout(this.confirmTimer)
     this.confirmTimer = window.setTimeout(() => {
       btn.classList.remove('is-danger')
-      btn.textContent = '새로하기'
+      btn.textContent = t('newGame', '새로하기')
     }, 3400)
   }
 

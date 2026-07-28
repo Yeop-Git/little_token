@@ -10,6 +10,8 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
+import { currentLocale } from '@/localization'
+import { localizedWordText } from '@/localization/content'
 
 export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
   intent.kind !== 'heal' && intent.kind !== 'guard'
@@ -18,7 +20,17 @@ export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
 export const NEUTRAL_STATS: StatBlock = { atk: 1, guard: 1, heal: 1, luck: 0 }
 
 // 스탯 표기 이름 — 카드/집계판에서 "공격 ×1"처럼 그대로 쓴다.
-export const STAT_NAME: Record<StatName, string> = { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
+export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
+  ? { atk: 'Attack', guard: 'Guard', heal: 'Heal', luck: 'Luck' }
+  : currentLocale === 'ja'
+    ? { atk: '攻撃', guard: '防御', heal: '回復', luck: '運' }
+    : currentLocale === 'ru'
+      ? { atk: 'Атака', guard: 'Защита', heal: 'Лечение', luck: 'Удача' }
+      : currentLocale === 'zh-Hans'
+        ? { atk: '攻击', guard: '防御', heal: '恢复', luck: '幸运' }
+        : currentLocale === 'zh-Hant'
+          ? { atk: '攻擊', guard: '防禦', heal: '恢復', luck: '幸運' }
+          : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
 // 단어 하나가 만드는 깡수치. 스탯 비례 단어는 "스탯 × 계수", 아니면 고정 위력.
 // 성냥팔이 소녀의 망토(verbLuck)를 들면 어떤 동사든 운 스탯만큼을 더 받는다.
@@ -82,7 +94,11 @@ export function sentenceTokens(sel: Selection, t: Tables): string[] {
   return t.template.slots.map((s) => {
     const w = sel[s.key]
     if (!w) return '____'
-    return s.josa && !w.growHp ? eul(w.text) : w.text
+    const text = localizedWordText(w)
+    if (!s.josa || w.growHp) return text
+    if (currentLocale === 'ko') return eul(text)
+    if (currentLocale === 'ja') return `${text}を`
+    return text
   })
 }
 
@@ -90,7 +106,9 @@ export function sentenceTokens(sel: Selection, t: Tables): string[] {
 export function joinTokens(tokens: string[], t: Tables): string {
   return tokens.reduce((out, tok, i) => {
     if (!out) return tok
-    return t.template.slots[i]?.attach ? out + tok : `${out} ${tok}`
+    return t.template.slots[i]?.attach || currentLocale === 'ja' || currentLocale === 'zh-Hans' || currentLocale === 'zh-Hant'
+      ? out + tok
+      : `${out} ${tok}`
   }, '')
 }
 

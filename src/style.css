@@ -5797,6 +5797,13 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .settings-reset-btn:hover:not(:disabled) { color: #2b1e10; background: var(--gold); }
 .settings-reset-btn:disabled { color: var(--ink-faint); cursor: default; opacity: .7; }
+.settings-select {
+  width: 100%; min-height: 52px; padding: 0 15px; border: 1px solid rgba(255,207,118,.35);
+  border-radius: 12px; color: #fff3d3; background: rgba(12,9,8,.72); font: inherit; font-size: 17px;
+  cursor: pointer;
+}
+.settings-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.settings-select option { color: #24170d; background: #fff5df; }
 .settings-reset-btn.is-danger {
   color: #2b120c;
   background: var(--danger);

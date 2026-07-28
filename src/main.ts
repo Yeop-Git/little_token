@@ -34,6 +34,9 @@ import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 import { CustomCursor } from '@/ui/CustomCursor'
 import { ClickScribble } from '@/ui/ClickScribble'
+import { applyLocaleToDocument } from '@/localization'
+import { applyContentLocalization } from '@/localization/content'
+import { installDomLocalization } from '@/localization/dom'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -52,6 +55,9 @@ const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
 let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0
+applyLocaleToDocument()
+applyContentLocalization()
+installDomLocalization()
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
 installFoilShaders()
