@@ -6766,7 +6766,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   pointer-events: none;
 }
 .iforge-illust.forge-hammering .forge-hammer {
-  animation: forge-hammer-strike .5s cubic-bezier(.16,.8,.16,1) both;
+  animation: forge-hammer-strike .36s cubic-bezier(.12,.86,.16,1) both;
 }
 @keyframes forge-hammer-strike {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(-75deg) scale(.92); }
@@ -6789,7 +6789,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   opacity: 0;
   pointer-events: none;
 }
-.iforge-illust.forge-impact .forge-impact-word { animation: forge-impact-word-pop .5s cubic-bezier(.16,1.25,.3,1); }
+.iforge-illust.forge-impact .forge-impact-word { animation: forge-impact-word-pop .38s cubic-bezier(.16,1.25,.3,1); }
 @keyframes forge-impact-word-pop {
   0% { opacity: 0; transform: translate(-12px, 10px) scale(.35) rotate(-12deg); }
   28% { opacity: 1; transform: translate(5px, -5px) scale(1.22) rotate(5deg); }
@@ -6804,12 +6804,12 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .iforge-illust .card-commit-burst.forge-card-burst::after { animation-duration: .4s; }
 .iforge-illust .card-commit-burst.forge-card-burst > i { animation-duration: .44s; }
 .iforge-enchantment.impact {
-  animation: forge-core-impact .52s cubic-bezier(.18,.82,.22,1);
+  animation: forge-core-impact .4s cubic-bezier(.18,.82,.22,1);
 }
-.iforge-enchantment.impact .orbit-a { animation: forge-ring-a .52s ease-out; }
-.iforge-enchantment.impact .orbit-b { animation: forge-ring-b .52s ease-out; }
+.iforge-enchantment.impact .orbit-a { animation: forge-ring-a .4s ease-out; }
+.iforge-enchantment.impact .orbit-b { animation: forge-ring-b .4s ease-out; }
 .iforge-enchantment.impact .forge-sparks::before,
-.iforge-enchantment.impact .forge-sparks::after { animation: forge-spark-pop .5s ease-out; }
+.iforge-enchantment.impact .forge-sparks::after { animation: forge-spark-pop .38s ease-out; }
 @keyframes forge-core-impact {
   0% { transform: translate(-50%, -50%) scale(.5); filter: brightness(2.8) drop-shadow(0 0 2px var(--forge-impact-color)); }
   42% { transform: translate(-50%, -50%) scale(1.3); filter: brightness(1.8) drop-shadow(0 0 28px var(--forge-impact-color)); }
@@ -6831,7 +6831,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   background: linear-gradient(to top, rgba(12, 8, 16, .92) 34%, rgba(12, 8, 16, .6) 66%, transparent);
 }
 .iforge-illust.forge-impact {
-  animation: forge-panel-impact .52s ease-out;
+  animation: forge-panel-impact .4s ease-out;
 }
 @keyframes forge-panel-impact {
   0%, 100% { transform: none; box-shadow: inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 8px rgba(65,43,35,.48), 0 14px 28px rgba(0,0,0,.38); }
@@ -6859,7 +6859,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .iforge-stats .stat .sv { margin-left: auto; font-size: 20px; font-weight: 900; color: #ffe4a8; text-shadow: 0 0 10px rgba(255, 210, 122, 0.3); }
 .iforge-stats .stat .sv .up { color: var(--heal); font-size: 15px; margin-left: 6px; }
 .iforge-stats .stat.forge-gained {
-  animation: forge-stat-gained .52s cubic-bezier(.2,.8,.25,1);
+  animation: forge-stat-gained .4s cubic-bezier(.2,.8,.25,1);
 }
 @keyframes forge-stat-gained {
   0% { transform: translateX(-7px); background: rgba(255,255,255,.04); }
@@ -6915,18 +6915,18 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .iforge-complete b { font-size: 23px; letter-spacing: .12em; }
 .iforge-complete em { color: #e5cfaa; font-size: 13px; font-style: normal; }
-.iforge-complete.show { animation: forge-complete-stamp .7s cubic-bezier(.18,1.28,.28,1) forwards; }
+.iforge-complete.show { animation: forge-complete-stamp .5s cubic-bezier(.18,1.28,.28,1) forwards; }
 @keyframes forge-complete-stamp {
   0% { opacity: 0; transform: translate(-50%, -20px) scale(1.5) rotate(5deg); filter: brightness(2); }
   52% { opacity: 1; transform: translate(-50%, 0) scale(.94) rotate(-2deg); filter: brightness(1.45); }
   100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(-1deg); filter: none; }
 }
-.item-scene.is-finalizing .iforge-choose { pointer-events: none; animation: forge-choices-recede .52s ease .32s forwards; }
-.item-scene.is-forged .iforge-chain { animation: forge-chain-seal .58s ease-out; }
+.item-scene.is-finalizing .iforge-choose { pointer-events: none; animation: forge-choices-recede .4s ease .18s forwards; }
+.item-scene.is-forged .iforge-chain { animation: forge-chain-seal .42s ease-out; }
 .item-scene.is-forged .iforge-enchantment {
   opacity: 1;
   filter: brightness(1.5) drop-shadow(0 0 24px var(--forge-impact-color));
-  animation: forge-final-seal .72s ease-out;
+  animation: forge-final-seal .52s ease-out;
 }
 @keyframes forge-choices-recede { to { opacity: .16; transform: translateY(16px) scale(.96); filter: blur(2px); } }
 @keyframes forge-chain-seal { 45% { letter-spacing: .08em; transform: scale(1.08); filter: brightness(1.8) drop-shadow(0 0 20px #ffd78d); } }

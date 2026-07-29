@@ -137,6 +137,7 @@ export class CardHand {
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
+  private inputEnabled = true
   private serial = 0
   private epoch = 0
   private conflictOf: ConflictResolver = () => null
@@ -168,7 +169,9 @@ export class CardHand {
     const card = button ? this.cardFor(button) : undefined
     if (button && card) this.commit(card, button)
   }
-  private readonly onHandPointerDown = (event: PointerEvent) => this.cardButton(event.target)?.classList.add('pressing')
+  private readonly onHandPointerDown = (event: PointerEvent) => {
+    if (this.inputEnabled) this.cardButton(event.target)?.classList.add('pressing')
+  }
   private readonly onHandPointerUp = (event: PointerEvent) => this.cardButton(event.target)?.classList.remove('pressing')
   private readonly onHandKeyDown = (event: KeyboardEvent) => {
     const button = this.cardButton(event.target)
@@ -197,6 +200,13 @@ export class CardHand {
     this.selectedId = null
     this.drawingId = null
     this.processing = false
+  }
+
+  setInputEnabled(enabled: boolean) {
+    if (this.inputEnabled === enabled) return
+    this.inputEnabled = enabled
+    this.opts.handRoot.classList.toggle('input-locked', !enabled)
+    this.render()
   }
 
   /** 장로거미 전용 — 봉인을 누적하되 현재 손패에는 선택 가능한 카드를 반드시 남긴다. */
@@ -379,7 +389,7 @@ export class CardHand {
 
   private async drawOne() {
     const state = this.currentState()
-    if (!state || this.destroyed || this.processing) return
+    if (!state || this.destroyed || this.processing || !this.inputEnabled) return
     if (this.drawsLeft <= 0 || state.hand.length >= CARD_HAND_CONFIG.maxHand || state.deck.length === 0) {
       this.opts.deckButton.animate(
         [{ transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' }, { transform: 'translateX(0)' }],
@@ -517,7 +527,7 @@ export class CardHand {
       const emotionKey = emotionOrNeutral(card.word.emotion)
       button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
-      button.disabled = !!unavailable
+      button.disabled = !this.inputEnabled || !!unavailable
       button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${wordNoteText(card.word)}`)
       button.setAttribute('aria-pressed', String(selected))
       button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
@@ -559,7 +569,7 @@ export class CardHand {
       overlay: webOverlay,
     })
     return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
-      data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${unavailable ? 'disabled' : ''}
+      data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${!this.inputEnabled || unavailable ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
@@ -571,7 +581,7 @@ export class CardHand {
   // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.
   // 중앙에서 카드가 터지는 프레임에 onConfirm을 호출해 화면 연출과 실제 적용을 일치시킨다.
   private async commit(card: CardInstance, button?: HTMLButtonElement) {
-    if (this.destroyed || this.processing) return
+    if (this.destroyed || this.processing || !this.inputEnabled) return
     // 재렌더로 이미 손을 떠난 버튼(예: Enter 직후 따라오는 click)은 무시한다.
     if (button && !button.isConnected) return
     if (this.drawingId === card.instanceId) return
@@ -694,7 +704,7 @@ export class CardHand {
     const pileLeft = state.deck.length
     const full = state.hand.length >= CARD_HAND_CONFIG.maxHand
     const spent = this.drawsLeft <= 0
-    const disabled = this.processing || full || spent || pileLeft === 0
+    const disabled = !this.inputEnabled || this.processing || full || spent || pileLeft === 0
     const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
     // 아끼면 그만큼 보상등급이 오른다 — 뽑기를 참는 선택에 값을 붙여 둔다.
     const saveHint = this.drawsLeft > 0 ? ` · 아끼면 보상등급 +${this.drawsLeft}` : ''

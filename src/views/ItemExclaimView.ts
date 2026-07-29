@@ -36,6 +36,13 @@ const BLESS_POOL: { stat: StatKey; n: number }[] = [
 // 등급 1당 4% — 등급 10이면 선택지마다 40% 확률로 팅!이 붙는다.
 const BLESS_CHANCE_PER_GRADE = 0.04
 
+// 선택의 손맛이 끊기지 않도록 카드 이동 → 망치 접촉 → 다음 타격을 짧은 한 박자로 묶는다.
+const FORGE_TRANSFER_DURATION_MS = 500
+const FORGE_TRANSFER_STAGGER_MS = 45
+const FORGE_HAMMER_CONTACT_MS = 220
+const FORGE_STRIKE_DURATION_MS = 590
+const FORGE_COMPLETE_HOLD_MS = 420
+
 export class ItemExclaimView {
   private picks: Record<string, string | undefined> = {}
   private slotIndex = 0
@@ -162,15 +169,15 @@ export class ItemExclaimView {
       const dx = target.left + target.width / 2 - (from.left + from.width / 2)
       const dy = target.top + target.height / 2 - (from.top + from.height * 0.34)
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      const delay = reducedMotion ? index * 15 : index * 60
-      const duration = reducedMotion ? 150 : 650
+      const delay = reducedMotion ? index * 15 : index * FORGE_TRANSFER_STAGGER_MS
+      const duration = reducedMotion ? 150 : FORGE_TRANSFER_DURATION_MS
       mote.animate([
         { transform: 'translate3d(0, 0, 0) scale(.72) rotate(-8deg)', opacity: 0 },
         { transform: 'translate3d(0, -24px, 0) scale(1.12) rotate(3deg)', opacity: 1, offset: .18 },
         { transform: `translate3d(${dx * .52}px, ${dy * .22 - 70}px, 0) scale(1.02) rotate(-4deg)`, opacity: 1, offset: .52 },
         { transform: `translate3d(${dx * .9}px, ${dy * .86}px, 0) scale(.92) rotate(7deg)`, opacity: 1, offset: .86 },
         { transform: `translate3d(${dx}px, ${dy}px, 0) scale(.16) rotate(12deg)`, opacity: .12 },
-      ], { duration, delay, easing: 'cubic-bezier(.28,.72,.22,1)', fill: 'forwards' })
+      ], { duration, delay, easing: 'cubic-bezier(.2,.84,.2,1)', fill: 'forwards' })
 
       this.timers.push(window.setTimeout(() => {
         mote.remove()
@@ -213,7 +220,7 @@ export class ItemExclaimView {
     panel.classList.add('forge-hammering')
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const contactDelay = reducedMotion ? 20 : 310
+    const contactDelay = reducedMotion ? 20 : FORGE_HAMMER_CONTACT_MS
     this.timers.push(window.setTimeout(() => {
       if (panel.dataset.impact !== impactKey) return
       GameAudio.playForgeHit(beat)
@@ -251,7 +258,7 @@ export class ItemExclaimView {
       this.forgeStrikeRunning = false
       this.runNextForgeStrike()
       if (this.finalizing && this.pendingForgeStrikes === 0) this.finishForging()
-    }, reducedMotion ? 90 : 780))
+    }, reducedMotion ? 90 : FORGE_STRIKE_DURATION_MS))
   }
 
   /** 대기 중인 마지막 카드별 망치질까지 끝난 뒤에만 완료 봉인과 실제 획득을 진행한다. */
@@ -275,7 +282,7 @@ export class ItemExclaimView {
         stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
         passive: item.passive,
       })
-    }, reducedMotion ? 360 : 560))
+    }, reducedMotion ? 360 : FORGE_COMPLETE_HOLD_MS))
   }
 
   // 모든 감탄사를 고르면 자동 확정하되, 아직 날아가는 힘과 망치질이 있으면 끝까지 기다린다.

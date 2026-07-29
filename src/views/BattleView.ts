@@ -568,6 +568,7 @@ export class BattleView {
   private onEnemiesArrived() {
     if (this.spiderCastReady) return
     this.spiderCastReady = true
+    this.cardHand.setInputEnabled(true)
     const pending = this.pendingSpiderSeal
     if (!pending) return
     const current = this.order()[this.slotIndex]
@@ -694,6 +695,9 @@ export class BattleView {
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
+    // 손패 DOM은 등장 연출 전에 먼저 만들어진다. 보이지 않는 카드를 광클해
+    // 문장이 임의로 확정되지 않도록 적이 전장에 도착할 때까지 입력을 잠근다.
+    this.cardHand.setInputEnabled(false)
     document.addEventListener('pointerdown', this.onPointerDown, true)
     document.addEventListener('pointerup', this.onPointerUp, true)
     document.addEventListener('pointercancel', this.onPointerUp, true)
