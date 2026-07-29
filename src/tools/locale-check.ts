@@ -3,8 +3,9 @@ import { EARLY_WORDS } from '@data/earlyWords'
 import { PROPER_NAMES, SUPPORTED_LOCALES } from '@/localization'
 import { localizedGuidePages } from '@/localization/guide'
 import { missingLocalizationTexts, translateText } from '@/localization/dom'
+import { bossTokenLocalizationErrors } from '@/localization/bossToken'
 
-const errors = localizationCoverageErrors()
+const errors = [...localizationCoverageErrors(), ...bossTokenLocalizationErrors()]
 const samples = Object.values(EARLY_WORDS).flat()
 const EXPECTED_PROPER_NAMES = {
   ko: { player: '프롬', token: '토큰' },

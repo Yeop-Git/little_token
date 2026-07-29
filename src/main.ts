@@ -18,8 +18,8 @@ import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
-import { genRewards, rewardGradeForDay, type RewardOption } from '@data/rewards'
-import { newRun, registerWord, applyItemReward, type RewardPhase, type RewardPickRef } from '@core/run'
+import { genRewards, REWARD_REFRESH_COST, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
+import { applyItemReward, gainInspiration, newRun, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
@@ -618,7 +618,15 @@ function goEnding(grade = startGrade(run.player.stats.luck)) {
 }
 
 function beginReward(grade: number) {
-  run.reward = { day: run.day, grade, phase: 'subject', picks: [] }
+  gainInspiration(run, grade)
+  run.reward = {
+    day: run.day,
+    grade,
+    phase: 'subject',
+    picks: [],
+    seed: Math.floor(Math.random() * 0x7fffffff),
+    refreshes: { subject: 0, item: 0, verb: 0 },
+  }
   saveRun(run)
   goReward(grade, 'subject')
 }
@@ -633,15 +641,17 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
 
 function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
   const picks = [...(run.reward?.picks ?? [])]
+  const seed = run.reward?.seed ?? Math.floor(Math.random() * 0x7fffffff)
+  const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }
   if (pick) picks.push(pick)
   if (phase === 'subject') {
-    run.reward = { day: run.day, grade, phase: 'item', picks }
+    run.reward = { day: run.day, grade, phase: 'item', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'item')
     return
   }
   if (phase === 'item') {
-    run.reward = { day: run.day, grade, phase: 'verb', picks }
+    run.reward = { day: run.day, grade, phase: 'verb', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'verb')
     return
@@ -680,25 +690,46 @@ function goReward(
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player, grade, run.day, phase)
+  const seed = run.reward?.seed ?? 0
+  const refreshes = run.reward?.refreshes?.[phase] ?? 0
+  const options = genRewards(run.player, grade, run.day, phase, rewardOfferRng(seed, phase, refreshes))
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
-    grade: rewardGradeForDay(grade, run.day),
+    inspiration: run.inspiration,
+    earned: Math.max(0, Math.round(grade)),
     phase,
     options,
     onPick: (opt) => {
+      const cost = rewardPrice(opt)
+      if (run.inspiration < cost) {
+        advanceReward(grade, phase)
+        return
+      }
       const pick = rewardPickRef(opt)
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
         if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, () => advanceReward(grade, phase, pick))
+          goDiscard(opt.word, result.candidates, () => {
+            spendInspiration(run, cost)
+            advanceReward(grade, phase, pick)
+          })
         } else {
+          spendInspiration(run, cost)
           advanceReward(grade, phase, pick)
         }
       } else if (opt.item) {
-        goItem(opt.item, grade, phase, pick)
+        goItem(opt.item, grade, phase, pick, cost)
       }
+    },
+    onRefresh: () => {
+      if (!spendInspiration(run, REWARD_REFRESH_COST)) return false
+      const pending = run.reward
+      if (!pending) return false
+      pending.refreshes[phase] += 1
+      saveRun(run)
+      goReward(grade, phase)
+      return true
     },
     onSkip: () => advanceReward(grade, phase),
   })
@@ -710,6 +741,7 @@ function goItem(
   grade = startGrade(run.player.stats.luck),
   rewardPhase?: RewardPhase,
   pick?: RewardPickRef,
+  inspirationCost = 0,
 ) {
   battleRequest++
   reset()
@@ -718,6 +750,10 @@ function goItem(
     item: itemDef,
     grade,
     onDone: (result) => {
+      if (inspirationCost > 0 && !spendInspiration(run, inspirationCost)) {
+        if (rewardPhase) advanceReward(grade, rewardPhase)
+        return
+      }
       applyItemReward(run.player, result)
       if (rewardPhase && pick) {
         advanceReward(grade, rewardPhase, pick)

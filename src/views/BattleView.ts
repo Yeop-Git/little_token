@@ -19,6 +19,7 @@ import {
   type ResolvedMult,
 } from '@core/compiler'
 import { wordNoteText, wordValueLines } from '@core/wordText'
+import { eul } from '@core/josa'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
@@ -56,6 +57,7 @@ import {
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
+import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
 import { REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
@@ -79,6 +81,7 @@ import {
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { t } from '@/localization'
+import { bossTokenLine, type TokenLine } from '@/localization/bossToken'
 import {
   characterAnimationOf,
   destroyCharacterModels,
@@ -96,7 +99,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 interface Opts {
   field: FieldDef
   encounter: string[]
-  /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
+  /** 전투가 끝난 시점의 영감 획득량을 들고 나간다 — 런 재화와 보상 희귀도 확률에 함께 쓰인다. */
   onWin: (grade: number, resources: { hp: number; guard: number }) => void
   onLose: (cause: DefeatCause | null) => void
   /** 런 내내 누적되는 기록. 결과 화면의 찢어진 종이가 이걸 읽는다. */
@@ -188,10 +191,10 @@ const SLASH_BEAM_MS = 120
  */
 const HEAVY_MULT_CEILING = 8
 const TOKEN_BOSS_LINES = [
-  '어떡하지...! 도와줘, 프롬!!',
-  '프롬, 저 녀석 너무 커...!',
-  '으으... 그래도 물러나면 안 돼!',
-  '조심해! 뭔가 오고 있어!',
+  bossTokenLine('idleConcern'),
+  bossTokenLine('idleHuge'),
+  bossTokenLine('idleStand'),
+  bossTokenLine('idleIncoming'),
 ] as const
 /**
  * 토큰의 말투 세기. 보스 패턴 경고와 파훼 방법은 전부 토큰의 말풍선으로 나가고,
@@ -207,27 +210,23 @@ const TOKEN_BOSS_LINES = [
  */
 const tip = (title: string, detail: string): string => `${title}\n${detail}`
 
-export type TokenTone = 'calm' | 'warn' | 'relief'
-export interface TokenLine { text: string; tone: TokenTone }
-const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
-
 const TOKEN_BOSS_HINTS = {
-  mantisStart: say('기본공격 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!'),
-  mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 방어야! 표시된 수치만큼 반드시 방어해!!', 'warn'),
-  mantisGroggy: say('실드는 깨졌지만 강공격은 취소야! 사마귀가 그로기에 빠져서 다음 공격을 한 턴 걸러!!', 'relief'),
-  mantisPunished: say('못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!', 'warn'),
-  queenBeeStart: say('여왕벌 본체는 지금 공격이 안 통해! 먼저 앞을 막은 일벌부터 쓰러뜨리자!!'),
-  queenBeeDispersed: say('좋아, 프롬! 일벌이 쓰러졌어!!', 'relief'),
-  elderSpiderMiss: say('약점이 아니면 그 다리에서 막혀! 지금 약점을 노려 봐!!', 'warn'),
-  elderSpiderWebReady: say('거미줄이 다 조여들었어! 이번엔 꼭 약점을 노리자!!', 'warn'),
-  elderSpiderWebCut: say('맞았어, 프롬! 거미줄이 느슨해지고 있어!!', 'relief'),
+  mantisStart: bossTokenLine('mantisStart'),
+  mantisTelegraph: bossTokenLine('mantisTelegraph', 'warn'),
+  mantisGroggy: bossTokenLine('mantisGroggy', 'relief'),
+  mantisPunished: bossTokenLine('mantisPunished', 'warn'),
+  queenBeeStart: bossTokenLine('queenBeeStart'),
+  queenBeeDispersed: bossTokenLine('queenBeeDispersed', 'relief'),
+  elderSpiderMiss: bossTokenLine('elderSpiderMiss', 'warn'),
+  elderSpiderWebReady: bossTokenLine('elderSpiderWebReady', 'warn'),
+  elderSpiderWebCut: bossTokenLine('elderSpiderWebCut', 'relief'),
 } as const
 
 /** 다리가 떨어질 때마다 다음 약점을 이름으로 알려 준다 — 이 보스의 유일한 공략이다. */
 const spiderNextWeaknessLine = (weakness: string | null): TokenLine =>
   weakness
-    ? say(`다리가 떨어졌어! 이번엔 「${weakness}」 감정이 약점이야!!`, 'relief')
-    : say('다리를 전부 끊었어! 이제 본체야 — 약점은 없어, 힘껏 밀어붙이자!!', 'relief')
+    ? bossTokenLine('spiderNextWeakness', 'relief', { weakness })
+    : bossTokenLine('spiderBody', 'relief')
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
   'target',
@@ -275,7 +274,7 @@ export class BattleView {
   private isBoss = false
   private playerVisual: CharacterVisualDef
   private modeLabel = ''
-  // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
+  // 획득 예정 영감 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
   private player: PlayerState
   private state: BattleState
@@ -347,6 +346,10 @@ export class BattleView {
   private tokenSpeechHideTimer = 0
   private bossPatternSolved = false
   private bossPatternHint: TokenLine | null = null
+  /** 보스 문장은 전투 상태에서 다시 만들고, 방금 일어난 사건 한 줄만 짧게 덧쓴다. */
+  private bossSentenceEvent: string | null = null
+  private bossSentenceEventTimer = 0
+  private bossSentenceSignature = ''
   /** 지금 화면에 붙잡아 둔 핵심 경고가 있는가. 한가한 응원이 이걸 덮지 못하게 한다. */
   private tokenHolding = false
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
@@ -593,7 +596,7 @@ export class BattleView {
         <div class="hud-top">
           <div class="hud-left-stack">
             <div class="hud-left-status" aria-label="전투 상태">
-              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>영감</span><b id="grade"></b></div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
             <aside class="action-order" aria-label="이번 문장 행동 순서">
@@ -618,6 +621,7 @@ export class BattleView {
           ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? this.bossHudHtml() : ''}
           ${this.isBoss ? this.bossTokenHtml() : ''}
+          ${this.isBoss ? '<section class="boss-sentence-board" id="boss-sentence-board" role="status" aria-live="polite" hidden></section>' : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
@@ -852,6 +856,7 @@ export class BattleView {
     this.renderStats()
     this.renderActionOrder()
     this.syncMantisGuardCue()
+    this.renderBossSentence()
   }
 
   private renderEnemyOverflow(host: HTMLElement, count: number) {
@@ -1178,6 +1183,85 @@ export class BattleView {
     cue.classList.remove('breaking')
   }
 
+  private bossSentenceTokenHtml(token: EnemySentenceToken): string {
+    const emotion = token.emotion ? ` emotion-${token.emotion}` : ''
+    return `<span class="boss-sentence-token role-${token.role}${emotion}${token.crossed ? ' is-crossed' : ''}">
+      <small>${token.role === 'subject' ? '주어' : token.role === 'modifier' ? '수식' : token.role === 'object' ? '목적' : '행동'}</small>
+      <b>${token.text}</b>
+    </span>`
+  }
+
+  private bossSentenceLineHtml(view: { tokens: EnemySentenceToken[] }): string {
+    return `<div class="boss-sentence-line">${view.tokens.map((token) => this.bossSentenceTokenHtml(token)).join('<i aria-hidden="true">/</i>')}</div>`
+  }
+
+  /** 현재 시뮬레이션 상태를 그대로 읽어 보스가 쓰는 다음 문장으로 투영한다. */
+  private renderBossSentence() {
+    if (!this.isBoss) return
+    const host = this.root.querySelector<HTMLElement>('#boss-sentence-board')
+    const boss = this.state.enemies.find((enemy) => enemy.def.boss && !enemy.dead)
+    if (!host || !boss) {
+      if (host) host.hidden = true
+      return
+    }
+    const view = enemySentenceFor(this.state, boss, { eventText: this.bossSentenceEvent })
+    if (!view) {
+      host.hidden = true
+      return
+    }
+    const signature = JSON.stringify(view)
+    if (signature === this.bossSentenceSignature) return
+    this.bossSentenceSignature = signature
+    this.paintBossSentence(host, view)
+  }
+
+  private paintBossSentence(host: HTMLElement, view: EnemySentenceView) {
+    const context = view.context
+      ? `<div class="boss-sentence-context">
+          <span class="boss-sentence-side-label">${view.context.label}</span>
+          ${this.bossSentenceLineHtml(view.context)}
+          <div class="boss-sentence-meta">${view.context.meta.map((text) => `<span>${text}</span>`).join('')}</div>
+        </div>`
+      : ''
+    const manuscript = view.manuscript?.length
+      ? `<div class="boss-manuscript" aria-label="장로거미가 훼손 중인 문장">
+          <span class="boss-sentence-side-label">훼손 중인 긴 문장</span>
+          <div class="boss-manuscript-line">${view.manuscript.map((clause) => `
+            <span class="boss-manuscript-clause${clause.active ? ' is-active' : ''}${clause.crossed ? ' is-crossed' : ''}${clause.emotion ? ` emotion-${clause.emotion}` : ''}" data-clause-id="${clause.id}">
+              <b>${clause.text}</b>
+            </span>`).join('<i aria-hidden="true">/</i>')}</div>
+        </div>`
+      : ''
+    host.className = `boss-sentence-board tone-${view.tone}`
+    host.innerHTML = `
+      <div class="boss-sentence-heading"><span>${view.label}</span><b>${view.tone === 'danger' ? '곧 실행' : view.tone === 'relief' ? '결말 수정' : '적의 의도'}</b></div>
+      ${context}
+      <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
+      <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
+      ${manuscript}
+      ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
+    host.hidden = false
+    host.classList.remove('is-writing')
+    void host.offsetWidth
+    host.classList.add('is-writing')
+  }
+
+  /** 봉인·파훼·실패처럼 상태 한 장으로는 사라지는 사건만 짧게 문장 여백에 남긴다. */
+  private showBossSentenceEvent(text: string, duration = 1800) {
+    if (!this.isBoss || this.over) return
+    clearTimeout(this.bossSentenceEventTimer)
+    this.bossSentenceEvent = text
+    this.bossSentenceSignature = ''
+    this.renderBossSentence()
+    this.bossSentenceEventTimer = window.setTimeout(() => {
+      if (this.destroyed) return
+      this.bossSentenceEvent = null
+      this.bossSentenceSignature = ''
+      this.renderBossSentence()
+    }, duration)
+    this.timers.push(this.bossSentenceEventTimer)
+  }
+
   private bossPlayerHudHtml(): string {
     return `
       <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="${t('playerName', '프롬')} 체력">
@@ -1235,9 +1319,9 @@ export class BattleView {
     if (boss.def.id === 'queenBee') return TOKEN_BOSS_HINTS.queenBeeStart
     if (boss.def.id === 'elderSpider') {
       const weak = activeEnemyPart(boss)?.def.weakness?.label
-      return say(weak
-        ? `첫 공격은 마력실드가 막아! 연타로 벗긴 뒤 「${weak}」 감정으로 첫째 다리를 노려 — 거미줄은 방패도 넘어 와!!`
-        : '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!')
+      return weak
+        ? bossTokenLine('spiderOpeningWeak', 'calm', { weakness: weak })
+        : bossTokenLine('spiderOpeningGeneric')
     }
     return null
   }
@@ -1249,7 +1333,7 @@ export class BattleView {
       // 한가한 응원은 경고를 밀어내지 않는다. 큰낫이 올라간 채로 "힘내!"가 뜨면
       // 화면이 지금 무엇이 급한지 스스로 뒤집는 셈이다.
       if (this.tokenHolding) return this.scheduleBossTokenSpeech(7600)
-      this.showBossTokenSpeech(say(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length]))
+      this.showBossTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
       this.tokenSpeechIndex += 1
       this.scheduleBossTokenSpeech(7600)
     }, delay)
@@ -1983,6 +2067,9 @@ export class BattleView {
         ? `장로거미가 ${this.t.template.slots.find((slot) => slot.key === slotKey)?.label ?? slotKey} 「${sealed.word.text}」 카드를 봉인했다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`
         : `선택지를 남기기 위해 이번 거미줄은 빗나갔다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`,
     )
+    this.showBossSentenceEvent(sealed
+      ? `장로거미가 네 문장에서 「${sealed.word.text}」 카드를 실로 묶었다.`
+      : '선택 가능한 단어를 남기기 위해 거미줄이 빗나갔다.')
     if (this.cardHand.sealedCount >= pending.maxSealed) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderWebReady)
     this.renderActors()
   }
@@ -2934,7 +3021,7 @@ export class BattleView {
     // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
     this.killsThisBattle += kills
 
-    // 한 턴에 두 마리 이상 쓸어담으면 보상등급이 띵·띵·띵 오른다. 전멸 마무리면 +1.
+    // 한 턴에 두 마리 이상 쓸어담으면 획득 예정 영감이 띵·띵·띵 오른다. 전멸 마무리면 +1.
     const gradeGain = overkillGain(kills, allDead(this.state))
     if (gradeGain > 0) await this.dingGrade(gradeGain)
 
@@ -3318,6 +3405,9 @@ export class BattleView {
     scene.classList.add('spider-web-cut')
     this.popAt(enemyIdx, released > 0 ? '약점 파훼! 카드 봉인 -1' : '약점 파훼!', 'buff big')
     this.log(`현재 다리의 약점을 문장에 담아 카드 봉인 ${released}개를 풀었다.`)
+    this.showBossSentenceEvent(released > 0
+      ? `약점에 맞는 문장이 거미줄 한 겹을 고쳐 썼다.`
+      : '약점에 맞는 문장이 장로거미의 구절을 흔들었다.')
     this.resolveBossPattern(TOKEN_BOSS_HINTS.elderSpiderWebCut)
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-cut'), 720))
   }
@@ -3342,6 +3432,9 @@ export class BattleView {
     // 다리가 바뀌면 노려야 할 감정도 바뀐다. 부위 목록의 작은 뱃지만으로는
     // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
     const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
+    this.showBossSentenceEvent(nextWeak
+      ? `한 구절을 지웠다. 다음에는 ${eul(nextWeak)} 되찾아야 한다.`
+      : '네 감정을 묶던 네 구절을 모두 지웠다.')
     this.resolveBossPattern(spiderNextWeaknessLine(nextWeak))
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-burst'), 880))
   }
@@ -3420,7 +3513,7 @@ export class BattleView {
     const enemy = this.state.enemies[target]
     if (removed && enemy?.def.id === 'elderSpider') {
       const weak = activeEnemyPart(enemy)?.def.weakness?.label
-      if (weak) this.showBossTokenHint(say(`마력실드가 깨졌어! 이제 「${weak}」 감정으로 현재 다리를 노려!!`, 'relief'))
+      if (weak) this.showBossTokenHint(bossTokenLine('spiderShieldBroken', 'relief', { weakness: weak }))
     }
   }
 
@@ -3851,7 +3944,7 @@ export class BattleView {
   }
 
   /**
-   * 승리 마무리 — 아낀 카드 뽑기를 보상등급으로 바꾼 뒤 피날레를 돌린다.
+   * 승리 마무리 — 아낀 카드 뽑기를 영감으로 바꾼 뒤 피날레를 돌린다.
    * 뽑기를 참으면 그만큼 전리품이 좋아지므로 "지금 손패로 버틸까"가 선택이 된다.
    */
   private async finishWin(pause: number): Promise<void> {
@@ -3863,7 +3956,7 @@ export class BattleView {
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
     const saved = this.cardHand.savedDraws
     if (saved > 0) {
-      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 보상등급 +${saved}`)
+      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 영감 +${saved}`)
       await this.dingGrade(saved)
     }
     await sleep(pause)
@@ -4065,8 +4158,11 @@ export class BattleView {
     if (groggyTriggered) {
       this.popAt(enemyIdx, '일벌 전멸! 다음 턴 행동 불가!', 'buff big')
       this.log('일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 그 다음 턴에 일벌 넷을 다시 부른다.')
-      this.resolveBossPattern(say('지금이 빈틈이에요!!', 'relief'))
+      this.resolveBossPattern(bossTokenLine('queenOpportunity', 'relief'))
+      this.showBossSentenceEvent('일벌이 모두 흩어져 공격 문장이 지워졌다.')
       await sleep(260)
+    } else if (count > 0) {
+      this.showBossSentenceEvent(`일벌 ${count}마리가 문장에서 지워졌다.`)
     }
     if (renderAfter) this.renderActors()
     if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
@@ -4196,6 +4292,7 @@ export class BattleView {
         // 흡혈은 내려베기를 못 막았다는 뜻이다. 실패한 그 순간에 다음 대응을 다시 말해 준다.
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisPunished)
+          this.showBossSentenceEvent('「내려벤다」를 막지 못해 사마귀가 상처의 먹물을 빨아들였다.')
         }
       }
       if (st.groggyEntered) {
@@ -4203,6 +4300,7 @@ export class BattleView {
         this.log(`${this.state.enemies[st.idx].def.name}이 빈틈을 보였다 — 받는 피해 ×${st.groggyDamageMult.toFixed(1)} · 예정된 다음 공격을 한 턴 거른다`)
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.resolveBossPattern(TOKEN_BOSS_HINTS.mantisGroggy)
+          this.showBossSentenceEvent('「큰낫을 내려벤다」를 지우고 「휘청거린다」로 고쳐 썼다.')
         }
       }
       if (st.summonsReleased > 0) {

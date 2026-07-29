@@ -5,7 +5,14 @@ import { deserializeRun, serializeRun } from '@core/save'
 const original = newRun()
 original.day = 7
 original.combat = { hp: 31, guard: 9 }
-original.reward = { day: 7, grade: 2, phase: 'item', picks: [{ kind: 'word', id: 'na' }] }
+original.reward = {
+  day: 7,
+  grade: 2,
+  phase: 'item',
+  picks: [{ kind: 'word', id: 'na' }],
+  seed: 17,
+  refreshes: { subject: 0, item: 1, verb: 0 },
+}
 
 const roundTrip = deserializeRun(serializeRun(original))
 assert(roundTrip, 'current save must deserialize')

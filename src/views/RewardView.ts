@@ -4,14 +4,13 @@
  */
 
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
-import type { RewardOption } from '@data/rewards'
+import { REWARD_REFRESH_COST, rewardPrice, type RewardOption } from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type ItemDef, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
-import { gradeTier } from '@core/grade'
 import { reinforceWord } from '@core/run'
 import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
 import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
@@ -20,10 +19,12 @@ import { comboHintHtml } from '@/ui/ComboHint'
 interface Opts {
   day: number
   deck?: Record<string, Word[]>
-  grade: number
+  inspiration: number
+  earned: number
   options: RewardOption[]
   phase: RewardPhase
   onPick: (opt: RewardOption) => void
+  onRefresh: () => boolean
   onSkip: () => void
 }
 
@@ -165,8 +166,9 @@ function rewardPickHtml(p: RewardOption, i: number): string {
   const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
   const nameLength = [...p.name.replace(/\s/g, '')].length
   const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
+  const price = rewardPrice(p)
   return `
-    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}">
+    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}">
       ${bgHtml(p)}
       <span class="rp-tint" aria-hidden="true"></span>
       <span class="rp-veil" aria-hidden="true"></span>
@@ -185,7 +187,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
           <button class="rp-detail" type="button">자세히보기</button>
-          <span class="rp-take">고르기 →</span>
+          <span class="rp-take"><b class="rp-price">✦ ${price}</b> 기록하기 →</span>
         </div>
       </div>
     </div>`
@@ -213,12 +215,16 @@ export class RewardView {
               <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
               </div>
-              <div class="reward-grade rarity-${gradeTier(opts.grade)}">오늘의 보상등급 <b>✦ ${opts.grade.toFixed(1)}</b></div>
+              <div class="reward-grade">보유 영감 <b>✦ ${opts.inspiration}</b><span>이번 클리어 +${opts.earned}</span></div>
             </header>
+            <div class="reward-system-message" role="status" aria-live="assertive" hidden></div>
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
-            <button class="reward-skip" type="button" title="이번 단계의 보상을 받지 않고 넘어갑니다">보상 받지 않기</button>
+            <div class="reward-controls">
+              <button class="reward-refresh" type="button">다른 발상 떠올리기 <b>✦ ${REWARD_REFRESH_COST}</b></button>
+              <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
+            </div>
           </div>
           <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
             <div class="rd-hint">카드의 <b>자세히보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
@@ -228,6 +234,10 @@ export class RewardView {
 
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((el) => {
       const i = Number(el.dataset.i)
+      const price = Number(el.dataset.price)
+      if (price > opts.inspiration) {
+        el.classList.add('is-unaffordable')
+      }
       el.addEventListener('click', () => this.take(el, opts.options[i]))
       el.querySelector<HTMLElement>('.rp-detail')?.addEventListener('click', (event) => {
         event.stopPropagation()
@@ -237,6 +247,10 @@ export class RewardView {
     this.root.querySelector<HTMLButtonElement>('.reward-skip')?.addEventListener('click', (event) => {
       event.stopPropagation()
       this.skip()
+    })
+    this.root.querySelector<HTMLButtonElement>('.reward-refresh')?.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.refresh()
     })
   }
 
@@ -251,10 +265,39 @@ export class RewardView {
 
   private take(el: HTMLElement, opt: RewardOption) {
     if (this.locked) return
+    const price = rewardPrice(opt)
+    if (this.opts.inspiration < price) {
+      this.failAndSkip(`영감이 ${price - this.opts.inspiration} 부족해 이 보상을 기록하지 못했다.`)
+      return
+    }
     this.locked = true
     this.disableChoices()
     el.style.transform = 'translateY(-10px) scale(1.03)'
     window.setTimeout(() => this.opts.onPick(opt), 220)
+  }
+
+  private refresh() {
+    if (this.locked) return
+    if (this.opts.inspiration < REWARD_REFRESH_COST || !this.opts.onRefresh()) {
+      this.showSystemMessage('영감이 부족해 다른 발상을 떠올릴 수 없다.')
+    }
+  }
+
+  private failAndSkip(message: string) {
+    this.locked = true
+    this.disableChoices()
+    this.showSystemMessage(message)
+    window.setTimeout(() => this.opts.onSkip(), 1100)
+  }
+
+  private showSystemMessage(message: string) {
+    const notice = this.root.querySelector<HTMLElement>('.reward-system-message')
+    if (!notice) return
+    notice.hidden = false
+    notice.textContent = message
+    notice.classList.remove('show')
+    void notice.offsetWidth
+    notice.classList.add('show')
   }
 
   private skip() {
@@ -270,6 +313,8 @@ export class RewardView {
     })
     const skip = this.root.querySelector<HTMLButtonElement>('.reward-skip')
     if (skip) skip.disabled = true
+    const refresh = this.root.querySelector<HTMLButtonElement>('.reward-refresh')
+    if (refresh) refresh.disabled = true
   }
 
   destroy() {}

@@ -782,6 +782,29 @@ export interface EnemyStrike {
   counterHit: HitFx | null
 }
 
+/** 다음 적 공격의 0~2 난수 한 칸을 실제 피해로 바꾼다. 화면 예상값과 실행이 함께 쓴다. */
+export function enemyAttackDamageForRoll(state: Pick<BattleState, 'turn' | 'playerMax'>, enemy: EnemyInst, roll: number): number {
+  const attackStep = nextEnemyAttackStep(enemy)
+  if (attackStep?.damageScale === 0) return 0
+  const attackStage = bossAttackStage(enemy)
+  const escorts = enemy.summonsLeft + enemy.summonsRight
+  const summonAttackBonus = escorts * (enemy.def.summonPattern?.attackBonusPerUnit ?? 0)
+  const uncappedRaw = Math.round(
+    (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + Math.max(0, Math.min(2, Math.floor(roll))))
+      * enemy.atkMult
+      * BOSS_ATTACK_MULTIPLIER[attackStage]
+      * (attackStep?.damageScale ?? 1),
+  )
+  // 거미줄은 방어 위를 타고 넘는 대신 한 번에 최대 체력의 1/5까지만 조인다.
+  const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
+  const pressureBase = enemy.def.webPattern ? Math.min(uncappedRaw, webShowCap) : uncappedRaw
+  return Math.round(pressureBase * bossTurnPressureMultiplier(enemy, state.turn))
+}
+
+export function enemyAttackDamageRange(state: Pick<BattleState, 'turn' | 'playerMax'>, enemy: EnemyInst): [number, number] {
+  return [enemyAttackDamageForRoll(state, enemy, 0), enemyAttackDamageForRoll(state, enemy, 2)]
+}
+
 export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' | 'second'): EnemyStrike[] {
   const strikes: EnemyStrike[] = []
   const front = frontIdx(state)
@@ -797,25 +820,11 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const attackStage = bossAttackStage(enemy)
   const animationStage = attackStep?.animationStage ?? attackStage
   const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
-  const turnPressureMultiplier = bossTurnPressureMultiplier(enemy, state.turn)
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
   const summonsReleased = summonPattern?.releaseAt != null && escorts >= summonPattern.releaseAt ? escorts : 0
-  const uncappedRaw = Math.round(
-    (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + Math.floor(rng() * 3))
-      * enemy.atkMult
-      * attackMultiplier
-      * (attackStep?.damageScale ?? 1),
-  )
-  // 장로거미는 카드 봉인 파훼를 읽을 시간을 주도록 한 번의 체력 피해를 제한한다.
-  // 방어막을 타고 넘는 대신 한 방을 최대 체력의 1/5로 묶어, 여러 턴에 걸쳐
-  // 조여드는 압박으로 만든다.
-  const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
-  const pressureBase = enemy.def.webPattern
-    ? Math.min(uncappedRaw, webShowCap)
-    : uncappedRaw
-  const raw = Math.round(pressureBase * turnPressureMultiplier)
+  const raw = enemyAttackDamageForRoll(state, enemy, Math.floor(rng() * 3))
   // 모여든 호위가 한꺼번에 돌격하면 방패 위로 넘어 들어온다. 넷이 모이기 전에
   // 넓은 문장으로 흩어 놓는 것이 유일한 대응이고, 방어로 버티기는 답이 아니다.
   const piercedGuard = !!enemy.def.pierceGuard

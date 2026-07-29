@@ -145,6 +145,21 @@ export function deserializeRun(raw: string): RunState | null {
       parsed.reward.picks = []
       migrated = true
     }
+    if (typeof parsed.inspiration !== 'number' || !Number.isFinite(parsed.inspiration)) {
+      parsed.inspiration = 0
+      migrated = true
+    } else if (parsed.inspiration < 0) {
+      parsed.inspiration = 0
+      migrated = true
+    }
+    if (parsed.reward && typeof parsed.reward.seed !== 'number') {
+      parsed.reward.seed = Math.floor(Math.random() * 0x7fffffff)
+      migrated = true
+    }
+    if (parsed.reward && !parsed.reward.refreshes) {
+      parsed.reward.refreshes = { subject: 0, item: 0, verb: 0 }
+      migrated = true
+    }
     // 결과 화면 기록 도입 전 저장된 런은 빈 기록으로 시작한다 — 지난 판을 소급해
     // 셈할 방법은 없으니 0에서 이어 적는다.
     if (!parsed.record || typeof parsed.record !== "object") {

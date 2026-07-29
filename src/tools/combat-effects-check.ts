@@ -28,6 +28,7 @@ import {
   summonCount,
   type BattleState,
 } from '../sim/reference'
+import { enemyDamageRange, enemySentenceFor } from '../sim/enemySentences'
 
 const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(message) }
 const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', ...extra })
@@ -69,6 +70,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
     schemaVersion: 0,
     player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } },
     combat: { hp: 68, guard: 0 },
+    inspiration: 0,
     day: 9,
     record: emptyRunRecord(),
     balanceVersion: 0,
@@ -516,5 +518,45 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
   }
   const values = [...counts.values()]
   assert(Math.max(...values) - Math.min(...values) <= 1, `${kind} emotion balance`)
+}
+
+// 보스의 화면 문장은 별도 수치를 만들지 않고 현재 전투 상태를 그대로 설명한다.
+{
+  const mantis = makeEnemy(ENEMIES.mantis, 1, 1, 2)
+  const s = state([mantis])
+  mantis.attackPatternIndex = 1
+  let sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tokens.some((token) => token.text.includes('치켜든다')) && sentence.meta.includes('이번 행동 피해 없음'), 'mantis preparation sentence announces the harmless wind-up')
+  mantis.attackPatternIndex = 2
+  sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tone === 'danger' && sentence.meta.some((line) => line.startsWith('필요 방어 ')), 'mantis heavy sentence exposes the exact guard answer')
+  mantis.groggyUntilTurn = s.turn
+  mantis.groggyDamageMult = 1.5
+  sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tokens.some((token) => token.text === '휘청거린다'), 'mantis counter rewrites the promised attack into a stagger sentence')
+}
+{
+  const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
+  const s = state([queen])
+  summonAtTurnStart(s)
+  let sentence = enemySentenceFor(s, queen)!
+  assert(sentence.context?.tokens.some((token) => token.text.includes('일벌 넷')) && sentence.context.meta.includes('본체 무적'), 'queen escort count changes the sentence subject and exposes immunity')
+  queen.summonsLeft = 0
+  queen.summonsRight = 0
+  queen.summonHpLeft = []
+  queen.summonHpRight = []
+  queen.summonRespawnTurn = s.turn + 2
+  queen.groggyUntilTurn = s.turn
+  queen.groggyDamageMult = 1.5
+  sentence = enemySentenceFor(s, queen)!
+  assert(sentence.tokens.some((token) => token.text === '숨을 고른다') && sentence.meta.includes('다음 행동 스킵'), 'queen escort clear rewrites the attack into a recovery sentence')
+}
+{
+  const spider = makeEnemy(ENEMIES.elderSpider, 50, 1, 5)
+  const s = state([spider]); s.playerMax = 100
+  const sentence = enemySentenceFor(s, spider, { eventText: '「힘껏」 카드를 실로 묶었다.' })!
+  assert(sentence.manuscript?.length === 5 && sentence.manuscript[0].active && sentence.manuscript[0].emotion === 'joy', 'spider manuscript mirrors the active sequential weakness')
+  assert(sentence.eventText?.includes('힘껏') && sentence.meta.includes('방어 관통'), 'spider stolen word is written beside the persistent piercing intent')
+  assert(enemyDamageRange(s, spider)[1] === 20, 'spider sentence damage preview reads the same one-fifth hp cap as combat')
 }
 console.log('combat effects: ok')

@@ -45,6 +45,8 @@ export interface RunState {
   player: PlayerState
   /** 스테이지를 넘어 유지되는 현재 생존 자원. 최대 체력은 player.stats.hp가 기준이다. */
   combat: RunCombatState
+  /** 클리어 때 얻어 런 동안 쌓아 두고, 보상 카드 구입에 쓰는 영감. */
+  inspiration: number
   day: number
   /** 결과 화면에 보여 줄 이 런의 누적 기록. */
   record: RunRecord
@@ -82,10 +84,14 @@ export interface PendingReward {
   grade: number
   phase: RewardPhase | 'complete'
   picks: RewardPickRef[]
+  /** 이어하기로 현재 진열을 공짜로 바꾸지 못하게 하는 클리어별 난수 씨앗. */
+  seed: number
+  /** 각 보상 단계에서 영감을 내고 새로고침한 횟수. */
+  refreshes: Record<RewardPhase, number>
 }
 
 export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
-export const RUN_SAVE_SCHEMA_VERSION = 2
+export const RUN_SAVE_SCHEMA_VERSION = 3
 export const COMBAT_BALANCE_VERSION = 1
 
 function cloneDeck(d: Record<string, Word[]>): Record<string, Word[]> {
@@ -109,6 +115,7 @@ export function newRun(): RunState {
     schemaVersion: RUN_SAVE_SCHEMA_VERSION,
     player,
     combat: { hp: player.stats.hp, guard: 0 },
+    inspiration: 0,
     day: 1,
     record: emptyRunRecord(),
     balanceVersion: COMBAT_BALANCE_VERSION,
@@ -116,6 +123,21 @@ export function newRun(): RunState {
     endingSeen: false,
     reward: null,
   }
+}
+
+/** 전투에서 확정된 기존 보상 수치를 정수 영감으로 런 지갑에 쌓는다. */
+export function gainInspiration(run: RunState, rewardValue: number): number {
+  const gained = Math.max(0, Math.round(rewardValue))
+  run.inspiration += gained
+  return gained
+}
+
+/** 잔액이 충분할 때만 영감을 쓴다. 실패하면 상태를 바꾸지 않는다. */
+export function spendInspiration(run: RunState, cost: number): boolean {
+  const price = Math.max(0, Math.round(cost))
+  if (run.inspiration < price) return false
+  run.inspiration -= price
+  return true
 }
 
 // 아이템 보상 = 스탯 수치 상승(스펙업).
