@@ -18,6 +18,7 @@ import {
   MULT_BUDGET,
   expectedMult,
   hasBudget,
+  hasModifierTactic,
   tacticalVerbBudget,
   tacticalVerbPower,
   verbCoefBudget,
@@ -96,7 +97,7 @@ function checkArt(): string[] {
 /**
  * 등급 예산 검사 — 등급은 상한이 아니라 **예산**이라는 계약(`src/core/budget.ts`)을
  * 실제 데이터로 검증한다. 셋을 본다.
- *   ① 배율 칸(주어·수식): 기대 배율이 등급 예산 ±오차 안에 있다.
+ *   ① 주어 배율은 등급 예산 ±오차, 수식어는 배율·대성공 없이 전술 기능만 가진다.
  *   ② 동사 칸: 스탯 계수가 등급 계수(전체 적중이면 깎인 값)와 같다.
  *   ③ 초기 덱의 노멀 정원(주어 1 · 수식 3 · 동사 3) — 노멀 쌍둥이 방지.
  * 여기에 카드 문구(`note`)가 실제 수치를 빠뜨리지 않았는지도 함께 본다.
@@ -130,6 +131,26 @@ function checkBudget(): string[] {
   for (const { slot, w, pool } of [...early, ...reward, ...special]) {
     const rarity = w.rarity ?? 'common'
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
+    if (slot === 'adv') {
+      const staleStats = w.bonus != null || w.crit != null || w.stat != null
+      if (staleStats) {
+        out.push(`${pool}/${w.text}: 수식어에 배율·대성공·룰렛 스탯이 남아 있다`)
+        console.log(`  위반  ${pool} · ${w.text} — 수식어는 배율·대성공·룰렛 스탯을 가질 수 없다`)
+      }
+      if (!hasModifierTactic(w)) {
+        out.push(`${pool}/${w.text}: 공개 전술 기능이 없다`)
+        console.log(`  위반  ${pool} · ${w.text} — 수식어에는 전술 기능이 최소 하나 필요하다`)
+      }
+      if ((w.effects?.guard ?? 0) > 0 || (w.effects?.heal ?? 0) > 0) {
+        out.push(`${pool}/${w.text}: 수식어가 방어·회복 수치를 직접 만든다`)
+        console.log(`  위반  ${pool} · ${w.text} — 방어·회복 수치는 동사만 만들 수 있다`)
+      }
+      if (w.inkCost == null) {
+        out.push(`${pool}/${w.text}: 명시 잉크 비용이 없다`)
+        console.log(`  위반  ${pool} · ${w.text} — 수식어 전술에는 명시 잉크 비용이 필요하다`)
+      }
+      continue
+    }
     if (slot === 'verb' || slot === 'verb2') {
       if (w.statMult == null) continue
       const isTactical = pool === '규칙'

@@ -1,4 +1,4 @@
-import { comboLeads, compile } from '@core/compiler'
+import { comboLeads, compile, withOverdrawEffects } from '@core/compiler'
 import { bossTurnPressureMultiplier } from '@core/combatRules'
 import { DECK_LIMITS, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
 import { defaultPlayer } from '@core/player'
@@ -36,7 +36,7 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
 }
-const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, counterMultiplier: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra });
+const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, enemyAttackDown: 0, drawCards: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra });
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
@@ -88,6 +88,11 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 
 { const s = state([makeEnemy(foe('shield', { magicShield: 2, hp: 20 }))]); const r = applyIntent(s, attack({ hitCount: 3 }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].magicShieldRemaining === 1 && r.hits[1].magicShieldRemaining === 0 && r.hits[2].dmg === 10 && s.enemies[0].hp === 10, 'layered magic shield and multihit') }
+{ const s = state([makeEnemy(foe('scaled-multihit', { hp: 20 }))]); const r = applyIntent(s, attack({ castCount: 2, castScale: .65 }), 1, 0); assert(r.hits.map((hit) => hit.dmg).join(',') === '7,7' && s.enemies[0].hp === 6, 'scaled verb cast repeats without doubling total power') }
+{ const s = state([makeEnemy(foe('scaled-guard'))]); const r = applyPreparation(s, attack({ base: 0, kind: 'guard', guard: 10, castCount: 2, castScale: .65 }), 1); assert(r.guardGain === 13, 'scaled verb cast repeats guard at the same disclosed total power') }
+{ const s = state([makeEnemy(foe('scaled-heal'))]); s.playerHp = 10; const r = applyIntent(s, attack({ base: 0, kind: 'heal', heal: 10, castCount: 2, castScale: .65 }), 1, 0); assert(r.heal === 13 && s.playerHp === 23, 'scaled verb cast repeats healing at the same disclosed total power') }
+{ const s = state([makeEnemy(foe('overdraw-fury', { hp: 30 }))]); const intent = withOverdrawEffects(attack({ overdrawHitCount: 1 }), 1); const r = applyIntent(s, intent, 1, 0); assert(r.hits.length === 2 && s.enemies[0].hp === 10, 'Ink overdraw unlocks the disclosed extra attack hit') }
+{ const intent = withOverdrawEffects(attack({ overdrawHitCount: 1 }), 0); assert(intent.hitCount === 1, 'overdraw attack reward stays dormant without health payment') }
 {
   const front = makeEnemy(foe('multihit-front', { hp: 15 }))
   const rear = makeEnemy(foe('multihit-rear', { hp: 10 }))
@@ -145,6 +150,12 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(playerGuardLimit(s.playerMax) === 30 && r.guardAttempted === 10 && r.guardGain === 2 && s.guard === 30, 'player guard is capped at max hp and reports the applied gain')
 }
 {
+  const s = state([makeEnemy(foe('weakened'))])
+  applyPreparation(s, attack({ enemyAttackDown: 3 }), 1)
+  const strikes = enemyTurn(s, () => 0, 'second')
+  assert(strikes[0]?.dealt === 1 && s.enemyAttackReduction === 0, 'enemy attack reduction applies once and is consumed')
+}
+{
   // 상한에 막혀 비축분이 0이어도 그 턴을 방어에 썼으므로 반격은 걸려 있어야 한다.
   const s = state([makeEnemy(foe('guard-cap-counter'))])
   s.guard = playerGuardLimit(s.playerMax)
@@ -152,6 +163,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(r.guardGain === 0 && r.counterMultiplier === 1.5 && s.counterMultiplier === 1.5, 'guard sentence still arms the counter at the guard cap')
 }
 { const card: Word = { id: 'counter', text: '', slot: 'verb', tags: [], emotion: 'sorrow', kind: 'guard', effects: { counterMultiplier: 1.5 }, note: '' }; reinforceWord(card); assert(card.effects?.counterMultiplier === 1.75, 'counter reinforce') }
+{ const card: Word = { id: 'cast', text: '', slot: 'adv', tags: [], emotion: 'anger', effects: { castCount: 2, castScale: .65 }, note: '' }; reinforceWord(card); assert(card.effects?.castScale === .7, 'repeat-cast reinforce') }
 { const card: Word = { id: 'scaled', text: '', slot: 'verb', tags: [], emotion: 'anger', stat: 'atk', statMult: 1, kind: 'attack', note: '' }; reinforceWord(card); assert(card.statMult === 1.15, 'stat-scaled verb reinforce') }
 { const s = state([makeEnemy(foe('delay', { hp: 20 }))]); applyIntent(s, attack({ timing: 'delayed', hitCount: 2, pierceGuard: true, emotions: ['anger'] }), 1, 0); const r = applyPendingAttack(s)!; assert(r.hits.length === 2 && s.enemies[0].hp === 0, 'delayed plan') }
 {

@@ -149,13 +149,13 @@ export function compile(
   const complete = order.length > 0 && order.every((k) => !!sel[k])
   const doubting = !!mods.doubt && complete
 
-  // base = object/verb 깡수치 합, bonusPool = subject/modifier/ending bonus 합.
+  // base = object/verb 깡수치 합, bonusPool = subject/ending bonus 합.
   let base = 0
   let statGuard = 0 // 방어 동사가 스탯에서 뽑아낸 수치
   let statHeal = 0 // 회복 동사가 스탯에서 뽑아낸 수치
   let bonusPool = 0
-  let critP = 0 // 수식 룰렛: 대성공 확률 합
-  let failP = 0 // 수식 룰렛: 실패 확률 합
+  let critP = 0 // 규칙 카드의 대성공 확률 합
+  let failP = 0 // 폐지된 실패 확률 합
   let statKey: Intent['statKey'] = null
   let kind: Intent['kind'] = 'attack'
   let damageKind: Intent['kind'] | null = null
@@ -202,7 +202,7 @@ export function compile(
     }
     critP += w.crit || 0
     failP += w.fail || 0
-    // 룰렛을 밀어 줄 스탯은 수식이 지정한다(단단히=방어, 힘껏=공격 …).
+    // 확장 수식어가 룰렛 기준 스탯을 지정할 수 있다. 일반 수식어는 전술 기능 전용이다.
     if (role === 'modifier' && w.stat) statKey = w.stat
 
     // 동사가 둘일 수 있다(맛동사). 뒤 동사가 앞 동사를 덮어쓰되, 피해를 내는
@@ -305,7 +305,12 @@ export function compile(
     evade: sumEffect('evade'),
     pierceGuard: order.some((key) => !!sel[key]?.effects?.pierceGuard),
     hitCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.hitCount ?? 1)),
+    castCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.castCount ?? 1)),
+    castScale: Math.min(1, ...order.map((key) => sel[key]?.effects?.castScale ?? 1)),
+    overdrawHitCount: Math.max(0, ...order.map((key) => sel[key]?.effects?.overdrawHitCount ?? 0)),
     counterMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.counterMultiplier ?? 0)),
+    enemyAttackDown: sumEffect('enemyAttackDown'),
+    drawCards: sumEffect('drawCards'),
     emotions,
     emotionResonance,
     tags: allTags,
@@ -320,6 +325,12 @@ export function compile(
     doubtCount: doubting ? 1 : 0,
     breakdown: { flats, mults },
   }
+}
+
+/** Activates the explicitly disclosed reward for paying health through Ink overdraw. */
+export function withOverdrawEffects(intent: Intent, healthPaid: number): Intent {
+  if (healthPaid <= 0 || intent.overdrawHitCount <= 0 || intent.base <= 0) return intent
+  return { ...intent, hitCount: intent.hitCount + intent.overdrawHitCount }
 }
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.

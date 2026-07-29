@@ -11,13 +11,21 @@
  *
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
  */
-import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf } from '@core/compiler'
+import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf, withOverdrawEffects } from '@core/compiler'
 import { conflictReason } from '@core/validator'
 import { modsFor } from '@core/passives'
 import { bumpGrade, decayGrade, overkillGain, startGrade } from '@core/grade'
 import type { Intent, Rarity, Selection, Word } from '@core/types'
 import type { PlayerState, PlayerStats } from '@core/player'
 import { applyItemReward, registerWord, startingPlayer } from '@core/run'
+import {
+  carryInkAfterSpend,
+  inkExceedsLimit,
+  inkOverdraw,
+  selectionCarryInk,
+  selectionInkCost,
+  sentenceInkAvailable,
+} from '@core/ink'
 import { makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { STORY_FLOORS, stageFor } from '@data/stages'
@@ -27,6 +35,7 @@ import {
   aliveIdx,
   allDead,
   applyIntent,
+  applyInkOverdraw,
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
@@ -60,6 +69,8 @@ interface Candidate {
   dmg: number
   guard: number
   heal: number
+  inkCost: number
+  overdraw: number
 }
 
 /** 보상 기량 — 세 장 중 무엇을 고르는가. */
@@ -99,7 +110,7 @@ function deckScore(player: PlayerState): number {
       const intent = compile(sel, t, player.stats, mods)
       if (!isDamageIntent(intent)) return
       const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
-      dmgs.push(effectiveBase(intent) * m)
+      dmgs.push(effectiveBase(intent) * m * intent.hitCount * intent.castCount * intent.castScale)
       return
     }
     for (const w of (t.words[order[i]] ?? []) as Word[]) {
@@ -210,16 +221,17 @@ function drawHands(
   rng: () => number,
   sealed: Set<string>,
   preferWide: boolean,
+  openingHandBonus = 0,
 ): { hands: Word[][]; tables: ReturnType<typeof makeEarlyTables> } {
   const t = tablesForEncounter(makeEarlyTables(player.deck, player), enemyId)
   const order = t.template.slots.map((s) => s.key)
-  const hands = order.map((key) => {
+  const hands = order.map((key, slotIndex) => {
     const pool = [...((t.words[key] ?? []) as Word[])]
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
       ;[pool[i], pool[j]] = [pool[j], pool[i]]
     }
-    const size = key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE
+    const size = (key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE) + (slotIndex === 0 ? openingHandBonus : 0)
     const hand = pool.slice(0, size)
     if (hand.every((w) => sealed.has(w.id))) {
       const replacement = pool.slice(size).find((w) => !sealed.has(w.id))
@@ -244,20 +256,26 @@ function enumerate(
   hands: Word[][],
   sealed: Set<string>,
   kills: number,
+  availableInk: number,
 ): Candidate[] {
   const order = tables.template.slots.map((s) => s.key)
   const mods = modsFor(player, kills)
   const out: Candidate[] = []
   const walk = (i: number, sel: Selection) => {
     if (i === order.length) {
-      const intent = compile(sel, tables, player.stats, mods)
+      const inkCost = selectionInkCost(sel)
+      if (inkExceedsLimit(inkCost, availableInk)) return
+      const overdraw = inkOverdraw(inkCost, availableInk)
+      const intent = withOverdrawEffects(compile(sel, tables, player.stats, mods), overdraw)
       const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
       out.push({
         sel,
         intent,
-        dmg: isDamageIntent(intent) ? Math.round(effectiveBase(intent) * m) : 0,
-        guard: Math.round(intent.guard * m),
-        heal: Math.round(intent.heal * m),
+        dmg: isDamageIntent(intent) ? Math.round(effectiveBase(intent) * m * intent.castScale) : 0,
+        guard: Math.round(intent.guard * m * intent.castCount * intent.castScale),
+        heal: Math.round(intent.heal * m * intent.castCount * intent.castScale),
+        inkCost,
+        overdraw,
       })
       return
     }
@@ -288,7 +306,17 @@ function railValue(c: Candidate, state: BattleState): number {
   }
   // 단일은 오버킬이 뒤로 이어지므로 레일 총 체력까지 인정한다.
   const railHp = alive.reduce((s, i) => s + hpOf(i), 0)
-  return Math.min(c.dmg * c.intent.hitCount, railHp)
+  return Math.min(c.dmg * c.intent.hitCount * c.intent.castCount, railHp)
+}
+
+function candidateValue(c: Candidate, state: BattleState): number {
+  return railValue(c, state)
+    + c.guard * 0.55
+    + c.heal * 0.7
+    + c.intent.enemyAttackDown * 2.5
+    + c.intent.drawCards * 2
+    + c.intent.counterMultiplier * 2
+    + selectionCarryInk(c.sel) * 1.5
 }
 
 interface StageResult {
@@ -328,6 +356,8 @@ function fightStage(
   const sealed = new Set<string>()
   let killsThisBattle = 0
   let turn = 0
+  let carriedInk = 0
+  let openingHandBonus = 0
 
   while (turn < MAX_TURNS_PER_STAGE && state.playerHp > 0 && !allDead(state)) {
     turn++
@@ -338,7 +368,8 @@ function fightStage(
 
     const escorts = summonCount(boss)
     const preferWide = !!boss.def.summonPattern && escorts > 0
-    const { hands, tables } = drawHands(player, stage.encounter[0], rng, sealed, preferWide)
+    const { hands, tables } = drawHands(player, stage.encounter[0], rng, sealed, preferWide, openingHandBonus)
+    openingHandBonus = 0
     if (web) {
       const slotKey = spiderSealSlotForTurn(tables.template.slots.map((s) => s.key), turn)
       const idx = tables.template.slots.findIndex((s) => s.key === slotKey)
@@ -349,9 +380,15 @@ function fightStage(
       }
     }
 
-    const hand = enumerate(player, tables, hands, sealed, killsThisBattle)
+    const availableInk = sentenceInkAvailable(carriedInk)
+    const hand = enumerate(player, tables, hands, sealed, killsThisBattle, availableInk)
     if (!hand.length) break
-    const rankedAttacks = [...hand].sort((a, b) => railValue(b, state) - railValue(a, state) || b.dmg - a.dmg)
+    const attackScore = (candidate: Candidate) => skill === 'average'
+      ? candidateValue(candidate, state)
+      : railValue(candidate, state)
+    const rankedAttacks = hand
+      .filter((candidate) => candidate.dmg > 0)
+      .sort((a, b) => attackScore(b) - attackScore(a) || b.dmg - a.dmg)
     // 평균 플레이는 손패의 상위 25% 안에서 자연스러운 문장을 고른다. 매번 전 조합의
     // 수학적 최댓값을 집는 모델은 실제 플레이어가 아니라 솔버라 완주율을 과대평가한다.
     const attackPool = skill === 'average' ? Math.max(1, Math.ceil(rankedAttacks.length * 0.25)) : 1
@@ -391,9 +428,24 @@ function fightStage(
       else if (weakAnswer) pick = weakAnswer
       else if (willBeHit && threat > state.guard + state.playerHp * 0.4 && bestGuard) pick = bestGuard
     }
+    // 평균 이상 플레이어는 카드에 공개된 체력 지불을 읽는다. 같은 역할의 무과금 문장이
+    // 75% 이상 효율이면 작은 수치 차이 때문에 매 턴 체력을 태우지 않는다.
+    if (skill !== 'greedy' && pick?.overdraw) {
+      const safe = hand
+        .filter((candidate) => candidate.overdraw === 0 && candidate.intent.kind === pick!.intent.kind)
+        .sort((a, b) => candidateValue(b, state) - candidateValue(a, state))[0]
+      if (safe && candidateValue(safe, state) >= candidateValue(pick, state) * 0.75) pick = safe
+    }
     if (!pick) break
 
-    const intent = compile(pick.sel, tables, player.stats, modsFor(player, killsThisBattle))
+    applyInkOverdraw(state, pick.inkCost, availableInk)
+    carriedInk = carryInkAfterSpend(pick.inkCost, availableInk, selectionCarryInk(pick.sel))
+    if (state.playerHp <= 0) break
+
+    const intent = withOverdrawEffects(
+      compile(pick.sel, tables, player.stats, modsFor(player, killsThisBattle)),
+      pick.overdraw,
+    )
     const resolved = resolveMultiplier(
       intent,
       { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) },
@@ -439,6 +491,7 @@ function fightStage(
         if (pending.killed.length) engageFront(state)
       }
     }
+    if (state.playerHp > 0 && !allDead(state)) openingHandBonus += intent.drawCards
     if (state.playerHp <= 0 || allDead(state)) break
     grade = decayGrade(grade, player.stats.luck)
   }
@@ -593,8 +646,10 @@ if (check) {
   const expert = byLabel.expert
   const violations: string[] = []
   if (metrics.some((metric) => metric.firstFloorDeaths > 0)) violations.push('초반 학습 구간인 1층에서 사망이 발생했다')
-  if (naive.reach5 / RUNS < 0.25) violations.push('무작위 보상 플레이의 5층 도달률이 25% 미만이다')
-  if (average.cleared / RUNS < 0.75) violations.push('평균 플레이의 15층 클리어율이 75% 미만이다')
+  // 수식어의 자동 배율을 없앤 뒤에는 공개 전술을 읽는 선택 자체가 성장 축이다.
+  // 무작위 플레이의 최소 생존선과 평균 플레이의 안정적 진전을 따로 보장한다.
+  if (naive.reach5 / RUNS < 0.05) violations.push('무작위 보상 플레이의 5층 도달률이 5% 미만이다')
+  if (average.cleared / RUNS < 0.65) violations.push('평균 플레이의 15층 클리어율이 65% 미만이다')
   if (average.cleared / RUNS > 0.95) violations.push('평균 플레이의 15층 클리어율이 95%를 넘어 난이도 곡선이 무의미하다')
   if (expert.cleared < average.cleared) violations.push('숙련 플레이가 평균 플레이보다 낮은 클리어율을 보인다')
   if (average.avgFloor - naive.avgFloor < 4) violations.push('선택 기량에 따른 평균 도달층 차이가 4층 미만이다')

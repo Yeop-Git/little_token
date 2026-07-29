@@ -27,8 +27,30 @@ const QUEEN_BEE_TACTIC: Word = {
   lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
 }
 
+const ELDER_SPIDER_TACTIC: Word = {
+  id: 'elderSpiderTactic',
+  text: '빈틈을 고쳐 찔렀다',
+  slot: 'verb',
+  tags: ['adapt', 'atk'],
+  emotion: 'neutral',
+  inkCost: 2,
+  stat: 'atk',
+  statMult: 1,
+  kind: 'attack',
+  targetCount: 1,
+  art: '3009',
+  rarity: 'common',
+  note: '공격 ×1 · 1명 · 현재 다리 약점 적용',
+  lore: '거미가 바꾼 문장을 읽고, 필요한 감정을 여백에 빌려 적었다.',
+}
+
 /** 덱에 범위 단어가 없어도 여왕벌의 일벌 퇴치가 운에 막히지 않게 해 주는 전투 한정 단어. */
 export function tablesForEncounter(tables: Tables, enemyId?: string): Tables {
+  if (enemyId === 'elderSpider') {
+    const verbs = tables.words.verb ?? []
+    if (verbs.some((word) => word.id === ELDER_SPIDER_TACTIC.id)) return tables
+    return { ...tables, words: { ...tables.words, verb: [...verbs, ELDER_SPIDER_TACTIC] } }
+  }
   if (enemyId !== 'queenBee') return tables
   const verbs = tables.words.verb ?? []
   if (verbs.some((word) => word.id === QUEEN_BEE_TACTIC.id)) return tables

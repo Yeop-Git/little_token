@@ -91,6 +91,13 @@ function optionalNumber(value: string | undefined, file: string, line: number, k
   return parsed
 }
 
+function optionalBoolean(value: string | undefined, file: string, line: number, key: string): boolean | undefined {
+  if (value == null || value.trim() === '') return undefined
+  if (value === '1' || value.toLowerCase() === 'true') return true
+  if (value === '0' || value.toLowerCase() === 'false') return false
+  throw new Error(`${file}:${line}: ${key} 값 '${value}'은 0/1 또는 true/false여야 합니다.`)
+}
+
 function requiredNumber(row: Row, key: string, file: string, line: number): number {
   return optionalNumber(required(row, key, file, line), file, line, key)!
 }
@@ -132,6 +139,13 @@ function compact<T extends Record<string, unknown>>(value: T): T {
 // 기존 CSV는 감정 열이 생기기 전부터 축적됐다. 현재 태그를 기준으로 한 번만
 // 안정적으로 분류해 모든 카드가 런타임에서는 단일 감정 속성을 갖게 한다.
 const wordRows = load('words.csv')
+const tacticRows = load('card_tactics.csv')
+const tactics = new Map(tacticRows.map((row, index) => {
+  const line = index + 2
+  const pool = poolOf(row, 'card_tactics.csv', line)
+  const id = required(row, 'id', 'card_tactics.csv', line)
+  return [`${pool}:${id}`, { row, line }] as const
+}))
 const ids = new Set<string>()
 const wordsByPool = emptyByPool<Record<string, unknown>>()
 
@@ -143,11 +157,25 @@ wordRows.forEach((row, index) => {
   if (ids.has(uniqueId)) throw new Error(`words.csv:${line}: ${uniqueId}가 중복되었습니다.`)
   ids.add(uniqueId)
 
+  const tactic = tactics.get(uniqueId)
+  const tacticRow = tactic?.row ?? {}
+  const tacticLine = tactic?.line ?? line
+
   const effects = compact({
-    guard: optionalNumber(row.guard, 'words.csv', line, 'guard'),
-    heal: optionalNumber(row.heal, 'words.csv', line, 'heal'),
+    guard: optionalNumber(tacticRow.guard ?? row.guard, tacticRow.guard ? 'card_tactics.csv' : 'words.csv', tacticLine, 'guard'),
+    heal: optionalNumber(tacticRow.heal ?? row.heal, tacticRow.heal ? 'card_tactics.csv' : 'words.csv', tacticLine, 'heal'),
     recoil: optionalNumber(row.recoil, 'words.csv', line, 'recoil'),
     evade: optionalNumber(row.evade, 'words.csv', line, 'evade'),
+    pierceGuard: optionalBoolean(tacticRow.pierce_guard, 'card_tactics.csv', tacticLine, 'pierce_guard'),
+    hitCount: optionalNumber(tacticRow.hit_count, 'card_tactics.csv', tacticLine, 'hit_count'),
+    castCount: optionalNumber(tacticRow.cast_count, 'card_tactics.csv', tacticLine, 'cast_count'),
+    castScale: optionalNumber(tacticRow.cast_scale, 'card_tactics.csv', tacticLine, 'cast_scale'),
+    overdrawHitCount: optionalNumber(tacticRow.overdraw_hit_count, 'card_tactics.csv', tacticLine, 'overdraw_hit_count'),
+    counterMultiplier: optionalNumber(tacticRow.counter_multiplier, 'card_tactics.csv', tacticLine, 'counter_multiplier'),
+    inkDiscount: optionalNumber(tacticRow.ink_discount, 'card_tactics.csv', tacticLine, 'ink_discount'),
+    carryInk: optionalNumber(tacticRow.carry_ink, 'card_tactics.csv', tacticLine, 'carry_ink'),
+    enemyAttackDown: optionalNumber(tacticRow.enemy_attack_down, 'card_tactics.csv', tacticLine, 'enemy_attack_down'),
+    drawCards: optionalNumber(tacticRow.draw_cards, 'card_tactics.csv', tacticLine, 'draw_cards'),
   })
   const variance = compact({
     p: optionalNumber(row.variance_p, 'words.csv', line, 'variance_p'),
@@ -160,12 +188,14 @@ wordRows.forEach((row, index) => {
   }
 
   const tags = row.tags ? row.tags.split('|').filter(Boolean) : []
+  if (optionalBoolean(tacticRow.preempt, 'card_tactics.csv', tacticLine, 'preempt')) tags.push('preempt')
   wordsByPool[pool].push(compact({
     id,
     text: required(row, 'text', 'words.csv', line),
     slot: required(row, 'slot', 'words.csv', line),
     tags,
     emotion: emotionFor(pool, id),
+    inkCost: optionalNumber(tacticRow.ink_cost ?? row.ink_cost, tactic ? 'card_tactics.csv' : 'words.csv', tacticLine, 'ink_cost'),
     power: optionalNumber(row.power, 'words.csv', line, 'power'),
     stat: statOf(row, 'words.csv', line),
     statMult: optionalNumber(row.stat_mult, 'words.csv', line, 'stat_mult'),
@@ -177,7 +207,10 @@ wordRows.forEach((row, index) => {
     kind: row.kind || undefined,
     timing: row.timing || undefined,
     targetMode: row.target_mode || undefined,
-    aoe: row.aoe || undefined,
+    aoe: tacticRow.aoe || row.aoe || undefined,
+    targetCount: tacticRow.target_count === 'all'
+      ? 'all'
+      : optionalNumber(tacticRow.target_count, 'card_tactics.csv', tacticLine, 'target_count'),
     rarity: row.rarity || undefined,
     art: row.art || undefined,
     note: required(row, 'note', 'words.csv', line),
@@ -186,6 +219,10 @@ wordRows.forEach((row, index) => {
     variance: varianceCount ? variance : undefined,
   }))
 })
+
+for (const key of tactics.keys()) {
+  if (!ids.has(key)) throw new Error(`card_tactics.csv: words.csv에 없는 카드 '${key}'입니다.`)
+}
 
 function groupWords(words: Record<string, unknown>[]): Record<string, Record<string, unknown>[]> {
   const grouped: Record<string, Record<string, unknown>[]> = {}

@@ -9,12 +9,33 @@ import type { StatBlock, TargetCount, Variance, Word } from './types'
 import { currentLocale } from '@/localization'
 
 const L = {
-  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', counter:'카운터', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발' },
-  en: { chance:'chance for multiplier', rest:'otherwise', mult:'Multiplier', crit:'Critical', power:'Power', guard:'Guard', heal:'Heal', hp:'Max HP', allHit:'Hits all enemies', next:'Activates next turn', self:'40% damage returns to self', preempt:'Acts before first-strike enemies', attack:' targets', unit:' targets', pierce:'Pierces guard', hits:' hits', counter:'Counter', all:'All', noMult:'Unaffected by multipliers', pool:'Multiplier pool', safe:'safe move', immediate:'Immediate' },
-  ja: { chance:'の確率で倍率', rest:'それ以外', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'回復', hp:'最大体力', allHit:'敵全体に命中', next:'次のターンに発動', self:'ダメージ40%が自分に戻る', preempt:'先攻の敵より先に行動', attack:'体を攻撃', unit:'体', pierce:'防御貫通', hits:'連打', counter:'カウンター', all:'全体', noMult:'倍率を受けない', pool:'倍率プール', safe:'安全な一手', immediate:'即時' },
-  ru: { chance:'шанс на множитель', rest:'иначе', mult:'Множитель', crit:'Критический успех', power:'Сила', guard:'Защита', heal:'Лечение', hp:'Макс. здоровье', allHit:'Попадает по всем врагам', next:'Сработает в следующий ход', self:'40% урона возвращается герою', preempt:'Действует раньше быстрых врагов', attack:' цели', unit:' цели', pierce:'Пробивает защиту', hits:' ударов', counter:'Контратака', all:'Все', noMult:'Не получает множитель', pool:'Пул множителя', safe:'надёжный ход', immediate:'Сразу' },
-  'zh-Hans': { chance:'概率获得倍率', rest:'其余', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'恢复', hp:'最大体力', allHit:'命中全部敌人', next:'下回合发动', self:'40%伤害反弹给自己', preempt:'先于先攻敌人行动', attack:'个目标', unit:'个目标', pierce:'贯穿防御', hits:'连击', counter:'反击', all:'全部', noMult:'不受倍率影响', pool:'倍率池', safe:'稳妥一手', immediate:'立即发动' },
-  'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', counter:'反擊', all:'全部', noMult:'不受倍率影響', pool:'倍率池', safe:'穩妥一手', immediate:'立即發動' },
+  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', carryInk:'다음 문장 잉크', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발' },
+  en: { chance:'chance for multiplier', rest:'otherwise', mult:'Multiplier', crit:'Critical', power:'Power', guard:'Guard', heal:'Heal', hp:'Max HP', allHit:'Hits all enemies', next:'Activates next turn', self:'40% damage returns to self', preempt:'Acts before first-strike enemies', adapt:'Uses current part weakness', attack:' targets', unit:' targets', pierce:'Pierces guard', hits:' hits', casts:' verb casts', each:'each', counter:'Counter', inkDiscount:'Sentence cost', carryInk:'Next sentence Ink', all:'All', noMult:'Unaffected by multipliers', pool:'Multiplier pool', safe:'safe move', immediate:'Immediate' },
+  ja: { chance:'の確率で倍率', rest:'それ以外', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'回復', hp:'最大体力', allHit:'敵全体に命中', next:'次のターンに発動', self:'ダメージ40%が自分に戻る', preempt:'先攻の敵より先に行動', adapt:'現在の部位弱点を適用', attack:'体を攻撃', unit:'体', pierce:'防御貫通', hits:'連打', casts:'回動詞発動', each:'各', counter:'カウンター', inkDiscount:'文のコスト', carryInk:'次の文のインク', all:'全体', noMult:'倍率を受けない', pool:'倍率プール', safe:'安全な一手', immediate:'即時' },
+  ru: { chance:'шанс на множитель', rest:'иначе', mult:'Множитель', crit:'Критический успех', power:'Сила', guard:'Защита', heal:'Лечение', hp:'Макс. здоровье', allHit:'Попадает по всем врагам', next:'Сработает в следующий ход', self:'40% урона возвращается герою', preempt:'Действует раньше быстрых врагов', adapt:'Использует слабость текущей части', attack:' цели', unit:' цели', pierce:'Пробивает защиту', hits:' ударов', casts:' срабатывания глагола', each:'каждый', counter:'Контратака', inkDiscount:'Стоимость фразы', carryInk:'Чернила следующей фразы', all:'Все', noMult:'Не получает множитель', pool:'Пул множителя', safe:'надёжный ход', immediate:'Сразу' },
+  'zh-Hans': { chance:'概率获得倍率', rest:'其余', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'恢复', hp:'最大体力', allHit:'命中全部敌人', next:'下回合发动', self:'40%伤害反弹给自己', preempt:'先于先攻敌人行动', adapt:'套用当前部位弱点', attack:'个目标', unit:'个目标', pierce:'贯穿防御', hits:'连击', casts:'次动词发动', each:'每次', counter:'反击', inkDiscount:'句子费用', carryInk:'下句墨水', all:'全部', noMult:'不受倍率影响', pool:'倍率池', safe:'稳妥一手', immediate:'立即发动' },
+  'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', adapt:'套用目前部位弱點', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', casts:'次動詞發動', each:'每次', counter:'反擊', inkDiscount:'句子費用', carryInk:'下句墨水', all:'全部', noMult:'不受倍率影響', pool:'倍率池', safe:'穩妥一手', immediate:'立即發動' },
+}[currentLocale]
+
+const EXTRA_EFFECT_LABEL = {
+  ko: { enemyAttackDown: '다음 적 공격', drawCards: '다음 첫 손패' },
+  en: { enemyAttackDown: 'Next enemy attack', drawCards: 'Next opening hand' },
+  ja: { enemyAttackDown: '次の敵攻撃', drawCards: '次の初期手札' },
+  ru: { enemyAttackDown: 'Следующая атака врага', drawCards: 'Следующая начальная рука' },
+  'zh-Hans': { enemyAttackDown: '下次敌方攻击', drawCards: '下句起始手牌' },
+  'zh-Hant': { enemyAttackDown: '下次敵方攻擊', drawCards: '下句起始手牌' },
+}[currentLocale]
+
+const OVERDRAW_HIT_LABEL = {
+  ko: '잉크 초과 시 공격',
+  en: 'Attack hits on Ink overdraw',
+  ja: 'インク超過時の攻撃',
+  ru: 'Удары атаки при перерасходе чернил',
+  'zh-Hans': '墨水超支时攻击',
+  'zh-Hant': '墨水超支時攻擊',
+}[currentLocale]
+const OVERDRAW_HIT_UNIT = {
+  ko: '타', en: ' hits', ja: 'ヒット', ru: ' удара', 'zh-Hans': '次', 'zh-Hant': '次',
 }[currentLocale]
 
 /**
@@ -77,11 +98,21 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.timing === 'delayed') out.push({ text: L.next, cls: '' })
   if (w.targetMode === 'both') out.push({ text: L.self, cls: 'self' })
   if (w.tags.includes(PREEMPT_TAG)) out.push({ text: L.preempt, cls: 'buff' })
+  if (w.tags.includes('adapt')) out.push({ text: L.adapt, cls: 'buff' })
   // 수치가 없는 카드(규칙 카드·차단 안내)는 카드에 적힌 문구를 그대로 쓴다.
   if ((w.kind === 'attack' || w.targetCount) && w.aoe !== 'all') out.push({ text: `${w.targetCount ?? 1}${L.attack}`, cls: 'dmg' })
   if (w.effects?.pierceGuard) out.push({ text: L.pierce, cls: 'dmg' })
   if (w.effects?.hitCount && w.effects.hitCount > 1) out.push({ text: `${w.effects.hitCount}${L.hits}`, cls: 'dmg' })
+  if (w.effects?.castCount && w.effects.castCount > 1) {
+    const scale = w.effects.castScale != null ? ` (${L.each} ${Math.round(w.effects.castScale * 100)}%)` : ''
+    out.push({ text: `${w.effects.castCount}${L.casts}${scale}`, cls: 'buff' })
+  }
+  if (w.effects?.overdrawHitCount) out.push({ text: `${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`, cls: 'dmg' })
   if (w.effects?.counterMultiplier) out.push({ text: `${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
+  if (w.effects?.inkDiscount) out.push({ text: `${L.inkDiscount} −${w.effects.inkDiscount}`, cls: 'buff' })
+  if (w.effects?.carryInk) out.push({ text: `${L.carryInk} +${w.effects.carryInk}`, cls: 'buff' })
+  if (w.effects?.enemyAttackDown) out.push({ text: `${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`, cls: 'buff' })
+  if (w.effects?.drawCards) out.push({ text: `${EXTRA_EFFECT_LABEL.drawCards} +${w.effects.drawCards}`, cls: 'buff' })
   if (!out.length) out.push({ text: wordNoteText(w), cls: 'flat' })
   return out
 }
@@ -128,7 +159,7 @@ function noteParts(w: Word): string[] {
   if (w.stat && w.statMult != null) out.push(`${STAT_NAME[w.stat]} ×${w.statMult}`)
   else if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.variance) out.push(gambleText(w.variance))
-  // 배율 풀에 보태는 칸(주어·수식·어미)은 0이어도 "배율 ×1.00"을 적는다.
+  // 배율 풀에 보태는 칸(주어·어미)은 0이어도 "배율 ×1.00"을 적는다.
   else if (w.bonus != null && w.statMult == null && !w.power) out.push(multText(w.bonus))
   else if (w.bonus) out.push(multText(w.bonus))
   if (w.effects?.guard) out.push(`${L.guard} +${w.effects.guard}`)
@@ -139,7 +170,18 @@ function noteParts(w: Word): string[] {
   if (w.targetCount && hits <= 1) out.push(targetCountText(w.targetCount))
   if (w.effects?.pierceGuard) out.push(currentLocale === 'ko' ? '관통' : L.pierce)
   if (hits > 1) out.push(`${hits}${L.hits}`)
+  if ((w.effects?.castCount ?? 1) > 1) {
+    const scale = w.effects?.castScale != null ? ` (${L.each} ${Math.round(w.effects.castScale * 100)}%)` : ''
+    out.push(`${w.effects!.castCount}${L.casts}${scale}`)
+  }
+  if (w.effects?.overdrawHitCount) out.push(`${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`)
   if (w.effects?.counterMultiplier) out.push(`${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`)
+  if (w.effects?.inkDiscount) out.push(`${L.inkDiscount} −${w.effects.inkDiscount}`)
+  if (w.effects?.carryInk) out.push(`${L.carryInk} +${w.effects.carryInk}`)
+  if (w.effects?.enemyAttackDown) out.push(`${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`)
+  if (w.effects?.drawCards) out.push(`${EXTRA_EFFECT_LABEL.drawCards} +${w.effects.drawCards}`)
+  if (w.tags.includes(PREEMPT_TAG)) out.push(L.preempt)
+  if (w.tags.includes('adapt')) out.push(L.adapt)
   if (w.aoe === 'all') out.push(w.slot === 'adv' && currentLocale === 'ko' ? '전체 적중' : w.slot === 'adv' ? L.allHit : L.all)
   if (w.timing === 'delayed') out.push(L.next)
   else if (w.timing === 'immediate') out.push(L.immediate)

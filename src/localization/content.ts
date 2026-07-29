@@ -19,7 +19,7 @@ const WORD_IDS = [
   'neo', 'geu', 'holo', 'joy', 'mad', 'slow', 'neolli', 'war', 'fir', 'sil', 'mem', 'bit',
   'jin', 'hoi', 'jum', 'mang', 'hui', 'e1', 'e2', 'e3', 'e4', 'pt_bang', 'pt_dot', 'pt_q', 'gr',
   'focusStrike', 'pierceStrike', 'spreadTwo', 'splitTwo', 'scatterThree', 'pourThree', 'doubleTap', 'flurry',
-  'counterOne', 'counterTwo', 'tearMend', 'riseAgain', 'queenBeeTactic',
+  'counterOne', 'counterTwo', 'tearMend', 'riseAgain', 'queenBeeTactic', 'elderSpiderTactic',
 ] as const
 
 function mapValues(values: readonly string[]): Record<string, string> {
@@ -37,7 +37,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'You', 'That child', 'alone', 'quietly', 'madly', 'slowly', 'far and wide', 'the battle', 'the flame', 'the silence', 'the memory', 'the rain',
     'advanced', 'evaded', 'ignited', 'forgot', 'swept away', 'did it', 'tried to do it', 'did I do it?', 'ended up doing it!', '!', '.', '?', 'growing',
     'focused and struck', 'pierced through', 'spread it', 'split it', 'scattered it', 'poured it out', 'tapped twice', 'unleashed a flurry',
-    'gave it back', 'held firm', 'swallowed my tears', 'rose with gritted teeth', 'spread it',
+    'gave it back', 'held firm', 'swallowed my tears', 'rose with gritted teeth', 'spread it', 'corrected the opening and struck',
   ]),
   ja: mapValues([
     'ぼくは', '昨日のぼくは', 'ぼくも', '今日のぼくは', '歯を食いしばったぼくは', '奮い立つぼくは', '傷ついたぼくは', 'ぼくたちは', '明るく笑うぼくは', 'あたたかなぼくたちは',
@@ -48,7 +48,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'きみは', 'あの子は', 'ひとりで', '静かに', '狂ったように', 'ゆっくり', '広く', '戦い', '炎', '沈黙', '記憶', '雨',
     '進めた', 'かわした', '灯した', '忘れた', 'なぎ払った', 'した', 'しようとした', 'したっけ？', 'してしまった！', '！', '。', '？', 'すくすく',
     '狙いすまして打った', '貫いた', '広げた', '切り裂いた', 'まき散らした', '浴びせた', '二度たたいた', '乱打した',
-    '返した', '耐え抜いた', '涙を飲みこんだ', '歯を食いしばって立った', '広げた',
+    '返した', '耐え抜いた', '涙を飲みこんだ', '歯を食いしばって立った', '広げた', '隙を書き直して突いた',
   ]),
   ru: mapValues([
     'Я', 'Вчера я', 'Я тоже', 'Сегодня я', 'Стиснув зубы, я', 'Встав во весь рост, я', 'Раненый, я', 'Мы', 'Сияя улыбкой, я', 'Согретые теплом, мы',
@@ -59,7 +59,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'Ты', 'Тот ребёнок', 'в одиночку', 'тихо', 'безумно', 'медленно', 'широко', 'битву', 'пламя', 'тишину', 'память', 'дождь',
     'продолжил', 'уклонился', 'зажёг', 'забыл', 'смёл', 'сделал это', 'попытался сделать', 'я сделал это?', 'всё-таки сделал!', '!', '.', '?', 'всё выше',
     'прицельно ударил', 'пронзил', 'распространил', 'рассёк', 'рассеял', 'обрушил', 'ударил дважды', 'нанёс град ударов',
-    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал, стиснув зубы', 'распространил',
+    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал, стиснув зубы', 'распространил', 'исправил брешь и ударил',
   ]),
   'zh-Hans': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬紧牙关的我', '挺身而出的我', '受伤的我', '我们', '灿烂笑着的我', '温暖的我们',
@@ -70,7 +70,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那个孩子', '独自', '安静地', '疯狂地', '慢慢地', '广泛地', '战斗', '火焰', '沉默', '记忆', '雨水',
     '推进了', '回避了', '点燃了', '忘却了', '横扫了', '做了', '本想去做', '做过吗？', '终究还是做了！', '！', '。', '？', '茁壮成长',
     '瞄准重击了', '钻了进去', '扩散开了', '劈开了', '挥洒开了', '倾泻而出了', '敲了两下', '连续猛击了',
-    '还了回去', '坚持住了', '咽下了眼泪', '咬紧牙关站了起来', '扩散开了',
+    '还了回去', '坚持住了', '咽下了眼泪', '咬紧牙关站了起来', '扩散开了', '改写破绽后刺了过去',
   ]),
   'zh-Hant': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬緊牙關的我', '挺身而出的我', '受傷的我', '我們', '燦爛笑著的我', '溫暖的我們',
@@ -81,17 +81,17 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那個孩子', '獨自', '安靜地', '瘋狂地', '慢慢地', '廣泛地', '戰鬥', '火焰', '沉默', '記憶', '雨水',
     '推進了', '迴避了', '點燃了', '忘卻了', '橫掃了', '做了', '本想去做', '做過嗎？', '終究還是做了！', '！', '。', '？', '茁壯成長',
     '瞄準重擊了', '鑽了進去', '擴散開了', '劈開了', '揮灑開了', '傾瀉而出了', '敲了兩下', '連續猛擊了',
-    '還了回去', '堅持住了', '嚥下了眼淚', '咬緊牙關站了起來', '擴散開了',
+    '還了回去', '堅持住了', '嚥下了眼淚', '咬緊牙關站了起來', '擴散開了', '改寫破綻後刺了過去',
   ]),
 }
 
-const COMBO_IDS = [...Array.from({ length: 28 }, (_, i) => `ec${i + 1}`), ...Array.from({ length: 6 }, (_, i) => `c${i + 1}`)]
+const COMBO_IDS = [...Array.from({ length: 31 }, (_, i) => `ec${i + 1}`), ...Array.from({ length: 6 }, (_, i) => `c${i + 1}`)]
 const COMBO_NAMES: Record<ForeignLocale, string[]> = {
-  en: ['Head-on Charge','Iron Wall','Together','Standing Alone','Today’s Resolve','Pain’s Price','Echo','Leave Yesterday Behind','A Careful Touch','One Step Through Grit','Unstoppable','Gritted Teeth','Drying Tears','Turn and Sway','Joyful Flame','Rise Again','Warm Embrace','In a Blink','Frenzied Blow','No Way Back','Bright Mending','Welcome Touch','Mending with a Smile','Angry Blow','Lonely Shield','Struggling Up','Dancing Attack','Lively Recovery','Lone Warrior','Flame Frenzy','Perfect Silence','Rite of Forgetting','Mutual Ruin','Monsoon Rain'],
-  ja: ['正面突破','鉄壁','一緒なら','ひとり立ち','今日の決意','傷の代価','こだま','昨日を忘れて','慎重な手当て','歯を食いしばる一歩','ためらいなく','歯を食いしばって','涙をぬぐって','くるりと回って','弾む炎','もう一度立つ','あたたかな手','あっという間','狂乱の一撃','退路なし','明るい修繕','うれしい手当て','笑顔で直す','怒りの一撃','寂しい盾','懸命に立つ','弾む攻撃','軽やかな回復','孤独な戦士','炎の狂乱','完全な静寂','忘却の儀式','共倒れ','梅雨の雨'],
-  ru: ['Лобовая атака','Железная стена','Вместе','Стоять одному','Сегодняшняя клятва','Цена раны','Эхо','Оставить вчера позади','Осторожное прикосновение','Шаг сквозь боль','Без удержу','Стиснув зубы','Вытереть слёзы','Кружась','Весёлое пламя','Подняться снова','Тёплые руки','В мгновение ока','Безумный удар','Некуда отступать','Светлая починка','Желанная помощь','Исправить с улыбкой','Яростный удар','Одинокий щит','Подняться через силу','Ритмичная атака','Лёгкое исцеление','Одинокий воин','Огненное безумие','Полная тишина','Обряд забвения','Общая гибель','Сезонный ливень'],
-  'zh-Hans': ['正面突破','铁壁','只要在一起','独自站立','今天的决心','伤痛的代价','回声','忘掉往事','小心的触碰','咬牙迈步','势不可挡','咬紧牙关','擦干眼泪','旋身躲闪','欢快火焰','重新站起','温暖的手','转瞬之间','狂乱一击','无路可退','明亮修补','欣喜之手','笑着修好','愤怒一击','孤独之盾','努力站起','跃动攻击','轻快恢复','孤独战士','烈焰狂乱','绝对寂静','忘却仪式','同归于尽','梅雨'],
-  'zh-Hant': ['正面突破','鐵壁','只要在一起','獨自站立','今天的決心','傷痛的代價','回聲','忘掉往事','小心的觸碰','咬牙邁步','勢不可擋','咬緊牙關','擦乾眼淚','旋身躲閃','歡快火焰','重新站起','溫暖的手','轉瞬之間','狂亂一擊','無路可退','明亮修補','欣喜之手','笑著修好','憤怒一擊','孤獨之盾','努力站起','躍動攻擊','輕快恢復','孤獨戰士','烈焰狂亂','絕對寂靜','忘卻儀式','同歸於盡','梅雨'],
+  en: ['Head-on Charge','Iron Wall','Together','Standing Alone','Today’s Resolve','Pain’s Price','Echo','Leave Yesterday Behind','A Careful Touch','One Step Through Grit','Unstoppable','Gritted Teeth','Drying Tears','Turn and Sway','Joyful Flame','Rise Again','Warm Embrace','In a Blink','Frenzied Blow','No Way Back','Bright Mending','Welcome Touch','Mending with a Smile','Angry Blow','Lonely Shield','Struggling Up','Dancing Attack','Lively Recovery','Shine and Spread','Joyful Barrage','Mischief Wave','Lone Warrior','Flame Frenzy','Perfect Silence','Rite of Forgetting','Mutual Ruin','Monsoon Rain'],
+  ja: ['正面突破','鉄壁','一緒なら','ひとり立ち','今日の決意','傷の代価','こだま','昨日を忘れて','慎重な手当て','歯を食いしばる一歩','ためらいなく','歯を食いしばって','涙をぬぐって','くるりと回って','弾む炎','もう一度立つ','あたたかな手','あっという間','狂乱の一撃','退路なし','明るい修繕','うれしい手当て','笑顔で直す','怒りの一撃','寂しい盾','懸命に立つ','弾む攻撃','軽やかな回復','明るく広がれ','楽しい連打','いたずらの波','孤独な戦士','炎の狂乱','完全な静寂','忘却の儀式','共倒れ','梅雨の雨'],
+  ru: ['Лобовая атака','Железная стена','Вместе','Стоять одному','Сегодняшняя клятва','Цена раны','Эхо','Оставить вчера позади','Осторожное прикосновение','Шаг сквозь боль','Без удержу','Стиснув зубы','Вытереть слёзы','Кружась','Весёлое пламя','Подняться снова','Тёплые руки','В мгновение ока','Безумный удар','Некуда отступать','Светлая починка','Желанная помощь','Исправить с улыбкой','Яростный удар','Одинокий щит','Подняться через силу','Ритмичная атака','Лёгкое исцеление','Сияние вширь','Весёлая очередь','Озорная волна','Одинокий воин','Огненное безумие','Полная тишина','Обряд забвения','Общая гибель','Сезонный ливень'],
+  'zh-Hans': ['正面突破','铁壁','只要在一起','独自站立','今天的决心','伤痛的代价','回声','忘掉往事','小心的触碰','咬牙迈步','势不可挡','咬紧牙关','擦干眼泪','旋身躲闪','欢快火焰','重新站起','温暖的手','转瞬之间','狂乱一击','无路可退','明亮修补','欣喜之手','笑着修好','愤怒一击','孤独之盾','努力站起','跃动攻击','轻快恢复','明亮扩散','快乐连击','顽皮浪潮','孤独战士','烈焰狂乱','绝对寂静','忘却仪式','同归于尽','梅雨'],
+  'zh-Hant': ['正面突破','鐵壁','只要在一起','獨自站立','今天的決心','傷痛的代價','回聲','忘掉往事','小心的觸碰','咬牙邁步','勢不可擋','咬緊牙關','擦乾眼淚','旋身躲閃','歡快火焰','重新站起','溫暖的手','轉瞬之間','狂亂一擊','無路可退','明亮修補','欣喜之手','笑著修好','憤怒一擊','孤獨之盾','努力站起','躍動攻擊','輕快恢復','明亮擴散','快樂連擊','頑皮浪潮','孤獨戰士','烈焰狂亂','絕對寂靜','忘卻儀式','同歸於盡','梅雨'],
 }
 
 const ITEM_IDS = ['ribbon','candle','emptyShell','lostMap','starLantern','oilLantern','oldCompass','gardenSpray','storyBrush','paperShield','stargazerScope','blueInkwell','yesterdayHourglass','forestRemedy','keepersSatchel','echoChime','tastyVerb','snowShoe','matchCloak','pinoDoubt','olymCarrot','goldenApple','beautyMirror','redMatch','pigBbq','beanSprout']

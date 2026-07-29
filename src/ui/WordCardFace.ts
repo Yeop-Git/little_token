@@ -5,7 +5,8 @@
  * 설명서에 그려지는 카드가 전투에서 집는 카드와 한 글자도 다르지 않게 한다.
  */
 
-import { SKILL_ART } from '@/assets'
+import { INK_UI, SKILL_ART } from '@/assets'
+import { currentLocale, type LocaleCode } from '@/localization'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, type Word } from '@core/types'
@@ -46,14 +47,52 @@ export function wordArtGlyph(word: Word): string {
 }
 
 /** 동사는 카드 문구를 읽기 전에도 공격·방어·회복 역할을 알아볼 수 있게 한다. */
-export function wordActionBadge(word: Word): string {
-  if (word.slot !== 'verb' && word.slot !== 'verb2') return ''
-  const action = word.kind === 'heal' || word.effects?.heal
-    ? { cls: 'heal', label: '회복', glyph: 'cross' }
+const ACTION_LABELS: Record<LocaleCode, Record<'attack' | 'guard' | 'heal', string>> = {
+  ko: { attack: '공격', guard: '방어', heal: '회복' },
+  en: { attack: 'Attack', guard: 'Guard', heal: 'Heal' },
+  ja: { attack: '攻撃', guard: '防御', heal: '回復' },
+  ru: { attack: 'Атака', guard: 'Защита', heal: 'Лечение' },
+  'zh-Hans': { attack: '攻击', guard: '防御', heal: '恢复' },
+  'zh-Hant': { attack: '攻擊', guard: '防禦', heal: '恢復' },
+}
+
+type CardActionKind = 'attack' | 'guard' | 'heal'
+
+function wordActionKind(word: Word): CardActionKind | null {
+  if (word.slot !== 'verb' && word.slot !== 'verb2') return null
+  return word.kind === 'heal' || word.effects?.heal
+    ? 'heal'
     : word.kind === 'guard' || word.effects?.guard
-      ? { cls: 'guard', label: '방어', glyph: 'shield' }
-      : { cls: 'attack', label: '공격', glyph: 'sword' }
-  return `<span class="card-action action-${action.cls}" title="${action.label}" aria-hidden="true">${icon(action.glyph)}</span>`
+      ? 'guard'
+      : 'attack'
+}
+
+function actionGlyph(kind: CardActionKind): 'sword' | 'shield' | 'cross' {
+  return kind === 'heal' ? 'cross' : kind === 'guard' ? 'shield' : 'sword'
+}
+
+export function wordCardDisplayNote(word: Word, note = wordNoteText(word)): string {
+  const actionKind = wordActionKind(word)
+  if (!actionKind) return note
+  const label = ACTION_LABELS[currentLocale][actionKind]
+  const parts = note.split(' · ')
+  const first = parts[0]?.trim()
+  if (!first?.startsWith(label)) return note
+  const compact = first.slice(label.length).trim().replace(/^\+\s*/, '')
+  return [compact, ...parts.slice(1)].filter(Boolean).join(' · ')
+}
+
+export function wordActionInline(word: Word): string {
+  const actionKind = wordActionKind(word)
+  if (!actionKind) return ''
+  const label = ACTION_LABELS[currentLocale][actionKind]
+  return `<span class="card-action-inline action-${actionKind}">${icon(actionGlyph(actionKind))}<b>${label}</b></span>`
+}
+
+function wordCardNoteHtml(word: Word, note: string): string {
+  const action = wordActionInline(word)
+  const displayNote = wordCardDisplayNote(word, note)
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}<span class="card-note-text">${displayNote}</span></span>`
 }
 
 export interface WordCardFaceOpts {
@@ -76,12 +115,14 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false, hideEmotion = false } = opts
   const artUrl = opts.artUrl ?? (word.art ? SKILL_ART[word.art] : undefined)
   const emotion = emotionOrNeutral(word.emotion)
+  const inkCost = wordInkCost(word)
+  const inkCostStyle = `style="--ink-cost-badge-image:url('${INK_UI.costBadge}')"`
   const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
-  const costBadge = hideMeta ? '' : `<span class="card-cost" title="잉크 비용" aria-label="잉크 ${wordInkCost(word)}">${wordInkCost(word)}</span>`
+  const costBadge = hideMeta ? '' : `<span class="card-cost" ${inkCostStyle} title="잉크 비용" aria-label="잉크 ${inkCost}">${inkCost}</span>`
   const resourceBadge = hideMeta
     ? ''
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
-  const badges = `${resourceBadge}${wordActionBadge(word)}`
+  const badges = resourceBadge
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
@@ -90,7 +131,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
           <span class="card-foil" aria-hidden="true"></span>
           ${badges}
           <strong class="card-title" ${cardTitleStyle(word.text, true)}>${word.text}</strong>
-          <span class="card-note">${note}</span>
+          ${wordCardNoteHtml(word, note)}
           ${overlay}
         </span>`
   }
@@ -99,7 +140,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
           ${badges}
           <span class="card-art" aria-hidden="true"><i></i><b>${wordArtGlyph(word)}</b></span>
           <strong class="card-title" ${cardTitleStyle(word.text)}>${word.text}</strong>
-          <span class="card-note">${note}</span>
+          ${wordCardNoteHtml(word, note)}
           <small>${footer}</small>
           ${overlay}
         </span>`

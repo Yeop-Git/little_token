@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "scripts": {
@@ -22,10 +22,11 @@
     "check": "npm run data:generate && tsx src/tools/check-tables.ts",
     "effects:check": "npm run data:generate && tsx src/tools/combat-effects-check.ts",
     "core:check": "npm run data:generate && tsx src/tools/core-contract-check.ts",
-    "balance:check": "npm run data:generate && tsx src/tools/run-sim.ts --runs=8 --check",
+    "emotion:check": "npm run data:generate && tsx src/tools/emotion-balance-check.ts",
+    "balance:check": "npm run data:generate && tsx src/tools/run-sim.ts --runs=24 --check",
     "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts",
     "run:sim": "npm run data:generate && tsx src/tools/run-sim.ts",
-    "test": "npm run type-check && npm run sweep && npm run check && npm run locale:check && npm run effects:check && npm run core:check && npm run boss:sim && npm run balance:check"
+    "test": "npm run type-check && npm run sweep && npm run check && npm run locale:check && npm run effects:check && npm run core:check && npm run emotion:check && npm run boss:sim && npm run balance:check"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",

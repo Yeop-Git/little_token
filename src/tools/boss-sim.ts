@@ -119,9 +119,9 @@ function candidates(
       out.push({
         sel,
         intent,
-        dmg: isDamageIntent(intent) ? Math.round(effectiveBase(intent) * m) : 0,
-        guard: Math.round(intent.guard * m),
-        heal: Math.round(intent.heal * m),
+        dmg: isDamageIntent(intent) ? Math.round(effectiveBase(intent) * m * intent.castScale) : 0,
+        guard: Math.round(intent.guard * m * intent.castCount * intent.castScale),
+        heal: Math.round(intent.heal * m * intent.castCount * intent.castScale),
       })
       return
     }
