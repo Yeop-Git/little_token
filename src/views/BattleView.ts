@@ -19,6 +19,8 @@ import {
   type ResolvedMult,
 } from '@core/compiler'
 import { wordNoteText, wordValueLines } from '@core/wordText'
+import { inkOverdraw, selectionInkCost, SENTENCE_INK, wordInkCost } from '@core/ink'
+import { eul } from '@core/josa'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
@@ -32,6 +34,7 @@ import {
   allDead,
   aliveIdx,
   applyIntent,
+  applyInkOverdraw,
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
@@ -51,10 +54,12 @@ import {
   spiderWebTension,
   summonAtTurnStart,
   summonCount,
+  type ApplyResult,
   type TurnSummon,
   type BattleState,
   type EnemyInst,
 } from '@/sim/reference'
+import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
 import { REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
@@ -62,12 +67,14 @@ import { TooltipLayer } from '@/ui/TooltipLayer'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
+import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CARD_HAND_CONFIG, CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { GameAudio } from '@/audio/GameAudio'
+import { inkMeterHtml, updateInkMeter } from '@/ui/InkMeter'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_MULT, PUMP_RATIO, type AttackCut } from '@/ui/AttackCinematic'
 import {
@@ -77,6 +84,9 @@ import {
   type FieldBackground,
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
+import { currentLocale, t } from '@/localization'
+import { bossTokenLine, type TokenLine } from '@/localization/bossToken'
+import { enemySentenceText as bossText } from '@/localization/enemySentences'
 import {
   characterAnimationOf,
   destroyCharacterModels,
@@ -91,10 +101,18 @@ import {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+const hudTip = (key: string, korean: string, values: Record<string, string | number> = {}): string => {
+  let text = t(key, korean)
+  for (const [name, value] of Object.entries(values)) text = text.split(`{${name}}`).join(String(value))
+  return text
+}
+
 interface Opts {
   field: FieldDef
   encounter: string[]
-  /** 전투가 끝난 시점의 보상등급을 들고 나간다 — 보상 희귀도 확률에 쓰인다. */
+  /** 런 전체에서 보유 중인 영감. 전투 HUD에서는 이번 전투 획득 예정치와 분리해 보여 준다. */
+  inspiration?: number
+  /** 전투가 끝난 시점의 영감 획득량을 들고 나간다 — 런 재화와 보상 희귀도 확률에 함께 쓰인다. */
   onWin: (grade: number, resources: { hp: number; guard: number }) => void
   onLose: (cause: DefeatCause | null) => void
   /** 런 내내 누적되는 기록. 결과 화면의 찢어진 종이가 이걸 읽는다. */
@@ -186,11 +204,22 @@ const SLASH_BEAM_MS = 120
  */
 const HEAVY_MULT_CEILING = 8
 const TOKEN_BOSS_LINES = [
-  '어떡하지...! 도와줘, 프롬!!',
-  '프롬, 저 녀석 너무 커...!',
-  '으으... 그래도 물러나면 안 돼!',
-  '조심해! 뭔가 오고 있어!',
+  bossTokenLine('idleConcern'),
+  bossTokenLine('idleHuge'),
+  bossTokenLine('idleStand'),
+  bossTokenLine('idleIncoming'),
 ] as const
+const TOKEN_COACH_LINES: Record<CombatCoachHint, TokenLine> = {
+  subject: bossTokenLine('coachSubject'),
+  modifier: bossTokenLine('coachModifier'),
+  verb: bossTokenLine('coachVerb'),
+  resonance: bossTokenLine('coachResonance', 'relief'),
+  context: bossTokenLine('coachContext', 'relief'),
+  'ink-low': bossTokenLine('coachInkLow'),
+  'ink-overdraw': bossTokenLine('coachInkOverdraw', 'warn'),
+  'enemy-first': bossTokenLine('coachEnemyFirst', 'warn'),
+  overflow: bossTokenLine('coachOverflow', 'relief'),
+}
 /**
  * 토큰의 말투 세기. 보스 패턴 경고와 파훼 방법은 전부 토큰의 말풍선으로 나가고,
  * 지금 놓치면 아픈 것만 `warn`으로 올려 빨간 색연필 쪽지가 된다.
@@ -205,27 +234,23 @@ const TOKEN_BOSS_LINES = [
  */
 const tip = (title: string, detail: string): string => `${title}\n${detail}`
 
-export type TokenTone = 'calm' | 'warn' | 'relief'
-export interface TokenLine { text: string; tone: TokenTone }
-const say = (text: string, tone: TokenTone = 'calm'): TokenLine => ({ text, tone })
-
 const TOKEN_BOSS_HINTS = {
-  mantisStart: say('기본공격 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!'),
-  mantisTelegraph: say('큰낫이 올라갔어! 다음 문장은 방어야! 표시된 수치만큼 반드시 방어해!!', 'warn'),
-  mantisGroggy: say('실드는 깨졌지만 강공격은 취소야! 사마귀가 그로기에 빠져서 다음 공격을 한 턴 걸러!!', 'relief'),
-  mantisPunished: say('못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!', 'warn'),
-  queenBeeStart: say('여왕벌 본체는 지금 공격이 안 통해! 먼저 앞을 막은 일벌부터 쓰러뜨리자!!'),
-  queenBeeDispersed: say('좋아, 프롬! 일벌이 쓰러졌어!!', 'relief'),
-  elderSpiderMiss: say('약점이 아니면 그 다리에서 막혀! 지금 약점을 노려 봐!!', 'warn'),
-  elderSpiderWebReady: say('거미줄이 다 조여들었어! 이번엔 꼭 약점을 노리자!!', 'warn'),
-  elderSpiderWebCut: say('맞았어, 프롬! 거미줄이 느슨해지고 있어!!', 'relief'),
+  mantisStart: bossTokenLine('mantisStart'),
+  mantisTelegraph: bossTokenLine('mantisTelegraph', 'warn'),
+  mantisGroggy: bossTokenLine('mantisGroggy', 'relief'),
+  mantisPunished: bossTokenLine('mantisPunished', 'warn'),
+  queenBeeStart: bossTokenLine('queenBeeStart'),
+  queenBeeDispersed: bossTokenLine('queenBeeDispersed', 'relief'),
+  elderSpiderMiss: bossTokenLine('elderSpiderMiss', 'warn'),
+  elderSpiderWebReady: bossTokenLine('elderSpiderWebReady', 'warn'),
+  elderSpiderWebCut: bossTokenLine('elderSpiderWebCut', 'relief'),
 } as const
 
 /** 다리가 떨어질 때마다 다음 약점을 이름으로 알려 준다 — 이 보스의 유일한 공략이다. */
 const spiderNextWeaknessLine = (weakness: string | null): TokenLine =>
   weakness
-    ? say(`다리가 떨어졌어! 이번엔 「${weakness}」 감정이 약점이야!!`, 'relief')
-    : say('다리를 전부 끊었어! 이제 본체야 — 약점은 없어, 힘껏 밀어붙이자!!', 'relief')
+    ? bossTokenLine('spiderNextWeakness', 'relief', { weakness })
+    : bossTokenLine('spiderBody', 'relief')
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
   'target',
@@ -273,8 +298,9 @@ export class BattleView {
   private isBoss = false
   private playerVisual: CharacterVisualDef
   private modeLabel = ''
-  // 보상등급 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
+  // 획득 예정 영감 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
+  private inspiration = 0
   private player: PlayerState
   private state: BattleState
   /**
@@ -345,6 +371,10 @@ export class BattleView {
   private tokenSpeechHideTimer = 0
   private bossPatternSolved = false
   private bossPatternHint: TokenLine | null = null
+  /** 보스 문장은 전투 상태에서 다시 만들고, 방금 일어난 사건 한 줄만 짧게 덧쓴다. */
+  private bossSentenceEvent: string | null = null
+  private bossSentenceEventTimer = 0
+  private bossSentenceSignature = ''
   /** 지금 화면에 붙잡아 둔 핵심 경고가 있는가. 한가한 응원이 이걸 덮지 못하게 한다. */
   private tokenHolding = false
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
@@ -366,6 +396,7 @@ export class BattleView {
       ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI, companion: undefined }
       : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
+    this.inspiration = Math.max(0, Math.floor(opts.inspiration ?? 0))
     this.t = tablesForEncounter(opts.tables ?? TABLES, opts.encounter[0])
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -566,6 +597,15 @@ export class BattleView {
   private onEnemiesArrived() {
     if (this.spiderCastReady) return
     this.spiderCastReady = true
+    this.cardHand.setInputEnabled(true)
+    if (!this.isBoss) {
+      this.timers.push(window.setTimeout(() => {
+        const front = this.state.enemies[frontIdx(this.state)]
+        if (!this.showCombatCoach('subject') && front?.initiativePhase === 'first') {
+          this.showCombatCoach('enemy-first')
+        }
+      }, 480))
+    }
     const pending = this.pendingSpiderSeal
     if (!pending) return
     const current = this.order()[this.slotIndex]
@@ -590,10 +630,17 @@ export class BattleView {
         <div class="hud-top">
           <div class="hud-left-stack">
             <div class="hud-left-status" aria-label="전투 상태">
-              <div class="grade-badge glass" id="grade-badge" title="보상등급 — 오래 끌면 내려가고, 한 턴에 쓸어담으면 오른다"><span>보상</span><b id="grade"></b></div>
+              <div class="inspiration-wallet glass" role="img" tabindex="0" aria-label="보유 영감 ${this.inspiration}" data-tooltip="${hudTip('hudInspirationTip', `보유 영감 ${this.inspiration}\n전투에서 모아 보상 카드를 구입하거나 보상 목록을 새로 고칠 때 사용한다.`, { value: this.inspiration })}">
+                <span class="inspiration-mark" aria-hidden="true">◈</span>
+                <span class="inspiration-wallet-copy"><small>보유 영감</small><b>${this.inspiration}</b></span>
+              </div>
+              <div class="grade-badge glass" id="grade-badge" role="img" tabindex="0">
+                <span class="clear-reward-mark" aria-hidden="true">◈</span>
+                <span class="clear-reward-copy"><small>클리어 보상</small><b id="grade"></b></span>
+              </div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
-            <aside class="action-order" aria-label="이번 문장 행동 순서">
+            <aside class="action-order" tabindex="0" aria-label="이번 문장 행동 순서" data-tooltip="${hudTip('hudActionOrderTip', '행동 순서\n누가 먼저 행동하고, 문장 뒤에 누가 행동하며, 누가 레일에서 기다리는지 보여 준다.')}">
               <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
               <ol id="action-order-list"></ol>
             </aside>
@@ -602,9 +649,9 @@ export class BattleView {
           <div class="hud-status">
             <div class="hud-status-bar">
               <div class="hud-actions glass" aria-label="시스템 메뉴">
-                <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
-                <button id="codex-btn" type="button" title="도감" aria-label="그림일기 도감">${icon('collection')}</button>
-                <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
+                <button id="settings-btn" type="button" aria-label="설정" data-tooltip="${hudTip('hudSettingsTip', '설정\n그래픽, 소리, 언어와 플레이 기록을 조정한다.')}">${icon('settings')}</button>
+                <button id="codex-btn" type="button" aria-label="그림일기 도감" data-tooltip="${hudTip('hudCodexTip', '그림일기 도감\n단어, 카드, 만난 벌레와 획득한 아이템을 살펴본다.')}">${icon('collection')}</button>
+                <button id="home-btn" type="button" aria-label="홈으로" data-tooltip="${hudTip('hudHomeTip', '홈\n전투를 나가 타이틀 화면으로 돌아간다.')}">${icon('home')}</button>
               </div>
             </div>
             <div class="effect-log" id="log"></div>
@@ -615,6 +662,7 @@ export class BattleView {
           ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? this.bossHudHtml() : ''}
           ${this.isBoss ? this.bossTokenHtml() : ''}
+          ${this.isBoss ? '<section class="boss-sentence-board" id="boss-sentence-board" role="status" aria-live="polite" hidden></section>' : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
           <div class="combo-flash" id="combo"></div>
@@ -627,6 +675,7 @@ export class BattleView {
         ${this.isBoss ? this.bossPlayerHudHtml() : ''}
 
         <div class="slot-step" id="steps" aria-label="문장 조립 단계"></div>
+        ${inkMeterHtml()}
 
         <div class="word-zone">
           <div class="card-table" aria-label="단어 카드 선택 영역">
@@ -646,8 +695,8 @@ export class BattleView {
             <div class="battle-help-heading">
               <span aria-hidden="true">✦</span>
               <div>
-                <small>토큰이 알려 줄게!</small>
-                <h2 id="battle-help-title">멋진 문장을 쓰는 법</h2>
+                <small>토큰의 메모</small>
+                <h2 id="battle-help-title">문장 규칙 다시보기</h2>
               </div>
             </div>
             <ul>
@@ -657,7 +706,7 @@ export class BattleView {
               <li><i aria-hidden="true">쾅!</i><span>초과 데미지는 짜릿한 <b>오버킬</b>을 선사!</span></li>
             </ul>
           </aside>
-          <button class="battle-help-button" id="battle-help-button" type="button" aria-label="전투 도움말 열기" aria-controls="battle-help-note" aria-expanded="false">?</button>
+          <button class="battle-help-button" id="battle-help-button" type="button" aria-label="전투 도움말 열기" aria-controls="battle-help-note" aria-expanded="false" data-tooltip="${hudTip('hudHelpTip', '전투 도움말\n문장을 조립하는 핵심 규칙을 다시 살펴본다.')}">?</button>
         </div>
 
         <div id="overlay"></div>
@@ -692,6 +741,9 @@ export class BattleView {
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
+    // 손패 DOM은 등장 연출 전에 먼저 만들어진다. 보이지 않는 카드를 광클해
+    // 문장이 임의로 확정되지 않도록 적이 전장에 도착할 때까지 입력을 잠근다.
+    this.cardHand.setInputEnabled(false)
     document.addEventListener('pointerdown', this.onPointerDown, true)
     document.addEventListener('pointerup', this.onPointerUp, true)
     document.addEventListener('pointercancel', this.onPointerUp, true)
@@ -846,6 +898,7 @@ export class BattleView {
     this.renderStats()
     this.renderActionOrder()
     this.syncMantisGuardCue()
+    this.renderBossSentence()
   }
 
   private renderEnemyOverflow(host: HTMLElement, count: number) {
@@ -1048,7 +1101,7 @@ export class BattleView {
     })
     const playerEntry: OrderEntry = {
       key: 'player',
-      name: '프롬',
+      name: t('playerName', '프롬'),
       portrait: CHARACTER_VISUALS.player.portrait2d,
       side: 'player',
       timing: 'player',
@@ -1132,9 +1185,10 @@ export class BattleView {
   private playerHtml(): string {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
-      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="프롬과 도우미 토큰 상세 보기">
+      <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="${t('playerName', '프롬')}과 도우미 ${t('tokenName', '토큰')} 상세 보기">
+        ${this.isBoss ? '' : '<div class="token-speech token-companion-speech" role="status" aria-live="polite"></div>'}
         ${this.isBoss ? '' : `<div class="nameplate glass">
-          <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
+          <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
         </div>`}
         <div class="shadow"></div>
@@ -1142,7 +1196,7 @@ export class BattleView {
           <span class="mantis-guard-shield" aria-hidden="true">◈</span>
           <span><b>방어 필수</b><em></em></span>
         </div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="프롬"></div>
+        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="${t('playerName', '프롬')}"></div>
       </div>`
   }
 
@@ -1172,10 +1226,90 @@ export class BattleView {
     cue.classList.remove('breaking')
   }
 
+  private bossSentenceTokenHtml(token: EnemySentenceToken): string {
+    const emotion = token.emotion ? ` emotion-${token.emotion}` : ''
+    const roleLabel = bossText(token.role === 'subject' ? 'roleSubject' : token.role === 'modifier' ? 'roleModifier' : token.role === 'object' ? 'roleObject' : 'roleAction')
+    return `<span class="boss-sentence-token role-${token.role}${emotion}${token.crossed ? ' is-crossed' : ''}">
+      <small>${roleLabel}</small>
+      <b>${token.text}</b>
+    </span>`
+  }
+
+  private bossSentenceLineHtml(view: { tokens: EnemySentenceToken[] }): string {
+    return `<div class="boss-sentence-line">${view.tokens.map((token) => this.bossSentenceTokenHtml(token)).join('<i aria-hidden="true">/</i>')}</div>`
+  }
+
+  /** 현재 시뮬레이션 상태를 그대로 읽어 보스가 쓰는 다음 문장으로 투영한다. */
+  private renderBossSentence() {
+    if (!this.isBoss) return
+    const host = this.root.querySelector<HTMLElement>('#boss-sentence-board')
+    const boss = this.state.enemies.find((enemy) => enemy.def.boss && !enemy.dead)
+    if (!host || !boss) {
+      if (host) host.hidden = true
+      return
+    }
+    const view = enemySentenceFor(this.state, boss, { eventText: this.bossSentenceEvent })
+    if (!view) {
+      host.hidden = true
+      return
+    }
+    const signature = JSON.stringify(view)
+    if (signature === this.bossSentenceSignature) return
+    this.bossSentenceSignature = signature
+    this.paintBossSentence(host, view)
+  }
+
+  private paintBossSentence(host: HTMLElement, view: EnemySentenceView) {
+    const context = view.context
+      ? `<div class="boss-sentence-context">
+          <span class="boss-sentence-side-label">${view.context.label}</span>
+          ${this.bossSentenceLineHtml(view.context)}
+          <div class="boss-sentence-meta">${view.context.meta.map((text) => `<span>${text}</span>`).join('')}</div>
+        </div>`
+      : ''
+    const manuscript = view.manuscript?.length
+      ? `<div class="boss-manuscript" aria-label="${bossText('manuscriptAria')}">
+          <span class="boss-sentence-side-label">${bossText('damagedLongSentence')}</span>
+          <div class="boss-manuscript-line">${view.manuscript.map((clause) => `
+            <span class="boss-manuscript-clause${clause.active ? ' is-active' : ''}${clause.crossed ? ' is-crossed' : ''}${clause.emotion ? ` emotion-${clause.emotion}` : ''}" data-clause-id="${clause.id}">
+              <b>${clause.text}</b>
+            </span>`).join('<i aria-hidden="true">/</i>')}</div>
+        </div>`
+      : ''
+    host.className = `boss-sentence-board tone-${view.tone}`
+    host.innerHTML = `
+      <div class="boss-sentence-heading"><span>${view.label}</span><b>${bossText(view.tone === 'danger' ? 'executeSoon' : view.tone === 'relief' ? 'endingRevision' : 'enemyIntent')}</b></div>
+      ${context}
+      <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
+      <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
+      ${manuscript}
+      ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
+    host.hidden = false
+    host.classList.remove('is-writing')
+    void host.offsetWidth
+    host.classList.add('is-writing')
+  }
+
+  /** 봉인·파훼·실패처럼 상태 한 장으로는 사라지는 사건만 짧게 문장 여백에 남긴다. */
+  private showBossSentenceEvent(text: string, duration = 1800) {
+    if (!this.isBoss || this.over) return
+    clearTimeout(this.bossSentenceEventTimer)
+    this.bossSentenceEvent = text
+    this.bossSentenceSignature = ''
+    this.renderBossSentence()
+    this.bossSentenceEventTimer = window.setTimeout(() => {
+      if (this.destroyed) return
+      this.bossSentenceEvent = null
+      this.bossSentenceSignature = ''
+      this.renderBossSentence()
+    }, duration)
+    this.timers.push(this.bossSentenceEventTimer)
+  }
+
   private bossPlayerHudHtml(): string {
     return `
-      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="프롬 체력">
-        <div class="row"><span class="nm">프롬</span><span class="hpn"></span></div>
+      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="${t('playerName', '프롬')} 체력">
+        <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
         <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
       </section>`
   }
@@ -1196,10 +1330,12 @@ export class BattleView {
             <div class="boss-hp-segments" hidden></div>
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
-          <span class="boss-weakness-mark" hidden></span>
+        </div>
+        <div class="boss-badge-row">
           <span class="boss-first-mark" hidden title="선공 — 내 문장 직후, 나보다 먼저 때린다">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
           </span>
+          <div class="boss-intel enemy-intel" aria-label="${bossText('bossBattleInfo', { boss: bossName })}" hidden></div>
         </div>
       </section>`
   }
@@ -1228,9 +1364,9 @@ export class BattleView {
     if (boss.def.id === 'queenBee') return TOKEN_BOSS_HINTS.queenBeeStart
     if (boss.def.id === 'elderSpider') {
       const weak = activeEnemyPart(boss)?.def.weakness?.label
-      return say(weak
-        ? `첫 공격은 마력실드가 막아! 연타로 벗긴 뒤 「${weak}」 감정으로 첫째 다리를 노려 — 거미줄은 방패도 넘어 와!!`
-        : '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!')
+      return weak
+        ? bossTokenLine('spiderOpeningWeak', 'calm', { weakness: weak })
+        : bossTokenLine('spiderOpeningGeneric')
     }
     return null
   }
@@ -1242,7 +1378,7 @@ export class BattleView {
       // 한가한 응원은 경고를 밀어내지 않는다. 큰낫이 올라간 채로 "힘내!"가 뜨면
       // 화면이 지금 무엇이 급한지 스스로 뒤집는 셈이다.
       if (this.tokenHolding) return this.scheduleBossTokenSpeech(7600)
-      this.showBossTokenSpeech(say(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length]))
+      this.showTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
       this.tokenSpeechIndex += 1
       this.scheduleBossTokenSpeech(7600)
     }, delay)
@@ -1255,14 +1391,14 @@ export class BattleView {
     this.tokenSpeechTimer = window.setTimeout(() => {
       if (this.over) return
       const next = this.bossPatternHint ?? line
-      this.showBossTokenSpeech(next)
+      this.showTokenSpeech(next)
       if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
       else this.scheduleBossTokenHint(next, 7600)
     }, delay)
     this.timers.push(this.tokenSpeechTimer)
   }
 
-  private showBossTokenSpeech(line: TokenLine) {
+  private showTokenSpeech(line: TokenLine) {
     const bubble = this.root.querySelector<HTMLElement>('.token-speech')
     const token = this.root.querySelector<HTMLElement>('.boss-token')
     if (!bubble) return
@@ -1285,11 +1421,28 @@ export class BattleView {
     this.timers.push(this.tokenSpeechHideTimer)
   }
 
+  /** 일반전의 동반 토큰이 최초 상황에만 짧게 개입한다. 보스의 고정 경고가 우선이다. */
+  private showCombatCoach(hint: CombatCoachHint): boolean {
+    if (this.isBoss || this.over || this.tokenHolding || hasSeenCombatCoach(hint)) return false
+    markCombatCoachSeen(hint)
+    this.showTokenSpeech(TOKEN_COACH_LINES[hint])
+    return true
+  }
+
+  private clearNormalTokenWarning() {
+    if (this.isBoss) return
+    this.tokenHolding = false
+    const bubble = this.root.querySelector<HTMLElement>('.token-companion-speech')
+    if (!bubble) return
+    bubble.classList.remove('is-speaking')
+    bubble.removeAttribute('data-tone')
+  }
+
   private showBossTokenHint(line: TokenLine) {
     if (!this.isBoss || this.over) return
     this.bossPatternHint = line
     clearTimeout(this.tokenSpeechTimer)
-    this.showBossTokenSpeech(line)
+    this.showTokenSpeech(line)
     if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
     else this.scheduleBossTokenHint(line, 7600)
   }
@@ -1299,7 +1452,7 @@ export class BattleView {
     this.bossPatternSolved = true
     this.bossPatternHint = null
     clearTimeout(this.tokenSpeechTimer)
-    this.showBossTokenSpeech(line)
+    this.showTokenSpeech(line)
     this.scheduleBossTokenSpeech(7600)
   }
 
@@ -1336,6 +1489,7 @@ export class BattleView {
             Array.from({ length: summonPattern.maxPerSide }, (_, slot) =>
               `<span class="queen-worker ${side}" data-side="${side}" data-slot="${slot + 1}" hidden>
                 <span class="queen-worker-nameplate nameplate glass" aria-label="일벌 체력 ${summonPattern.hp ?? 1} / ${summonPattern.hp ?? 1}">
+                  <span class="queen-worker-tag"><b>적</b><span>${summonPattern.name}</span><em>${summonPattern.hp ?? 1}/${summonPattern.hp ?? 1}</em></span>
                   <span class="queen-worker-hp hpbar foe"><i class="fill"></i></span>
                 </span>
                 <span class="model-shell" data-model-status="${workerVisual.model3d ? 'preparing-3d' : 'fallback-2d'}">
@@ -1361,7 +1515,6 @@ export class BattleView {
               <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
             </div>
           </div>
-          <div class="enemy-traits"></div>
         </div>
         <div class="enemy-intel" aria-label="${e.def.name} 전투 정보"></div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -1390,8 +1543,10 @@ export class BattleView {
           ?? 1
         const maxHp = enemy.def.summonPattern?.hp ?? 1
         const nameplate = worker.querySelector<HTMLElement>('.queen-worker-nameplate')
+        const hpText = worker.querySelector<HTMLElement>('.queen-worker-tag > em')
         const fill = worker.querySelector<HTMLElement>('.queen-worker-hp > .fill')
         nameplate?.setAttribute('aria-label', `일벌 체력 ${hp} / ${maxHp}`)
+        if (hpText) hpText.textContent = `${hp}/${maxHp}`
         if (fill) fill.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`
         this.queueDeferredCharacterModel(worker, CHARACTER_VISUALS.workerBee, 2)
       } else {
@@ -1476,43 +1631,17 @@ export class BattleView {
 
   /** 적 모델을 가리지 않는 작은 상태 아이콘. 숫자와 규칙은 호버 툴팁에서만 풀어 쓴다. */
   private updateEnemyIntel(el: HTMLElement, e: EnemyInst) {
-    const host = el.querySelector<HTMLElement>('.enemy-intel')!
-    const activePart = activeEnemyPart(e)
+    const host = e.def.boss
+      ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-intel')!
+      : el.querySelector<HTMLElement>('.enemy-intel')!
     const attackStep = nextEnemyAttackStep(e)
     const summonPattern = e.def.summonPattern
     const summons = summonCount(e)
-    const weak = activePart?.def.weakness ?? (e.def.weakEmotion ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: e.def.weakEmotion } : null)
     const icons: string[] = []
     const add = (kind: string, glyph: string, tooltip: string) => {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
     }
 
-    const bossWeakness = e.def.boss
-      ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-weakness-mark')
-      : el.querySelector<HTMLElement>('.boss-weakness-mark')
-    if (bossWeakness) {
-      bossWeakness.hidden = !weak
-      bossWeakness.className = `boss-weakness-mark${weak?.kind === 'emotion' ? ` emotion-${weak.value}` : ''}`
-      bossWeakness.setAttribute('aria-label', weak ? `${weak.label} 약점` : '')
-      bossWeakness.innerHTML = weak?.kind === 'emotion'
-        ? `${emotionIconContent(weak.value as Emotion)}<b>약점</b>`
-        : weak
-          ? '<strong aria-hidden="true">!</strong><b>약점</b>'
-          : ''
-    }
-    // 보스의 머리 위에는 상태 아이콘을 두지 않는다. 현재 약점은 상단 체력바 바로
-    // 오른쪽에 붙이고, 나머지 규칙은 상세 카드와 연출이 맡는다.
-    if (e.def.boss) {
-      host.hidden = true
-      host.innerHTML = ''
-      return
-    }
-
-    if (weak?.kind === 'emotion') {
-      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), tip(`약점 · ${weak.label}`, `${weak.label} 카드로 때리면 피해 1.5배`))
-    } else if (weak) {
-      add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
-    }
     if (attackStep) {
       const detail = attackStep.damageScale === 0
         ? '이번엔 안 때리고 다음 공격을 준비한다'
@@ -1527,7 +1656,7 @@ export class BattleView {
       const stage = bossAttackStage(e)
       add(`stage stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
     }
-    if (e.guard > 0) add('guard', icon('shield'), tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
+    if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
     if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
     if (e.def.pierceGuard) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
     if (summonPattern) add(
@@ -1551,6 +1680,20 @@ export class BattleView {
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
     const remainingBars = Math.ceil(Math.max(0, e.hp) / e.hpPerBar)
     const activePart = activeEnemyPart(e)
+    const activeWeakness = activePart ? activePart.def.weakness ?? null : null
+    const affinity = activePart
+      ? activeWeakness?.kind === 'emotion' ? activeWeakness.value as Emotion : 'neutral'
+      : e.def.weakEmotion ?? 'neutral'
+    const affinityLabel = affinity === 'neutral' ? '무속성' : `${EMOTION_LABEL[affinity]} 약점`
+    const affinityTooltip = affinity === 'neutral'
+      ? tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
+      : tip(affinityLabel, `${EMOTION_LABEL[affinity]} 카드로 때리면 피해 1.5배`)
+    ;(['joy', 'anger', 'sorrow', 'pleasure', 'neutral'] as const).forEach((emotion) => {
+      plate.classList.toggle(`emotion-${emotion}`, emotion === affinity)
+    })
+    plate.dataset.tooltip = affinityTooltip
+    plate.dataset.tipPlace = 'above'
+    plate.tabIndex = 0
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
       ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
       : `${Math.max(0, e.hp)}/${e.maxHp}`
@@ -1573,8 +1716,8 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
-    // 보스 상단 HUD는 체력바와 약점만 갱신한다. 선공은 배우 옆 공용 경고 표식이
-    // 실제 initiativePhase가 first일 때만 맡고, 패턴/단계/방어 텍스트는 출력하지 않는다.
+    // 보스 상단 HUD의 체력과 호위 규칙을 갱신한다. 세부 전투 정보는 바로 아래의
+    // 공용 아이콘 배지가 맡아 긴 텍스트가 체력바 폭을 밀어내지 않게 한다.
     if (bossHud) {
       const mark = plate.querySelector<HTMLElement>('.boss-health-mark')
       const escortedQueen = e.def.id === 'queenBee' && summonCount(e) > 0
@@ -1585,42 +1728,6 @@ export class BattleView {
       }
       return
     }
-    const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
-    // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다.
-    traits.hidden = true
-    const weak = e.def.weakEmotion
-    const attackStage = bossAttackStage(e)
-    const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
-    const attackStep = nextEnemyAttackStep(e)
-    const requiredGuard = enemyGuardBreakRequirement(e, this.state.turn)
-    const groggy = this.state.turn <= e.groggyUntilTurn
-    const partWeakness = activePart?.def.weakness
-    const partWeaknessHtml = partWeakness?.kind === 'emotion'
-      ? `<span class="trait weak emotion-${partWeakness.value}">${emotionBadgeContent(partWeakness.value as Emotion)}<strong>${partWeakness.label} ×1.5</strong></span>`
-      : partWeakness
-        ? `<span class="trait weak spider-tag-weak"><strong>${partWeakness.label} 태그 ×1.5</strong></span>`
-        : ''
-    const regularTraits = [
-      partWeaknessHtml || (weak ? `<span class="trait weak emotion-${weak}">${emotionBadgeContent(weak)}<strong>약점</strong></span>` : ''),
-      activePart ? `<span class="trait spider-active">${activePart.def.name} · ${Math.max(0, activePart.hp)}/${activePart.maxHp}</span>` : '',
-      e.def.boss
-        ? `<span class="trait boss-attack stage-${attackStage}">공격 ${attackStage}단계 · ×${attackMultiplier.toFixed(2)}</span>`
-        : '',
-      attackStep
-        ? `<span class="trait boss-attack">다음: ${attackStep.name}${attackStep.damageScale === 0 ? ' · 피해 없음' : attackStep.damageScale != null && attackStep.damageScale !== 1 ? ` · 위력 ${Math.round(attackStep.damageScale * 100)}%` : attackStep.bonusAtk > 0 ? ` · 공격 +${attackStep.bonusAtk}` : ''}</span>`
-        : '',
-      attackStep?.shatterGuard
-        ? `<span class="trait shatter">필요 방어 ${requiredGuard} · 성공: 피해 0+그로기</span>`
-        : '',
-      groggy
-        ? `<span class="trait groggy">그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}</span>`
-        : '',
-      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
-      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
-      e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
-    ].join('')
-    traits.hidden = regularTraits.length === 0
-    traits.innerHTML = regularTraits
     const partHost = plate.querySelector<HTMLElement>('.spider-parts')
     if (partHost) {
       partHost.hidden = !e.parts.length
@@ -1725,11 +1832,13 @@ export class BattleView {
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
             ...(currentPart?.def.weakness
               ? [['현재 약점', `${currentPart.def.weakness.label} · 공격 피해 ×1.5 · 방어·회복도 봉인 -1`]]
-              : []),
+              : currentPart ? [['현재 속성', '무속성 · 감정 추가 피해 없음']] : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
-            ...(enemy.def.weakEmotion
-              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
+            ...(!currentPart
+              ? [[enemy.def.weakEmotion ? '약점' : '속성', enemy.def.weakEmotion
+                ? `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`
+                : '무속성 · 감정 추가 피해 없음']]
               : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
@@ -1775,6 +1884,7 @@ export class BattleView {
         const emotion = emotionOrNeutral(w.emotion)
         return `<span class="chain-word emotion-${emotion}${attach}" data-i="${i}">
           <b class="cw-text">${toks[i]}</b>
+          <span class="cw-cost" title="잉크 비용">${wordInkCost(w)}</span>
           ${note ? `<em class="cw-note ${note.cls}">${note.text}</em>` : ''}
         </span>`
       })
@@ -1797,7 +1907,15 @@ export class BattleView {
     host.innerHTML = words + extra
     host.classList.toggle('has-sentence', anyPicked)
     host.classList.toggle('sentence-ready', this.complete())
+    this.renderInk()
     this.renderMultNow(anyPicked)
+  }
+
+  private renderInk(): void {
+    const meter = this.q<HTMLElement>('#ink-meter')
+    const spent = selectionInkCost(this.sel)
+    const over = inkOverdraw(spent)
+    updateInkMeter(meter, { spent, max: SENTENCE_INK, overdraw: over })
   }
 
   // 체인 아래 "지금 배율" — 카드를 고르는 즉시 숫자가 삐리릭 돌다가 팅! 하고 확정된다.
@@ -1977,6 +2095,9 @@ export class BattleView {
         ? `장로거미가 ${this.t.template.slots.find((slot) => slot.key === slotKey)?.label ?? slotKey} 「${sealed.word.text}」 카드를 봉인했다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`
         : `선택지를 남기기 위해 이번 거미줄은 빗나갔다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`,
     )
+    this.showBossSentenceEvent(sealed
+      ? bossText('sealCard', { word: sealed.word.text })
+      : bossText('webMiss'))
     if (this.cardHand.sealedCount >= pending.maxSealed) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderWebReady)
     this.renderActors()
   }
@@ -2065,7 +2186,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
         ${this.projectionHtml(w, key)}
-        <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+        <div class="wd-values"><div class="v flat">잉크 ${wordInkCost(w)}</div>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
         ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
       </div>
@@ -2158,11 +2279,11 @@ export class BattleView {
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
     this.q('#stats').innerHTML =
-      '<span class="hud-player-name" aria-label="주인공 이름 프롬">프롬</span>' +
+      `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
-          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}" title="${m.label}: ${value} — ${m.desc}">
+          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
       </div>`
@@ -2184,7 +2305,7 @@ export class BattleView {
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
       <div class="relic-icons">
-        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
+        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" tabindex="0" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
       </div>`
   }
 
@@ -2395,7 +2516,7 @@ export class BattleView {
   }
 
   private codexItemDetailHtml(item: (typeof ALL_ITEMS)[keyof typeof ALL_ITEMS]): string {
-    // 모든 아이템의 고정 기본 스탯은 0이다 — 실제 수치는 감탄 문장으로 확정된 보유분에 있다.
+    // 보유품은 기본 스탯과 감탄 문장 보너스가 합쳐진 확정 수치를 보여 준다.
     // 도감은 보유한 아이템만 상세를 여니, 그 판에서 정말 오른 값을 그대로 적는다.
     const owned = this.player.items.find((entry) => entry.id === item.id)
     const stats = owned?.stats ?? item.base
@@ -2442,12 +2563,30 @@ export class BattleView {
     this.renderChain()
     GameAudio.play('pencil')
     this.renderWords()
+    this.coachAfterPick()
     // 전부 채우면 자동 완성(반짝 → 발동)
     if (this.complete()) {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       GameAudio.playSentenceComplete(intent.emotions)
       void this.autoComplete()
     }
+  }
+
+  /** 한 번의 카드 선택에서는 가장 급한 상황 하나만 말한다. */
+  private coachAfterPick() {
+    if (this.isBoss || this.over) return
+    const spent = selectionInkCost(this.sel)
+    const overdraw = inkOverdraw(spent)
+    if (overdraw > 0 && this.showCombatCoach('ink-overdraw')) return
+    if (SENTENCE_INK - spent <= 3 && this.showCombatCoach('ink-low')) return
+
+    const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+    if (intent.emotionResonance > 1 && this.showCombatCoach('resonance')) return
+    if (intent.combos.length > 0 && this.showCombatCoach('context')) return
+
+    const chosen = this.order().filter((key) => !!this.sel[key]).length
+    if (chosen === 1) this.showCombatCoach('modifier')
+    else if (chosen === 2) this.showCombatCoach('verb')
   }
 
   private complete(): boolean {
@@ -2771,6 +2910,23 @@ export class BattleView {
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
     const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+    const inkCost = selectionInkCost(this.sel)
+    const overdraw = inkOverdraw(inkCost)
+    if (overdraw > 0) {
+      this.lastSentence = intent.sentence
+      this.lastHurtBy = { kind: 'self', sentence: intent.sentence }
+      this.setPhase('잉크 초과')
+      applyInkOverdraw(this.state, inkCost)
+      this.popPlayer(`잉크 초과 · 체력 -${overdraw}`, 'dmg big')
+      this.log(`잉크 ${inkCost}/${SENTENCE_INK} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
+      this.renderActors()
+      await sleep(420)
+      this.clearNormalTokenWarning()
+      if (this.state.playerHp <= 0) {
+        await this.lose()
+        return
+      }
+    }
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
@@ -2851,6 +3007,7 @@ export class BattleView {
     } else {
       this.setPhase('선공 상대 행동')
       await this.enemyPhase('first')
+      this.clearNormalTokenWarning()
       if (this.state.playerHp <= 0) {
         await this.lose()
         return
@@ -2893,12 +3050,6 @@ export class BattleView {
     await this.strike(res, sweep, heavy)
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
     if (res.summonDamage > 0) {
-      // 원격의 새 일벌 피해 표시를 쓰되, 강타에서는 기다리지 않는다 — 일벌이 흩어지는
-      // 것과 검기가 뻗는 건 같은 순간에 벌어져야 한다. 기다리면 정지 뒤에 텀이 하나 더 생긴다.
-      const dispersal = this.playSummonDispersal(
-        this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered,
-      )
-      if (!heavy) await dispersal
       this.log(`문장이 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     const rouletteNote = resolved.outcome === 'crit' ? ' · 대성공!' : resolved.outcome === 'fail' ? ' · 실패…' : ''
@@ -2920,7 +3071,10 @@ export class BattleView {
       return
     }
 
-    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+    if (res.overflow > 0 && !allDead(this.state)) {
+      this.showCombatCoach('overflow')
+      kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+    }
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
     // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
@@ -2934,7 +3088,7 @@ export class BattleView {
     // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
     this.killsThisBattle += kills
 
-    // 한 턴에 두 마리 이상 쓸어담으면 보상등급이 띵·띵·띵 오른다. 전멸 마무리면 +1.
+    // 한 턴에 두 마리 이상 쓸어담으면 획득 예정 영감이 띵·띵·띵 오른다. 전멸 마무리면 +1.
     const gradeGain = overkillGain(kills, allDead(this.state))
     if (gradeGain > 0) await this.dingGrade(gradeGain)
 
@@ -2960,6 +3114,7 @@ export class BattleView {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
             this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
             if ((hit.barOverflow ?? 0) > 0) this.playBossBarOverkill(hit.target, hit.barOverflow ?? 0, !!hit.barOverflowPassed)
+            if ((hit.barsBroken ?? 0) > 0) this.playBossBarBreak(hit.target, hit.barsBroken ?? 1, !!hit.barOverflowPassed)
           }
         }
         if (result.summonDamage > 0) {
@@ -2990,6 +3145,7 @@ export class BattleView {
     // 채로 굳는다 — 실제로 "어두워진 화면이 안 돌아온다"는 사고가 여기서 났다.
     this.endSlowmo()
     this.sel = {}
+    this.clearNormalTokenWarning()
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++
@@ -3066,7 +3222,6 @@ export class BattleView {
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
     await this.strike(res, sweep, heavy)
     if (res.summonDamage > 0) {
-      await this.playSummonDispersal(this.target, res.summonsDispersed, res.summonDamage, res.summonBacklashDamage, res.summonFocusedBacklash, res.summonGroggyTriggered)
       this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
@@ -3079,33 +3234,15 @@ export class BattleView {
 
   // 플레이어 공격/방어/회복 꽂힘 — 공격이면 돌진, 방어/회복/자해는 플레이어에게 날아가 꽂힘.
   private async strike(
-    res: {
-      hits: {
-        target: number
-        dmg: number
-        magicShieldBroken: boolean
-        magicShieldRemaining: number
-        summonShieldBlocked?: boolean
-        weak?: boolean
-        barsBroken?: number
-        barOverflow?: number
-        barOverflowPassed?: boolean
-        partId?: string
-        partName?: string
-        webCut?: boolean
-        webBurst?: boolean
-        tensionReduced?: number
-      }[]
-      selfDmg: number
-      heal: number
-      killed: number[]
-      supportWebCut?: { target: number; tensionReduced: number } | null
-    },
+    res: ApplyResult,
     sweep = false,
     heavy: AttackCut | null = null,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
-    const attacking = res.hits.length > 0
+    // 여왕벌은 피해를 먼저 일벌 킬체인에 소비하므로 본체 hit가 0건일 수 있다.
+    // 그 경우에도 실제 공격은 일어났다. hit만 보면 정확히 30/60/120 피해에서 프롬이
+    // 가만히 선 채 일벌만 뒤늦게 사라지는 역전된 그림이 된다.
+    const attacking = res.hits.length > 0 || res.summonDamage > 0
     this.swordHitCount = 0
     if (heavy && attacking && this.heavyHeld) {
       // 이미 칼을 들어올린 채 멈춰 있다. 돌진을 먼저 출발시켜 내리치는 프레임에
@@ -3134,6 +3271,51 @@ export class BattleView {
       this.q('#actors').classList.add('rail-rush')
     }
 
+    const stopMs = Math.min(112, 62 + res.killed.length * 14 + (sweep ? 20 : 0))
+    let firstHitStopped = heavy ? this.heavyStopUsed : false
+    const stopFirstHit = async (target: HTMLElement | null) => {
+      if (firstHitStopped) return
+      firstHitStopped = true
+      if (heavy) {
+        this.heavyStopUsed = true
+        const tier = this.heavyTier()
+        await sleep(HEAVY_FLASH_BLOOM_MS)
+        await this.attackHitStop(you, target, stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
+        this.shakeStage(1 + tier * .7)
+        this.endSlowmo()
+      } else {
+        await this.attackHitStop(you, target, stopMs)
+      }
+    }
+
+    const chainContinuesToBody = res.summonDamage > 0 && res.hits.some((hit) => hit.dmg > 0)
+    if (res.summonDamage > 0) {
+      // 일벌 킬체인의 첫 접촉이 이 공격의 유일한 히트스톱이다. 먼저 한 마리에
+      // 충격점을 만든 뒤 멈추고, 풀린 다음 나머지 일벌과 본체까지는 절대 다시 멈추지 않는다.
+      const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
+        `.actor.foe[data-i="${this.target}"] .queen-worker:not([hidden])`,
+      )]
+      const firstWorker = res.summonsDispersed > 0
+        ? visibleWorkers[Math.max(0, visibleWorkers.length - res.summonsDispersed)]
+        : visibleWorkers[visibleWorkers.length - 1]
+      if (firstWorker) {
+        GameAudio.playSwordHit(this.swordHitCount++)
+        SquareBurst.playOn(firstWorker, 'damage', { spread: heavy ? 150 : 92 })
+        this.hitOne(firstWorker)
+      }
+      if (firstWorker) await stopFirstHit(firstWorker)
+      await this.playSummonDispersal(
+        this.target,
+        res.summonsDispersed,
+        res.summonDamage,
+        res.summonBacklashDamage,
+        res.summonFocusedBacklash,
+        res.summonGroggyTriggered,
+        chainContinuesToBody,
+        false,
+      )
+    }
+
     let remainingSwordHits = res.hits.filter((hit) =>
       hit.dmg > 0 && !hit.summonShieldBlocked && !hit.magicShieldBroken,
     ).length
@@ -3143,7 +3325,9 @@ export class BattleView {
         continue
       }
       if (h.magicShieldBroken) {
+        const shieldTarget = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
         await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
+        if (shieldTarget) await stopFirstHit(shieldTarget)
         continue
       }
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
@@ -3159,35 +3343,16 @@ export class BattleView {
       }
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
+      if ((h.barsBroken ?? 0) > 0) this.playBossBarBreak(h.target, h.barsBroken ?? 1, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
+      if (el) await stopFirstHit(el)
       if (remainingSwordHits > 0) await sleep(SWORD_HIT_GAP_MS)
     }
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
-    const hitTargets = res.hits
-      .filter((hit) => hit.dmg > 0)
-      .map((hit) => this.q<HTMLElement>(`#actors .actor.foe[data-i="${hit.target}"]`))
-      .filter((actor): actor is HTMLElement => !!actor)
-    if (hitTargets.length > 0) {
-      const stopMs = Math.min(112, 62 + Math.max(0, hitTargets.length - 1) * 10 + res.killed.length * 14 + (sweep ? 20 : 0))
-      // 프레임 정지는 **발동당 딱 한 번**이다. 처음 검을 내리치는 그 프레임에만 붙고,
-      // 관통이나 메아리에서는 두 번 다시 멈추지 않는다 — 검기가 지나가는 흐름을
-      // 토막토막 끊으면 "슝" 하고 훑는 한 줄기가 안 된다.
-      if (heavy && !this.heavyStopUsed) {
-        // 섬광이 피어날 한 프레임을 준 다음 화면째로 끊는다. 정지가 풀리는 순간
-        // 흔들림과 함께 확대가 풀려서 "팡" 하고 뒤로 물러나는 것처럼 보인다.
-        // 배율이 높을수록 더 오래 끊고 더 세게 흔든다 — 잘 쌓은 문장의 몫이다.
-        this.heavyStopUsed = true
-        const tier = this.heavyTier()
-        await sleep(HEAVY_FLASH_BLOOM_MS)
-        await this.sceneHitStop(stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
-        this.shakeStage(1 + tier * 0.7)
-        this.endSlowmo()
-      } else if (!heavy) {
-        await this.attackHitStop(you, stopMs)
-      }
-    }
+    // 실제로 attack 애니메이션이 닿은 첫 대상만 붙든다. 보호막·무적 때문에 대상 연출이
+    // 없거나 이후 resolveOverflow로 이어지는 연쇄 타격에는 히트스톱을 만들지 않는다.
     // 강타는 정지가 풀리는 순간 곧바로 검기가 나가야 한다. 여기서부터 아래는 전부
     // 기다리지 않는다 — 돌진 마무리도, 수치가 날아가는 것도, 쓰러지는 것도 뒤에서
     // 저절로 일어난다. 정지 한 순간 말고 텀이 하나라도 더 끼면 "탕→촥"이 안 된다.
@@ -3262,6 +3427,44 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => fx.remove(), 700))
   }
 
+  /** 보스 체력 막이 실제로 깨진 결과를 화면 중앙과 체력바 양쪽에서 동시에 읽힌다. */
+  private playBossBarBreak(enemyIdx: number, count: number, passed: boolean) {
+    if (count <= 0 || !this.state.enemies[enemyIdx]?.def.boss) return
+    const hud = this.root.querySelector<HTMLElement>('#boss-health-hud')
+    const pbox = this.q<HTMLElement>('#pbox')
+    if (!hud) return
+
+    hud.classList.remove('boss-bar-breaking', 'boss-bar-pierced')
+    void hud.offsetWidth
+    hud.classList.add(passed && count > 1 ? 'boss-bar-pierced' : 'boss-bar-breaking')
+
+    const banner = document.createElement('div')
+    banner.className = `boss-bar-break-banner${passed && count > 1 ? ' pierced' : ''}`
+    banner.innerHTML = passed && count > 1
+      ? `<small>한 번에 돌파</small><b>체력 막 ×${count} 관통!</b>`
+      : '<small>경계 파괴</small><b>체력 막 파괴!</b>'
+    pbox.append(banner)
+
+    const bar = hud.querySelector<HTMLElement>('.hpbar.foe')
+    if (bar) {
+      for (let i = 0; i < Math.min(12, 5 + count * 3); i++) {
+        const shard = document.createElement('i')
+        shard.className = 'boss-bar-shard'
+        shard.style.setProperty('--x', `${(Math.random() - .5) * (180 + count * 35)}px`)
+        shard.style.setProperty('--y', `${(Math.random() - .5) * 90}px`)
+        shard.style.setProperty('--r', `${(Math.random() - .5) * 150}deg`)
+        shard.style.setProperty('--delay', `${Math.random() * 55}ms`)
+        bar.append(shard)
+        this.timers.push(window.setTimeout(() => shard.remove(), 720))
+      }
+    }
+    this.shakeStage(passed && count > 1 ? 1.45 : .72)
+    this.timers.push(window.setTimeout(() => {
+      banner.remove()
+      hud.classList.remove('boss-bar-breaking', 'boss-bar-pierced')
+    }, 880))
+  }
+
   private playSpiderWebCut(enemyIdx: number, _reduced: number) {
     const scene = this.q<HTMLElement>('.scene.battle')
     const released = this.cardHand.releaseSealed(1)
@@ -3270,6 +3473,7 @@ export class BattleView {
     scene.classList.add('spider-web-cut')
     this.popAt(enemyIdx, released > 0 ? '약점 파훼! 카드 봉인 -1' : '약점 파훼!', 'buff big')
     this.log(`현재 다리의 약점을 문장에 담아 카드 봉인 ${released}개를 풀었다.`)
+    this.showBossSentenceEvent(released > 0 ? bossText('weakenWeb') : bossText('shakeClause'))
     this.resolveBossPattern(TOKEN_BOSS_HINTS.elderSpiderWebCut)
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-cut'), 720))
   }
@@ -3294,6 +3498,9 @@ export class BattleView {
     // 다리가 바뀌면 노려야 할 감정도 바뀐다. 부위 목록의 작은 뱃지만으로는
     // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
     const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
+    this.showBossSentenceEvent(nextWeak
+      ? bossText('nextLegRecover', { weakness: currentLocale === 'ko' ? eul(nextWeak) : nextWeak })
+      : bossText('allClausesErased'))
     this.resolveBossPattern(spiderNextWeaknessLine(nextWeak))
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-burst'), 880))
   }
@@ -3372,7 +3579,7 @@ export class BattleView {
     const enemy = this.state.enemies[target]
     if (removed && enemy?.def.id === 'elderSpider') {
       const weak = activeEnemyPart(enemy)?.def.weakness?.label
-      if (weak) this.showBossTokenHint(say(`마력실드가 깨졌어! 이제 「${weak}」 감정으로 현재 다리를 노려!!`, 'relief'))
+      if (weak) this.showBossTokenHint(bossTokenLine('spiderShieldBroken', 'relief', { weakness: weak }))
     }
   }
 
@@ -3528,31 +3735,6 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => flash.remove(), 900))
   }
 
-  /**
-   * 씬 전체 프레임 정지. 지금까지의 히트스탑은 **때린 사람만** 얼렸다 — 맞는 적은
-   * 계속 흔들리고 숫자도 계속 떠올라서, 정지가 정지로 안 읽혔다. 3D 클립과 CSS
-   * 애니메이션을 같은 순간에 통째로 붙들어야 한 프레임이 끊긴 것처럼 보인다.
-   */
-  private async sceneHitStop(ms: number) {
-    if (this.motionOff()) return
-    const scene = this.q('.scene.battle')
-    const actors = [...this.root.querySelectorAll<HTMLElement>('.actor, .boss-token')]
-    // 방금 붙인 애니메이션은 첫 프레임을 커밋하기 전까지 pending이라 playState가 아직
-    // 'running'이 아니다. running만 잡으면 정작 붙들어야 할 타격점 섬광이 정지 중에도
-    // 계속 피어난다(실측으로 그랬다).
-    const running = scene.getAnimations({ subtree: true })
-      .filter((a) => a.playState === 'running' || a.pending)
-    actors.forEach((actor) => freezeCharacterAnimation(actor, true))
-    running.forEach((animation) => animation.pause())
-    scene.classList.add('hit-stop')
-    await sleep(ms)
-    scene.classList.remove('hit-stop')
-    running.forEach((animation) => {
-      if (animation.playState === 'paused') animation.play()
-    })
-    actors.forEach((actor) => freezeCharacterAnimation(actor, false))
-  }
-
   // ── 런 기록 ── 결과 화면의 찢어진 종이에 적힐 값들을 여기서만 손댄다.
 
   /** 문장 하나가 정산될 때 — 문장 수, 최고 배율, 가장 센 한 방과 그 문장. */
@@ -3609,7 +3791,7 @@ export class BattleView {
 
   /** 저사양이나 동작 최소화 설정에서는 확대·정지·흔들림을 건너뛴다. */
   private motionOff(): boolean {
-    return document.documentElement.dataset.graphics === 'low'
+    return document.documentElement.dataset.effects === 'low'
       || window.matchMedia('(prefers-reduced-motion: reduce)').matches
   }
 
@@ -3824,11 +4006,14 @@ export class BattleView {
     const badge = this.q('#grade-badge')
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    this.q('#grade').textContent = `✦ ${this.grade}`
+    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${this.grade}\n획득 예정 영감이다. 전투가 길어지면 줄고, 한 턴에 쓸어담으면 늘어난다.`, { value: this.grade })
+    badge.setAttribute('aria-label', `클리어 보상 +${this.grade}`)
+    badge.dataset.tooltip = tooltip
+    this.q('#grade').textContent = `+${this.grade}`
   }
 
   /**
-   * 승리 마무리 — 아낀 카드 뽑기를 보상등급으로 바꾼 뒤 피날레를 돌린다.
+   * 승리 마무리 — 아낀 카드 뽑기를 영감으로 바꾼 뒤 피날레를 돌린다.
    * 뽑기를 참으면 그만큼 전리품이 좋아지므로 "지금 손패로 버틸까"가 선택이 된다.
    */
   private async finishWin(pause: number): Promise<void> {
@@ -3840,11 +4025,12 @@ export class BattleView {
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
     const saved = this.cardHand.savedDraws
     if (saved > 0) {
-      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 보상등급 +${saved}`)
+      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 영감 +${saved}`)
       await this.dingGrade(saved)
     }
     await sleep(pause)
     await this.gradeFinale()
+    await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)
     this.onWin(this.grade, this.combatResources())
@@ -3903,6 +4089,69 @@ export class BattleView {
     await Promise.race([anim.finished.catch(() => undefined), sleep(900)])
     // CLEAR 원화와 최종 보상등급을 빵빠레 첫 구절 동안 읽을 수 있게 유지한다.
     await sleep(1300)
+  }
+
+  /** 클리어 보상을 중앙 배지에서 좌상단 보유 영감으로 옮기고 실제 지급값까지 카운트업한다. */
+  private async collectClearInspiration() {
+    const gained = Math.max(0, Math.round(this.grade))
+    const wallet = this.q<HTMLElement>('.inspiration-wallet')
+    const balance = wallet.querySelector<HTMLElement>('.inspiration-wallet-copy b')
+    const source = this.q<HTMLElement>('#grade-badge')
+    if (!balance || gained <= 0) return
+
+    const finalBalance = this.inspiration + gained
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const duration = reduceMotion ? 80 : 720
+    const sourceRect = source.getBoundingClientRect()
+    const targetRect = wallet.querySelector<HTMLElement>('.inspiration-mark')?.getBoundingClientRect()
+      ?? wallet.getBoundingClientRect()
+    const pop = document.createElement('span')
+    pop.className = 'inspiration-gain-pop'
+    pop.textContent = `+${gained}`
+    wallet.appendChild(pop)
+    wallet.classList.add('is-collecting')
+    wallet.setAttribute('aria-label', `보유 영감 ${finalBalance}`)
+
+    if (!reduceMotion) {
+      const moteCount = Math.max(3, Math.min(9, gained))
+      for (let i = 0; i < moteCount; i += 1) {
+        const mote = document.createElement('span')
+        mote.className = 'clear-inspiration-flight'
+        mote.textContent = '◈'
+        mote.style.left = `${sourceRect.left + sourceRect.width * (.36 + (i % 4) * .09)}px`
+        mote.style.top = `${sourceRect.top + sourceRect.height * (.38 + (i % 3) * .12)}px`
+        document.body.appendChild(mote)
+        const startX = Number.parseFloat(mote.style.left)
+        const startY = Number.parseFloat(mote.style.top)
+        const dx = targetRect.left + targetRect.width * .5 - startX
+        const dy = targetRect.top + targetRect.height * .5 - startY
+        const arc = 54 + (i % 3) * 24
+        const delay = i * 55
+        const animation = mote.animate([
+          { transform: 'translate(-50%, -50%) scale(.45) rotate(0deg)', opacity: 0 },
+          { transform: `translate(${dx * .28}px, ${dy * .28 - arc}px) scale(1.16) rotate(80deg)`, opacity: 1, offset: .3 },
+          { transform: `translate(${dx * .72}px, ${dy * .72 - arc * .35}px) scale(.82) rotate(190deg)`, opacity: 1, offset: .72 },
+          { transform: `translate(${dx}px, ${dy}px) scale(.18) rotate(280deg)`, opacity: 0 },
+        ], { duration: duration - 70, delay, easing: 'cubic-bezier(.22,.75,.2,1)', fill: 'forwards' })
+        const remove = () => mote.remove()
+        animation.onfinish = remove
+        this.timers.push(window.setTimeout(remove, duration + delay + 120))
+      }
+    }
+
+    const started = performance.now()
+    const count = (now: number) => {
+      const progress = Math.min(1, (now - started) / Math.max(1, duration))
+      const eased = 1 - Math.pow(1 - progress, 3)
+      balance.textContent = String(this.inspiration + Math.round(gained * eased))
+      if (progress < 1 && this.root.isConnected) requestAnimationFrame(count)
+    }
+    requestAnimationFrame(count)
+    GameAudio.play('contextBonus')
+    await sleep(duration + (reduceMotion ? 20 : 430))
+    balance.textContent = String(finalBalance)
+    wallet.classList.remove('is-collecting')
+    pop.remove()
   }
 
   // 턴 경과 감쇠 — 배지가 살짝 가라앉으며 식는다.
@@ -4006,11 +4255,16 @@ export class BattleView {
     backlashDamage = 0,
     focusedBacklash = false,
     groggyTriggered = false,
+    carriesToBody = false,
+    renderAfter = true,
   ) {
     const visibleWorkers = [...this.root.querySelectorAll<HTMLElement>(
       `.actor.foe[data-i="${enemyIdx}"] .queen-worker:not([hidden])`,
     )]
     const workers = count > 0 ? visibleWorkers.slice(-count) : []
+    const queen = this.root.querySelector<HTMLElement>(
+      `.actor.foe[data-i="${enemyIdx}"] > .model-shell`,
+    )
     workers.forEach((worker, index) => {
       playCharacterAnimation(worker, 'defeat')
       worker.animate(
@@ -4018,11 +4272,18 @@ export class BattleView {
           { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
           { transform: `translate(${index % 2 ? 105 : -105}px, -110px) rotate(${index % 2 ? 24 : -24}deg) scale(.55)`, opacity: 0 },
         ],
-        { duration: 280, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
+        { duration: 240, delay: index * 34, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
       )
+      SquareBurst.playOn(worker, 'damage', { spread: 72 + index * 10 })
     })
     this.popAt(enemyIdx, count > 0 ? `일벌 ${damage} 피해 · ${count}마리 퇴치` : `일벌 ${damage} 피해`, count > 0 ? 'guard big' : 'dmg')
-    await sleep(count > 0 ? 300 : 160)
+    await sleep(count > 0 ? Math.min(250, 130 + count * 28) : 120)
+    if (carriesToBody && queen) {
+      const from = workers[workers.length - 1] ?? queen
+      this.playQueenChainLink(from, queen)
+      this.popAt(enemyIdx, '연쇄 관통 → 본체!', 'dmg big weak')
+      await sleep(90)
+    }
     if (backlashDamage > 0) {
       this.popAt(enemyIdx, focusedBacklash ? `분노 집중! 본체 ${backlashDamage}` : `본체 ${backlashDamage}`, 'dmg big')
       this.log(`${focusedBacklash ? '분노 단일 공격으로 반동이 2배가 되어, 쓰러진' : '쓰러진'} 일벌이 여왕벌 본체에 ${backlashDamage} 피해를 되돌렸다.`)
@@ -4030,11 +4291,30 @@ export class BattleView {
     if (groggyTriggered) {
       this.popAt(enemyIdx, '일벌 전멸! 다음 턴 행동 불가!', 'buff big')
       this.log('일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 그 다음 턴에 일벌 넷을 다시 부른다.')
-      this.resolveBossPattern(say('지금이 빈틈이에요!!', 'relief'))
+      this.resolveBossPattern(bossTokenLine('queenOpportunity', 'relief'))
+      this.showBossSentenceEvent(bossText('workersGone'))
       await sleep(260)
+    } else if (count > 0) {
+      this.showBossSentenceEvent(bossText('workersErased', { count }))
     }
-    this.renderActors()
+    if (renderAfter) this.renderActors()
     if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
+  }
+
+  /** 마지막 일벌에서 여왕 본체까지 남은 피해가 같은 검기로 이어지는 경로를 그린다. */
+  private playQueenChainLink(fromEl: HTMLElement, toEl: HTMLElement) {
+    const from = this.toStageCenter(fromEl.getBoundingClientRect())
+    const to = this.toStageCenter(toEl.getBoundingClientRect())
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const link = document.createElement('i')
+    link.className = 'queen-chain-link'
+    link.style.left = `${from.x}px`
+    link.style.top = `${from.y}px`
+    link.style.width = `${Math.max(1, Math.hypot(dx, dy))}px`
+    link.style.setProperty('--angle', `${Math.atan2(dy, dx) * 180 / Math.PI}deg`)
+    this.q('#pbox').append(link)
+    this.timers.push(window.setTimeout(() => link.remove(), 520))
   }
 
   private async playSwarmRelease(enemyIdx: number): Promise<void> {
@@ -4090,8 +4370,13 @@ export class BattleView {
           ],
           { duration: 520, easing: 'cubic-bezier(.25,.8,.3,1)' },
         )
+        if (enemy?.def.boss) this.playBossSignatureEffect(enemy.def.id, 'telegraph', foe ?? null)
       } else {
         foe?.classList.add('lunge')
+        if (enemy?.def.boss) {
+          const signature = st.summonsReleased > 0 ? 'swarm' : st.animationStage >= 3 ? 'heavy' : 'attack'
+          this.playBossSignatureEffect(enemy.def.id, signature, foe ?? null)
+        }
       }
       const swarmFlight = st.summonsReleased > 0
         ? this.playSwarmRelease(st.idx)
@@ -4140,6 +4425,7 @@ export class BattleView {
         // 흡혈은 내려베기를 못 막았다는 뜻이다. 실패한 그 순간에 다음 대응을 다시 말해 준다.
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisPunished)
+          this.showBossSentenceEvent(bossText('mantisFailed'))
         }
       }
       if (st.groggyEntered) {
@@ -4147,6 +4433,7 @@ export class BattleView {
         this.log(`${this.state.enemies[st.idx].def.name}이 빈틈을 보였다 — 받는 피해 ×${st.groggyDamageMult.toFixed(1)} · 예정된 다음 공격을 한 턴 거른다`)
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.resolveBossPattern(TOKEN_BOSS_HINTS.mantisGroggy)
+          this.showBossSentenceEvent(bossText('mantisCorrected'))
         }
       }
       if (st.summonsReleased > 0) {
@@ -4157,6 +4444,47 @@ export class BattleView {
       if (!st.telegraphText) foe?.classList.remove('lunge')
     }
     this.renderActors()
+  }
+
+  /** 세 보스의 핵심 공격을 같은 사각 블라스트 대신 고유한 실루엣으로 읽히게 한다. */
+  private playBossSignatureEffect(
+    enemyId: string,
+    phase: 'telegraph' | 'attack' | 'heavy' | 'swarm',
+    foe: HTMLElement | null,
+  ) {
+    if (this.motionOff()) return
+    const pbox = this.q<HTMLElement>('#pbox')
+    const player = this.root.querySelector<HTMLElement>('.actor.you > .model-shell')
+    const target = player ? this.toStageCenter(player.getBoundingClientRect()) : { x: pbox.offsetWidth * .28, y: pbox.offsetHeight * .62 }
+    const source = foe ? this.toStageCenter((foe.querySelector<HTMLElement>(':scope > .model-shell') ?? foe).getBoundingClientRect()) : target
+    const fx = document.createElement('div')
+
+    if (enemyId === 'mantis') {
+      fx.className = `boss-signature-fx mantis-${phase === 'telegraph' ? 'telegraph' : phase === 'heavy' ? 'cleave' : 'slash'}`
+      const at = phase === 'telegraph' ? source : target
+      fx.style.left = `${at.x}px`
+      fx.style.top = `${at.y}px`
+      fx.innerHTML = phase === 'telegraph'
+        ? '<i class="sickle"></i><b>큰낫이 빛난다</b>'
+        : '<i class="blade"></i><i class="blade echo"></i><i class="cut-ring"></i>'
+    } else if (enemyId === 'queenBee') {
+      fx.className = `boss-signature-fx queen-${phase === 'swarm' ? 'swarm' : 'sting'}`
+      fx.style.left = `${target.x}px`
+      fx.style.top = `${target.y}px`
+      fx.innerHTML = phase === 'swarm'
+        ? '<i class="hex h1"></i><i class="hex h2"></i><i class="sting s1"></i><i class="sting s2"></i><i class="sting s3"></i><b>벌떼 돌격</b>'
+        : '<i class="sting s1"></i><i class="sting s2"></i>'
+    } else if (enemyId === 'elderSpider') {
+      fx.className = 'boss-signature-fx spider-bind'
+      fx.style.left = `${target.x}px`
+      fx.style.top = `${target.y}px`
+      fx.innerHTML = '<i class="web-ring r1"></i><i class="web-ring r2"></i><i class="web-cross"></i><b>방어 관통</b>'
+    } else {
+      return
+    }
+
+    pbox.append(fx)
+    this.timers.push(window.setTimeout(() => fx.remove(), phase === 'telegraph' ? 920 : 760))
   }
 
   // 중앙 총합 카운트업(띠리리릭).
@@ -4228,15 +4556,18 @@ export class BattleView {
     el.classList.add('hit')
   }
 
-  /** 첫 타격 프레임에서 주인공의 공격 클립과 돌진만 붙들며, 관통 연쇄에는 적용하지 않는다. */
-  private async attackHitStop(actor: HTMLElement, durationMs: number) {
-    const animations = actor.getAnimations()
-      .filter((animation) => animation.playState === 'running')
+  /** attack 애니메이션이 직접 닿은 첫 대상과 공격자만 붙든다. 관통 연쇄에는 적용하지 않는다. */
+  private async attackHitStop(actor: HTMLElement, target: HTMLElement | null, durationMs: number) {
+    if (this.motionOff()) return
+    const stoppedActors = target && target !== actor ? [actor, target] : [actor]
+    // 방금 붙인 피격 셰이크는 첫 프레임을 커밋하기 전까지 pending일 수 있다.
+    const animations = stoppedActors.flatMap((stoppedActor) => stoppedActor.getAnimations({ subtree: true }))
+      .filter((animation) => animation.playState === 'running' || animation.pending)
 
-    freezeCharacterAnimation(actor, true)
+    stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, true))
     animations.forEach((animation) => animation.pause())
     await sleep(durationMs)
-    freezeCharacterAnimation(actor, false)
+    stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, false))
     animations.forEach((animation) => {
       if (animation.playState === 'paused') animation.play()
     })

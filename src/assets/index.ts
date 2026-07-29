@@ -16,6 +16,9 @@ import rewardSubjectModifier from './ui/reward_subject_modifier.webp'
 import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
+import rewardRefresh from './ui/reward_refresh.svg'
+import inkBottle from './ui/ink_bottle.webp'
+import inkBarFrame from './ui/ink_bar_frame.webp'
 import player001 from './sprites/player_001.webp'
 import playerModel from './models/player.glb?url'
 import tokenModel from './models/token.glb?url'
@@ -35,6 +38,10 @@ import token003 from './sprites/token/token_003.webp'
 import token004 from './sprites/token/token_004.webp'
 import token005 from './sprites/token/token_005.webp'
 import token006 from './sprites/token/token_006.webp'
+import tutorialCard01 from './sprites/tutorial/tutorial_card_01.webp'
+import tutorialCard02 from './sprites/tutorial/tutorial_card_02.webp'
+import tutorialCard03 from './sprites/tutorial/tutorial_card_03.webp'
+import tutorialCard04 from './sprites/tutorial/tutorial_card_04.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
 import enemyFlea from './sprites/enemy_flea.webp'
 import enemyTermite from './sprites/enemy_termite.webp'
@@ -140,6 +147,7 @@ import itemStarLantern from './sprites/items/item_023.webp'
 import itemOilLantern from './sprites/items/item_024.webp'
 import itemCompass from './sprites/items/item_025.webp'
 import itemSatchel from './sprites/items/item_026.webp'
+import forgeHammer from './sprites/items/hammer_sprite.webp'
 import cinematic from './video/cinematic.webm'
 import bossCinematic001 from './video/bosscinematic_001.webm'
 import attack001 from './video/attack_001.webm'
@@ -150,6 +158,8 @@ import sentenceComplete from './audio/sentence-complete.mp3'
 import paperAttack from './audio/paper-attack.mp3'
 import paper from './audio/paper.mp3'
 import cardHover from './audio/cardhover.mp3'
+import wordSelect from './audio/word-select.mp3'
+import forgeHit from './audio/forge-hit.mp3'
 import pencil from './audio/pencil.mp3'
 import button from './audio/button.mp3'
 import battleStoryEatingBugs from './audio/battle-story-eating-bugs.mp3'
@@ -206,7 +216,14 @@ export const REWARD_ART = {
   item: rewardItem,
   verb: rewardVerb,
   clear: rewardClear,
+  refresh: rewardRefresh,
 }
+
+/** 잉크 HUD 전용 에셋. 교체할 때 소비 View 대신 이 매니페스트만 바꾼다. */
+export const INK_UI = {
+  bottle: inkBottle,
+  barFrame: inkBarFrame,
+} as const
 
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상과 화면 장식.
 // crown~gloom은 다이얼로그에 아직 안 쓰이고 장식으로 먼저 들어왔다.
@@ -218,6 +235,14 @@ export const TOKEN_FACES = {
   party: token005, // 고깔모자에 나팔 — 축하 자리
   gloom: token006, // 파랗게 질려 고개를 떨굼 — 패배·손실 자리
 }
+
+/** 튜토리얼 대사 선택 카드 원화. 게임의 희·노·애·락 순서와 1:1로 대응한다. */
+export const TUTORIAL_CARD_ART = [
+  tutorialCard02, // 기쁨
+  tutorialCard01, // 분노
+  tutorialCard04, // 슬픔
+  tutorialCard03, // 즐거움
+] as const
 
 // 카드 감정 뱃지 — 사용자 제공 수채화 캐릭터를 런타임 WebP로 최적화한 아이콘.
 export const EMOTION_FACES: Record<string, string> = {
@@ -380,6 +405,9 @@ export const ITEM_ART: Record<string, string> = {
   satchel: itemSatchel,
 }
 
+/** 아이템 제련 타격 연출에 공통으로 쓰는 투명 망치 스프라이트. */
+export const FORGE_HAMMER_ART = forgeHammer
+
 // 영상 — 오프닝 시네마틱과 공격 액션 컷.
 // attack1은 수치가 크게 부풀었을 때, attack2는 그 일격이 판을 통째로 쓸어버릴 때.
 export const VIDEO = {
@@ -398,6 +426,8 @@ export const AUDIO = {
   paperAttack,
   paper,
   cardHover,
+  wordSelect,
+  forgeHit,
   pencil,
   button,
   battleStoryEatingBugs,

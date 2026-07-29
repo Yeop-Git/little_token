@@ -26,13 +26,26 @@ export interface RewardOption {
   item?: ItemDef
 }
 
+/** 영감 가격은 희귀도만 읽는다. 같은 등급 안에서는 새 카드와 반복강화가 같은 선택 무게를 갖는다. */
+export const REWARD_PRICE: Readonly<Record<Rarity, number>> = {
+  common: 2,
+  rare: 4,
+  epic: 7,
+  legendary: 10,
+}
+export const REWARD_REFRESH_COST = 1
+
+export function rewardPrice(option: RewardOption): number {
+  return REWARD_PRICE[option.rarity]
+}
+
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식어', verb: '동사', obj: '목적어', end: '어미' }
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary']
 
-function shuffle<T>(values: T[]): T[] {
+function shuffle<T>(values: T[], rng: () => number): T[] {
   const result = [...values]
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[result[i], result[j]] = [result[j], result[i]]
   }
   return result
@@ -111,6 +124,7 @@ function pickOne(
   grade: number,
   day: number,
   used: Set<string>,
+  rng: () => number,
   forceRarity?: Rarity,
 ): RewardOption | null {
   const pools = new Map<Rarity, RewardOption[]>()
@@ -121,10 +135,10 @@ function pickOne(
     pool.push(option)
     pools.set(option.rarity, pool)
   }
-  for (const [rarity, pool] of pools) pools.set(rarity, shuffle(pool))
+  for (const [rarity, pool] of pools) pools.set(rarity, shuffle(pool, rng))
   const pool = forceRarity
     ? pools.get(forceRarity) ?? null
-    : nearestPool(pools, rollRewardRarity(grade, day))
+    : nearestPool(pools, rollRewardRarity(grade, day, rng))
   if (!pool) return null
   const option = pool[0]
   used.add(option.word?.id ?? option.item?.id ?? option.name)
@@ -163,7 +177,7 @@ const toItemOption = (item: ItemDef): RewardOption => ({
   kind: 'item',
   rarity: item.rarity,
   name: item.name,
-  desc: item.passive ? '고유효과 · 감탄사로 스탯 선택' : '감탄사로 스탯 선택',
+  desc: item.passive ? '고유효과 · 제련 문장으로 스탯 선택' : '제련 문장으로 스탯 선택',
   art: 'gift',
   item,
 })
@@ -175,7 +189,7 @@ function itemOptions(player: PlayerState): RewardOption[] {
   return [...Object.values(ITEMS), ...passives].map(toItemOption)
 }
 
-function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb'): RewardOption[] {
+function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb', rng: () => number): RewardOption[] {
   const slots = phase === 'subject' ? ['subj', 'adv'] : ['verb']
   const all = wordOptions(player, slots)
   const used = new Set<string>()
@@ -184,14 +198,14 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)
   if (bossRarity) {
-    const option = pickOne(all, grade, day, used, bossRarity)
+    const option = pickOne(all, grade, day, used, rng, bossRarity)
     if (option) picks.push(option)
   }
   // 첫 단계는 세 장이 한 문법에 몰리지 않도록 주어와 수식어를 한 장씩 보장한다.
   if (phase === 'subject') {
     for (const slot of slots) {
       if (picks.some((entry) => entry.word?.slot === slot)) continue
-      const option = pickOne(all.filter((entry) => entry.word?.slot === slot), grade, day, used)
+      const option = pickOne(all.filter((entry) => entry.word?.slot === slot), grade, day, used, rng)
       if (option) picks.push(option)
     }
   }
@@ -199,18 +213,18 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   // Already-owned cards remain useful here because the reward becomes a reinforcement.
   if (phase === 'verb') {
     const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
-    const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used)
+    const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
     if (option) picks.push(option)
   }
   while (picks.length < 3) {
-    const option = pickOne(all, grade, day, used)
+    const option = pickOne(all, grade, day, used, rng)
     if (!option) break
     picks.push(option)
   }
-  return shuffle(picks)
+  return shuffle(picks, rng)
 }
 
-function generateItemRewards(player: PlayerState, grade: number, day: number): RewardOption[] {
+function generateItemRewards(player: PlayerState, grade: number, day: number, rng: () => number): RewardOption[] {
   const items = itemOptions(player)
   const used = new Set<string>()
   const picks: RewardOption[] = []
@@ -219,15 +233,15 @@ function generateItemRewards(player: PlayerState, grade: number, day: number): R
   // 10층에는 매 사이클 전설 규칙 아이템을 최소 한 장 선택할 수 있게 둔다.
   const forceLegendaryItem = floorInCycle(day) === GUARANTEED_LEGENDARY_ITEM_FLOOR
   if (forceLegendaryItem) {
-    const item = pickOne(items, grade, day, used, 'legendary')
+    const item = pickOne(items, grade, day, used, rng, 'legendary')
     if (item) picks.push(item)
   }
   while (picks.length < 3) {
-    const option = pickOne(items, grade, day, used)
+    const option = pickOne(items, grade, day, used, rng)
     if (!option) break
     picks.push(option)
   }
-  return shuffle(picks)
+  return shuffle(picks, rng)
 }
 
 export function genRewards(
@@ -235,8 +249,22 @@ export function genRewards(
   grade = startGrade(player.stats.luck),
   day = 1,
   phase: RewardPhase = 'subject',
+  rng: () => number = Math.random,
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
-  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day)
-  return generateWordRewards(player, effectiveGrade, day, phase)
+  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day, rng)
+  return generateWordRewards(player, effectiveGrade, day, phase, rng)
+}
+
+/** 저장된 씨앗·단계·새로고침 횟수에서 같은 진열을 재현하는 작은 PRNG. */
+export function rewardOfferRng(seed: number, phase: RewardPhase, refreshes: number): () => number {
+  const phaseSalt: Record<RewardPhase, number> = { subject: 0x13579bdf, item: 0x2468ace, verb: 0x5bd1e995 }
+  let state = (seed ^ phaseSalt[phase] ^ Math.imul(refreshes + 1, 0x9e3779b1)) >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let value = state
+    value = Math.imul(value ^ (value >>> 15), value | 1)
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
 }

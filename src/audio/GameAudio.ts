@@ -7,6 +7,8 @@ type EffectName =
   | 'paperAttack'
   | 'paper'
   | 'cardHover'
+  | 'wordSelect'
+  | 'forgeHit'
   | 'pencil'
   | 'button'
   | 'resonanceJoy'
@@ -31,6 +33,8 @@ const EFFECT_VOLUME: Record<EffectName, number> = {
   paperAttack: 0.38,
   paper: 0.46,
   cardHover: 0.28,
+  wordSelect: 0.4,
+  forgeHit: 0.54,
   pencil: 0.34,
   button: 0.36,
   resonanceJoy: 0.48,
@@ -49,8 +53,18 @@ const EFFECT_VOLUME: Record<EffectName, number> = {
   gameOver: 0.54,
 }
 const BATTLE_EFFECTS = Object.keys(EFFECT_VOLUME) as EffectName[]
-const UI_EFFECTS: EffectName[] = ['button', 'cardHover', 'hover']
+const UI_EFFECTS: EffectName[] = ['button', 'cardHover', 'wordSelect', 'hover']
 const BUFFERED_BATTLE_EFFECTS = BATTLE_EFFECTS.filter((effect) => effect !== 'pencil')
+const CARD_INTERACTIVE_SELECTOR = [
+  '.word-card',
+  '.word-cell',
+  '.reward-pick',
+  '.discard-pick',
+  '.deck-hover-card',
+  '.draw-deck',
+  '.codex-selectable[data-detail-kind="word"]',
+  '.codex-selectable[data-detail-kind="item"]',
+].join(', ')
 
 const BGM_TRACK: Record<BgmName, string> = {
   title: AUDIO.bgm,
@@ -205,6 +219,14 @@ class GameAudioController {
     bell.stop(bellStart + 0.24)
   }
 
+  /** Play the recorded metal impact at the exact forge hammer contact frame. */
+  playForgeHit(beat = 0) {
+    const source = this.getEffect('forgeHit')
+    const voice = source.play()
+    source.volume(EFFECT_VOLUME.forgeHit, voice)
+    source.rate(Math.min(1.08, 1 + Math.max(0, beat) * 0.025), voice)
+  }
+
   installButtonSounds() {
     if (this.buttonSoundsInstalled) return
     this.buttonSoundsInstalled = true
@@ -219,6 +241,10 @@ class GameAudioController {
       // 단어 카드를 포함해 실제 클릭이 닿는 모든 입력면에 공용 피드백을 준다.
       // 비활성 요소와 소리를 명시적으로 끈 연출만 제외한다.
       if (!(target instanceof Element) || target.closest(':disabled, [aria-disabled="true"], [data-click-sound="none"]')) return
+      if (target.closest(CARD_INTERACTIVE_SELECTOR)) {
+        this.play('wordSelect')
+        return
+      }
       this.play('button')
     }, true)
     // pointerenter는 버블링하지 않는다. pointerover를 위임하되 같은 버튼의 자식
@@ -226,7 +252,7 @@ class GameAudioController {
     document.addEventListener('pointerover', (event) => {
       const target = event.target
       const card = target instanceof Element
-        ? target.closest<HTMLElement>('.word-card, .word-cell, .reward-pick, .discard-pick, .deck-hover-card, .draw-deck, .codex-selectable[data-detail-kind="word"]')
+        ? target.closest<HTMLElement>(CARD_INTERACTIVE_SELECTOR)
         : null
       if (card) {
         if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return
@@ -333,7 +359,7 @@ class GameAudioController {
       html5: streams,
       preload: streams ? 'metadata' : true,
       volume: EFFECT_VOLUME[effect],
-      pool: effect === 'cardHover' || effect === 'hover' || effect === 'swordHit' ? 8 : effect === 'pencil' ? 1 : 5,
+      pool: effect === 'cardHover' || effect === 'wordSelect' || effect === 'hover' || effect === 'swordHit' ? 8 : effect === 'pencil' ? 1 : 5,
     })
     source.on('loaderror', () => this.failedLoads.add(source))
     this.effects.set(effect, source)

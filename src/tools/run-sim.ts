@@ -6,7 +6,7 @@
  * 실제 난이도는 개별 전투 승률이 아니라 **1층부터 누적되는 소모전**에서 나온다.
  *
  * 이 도구는 1층부터 15층까지 한 런을 통째로 굴린다. 보상 3단계(주어·수식어 →
- * 아이템 → 동사)를 실제 `genRewards`로 뽑아 고르고, 남은 체력과 방어막을 다음
+ * 아이템 → 동사)를 실제 `genRewards`로 뽑아 영감 잔액 안에서 사고, 남은 체력과 방어막을 다음
  * 층으로 그대로 넘긴다. 여러 시드를 돌려 **어느 층에서 몇 %가 죽는지**를 센다.
  *
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
@@ -21,8 +21,8 @@ import { applyItemReward, registerWord, startingPlayer } from '@core/run'
 import { makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { STORY_FLOORS, stageFor } from '@data/stages'
-import { genRewards, type RewardOption } from '@data/rewards'
-import { EXCLAIM_SLOTS, exclaimModsFor, rollExclaimMultipliers, type StatKey } from '@data/items'
+import { genRewards, rewardPrice, type RewardOption } from '@data/rewards'
+import { EXCLAIM_SLOTS, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers, type StatKey } from '@data/items'
 import {
   aliveIdx,
   allDead,
@@ -64,8 +64,8 @@ interface Candidate {
 
 /** 보상 기량 — 세 장 중 무엇을 고르는가. */
 type RewardSkill = 'random' | 'ok' | 'best'
-/** 전투 기량 — 늘 최대 피해(greedy)인가, 예고·체력을 읽고 방어·회복을 섞는가(smart). */
-type CombatSkill = 'greedy' | 'smart'
+/** 전투 기량 — 평균 플레이는 매 턴 70% 확률로 위협을 읽고, 숙련자는 항상 읽는다. */
+type CombatSkill = 'greedy' | 'average' | 'smart'
 
 // ─────────────────────────────────────────── 플레이어 복제/평가
 
@@ -127,12 +127,15 @@ const EXCLAIM_WEIGHT: Record<RewardSkill, Record<StatKey, number>> = {
 
 function exclaimStats(rarity: Rarity, skill: RewardSkill, rng: () => number): Partial<PlayerStats> {
   const mults = rollExclaimMultipliers(rarity, rng)
+  const openChoices = rollExclaimChoices(rng)
   const out: Partial<PlayerStats> = {}
   const weight = EXCLAIM_WEIGHT[skill]
   EXCLAIM_SLOTS.forEach((slot, i) => {
+    const choices = openChoices[slot.key] ?? []
+    if (!choices.length) return
     const pick = skill === 'random'
-      ? slot.words[Math.floor(rng() * slot.words.length)]
-      : [...slot.words].sort((a, b) => scoreMods(b.mods, weight) - scoreMods(a.mods, weight))[0]
+      ? choices[Math.floor(rng() * choices.length)]
+      : [...choices].sort((a, b) => scoreMods(b.mods, weight) - scoreMods(a.mods, weight))[0]
     const mods = exclaimModsFor(mults[i], pick.mods)
     for (const [k, v] of Object.entries(mods)) {
       out[k as keyof PlayerStats] = (out[k as keyof PlayerStats] ?? 0) + (v ?? 0)
@@ -173,9 +176,10 @@ function applyOption(player: PlayerState, opt: RewardOption, skill: RewardSkill,
 }
 
 /** 한 층 클리어 보상 3단계를 실제 genRewards로 뽑아 고른다. */
-function takeRewards(player: PlayerState, grade: number, day: number, skill: RewardSkill, rng: () => number): void {
+function takeRewards(player: PlayerState, grade: number, day: number, skill: RewardSkill, rng: () => number, wallet: { inspiration: number }): void {
+  wallet.inspiration += Math.max(0, Math.round(grade))
   for (const phase of ['subject', 'item', 'verb'] as const) {
-    const options = genRewards(player, grade, day, phase)
+    const options = genRewards(player, grade, day, phase).filter((option) => rewardPrice(option) <= wallet.inspiration)
     if (!options.length) continue
     let chosen = options[Math.floor(rng() * options.length)]
     if (skill !== 'random') {
@@ -193,6 +197,7 @@ function takeRewards(player: PlayerState, grade: number, day: number, skill: Rew
       // ok는 최선을 늘 알아보지는 못한다 — 3할은 아무거나 고른다.
       if (skill === 'ok' && rng() < 0.3) chosen = options[Math.floor(rng() * options.length)]
     }
+    wallet.inspiration -= rewardPrice(chosen)
     applyOption(player, chosen, skill, rng)
   }
 }
@@ -346,12 +351,17 @@ function fightStage(
 
     const hand = enumerate(player, tables, hands, sealed, killsThisBattle)
     if (!hand.length) break
-    const bestAttack = [...hand].sort((a, b) => railValue(b, state) - railValue(a, state) || b.dmg - a.dmg)[0]
+    const rankedAttacks = [...hand].sort((a, b) => railValue(b, state) - railValue(a, state) || b.dmg - a.dmg)
+    // 평균 플레이는 손패의 상위 25% 안에서 자연스러운 문장을 고른다. 매번 전 조합의
+    // 수학적 최댓값을 집는 모델은 실제 플레이어가 아니라 솔버라 완주율을 과대평가한다.
+    const attackPool = skill === 'average' ? Math.max(1, Math.ceil(rankedAttacks.length * 0.25)) : 1
+    const bestAttack = rankedAttacks[skill === 'average' ? Math.floor(rng() * attackPool) : 0]
     const bestGuard = hand.filter((c) => c.guard > 0).sort((a, b) => b.guard - a.guard)[0]
     const bestHeal = hand.filter((c) => c.heal > 0).sort((a, b) => b.heal - a.heal)[0]
     let pick = (bestAttack?.dmg ?? 0) > 0 ? bestAttack : bestGuard ?? bestHeal ?? bestAttack
 
-    if (skill === 'smart') {
+    const readsSituation = skill === 'smart' || (skill === 'average' && rng() < 0.7)
+    if (readsSituation) {
       const step = nextEnemyAttackStep(boss)
       const telegraphed = !!step && step.damageScale === 0
       const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
@@ -462,6 +472,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, verbose
   Math.random = rng // genRewards의 shuffle까지 시드에 묶는다
   try {
     const player = startingPlayer()
+    const wallet = { inspiration: 0 }
     const carried = { hp: player.stats.hp, guard: 0 }
     const hpTrace: RunResult['hpTrace'] = []
     const log: string[] = []
@@ -477,7 +488,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, verbose
       }
       carried.hp = result.hp
       carried.guard = result.guard
-      takeRewards(player, result.grade, day, reward, rng)
+      takeRewards(player, result.grade, day, reward, rng, wallet)
     }
     return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log }
   } finally {
@@ -488,6 +499,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, verbose
 // ─────────────────────────────────────────── 리포트
 
 const verbose = process.argv.includes('--verbose')
+const check = process.argv.includes('--check')
 const runsArg = process.argv.find((a) => a.startsWith('--runs='))
 const RUNS = runsArg ? Math.max(1, Number(runsArg.split('=')[1])) : 60
 
@@ -497,9 +509,19 @@ console.log(`풀런 시뮬레이션 — 기량별 ${RUNS}회, 1~${STORY_FLOORS}�
 
 const SKILL_PROFILES: { label: string; reward: RewardSkill; combat: CombatSkill }[] = [
   { label: 'naive', reward: 'random', combat: 'greedy' },
-  { label: 'average', reward: 'ok', combat: 'smart' },
+  { label: 'average', reward: 'ok', combat: 'average' },
   { label: 'expert', reward: 'best', combat: 'smart' },
 ]
+
+interface ProfileMetrics {
+  label: string
+  cleared: number
+  reach5: number
+  avgFloor: number
+  firstFloorDeaths: number
+  avgTurns: number
+}
+const metrics: ProfileMetrics[] = []
 
 for (const profile of SKILL_PROFILES) {
   const runs = Array.from(
@@ -551,6 +573,35 @@ for (const profile of SKILL_PROFILES) {
   const s = sample.finalStats
   console.log(`  대표 런 최종 스탯: HP ${s.hp} · 공 ${s.atk} · 방 ${s.guard} · 회 ${s.heal} · 운 ${s.luck}`)
   const turns = runs.flatMap((r) => r.hpTrace.map((t) => t.turns))
-  console.log(`  평균 전투 길이 ${(turns.reduce((a, b) => a + b, 0) / turns.length).toFixed(1)}턴\n`)
+  const avgTurns = turns.reduce((a, b) => a + b, 0) / turns.length
+  console.log(`  평균 전투 길이 ${avgTurns.toFixed(1)}턴\n`)
+  metrics.push({
+    label: profile.label,
+    cleared,
+    reach5,
+    avgFloor,
+    firstFloorDeaths: runs.filter((r) => r.diedOn === 1).length,
+    avgTurns,
+  })
   if (verbose) sample.log.forEach((l) => console.log(l))
+}
+
+if (check) {
+  const byLabel = Object.fromEntries(metrics.map((metric) => [metric.label, metric]))
+  const naive = byLabel.naive
+  const average = byLabel.average
+  const expert = byLabel.expert
+  const violations: string[] = []
+  if (metrics.some((metric) => metric.firstFloorDeaths > 0)) violations.push('초반 학습 구간인 1층에서 사망이 발생했다')
+  if (naive.reach5 / RUNS < 0.25) violations.push('무작위 보상 플레이의 5층 도달률이 25% 미만이다')
+  if (average.cleared / RUNS < 0.75) violations.push('평균 플레이의 15층 클리어율이 75% 미만이다')
+  if (average.cleared / RUNS > 0.95) violations.push('평균 플레이의 15층 클리어율이 95%를 넘어 난이도 곡선이 무의미하다')
+  if (expert.cleared < average.cleared) violations.push('숙련 플레이가 평균 플레이보다 낮은 클리어율을 보인다')
+  if (average.avgFloor - naive.avgFloor < 4) violations.push('선택 기량에 따른 평균 도달층 차이가 4층 미만이다')
+  if (average.avgTurns < 1.4) violations.push('평균 전투 길이가 1.4턴 미만이라 문장 선택이 의미를 잃는다')
+  if (violations.length) {
+    console.error(`밸런스 계약 위반 ${violations.length}건:\n- ${violations.join('\n- ')}`)
+    process.exit(1)
+  }
+  console.log('밸런스 계약 통과 — 초반 생존 · 평균 완주 가능성 · 기량 격차 · 전투 길이')
 }

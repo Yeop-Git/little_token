@@ -1,13 +1,14 @@
 /**
  * 아이템 패시브 — 스탯이 아니라 "문장을 읽는 규칙"을 바꾸는 효과.
  *
- * 모든 아이템은 감탄사 선택으로만 스탯을 얻는다. 영웅/전설은 여기에 규칙 변경을 더한다.
+ * 영웅/전설 아이템은 감탄사 선택으로 스탯을 얻고 여기에 규칙 변경을 더한다.
  * 고유효과 등급의 감탄사 예산도 4/5점으로 보수적으로 제한해 아이템과 단어가 같은 축에서
  * 경쟁하지 않게 한다.
  */
 
 import type { PlayerState } from './player'
 import type { CompileMods } from './types'
+import { currentLocale } from '@/localization'
 
 export type PassiveId =
   | 'echo' // 누댕의 메아리 — 대성공하면 그 문장이 한 번 더 발동한다
@@ -31,7 +32,7 @@ export const BBQ_PER_KILL = 0.05
 /** 피노키오의 미아핑 — "…근데?" 한 번의 배율 상한(1.0 ~ 1+이 값). */
 export const DOUBT_RANGE = 0.3
 /** 완성한 문장 끝에 항상 붙는 말. 문장에 그대로 들어가므로 로그·체인에 함께 보인다. */
-export const DOUBT_SUFFIX = '…근데?'
+export const DOUBT_SUFFIX = currentLocale === 'en' ? '…but?' : currentLocale === 'ja' ? '…でも？' : currentLocale === 'ru' ? '…но?' : currentLocale === 'zh-Hans' ? '……但是？' : currentLocale === 'zh-Hant' ? '……但是？' : '…근데?'
 
 export interface PassiveDef {
   id: PassiveId

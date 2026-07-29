@@ -27,6 +27,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
+import { selectionInkCost, SENTENCE_INK } from '@core/ink'
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -43,6 +44,8 @@ import { BOSS_BY_FLOOR, bossHealthBarsForFloor, MAX_ENCOUNTER, STORY_FLOORS } fr
 import { CARD_HAND_CONFIG } from '@/ui/CardHand'
 import { emotionBadgeContent } from '@/ui/EmotionBadge'
 import { wordCardHtml } from '@/ui/WordCardFace'
+import { currentLocale } from '@/localization'
+import { localizedGuidePages } from '@/localization/guide'
 
 interface Opts {
   onBack: () => void
@@ -89,14 +92,14 @@ function cardSlot(word: Word | null, caption?: string): string {
 }
 
 export class CombatGuideView {
-  private chapters: Chapter[] = [
+  private chapters: Chapter[] = currentLocale === 'ko' ? [
     { key: 'flow', title: '전투의 흐름', hint: '한 턴에 벌어지는 일', body: () => this.pageFlow() },
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
     { key: 'damage', title: '피해가 정해지는 순서', hint: '깡수치 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
     { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
-  ]
+  ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body }))
 
   private active = 0
 
@@ -186,6 +189,8 @@ export class CombatGuideView {
     }).join('<span class="g-plus" aria-hidden="true">+</span>')
 
     const sentence = slots.map((slot) => slotWord(slot.key, EXAMPLE_IDS[slot.key])?.text ?? '____').join(' ')
+    const exampleSelection = Object.fromEntries(slots.map((slot) => [slot.key, slotWord(slot.key, EXAMPLE_IDS[slot.key]) ?? undefined]))
+    const exampleInk = selectionInkCost(exampleSelection)
 
     const phases: [string, string, string][] = [
       ['1', '단어 고르기', `${slots.map((s) => s.label).join(' → ')} 순서로 카드를 한 장씩 확정한다`],
@@ -204,6 +209,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
+      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_INK}</b> · 문장마다 잉크 ${SENTENCE_INK}을 새로 채운다. 합계가 넘더라도 완성할 수 있지만 초과분만큼 체력을 지불한다.</p>
 
       <h3 class="g-h3">한 턴의 순서</h3>
       <ol class="g-flow">
@@ -241,7 +247,8 @@ export class CombatGuideView {
     const parts: [string, string][] = [
       ['왼쪽 위 · 감정', `기쁨·분노·슬픔·즐거움 중 하나. 같은 감정을 모으면 공명 배율이 붙는다.`],
       ['가운데 위 · 행동', '동사 카드에만 붙는 표식으로 공격·방어·회복을 가린다.'],
-      ['오른쪽 위 · 등급', `${Object.values(RARITY_LABEL).join(' · ')}. 반복해서 얻으면 <b>Lv.</b>가 함께 오른다.`],
+      ['오른쪽 위 · 비용', '문장을 쓸 때 소비하는 잉크. 감정과 겹치지 않게 반대편에 표시한다.'],
+      ['테두리와 상세 · 등급', `${Object.values(RARITY_LABEL).join(' · ')}. 카드에 마우스를 올리면 등급과 반복강화 <b>Lv.</b>를 함께 볼 수 있다.`],
       ['가운데 · 이름', '문장에 실제로 적히는 말. 조사는 칸에 맞춰 자동으로 붙는다.'],
       ['아래 · 한 줄 효과', '이 카드가 문장에 보태는 값 전부. 숨은 수치는 없다.'],
     ]

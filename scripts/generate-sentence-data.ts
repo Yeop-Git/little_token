@@ -299,7 +299,10 @@ itemRows.forEach((row, index) => {
 
   const passive = row.passive?.trim() || undefined
   const budget = base.hp / 2 + base.atk + base.guard + base.heal + base.luck
-  if (budget !== 0) throw new Error(`items.csv:${line}: 스탯은 감탄사에서만 얻으므로 CSV 기본 스탯은 0이어야 합니다.`)
+  const expectedBudget = typedRarity === 'common' ? 1 : typedRarity === 'rare' ? 2 : 0
+  if (budget !== expectedBudget) {
+    throw new Error(`items.csv:${line}: ${typedRarity} 기본 스탯 예산은 ${expectedBudget}점이어야 합니다. (현재 ${budget}점)`)
+  }
   if (typedRarity === 'common' || typedRarity === 'rare') {
     if (passive) throw new Error(`items.csv:${line}: 노멀·희귀 아이템에는 고유효과를 넣을 수 없습니다.`)
   } else {

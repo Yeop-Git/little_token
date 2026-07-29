@@ -73,7 +73,7 @@ export class DeckDiscardView {
             오른쪽의 새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 현재 보유 카드 중 한 장을 골라 버린다.
           </div>
           <div class="discard-body">
-            <div class="reward-grid discard-grid">
+            <div class="reward-grid discard-grid" tabindex="0" aria-label="버릴 보유 카드 목록">
               ${opts.candidates.map(candidateHtml).join('')}
             </div>
             ${incomingHtml(opts.incoming)}

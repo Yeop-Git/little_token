@@ -8,8 +8,9 @@
 import { SKILL_ART } from '@/assets'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
-import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
+import { wordInkCost } from '@core/ink'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -55,24 +56,32 @@ export function wordActionBadge(word: Word): string {
   return `<span class="card-action action-${action.cls}" title="${action.label}" aria-hidden="true">${icon(action.glyph)}</span>`
 }
 
-interface FaceOpts {
+export interface WordCardFaceOpts {
   /** 선택 불가 사유처럼 카드 문구를 갈아 끼울 때 쓴다. 기본은 단어의 note. */
   note?: string
   /** 일러스트 없는 카드 하단의 작은 글자. */
   footer?: string
   /** 거미줄 봉인처럼 앞면 위에 덮는 겹. */
   overlay?: string
+  /** 스킬 카드 외의 화면에서 공용 앞면에 넣을 별도 일러스트 URL. */
+  artUrl?: string
+  /** 튜토리얼 대사처럼 감정과 잉크 정보가 의미 없는 카드에서 메타 배지를 숨긴다. */
+  hideMeta?: boolean
+  /** 잉크 비용은 남기되 감정 아이콘만 의미 없는 화면에서 숨긴다. */
+  hideEmotion?: boolean
 }
 
 /** 카드 앞면 한 겹. 일러스트가 있으면 원화 카드, 없으면 문양 카드로 그린다. */
-export function wordCardFrontHtml(word: Word, opts: FaceOpts = {}): string {
-  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '' } = opts
-  const artUrl = word.art ? SKILL_ART[word.art] : undefined
-  const level = word.level ?? 1
-  const rarity = word.rarity ?? 'common'
+export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): string {
+  const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false, hideEmotion = false } = opts
+  const artUrl = opts.artUrl ?? (word.art ? SKILL_ART[word.art] : undefined)
   const emotion = emotionOrNeutral(word.emotion)
-  const levelBadge = `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
-  const badges = `${levelBadge}${emotionIconBadge(emotion, 'card-emotion')}${wordActionBadge(word)}`
+  const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
+  const costBadge = hideMeta ? '' : `<span class="card-cost" title="잉크 비용" aria-label="잉크 ${wordInkCost(word)}">${wordInkCost(word)}</span>`
+  const resourceBadge = hideMeta
+    ? ''
+    : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
+  const badges = `${resourceBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
@@ -96,6 +105,11 @@ export function wordCardFrontHtml(word: Word, opts: FaceOpts = {}): string {
         </span>`
 }
 
+/** 버튼·도움말처럼 손패 밖에서 카드를 쓸 때도 앞면과 내부 구조를 그대로 공유한다. */
+export function wordCardInnerHtml(word: Word, opts: WordCardFaceOpts = {}): string {
+  return `<span class="card-lift"><span class="card-inner">${wordCardFrontHtml(word, opts)}</span></span>`
+}
+
 /**
  * 손패 밖에 한 장만 세우는 정적 카드. 손패 좌표 변수(--card-x/--card-z)를
  * 0으로 고정하므로 감싸는 칸이 크기만 잡아 주면 된다.
@@ -105,6 +119,6 @@ export function wordCardHtml(word: Word, className = ''): string {
   const rarity = word.rarity ?? 'common'
   return `<span class="word-card mood-${wordMood(word)} emotion-${emotion} rarity-${rarity}${className ? ` ${className}` : ''}"
       style="--card-x:0px;--card-z:1" aria-hidden="true">
-      <span class="card-lift"><span class="card-inner">${wordCardFrontHtml(word)}</span></span>
+      ${wordCardInnerHtml(word)}
     </span>`
 }

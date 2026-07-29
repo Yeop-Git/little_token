@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
+import { GraphicsSettings } from '@/ui/GameSettings'
 
 export type BattleAnimation = 'idle' | 'idle2' | 'walk' | 'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 /** 한 번만 재생하고 끝나는 동작. idle 계열과 walk는 계속 도는 클립이라 여기 안 든다. */
@@ -15,6 +16,8 @@ const TRANSITION_SECONDS = 0.18
 const LOOP_BLEND_SAMPLE_RATE = 30
 const MODEL_YAW_RETURN_SPEED = 9
 const MODEL_YAW_RETURN_EPSILON = 0.001
+const BOSS_EXPOSURE_BOOST = 1.14
+const BOSS_EMISSIVE_BOOST = 0.12
 const RETURN_TO_IDLE = new Set<BattleAnimation>(['appear', 'attack', 'attack2', 'attack3', 'heal', 'shield'])
 
 type BattleWeather = 'sunny' | 'rain' | 'night'
@@ -31,6 +34,7 @@ interface BattleAtmosphere {
   keyLightPosition: readonly [number, number, number]
   emissiveIntensity: number
   exposure: number
+  shadowFloor: number
 }
 
 /**
@@ -81,12 +85,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0xffe9bd),
     keyLight: new THREE.Color(0xffedc7),
     skyMix: 0.07,
-    groundMix: 0.28,
+    groundMix: 0.18,
     skyLightIntensity: 0.56,
     keyLightIntensity: 1.5,
     keyLightPosition: [-3.5, 6, 5],
-    emissiveIntensity: 0.38,
-    exposure: 0.96,
+    emissiveIntensity: 0.44,
+    exposure: 1.02,
+    shadowFloor: 0.5,
   },
   rain: {
     skyTint: new THREE.Color(0xaec8d0),
@@ -94,12 +99,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0xb8d0d7),
     keyLight: new THREE.Color(0xd7e4df),
     skyMix: 0.12,
-    groundMix: 0.36,
+    groundMix: 0.22,
     skyLightIntensity: 0.4,
     keyLightIntensity: 1.02,
     keyLightPosition: [-1.5, 7, 4],
-    emissiveIntensity: 0.28,
-    exposure: 0.84,
+    emissiveIntensity: 0.38,
+    exposure: 0.96,
+    shadowFloor: 0.48,
   },
   night: {
     skyTint: new THREE.Color(0x8998c4),
@@ -107,12 +113,13 @@ const BATTLE_ATMOSPHERES: Record<BattleWeather, BattleAtmosphere> = {
     skyLight: new THREE.Color(0x7188bd),
     keyLight: new THREE.Color(0xffc879),
     skyMix: 0.17,
-    groundMix: 0.46,
+    groundMix: 0.26,
     skyLightIntensity: 0.24,
     keyLightIntensity: 0.82,
     keyLightPosition: [-4, 3.2, 5.5],
-    emissiveIntensity: 0.14,
-    exposure: 0.7,
+    emissiveIntensity: 0.32,
+    exposure: 0.9,
+    shadowFloor: 0.44,
   },
 }
 
@@ -157,77 +164,12 @@ const modelLoader = new GLTFLoader()
 const normalizedClipCache = new WeakMap<THREE.AnimationClip, Map<string, THREE.AnimationClip>>()
 // 모든 배우가 한 WebGL 컨텍스트를 공유한다. 배우마다 컨텍스트를 만들면 여왕벌전에서
 // 같은 텍스처·셰이더를 일곱 번 GPU에 올려 첫 출력마다 수 초씩 메인 스레드가 멎는다.
-const SHARED_RENDER_SIZE = 1024
+const SHARED_RENDER_SIZE = 2048
 let sharedRenderer: THREE.WebGLRenderer | null = null
-// 출력 캔버스 DPR 1.5는 픽셀 작업량이 2.25배가 된다.
-// 카툰 셰이더의 계단은 1.25에서도 거의 보이지 않으며, 전투 중 지속 GPU 부하는
-// 1.5 대비 약 31% 줄어든다. 뒤쪽 적은 흐림·축소 연출이 있어 1배면 충분하다.
-const FOREGROUND_PIXEL_RATIO_CAP = 1.25
 const mountedModels = new WeakMap<HTMLElement, BattleCharacterModel>()
 const activeModels = new Set<BattleCharacterModel>()
 let animationFrame = 0
 let previousFrame = 0
-let slowFramePressure = 0
-let adaptiveRenderReduction = false
-let stableFrameTime = 0
-let fullRatePressure = 0
-let adaptiveFullRate = false
-
-function syncModelPerformanceMode() {
-  if (adaptiveRenderReduction) document.documentElement.dataset.modelPerformance = 'reduced'
-  else if (adaptiveFullRate) document.documentElement.dataset.modelPerformance = 'full-rate'
-  else delete document.documentElement.dataset.modelPerformance
-}
-
-function updateAdaptiveRenderBudget(frameMs: number) {
-  // 일시적인 탭 전환·개발자 도구 정지는 품질 변경 근거로 삼지 않는다.
-  if (frameMs <= 0 || frameMs >= 100) return
-
-  const highQuality = document.documentElement.dataset.graphics !== 'low'
-  if (!highQuality && adaptiveFullRate) {
-    adaptiveFullRate = false
-    stableFrameTime = 0
-    fullRatePressure = 0
-    syncModelPerformanceMode()
-  }
-
-  // 60Hz 기준으로 약 2.5초간 안정적인 프레임 여유가 확인되면 전경 idle 제한을
-  // 30→60fps로 푼다. 해제 뒤 부하가 생기면 짧은 히스테리시스를 거쳐 즉시 원래
-  // 제한으로 돌아가며, 다시 시험하기 전에는 충분한 안정 구간을 요구한다.
-  if (!adaptiveRenderReduction && highQuality && activeModels.size >= 2) {
-    if (adaptiveFullRate) {
-      fullRatePressure = frameMs > 21
-        ? Math.min(20, fullRatePressure + Math.max(0.75, (frameMs - 18) / 8))
-        : Math.max(0, fullRatePressure - 0.5)
-      if (fullRatePressure >= 10) {
-        adaptiveFullRate = false
-        stableFrameTime = -3_000
-        fullRatePressure = 0
-        syncModelPerformanceMode()
-      }
-    } else {
-      stableFrameTime = frameMs <= 20 && slowFramePressure < 5
-        ? Math.min(2_500, stableFrameTime + frameMs)
-        : Math.max(-3_000, stableFrameTime - frameMs * 2)
-      if (stableFrameTime >= 2_500) {
-        adaptiveFullRate = true
-        fullRatePressure = 0
-        syncModelPerformanceMode()
-      }
-    }
-  }
-
-  // 배우가 둘 이상인 실제 전투에서 24ms 초과 프레임이 오래 누적되면 해제 여부와
-  // 관계없이 기존 저사양 보호 단계까지 내린다.
-  if (activeModels.size < 2) return
-  slowFramePressure = frameMs > 24
-    ? Math.min(45, slowFramePressure + Math.max(0.5, (frameMs - 20) / 16.67))
-    : Math.max(0, slowFramePressure - 0.35)
-  if (adaptiveRenderReduction || slowFramePressure < 30) return
-  adaptiveRenderReduction = true
-  adaptiveFullRate = false
-  syncModelPerformanceMode()
-}
 
 function loadModel(url: string): Promise<GLTF> {
   const cached = modelLoads.get(url)
@@ -246,7 +188,9 @@ function acquireRenderer(): THREE.WebGLRenderer {
   sharedRenderer?.dispose()
   const renderer = new THREE.WebGLRenderer({
     alpha: true,
-    antialias: true,
+    // Native MSAA cannot be changed after this shared context is created.
+    // Adjustable supersampling is applied per actor output canvas instead.
+    antialias: false,
     powerPreference: 'high-performance',
     preserveDrawingBuffer: false,
   })
@@ -264,16 +208,11 @@ function runAnimationFrame(now: number) {
   const delta = Math.min(frameMs / 1000, 0.1)
   previousFrame = now
   if (!document.hidden) {
-    updateAdaptiveRenderBudget(frameMs)
     const models = [...activeModels]
-    const budget = adaptiveRenderReduction && models.length >= 3
-      ? models.length >= 6 ? 2 : 1
-      : models.length
     const allowed = new Set(
       models
         .filter((model) => model.wantsRender(now))
         .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
-        .slice(0, budget),
     )
     models.forEach((model) => model.render(delta, now, allowed.has(model)))
   }
@@ -292,12 +231,7 @@ function removeFromAnimationFrame(model: BattleCharacterModel) {
   if (animationFrame) cancelAnimationFrame(animationFrame)
   animationFrame = 0
   previousFrame = 0
-  slowFramePressure = 0
-  adaptiveRenderReduction = false
-  stableFrameTime = 0
-  fullRatePressure = 0
-  adaptiveFullRate = false
-  syncModelPerformanceMode()
+  delete document.documentElement.dataset.modelPerformance
   sharedRenderer?.renderLists.dispose()
 }
 
@@ -311,9 +245,10 @@ function normalizedClip(
   source: THREE.AnimationClip,
   seamlessLoop: boolean,
   loopBlendSeconds = 0,
+  startTrimSeconds = 0,
   endTrimSeconds = 0,
 ): THREE.AnimationClip {
-  const cacheKey = `${seamlessLoop ? 1 : 0}:${loopBlendSeconds}:${endTrimSeconds}`
+  const cacheKey = `${seamlessLoop ? 1 : 0}:${loopBlendSeconds}:${startTrimSeconds}:${endTrimSeconds}`
   const variants = normalizedClipCache.get(source) ?? new Map<string, THREE.AnimationClip>()
   const cached = variants.get(cacheKey)
   if (cached) return cached
@@ -332,6 +267,31 @@ function normalizedClip(
   }
 
   clip.resetDuration()
+
+  if (startTrimSeconds > 0) {
+    const trimmedStartTime = Math.min(startTrimSeconds, clip.duration)
+    clip.tracks.forEach((track) => {
+      const valueSize = track.getValueSize()
+      const interpolatingTrack = track as typeof track & {
+        createInterpolant: (result: Float32Array) => { evaluate: (time: number) => ArrayLike<number> }
+      }
+      const startValue = Array.from(
+        interpolatingTrack.createInterpolant(new Float32Array(valueSize)).evaluate(trimmedStartTime),
+      )
+      let firstKeptKey = 0
+      while (firstKeptKey < track.times.length && track.times[firstKeptKey] < trimmedStartTime) firstKeptKey += 1
+
+      const times = [0, ...Array.from(track.times.slice(firstKeptKey), (time) => time - trimmedStartTime)]
+      const values = [...startValue, ...Array.from(track.values.slice(firstKeptKey * valueSize))]
+      if ((times[1] ?? -1) < 0.00001) {
+        times.splice(1, 1)
+        values.splice(valueSize, valueSize)
+      }
+      track.times = new Float32Array(times)
+      track.values = new Float32Array(values)
+    })
+    clip.resetDuration()
+  }
 
   if (endTrimSeconds > 0) {
     const trimmedEndTime = Math.max(0, clip.duration - endTrimSeconds)
@@ -474,6 +434,8 @@ class BattleCharacterModel {
   private pendingRenderDelta = 0
   private lastRenderedAt = 0
   private renderedPixelRatio = 0
+  private compositedScale = 1
+  private readonly onWindowResize = () => this.resize()
   private readonly brokenSpiderParts = new Set<string>()
   private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
   private spiderPartDissolves: SpiderPartDissolve[] = []
@@ -512,6 +474,7 @@ class BattleCharacterModel {
     this.shell.addEventListener('pointerup', this.onPointerUp)
     this.shell.addEventListener('pointercancel', this.onPointerUp)
     this.shell.addEventListener('click', this.onClickCapture, true)
+    window.addEventListener('resize', this.onWindowResize)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(shell)
@@ -533,7 +496,11 @@ class BattleCharacterModel {
       this.scene.add(model)
       this.model = model
       this.brokenSpiderParts.forEach((partId) => this.startSpiderPartDissolve(partId, true))
-      if (fittedBounds) this.setupEffects(fittedBounds)
+      // 회복·방어 이펙트는 해당 동작이 있는 배우만 만든다. 적과 보스마다 보이지 않는
+      // 파편 71개와 방어 구체를 미리 만들던 비용을 없애되 실제 연출은 그대로 보존한다.
+      if (fittedBounds && (this.visual.animations?.heal || this.visual.animations?.shield)) {
+        this.setupEffects(fittedBounds)
+      }
       this.mixer = new THREE.AnimationMixer(model)
       this.actions = {
         idle: this.actionFor(gltf, 'idle'),
@@ -697,6 +664,9 @@ class BattleCharacterModel {
         animation === 'idle' || animation === 'idle2',
         (this.visual.animations?.idleLoopBlendMs ?? 0) / 1000,
         (animation === 'idle'
+          ? this.visual.animations?.idleStartTrimMs ?? 0
+          : 0) / 1000,
+        (animation === 'idle'
           ? this.visual.animations?.idleEndTrimMs ?? 0
           : this.visual.animations?.endTrimsMs?.[animation as OneShotAnimation] ?? 0) / 1000,
       ))
@@ -706,8 +676,12 @@ class BattleCharacterModel {
   private useBattleMaterials(model: THREE.Object3D) {
     const weather = battleWeatherOf(this.shell)
     const atmosphere = BATTLE_ATMOSPHERES[weather]
+    const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
+      // Imported actors never receive runtime shadow maps. Their softer baked AO
+      // remains part of the illustration-style surface treatment below.
+      object.receiveShadow = false
       const originals = Array.isArray(object.material) ? object.material : [object.material]
       const replacements = originals.map((material) => {
         const source = material as THREE.MeshStandardMaterial
@@ -725,7 +699,7 @@ class BattleCharacterModel {
           bumpScale: source.bumpScale,
           emissive: baseColor,
           emissiveMap: source.map ?? null,
-          emissiveIntensity: atmosphere.emissiveIntensity,
+          emissiveIntensity: atmosphere.emissiveIntensity + (boss ? BOSS_EMISSIVE_BOOST : 0),
           gradientMap: BATTLE_TOON_GRADIENT,
           transparent: material.transparent,
           opacity: material.opacity,
@@ -752,15 +726,19 @@ class BattleCharacterModel {
       shader.uniforms.uBattleGroundTint = { value: atmosphere.groundTint }
       shader.uniforms.uBattleSkyMix = { value: atmosphere.skyMix }
       shader.uniforms.uBattleGroundMix = { value: atmosphere.groundMix }
-      shader.uniforms.uBattleExposure = { value: atmosphere.exposure }
+      const boss = this.visual.id === 'mantis' || this.visual.id === 'queenBee' || this.visual.id === 'elderSpider'
+      shader.uniforms.uBattleExposure = { value: atmosphere.exposure * (boss ? BOSS_EXPOSURE_BOOST : 1) }
+      shader.uniforms.uBattleShadowFloor = { value: atmosphere.shadowFloor }
       shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
-varying float vBattleHeight;`)
+varying float vBattleHeight;
+varying float vBattleSide;`)
         .replace('#include <project_vertex>', `#include <project_vertex>
 vec4 battleWorldPosition = modelMatrix * vec4(transformed, 1.0);
-vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);`)
+vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);
+vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);`)
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
@@ -769,14 +747,29 @@ uniform vec3 uBattleGroundTint;
 uniform float uBattleSkyMix;
 uniform float uBattleGroundMix;
 uniform float uBattleExposure;
+uniform float uBattleShadowFloor;
 uniform float uPartDissolve;
-varying float vBattleHeight;`)
-        .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;
+varying float vBattleHeight;
+varying float vBattleSide;`)
+        // The stepped directional term exposes individual low-poly faces. Keep
+        // ambient/AO darkness and emissive texture color, but omit only that term.
+        .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.indirectDiffuse + totalEmissiveRadiance;
 float battleGroundWeight = (1.0 - smoothstep(0.08, 0.58, vBattleHeight)) * uBattleGroundMix;
 float battleSkyWeight = smoothstep(0.48, 1.0, vBattleHeight) * uBattleSkyMix;
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleGroundTint, battleGroundWeight);
 outgoingLight = mix(outgoingLight, outgoingLight * uBattleSkyTint, battleSkyWeight);
-outgoingLight *= uBattleExposure;
+// Three broad tonal zones follow the whole silhouette instead of mesh normals.
+// Wide smoothstep overlaps blur both boundaries, keeping low-poly faces hidden.
+float battleRampPosition = clamp((1.0 - vBattleSide) * 0.7 + vBattleHeight * 0.3, 0.0, 1.0);
+float battleShadowToMid = smoothstep(0.12, 0.5, battleRampPosition);
+float battleMidToLight = smoothstep(0.5, 0.9, battleRampPosition);
+float battleSoftLight = mix(0.94, 1.0, battleShadowToMid);
+battleSoftLight = mix(battleSoftLight, 1.05, battleMidToLight);
+outgoingLight *= uBattleExposure * battleSoftLight;
+vec3 battleTintedAlbedo = diffuseColor.rgb;
+battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleGroundTint, battleGroundWeight * 0.3);
+battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleSkyTint, battleSkyWeight * 0.3);
+outgoingLight = max(outgoingLight, battleTintedAlbedo * uBattleShadowFloor);
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
@@ -1334,20 +1327,17 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   }
 
   private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
-    if (adaptiveRenderReduction) return 0.75
-    if (document.documentElement.dataset.graphics === 'low' || waitingEnemy) return 1
-    return Math.min(window.devicePixelRatio, FOREGROUND_PIXEL_RATIO_CAP)
+    const profile = GraphicsSettings.profile()
+    const baseRatio = profile.resolutionScale
+    const waitingScale = waitingEnemy && profile.waitingFps < profile.activeFps ? 0.9 : 1
+    const antialiasing = GraphicsSettings.antiAliasingScale()
+    return Math.min(2.5, baseRatio * waitingScale * antialiasing) * this.compositedScale
   }
 
   private targetFps() {
-    const idle = this.requestedAnimation === 'idle' || this.requestedAnimation === 'idle2'
     const waitingEnemy = this.isWaitingEnemy()
-    const boss = this.shell.parentElement?.classList.contains('boss') ?? false
-    const lowQuality = document.documentElement.dataset.graphics === 'low'
-    return adaptiveRenderReduction
-      ? waitingEnemy ? 12 : boss ? idle ? 24 : 30 : idle ? 12 : 24
-      : waitingEnemy ? adaptiveFullRate && !lowQuality ? 30 : 24
-        : lowQuality || idle && !adaptiveFullRate ? 30 : 60
+    const profile = GraphicsSettings.profile()
+    return waitingEnemy ? profile.waitingFps : profile.activeFps
   }
 
   wantsRender(now: number) {
@@ -1369,6 +1359,10 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   private resize(waitingEnemy = this.isWaitingEnemy()) {
     const width = Math.max(1, this.shell.clientWidth)
     const height = Math.max(1, this.shell.clientHeight)
+    const rect = this.shell.getBoundingClientRect()
+    const scaleX = rect.width > 0 ? rect.width / width : 1
+    const scaleY = rect.height > 0 ? rect.height / height : 1
+    this.compositedScale = Math.max(0.25, scaleX, scaleY)
     const pixelRatio = this.desiredPixelRatio(waitingEnemy)
     this.renderedPixelRatio = pixelRatio
     this.outputCanvas.dataset.pixelRatio = String(pixelRatio)
@@ -1415,8 +1409,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
     if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy)
 
-    // 기본 idle은 30fps, 뒤 레일은 24fps로 시작한다. 실제 프레임 여유가 이어지면
-    // 전경 idle은 60fps, 뒤 레일은 30fps로 올리고 부하가 감지되면 자동 복귀한다.
+    // 고급 모드는 idle과 공격을 모두 60fps로 유지한다. 절전 모드만 사용자의 명시적
+    // 선택에 따라 24~30fps를 쓰며, 느린 한 구간이 전투 전체 품질을 고정 강등하지 않는다.
     const targetFps = this.targetFps()
     this.outputCanvas.dataset.renderFps = String(targetFps)
     if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return
@@ -1492,6 +1486,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.disposed = true
     removeFromAnimationFrame(this)
     this.resizeObserver.disconnect()
+    window.removeEventListener('resize', this.onWindowResize)
     this.shell.removeEventListener('pointerdown', this.onPointerDown)
     this.shell.removeEventListener('pointermove', this.onPointerMove)
     this.shell.removeEventListener('pointerup', this.onPointerUp)

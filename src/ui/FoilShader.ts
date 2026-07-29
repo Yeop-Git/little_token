@@ -1,3 +1,5 @@
+import { GraphicsSettings } from '@/ui/GameSettings'
+
 type FoilKind = 'epic' | 'legendary'
 
 interface FoilSurface {
@@ -259,14 +261,13 @@ class FoilShaderRenderer {
     requestAnimationFrame(this.frame)
     if (document.hidden) return
     const reduced = this.reducedMotion.matches
-    // 고급 모드의 호일은 대기 중에도 60fps로 갱신한다. 영웅의 별빛과 전설의
-    // 프리즘 조각은 정지 상태에서도 계속 흐르는 것이 등급 판별의 핵심이다.
-    const interval = reduced ? 500 : 1000 / 60
+    const profile = GraphicsSettings.profile()
+    const interval = reduced ? 500 : profile.foilFps > 0 ? 1000 / profile.foilFps : 100
     if (now - this.lastFrame < interval) return
     this.lastFrame = now
     if (this.scanQueued) this.scan()
 
-    const lowQuality = document.documentElement.dataset.graphics === 'low'
+    const lowQuality = profile.foilFps === 0
     const time = reduced ? 2.75 : now / 1000
     for (const [host, surface] of this.surfaces) {
       if (!host.isConnected) {

@@ -1,7 +1,7 @@
 /**
  * 아이템 + 감탄사 시스템.
- * 모든 아이템의 고정 기본 스탯은 0이다. 플레이어가 감탄 문장(감탄 / 정도 / 평가)을
- * 조립하면 등급 예산 안에서 선택한 단어에 맞는 스탯이 붙는다.
+ * 노멀·희귀 아이템은 각각 1점·2점의 고유 기본 스탯을 지닌다. 플레이어가 감탄 문장
+ * (감탄 / 정도 / 평가)을 조립하면 등급 예산 안에서 선택한 단어의 스탯이 추가로 붙는다.
  * 코어 루프(문장 조립)의 축소판이라 규칙이 일관된다.
  */
 
@@ -41,8 +41,8 @@ export interface ExclaimSlot {
   words: ExclaimWord[]
 }
 
-// 모든 아이템의 CSV 기본 스탯은 0이다. 스탯은 감탄사 선택에서만 얻고,
-// 영웅·전설은 보수적인 등급 보정과 고유효과를 함께 가진다.
+// 노멀·희귀는 각각 1점·2점의 소품별 기본 스탯을 갖고, 영웅·전설은 기본 스탯 대신
+// 보수적인 감탄사 등급 보정과 고유효과를 함께 가진다(체력 +2 = 1점).
 export const ITEMS: Record<string, ItemDef> = STAT_ITEMS
 export const PASSIVE_ITEMS: Record<string, ItemDef> = RULE_ITEMS
 export const ALL_ITEMS: Record<string, ItemDef> = { ...ITEMS, ...PASSIVE_ITEMS }

@@ -1,13 +1,34 @@
-import { COMBAT_BALANCE_VERSION, DECK_LIMITS, emptyRunRecord, reinforceWord, type RunState } from './run'
+import {
+  COMBAT_BALANCE_VERSION,
+  DECK_LIMITS,
+  RUN_SAVE_SCHEMA_VERSION,
+  emptyRunRecord,
+  reinforceWord,
+  type RunState,
+} from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
+import { ALL_ITEMS } from '@data/items'
 import type { Emotion, Word } from './types'
 import type { PlayerStats } from './player'
 
 const SAVE_KEY = 'little-token.run.v1'
+const CORRUPT_SAVE_KEY = 'little-token.run.corrupt.v1'
 // v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
 // 세이브가 있으면 튜토리얼을 영구히 놓칠 수 있었다. 완료 시점에 기록하는 v2로
 // 한 번 갱신해 해당 사용자도 복구된 오프닝을 볼 수 있게 한다.
 const TUTORIAL_KEY = 'little-token.tutorial-seen.v2'
+const COMBAT_COACH_KEY = 'little-token.combat-coach-seen.v1'
+
+export type CombatCoachHint =
+  | 'subject'
+  | 'modifier'
+  | 'verb'
+  | 'resonance'
+  | 'context'
+  | 'ink-low'
+  | 'ink-overdraw'
+  | 'enemy-first'
+  | 'overflow'
 
 // v0.3.25 이전 런에는 이 주어들이 무감정으로 저장됐다. 현재 데이터의 감정 분포로
 // 한 번만 올려, 이어하기 런도 새 공명 경로를 바로 사용할 수 있게 한다.
@@ -70,7 +91,7 @@ function migrateCardDefinitions(run: RunState): boolean {
 
 /** 삭제된 아이템은 기존 런에서도 보유 목록과 누적 스탯을 함께 거두어 들인다. */
 function migrateRemovedItems(run: RunState): boolean {
-  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id))
+  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id) || !ALL_ITEMS[item.id])
   if (!removed.length) return false
 
   for (const item of removed) {
@@ -78,7 +99,7 @@ function migrateRemovedItems(run: RunState): boolean {
       run.player.stats[key] = Math.max(0, run.player.stats[key] - (item.stats[key] ?? 0))
     }
   }
-  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id))
+  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id) && !!ALL_ITEMS[item.id])
   return true
 }
 
@@ -111,10 +132,9 @@ function isRunState(value: unknown): value is RunState {
   )
 }
 
-export function loadRun(): RunState | null {
+/** 저장소 없이도 회귀 테스트할 수 있는 순수 역직렬화 경계. */
+export function deserializeRun(raw: string): RunState | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
-    if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     if (!isRunState(parsed)) return null
 
@@ -135,6 +155,21 @@ export function loadRun(): RunState | null {
     }
     if (parsed.reward && !Array.isArray(parsed.reward.picks)) {
       parsed.reward.picks = []
+      migrated = true
+    }
+    if (typeof parsed.inspiration !== 'number' || !Number.isFinite(parsed.inspiration)) {
+      parsed.inspiration = 0
+      migrated = true
+    } else if (parsed.inspiration < 0) {
+      parsed.inspiration = 0
+      migrated = true
+    }
+    if (parsed.reward && typeof parsed.reward.seed !== 'number') {
+      parsed.reward.seed = Math.floor(Math.random() * 0x7fffffff)
+      migrated = true
+    }
+    if (parsed.reward && !parsed.reward.refreshes) {
+      parsed.reward.refreshes = { subject: 0, item: 0, verb: 0 }
       migrated = true
     }
     // 결과 화면 기록 도입 전 저장된 런은 빈 기록으로 시작한다 — 지난 판을 소급해
@@ -167,8 +202,34 @@ export function loadRun(): RunState | null {
     }
     migrated = migrateCardDefinitions(parsed) || migrated
     migrated = migrateRemovedItems(parsed) || migrated
-    if (migrated) saveRun(parsed)
+    if (parsed.schemaVersion !== RUN_SAVE_SCHEMA_VERSION) {
+      parsed.schemaVersion = RUN_SAVE_SCHEMA_VERSION
+      migrated = true
+    }
     return parsed
+  } catch {
+    return null
+  }
+}
+
+/** 저장 포맷 버전이 빠질 수 없도록 하는 순수 직렬화 경계. */
+export function serializeRun(run: RunState): string {
+  return JSON.stringify({ ...run, schemaVersion: RUN_SAVE_SCHEMA_VERSION })
+}
+
+export function loadRun(): RunState | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    if (!raw) return null
+    const run = deserializeRun(raw)
+    if (!run) {
+      localStorage.setItem(CORRUPT_SAVE_KEY, raw)
+      localStorage.removeItem(SAVE_KEY)
+      return null
+    }
+    const normalized = serializeRun(run)
+    if (normalized !== raw) localStorage.setItem(SAVE_KEY, normalized)
+    return run
   } catch {
     return null
   }
@@ -176,7 +237,7 @@ export function loadRun(): RunState | null {
 
 export function saveRun(run: RunState): void {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(run))
+    localStorage.setItem(SAVE_KEY, serializeRun(run))
   } catch {
     // 저장 공간을 사용할 수 없는 브라우저에서도 게임 진행은 유지한다.
   }
@@ -199,9 +260,31 @@ export function markTutorialSeen(): void {
   }
 }
 
+/** 전투 훈수는 최초 발견에만 나온다. 새 스테이지마다 같은 설명을 반복하지 않는다. */
+export function hasSeenCombatCoach(hint: CombatCoachHint): boolean {
+  try {
+    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    return raw ? (JSON.parse(raw) as unknown[]).includes(hint) : false
+  } catch {
+    return false
+  }
+}
+
+export function markCombatCoachSeen(hint: CombatCoachHint): void {
+  try {
+    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    const seen = new Set<CombatCoachHint>(raw ? JSON.parse(raw) : [])
+    seen.add(hint)
+    localStorage.setItem(COMBAT_COACH_KEY, JSON.stringify([...seen]))
+  } catch {
+    // Storage가 막혀도 현재 전투 진행은 계속한다.
+  }
+}
+
 function clearTutorialHistory(): void {
   try {
     localStorage.removeItem(TUTORIAL_KEY)
+    localStorage.removeItem(COMBAT_COACH_KEY)
   } catch {
     // 저장소를 못 쓰는 환경에서는 완료 기록도 남아 있지 않다.
   }

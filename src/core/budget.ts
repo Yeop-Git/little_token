@@ -6,6 +6,7 @@
  */
 
 import type { Rarity, Word } from './types'
+import { TARGET_FALLOFF } from './combatRules'
 
 export type BudgetRarity = 'common' | 'rare' | 'epic'
 
@@ -53,6 +54,31 @@ export const expectedMult = (w: Word): number =>
 /** 이 등급이 사도 되는 동사 계수(전체 적중이면 깎인다). */
 export const verbCoefBudget = (rarity: BudgetRarity, aoe?: Word['aoe']): number =>
   VERB_COEF_BUDGET[rarity] * (aoe === 'all' ? AOE_COEF_FACTOR : 1)
+
+/**
+ * 규칙 카드의 실전 총량. 다중 대상은 실제 대상 감쇠를, 연타는 타수를 더한다.
+ * 카운터는 기본 방어에 되돌려 주는 추가분만 합쳐 공격과 방어를 중복 계산하지 않는다.
+ */
+export const tacticalVerbPower = (w: Word): number => {
+  const coefficient = w.statMult ?? 0
+  if (w.kind === 'attack') {
+    const count = typeof w.targetCount === 'number' ? Math.max(1, w.targetCount) : 1
+    const coverage = Array.from({ length: count }, (_, i) =>
+      TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
+    ).reduce((sum, value) => sum + value, 0)
+    return coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
+  }
+  if (w.kind === 'guard' && w.effects?.counterMultiplier) {
+    return coefficient + Math.max(0, w.effects.counterMultiplier - 1)
+  }
+  return coefficient
+}
+
+/** 다중 대상 관통은 방어를 건너뛰는 희소 유틸리티를 총량의 15%로 평가한다. */
+export const tacticalVerbBudget = (w: Word, rarity: BudgetRarity): number => {
+  const multiTargetPierce = w.effects?.pierceGuard && typeof w.targetCount === 'number' && w.targetCount > 1
+  return VERB_COEF_BUDGET[rarity] * (multiTargetPierce ? 0.85 : 1)
+}
 
 /** 전설은 규칙 카드(문장부호·무럭무럭·아이템) 전용이라 수치 예산이 없다. */
 export const hasBudget = (rarity: Rarity | undefined): rarity is BudgetRarity =>

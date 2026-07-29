@@ -13,7 +13,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "base": {
       "hp": 0,
       "atk": 0,
-      "guard": 0,
+      "guard": 1,
       "heal": 0,
       "luck": 0
     },
@@ -26,7 +26,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "pencil",
     "base": {
       "hp": 0,
-      "atk": 0,
+      "atk": 1,
       "guard": 0,
       "heal": 0,
       "luck": 0
@@ -42,7 +42,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
       "hp": 0,
       "atk": 0,
       "guard": 0,
-      "heal": 0,
+      "heal": 1,
       "luck": 0
     },
     "flavor": "귀를 대면 멀리 두고 온 파도가 들린다."
@@ -57,7 +57,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
       "atk": 0,
       "guard": 0,
       "heal": 0,
-      "luck": 0
+      "luck": 1
     },
     "flavor": "목적지는 지워졌지만 길은 아직 남아 있다."
   },
@@ -67,7 +67,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "rarity": "common",
     "art": "starLantern",
     "base": {
-      "hp": 0,
+      "hp": 2,
       "atk": 0,
       "guard": 0,
       "heal": 0,
@@ -83,7 +83,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "base": {
       "hp": 0,
       "atk": 0,
-      "guard": 0,
+      "guard": 1,
       "heal": 0,
       "luck": 0
     },
@@ -99,7 +99,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
       "atk": 0,
       "guard": 0,
       "heal": 0,
-      "luck": 0
+      "luck": 1
     },
     "flavor": "바늘은 늘 다음 문장이 있는 쪽을 가리킨다."
   },
@@ -110,7 +110,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "bugSpray",
     "base": {
       "hp": 0,
-      "atk": 0,
+      "atk": 2,
       "guard": 0,
       "heal": 0,
       "luck": 0
@@ -124,10 +124,10 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "brush",
     "base": {
       "hp": 0,
-      "atk": 0,
+      "atk": 1,
       "guard": 0,
       "heal": 0,
-      "luck": 0
+      "luck": 1
     },
     "flavor": "검은 털끝이 빈 여백의 모양을 찾아낸다."
   },
@@ -139,7 +139,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "base": {
       "hp": 0,
       "atk": 0,
-      "guard": 0,
+      "guard": 2,
       "heal": 0,
       "luck": 0
     },
@@ -155,7 +155,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
       "atk": 0,
       "guard": 0,
       "heal": 0,
-      "luck": 0
+      "luck": 2
     },
     "flavor": "가장 먼 빛도 한 칸 앞으로 당겨 보여 준다."
   },
@@ -166,9 +166,9 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "inkwell",
     "base": {
       "hp": 0,
-      "atk": 0,
+      "atk": 1,
       "guard": 0,
-      "heal": 0,
+      "heal": 1,
       "luck": 0
     },
     "flavor": "마른 문장도 한 방울이면 다시 흐르기 시작한다."
@@ -181,9 +181,9 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "base": {
       "hp": 0,
       "atk": 0,
-      "guard": 0,
+      "guard": 1,
       "heal": 0,
-      "luck": 0
+      "luck": 1
     },
     "flavor": "뒤집을 때마다 지나간 순간이 잠깐 돌아온다."
   },
@@ -196,7 +196,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
       "hp": 0,
       "atk": 0,
       "guard": 0,
-      "heal": 0,
+      "heal": 2,
       "luck": 0
     },
     "flavor": "이름 모를 잎사귀 냄새가 상처보다 먼저 번진다."
@@ -207,9 +207,9 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "rarity": "rare",
     "art": "satchel",
     "base": {
-      "hp": 0,
+      "hp": 2,
       "atk": 0,
-      "guard": 0,
+      "guard": 1,
       "heal": 0,
       "luck": 0
     },

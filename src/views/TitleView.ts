@@ -1,5 +1,7 @@
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
+import { GraphicsSettings } from '@/ui/GameSettings'
+import { t } from '@/localization'
 import { preloadImages } from '@/ui/ResourceLibrary'
 
 interface Opts {
@@ -48,6 +50,10 @@ export class TitleView {
   private confirmTimer = 0
   private warpTimer = 0
   private settleTimer = 0
+  private onFirstAudioGesture = () => {
+    GameAudio.startBgm()
+    this.removeAudioGestureListeners()
+  }
   /** 얼렸다 풀 때 같은 루프를 이어 돌리려고 들고 있는다(freezeAmbient/thawAmbient). */
   private flyTick: ((now: number) => void) | null = null
   private flyLast = 0
@@ -69,10 +75,20 @@ export class TitleView {
     clearTimeout(this.confirmTimer)
     clearTimeout(this.warpTimer)
     clearTimeout(this.settleTimer)
+    this.removeAudioGestureListeners()
     window.removeEventListener('resize', this.onResize)
   }
 
+  private removeAudioGestureListeners() {
+    document.removeEventListener('click', this.onFirstAudioGesture, true)
+    document.removeEventListener('keydown', this.onFirstAudioGesture, true)
+  }
+
   private mount() {
+    // 브라우저 자동재생 정책상 진입 즉시 BGM을 틀 수 없다. 타이틀에서 발생한 첫
+    // 클릭이나 키 입력으로 오디오 잠금을 푼 뒤, 화면을 떠나기 전에 타이틀 곡을 시작한다.
+    document.addEventListener('click', this.onFirstAudioGesture, true)
+    document.addEventListener('keydown', this.onFirstAudioGesture, true)
     this.root.innerHTML = `
       <main class="scene title-scene">
         <svg class="title-warp-defs" aria-hidden="true" width="0" height="0">
@@ -100,16 +116,16 @@ export class TitleView {
             <img class="title-logo" src="${TITLE.logo}" alt="Little Token" />
           </div>
           <h1 class="sr-only">Little Token</h1>
-          <nav class="title-menu" aria-label="타이틀 메뉴">
+          <nav class="title-menu" aria-label="${t('titleMenu', '타이틀 메뉴')}">
             ${
               this.opts.hasSave
-                ? `<button class="tmenu-btn" type="button" data-act="continue">이어하기</button>
-            <button class="tmenu-btn" type="button" data-act="fresh">새로하기</button>`
-                : `<button class="tmenu-btn" type="button" data-act="continue">시작하기</button>`
+                ? `<button class="tmenu-btn" type="button" data-act="continue">${t('continue', '이어하기')}</button>
+            <button class="tmenu-btn" type="button" data-act="fresh">${t('newGame', '새로하기')}</button>`
+                : `<button class="tmenu-btn" type="button" data-act="continue">${t('start', '시작하기')}</button>`
             }
-            <button class="tmenu-btn" type="button" data-act="settings">설정하기</button>
-            <button class="tmenu-btn" type="button" data-act="guide">도움말</button>
-            <button class="tmenu-btn is-exit" type="button" data-act="exit">나가기</button>
+            <button class="tmenu-btn" type="button" data-act="settings">${t('settingsAction', '설정하기')}</button>
+            <button class="tmenu-btn" type="button" data-act="guide">${t('help', '도움말')}</button>
+            <button class="tmenu-btn is-exit" type="button" data-act="exit">${t('exit', '나가기')}</button>
           </nav>
           <div class="title-toast" id="title-toast" aria-live="polite"></div>
           <div class="title-loadmask" aria-hidden="true"></div>
@@ -233,7 +249,7 @@ export class TitleView {
     if (act === 'exit') {
       if (this.opts.onExit) return this.opts.onExit()
       window.close() // 스크립트로 연 창이 아니면 무시된다
-      this.toast('브라우저 탭을 닫아 주세요')
+      this.toast(t('closeTab', '브라우저 탭을 닫아 주세요'))
     }
   }
 
@@ -252,12 +268,12 @@ export class TitleView {
     if (!btn) return
     if (btn.classList.contains('is-danger')) return this.start(true)
     btn.classList.add('is-danger')
-    btn.textContent = '정말 새로할까요?'
-    this.toast('여태 쓴 일기가 지워져요')
+    btn.textContent = t('confirmNew', '정말 새로할까요?')
+    this.toast(t('diaryWillErase', '여태 쓴 일기가 지워져요'))
     clearTimeout(this.confirmTimer)
     this.confirmTimer = window.setTimeout(() => {
       btn.classList.remove('is-danger')
-      btn.textContent = '새로하기'
+      btn.textContent = t('newGame', '새로하기')
     }, 3400)
   }
 
@@ -337,14 +353,15 @@ export class TitleView {
     const tick = (now: number) => {
       // 절전 모드에서는 캔버스를 CSS로 숨긴다. 숨긴 표면을 계속 그리면 설정의
       // 의도와 달리 GPU 비용은 그대로이므로 루프만 유지하고 드로우는 건너뛴다.
-      if (document.hidden || document.documentElement.dataset.graphics === 'low') {
+      const profile = GraphicsSettings.profile()
+      if (document.hidden || profile.foilFps === 0) {
         this.flyLast = now
         this.raf = requestAnimationFrame(tick)
         return
       }
       // 전체 화면 캔버스에 방사형 그라디언트 20개를 그리는 효과라 60fps에서는
       // 타이틀 대기 중에도 GPU 합성 비용이 크다. 느린 부유물은 30fps로 충분하다.
-      if (now - this.flyLast < 1000 / 30) {
+      if (now - this.flyLast < 1000 / Math.min(30, profile.activeFps)) {
         this.raf = requestAnimationFrame(tick)
         return
       }

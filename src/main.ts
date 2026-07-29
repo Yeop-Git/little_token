@@ -17,9 +17,9 @@ import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
-import { floorInCycle, stageFor } from '@data/stages'
-import { genRewards, rewardGradeForDay, type RewardOption } from '@data/rewards'
-import { newRun, registerWord, applyItemReward, type RewardPhase, type RewardPickRef } from '@core/run'
+import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
+import { genRewards, REWARD_REFRESH_COST, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
+import { applyItemReward, gainInspiration, newRun, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import packageInfo from '../package.json'
@@ -34,6 +34,10 @@ import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 import { CustomCursor } from '@/ui/CustomCursor'
 import { ClickScribble } from '@/ui/ClickScribble'
+import { applyLocaleToDocument, currentLocale } from '@/localization'
+import { applyContentLocalization } from '@/localization/content'
+import { applyDetailedContentLocalization } from '@/localization/contentDetails'
+import { installDomLocalization } from '@/localization/dom'
 
 const STAGE_W = 1920
 const STAGE_H = 1080
@@ -45,21 +49,24 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
-/** 출시 빌드에서 닫아 둔 임시 기능. 다시 열 때는 타이틀 흐름과 저장 마이그레이션을 함께 검수한다. */
-const DEV_CHEAT_ENABLED = false
-const CONTINUE_ENABLED = false
+/** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
+const DEV_CHEAT_ENABLED = true
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
 let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0
+applyLocaleToDocument()
+applyContentLocalization()
+if (currentLocale !== 'ko') applyDetailedContentLocalization(currentLocale)
+installDomLocalization()
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
 installFoilShaders()
 CustomCursor.install()
 ClickScribble.install()
 
-if (new URLSearchParams(window.location.search).get('profile') === '1') {
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('profile') === '1') {
   void import('@/ui/RuntimeProfiler').then(({ startRuntimeProfiler }) => startRuntimeProfiler())
 }
 
@@ -70,9 +77,9 @@ function fit() {
 window.addEventListener('resize', fit)
 fit()
 
-// 이어하기가 닫힌 동안에는 기기에 남은 런을 부팅 상태로 불러오지 않는다.
-// 저장 코드는 런 도중의 체크포인트 형식을 보존하지만 타이틀에서는 접근할 수 없다.
-let run = CONTINUE_ENABLED ? loadRun() ?? newRun() : newRun()
+// 저장된 런이 있으면 그 다음 전투를 예열한다. 항상 새 런부터 예열하면 이어하기에서
+// 1층 모델을 받은 직후 현재 층 모델을 또 받아 네트워크·파싱 비용이 두 번 든다.
+let run = loadRun() ?? newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
 void preloadUpcomingBattle().catch(() => undefined)
@@ -437,13 +444,13 @@ function goTitle(withIntro: unknown = false) {
   reset()
   stage.setAttribute('data-theme', 'day')
   const title = new TitleView(stage, {
-    hasSave: CONTINUE_ENABLED && !!loadRun(),
+    hasSave: !!loadRun(),
     holdUi: playIntro,
     onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
-      if (!CONTINUE_ENABLED || fresh) clearRun()
-      const saved = CONTINUE_ENABLED && !fresh ? loadRun() : null
+      if (fresh) clearRun()
+      const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
@@ -547,6 +554,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     atkMult: st.atkMult,
     isBoss: st.isBoss,
     day: run.day,
+    inspiration: run.inspiration,
     bossHealthBars: st.bossHealthBars,
     modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
@@ -587,7 +595,7 @@ function handleBattleWin(grade: number, resources: { hp: number; guard: number }
   run.combat = resources
   // 넘긴 날 — 결과 종이가 "어디까지 갔는지"로 읽는 값이다.
   run.record.daysCleared += 1
-  if (run.day === 15 && !run.endingSeen) {
+  if (floorInCycle(run.day) === STORY_FLOORS && !run.endless && !run.endingSeen) {
     goEnding(grade)
     return
   }
@@ -611,7 +619,15 @@ function goEnding(grade = startGrade(run.player.stats.luck)) {
 }
 
 function beginReward(grade: number) {
-  run.reward = { day: run.day, grade, phase: 'subject', picks: [] }
+  gainInspiration(run, grade)
+  run.reward = {
+    day: run.day,
+    grade,
+    phase: 'subject',
+    picks: [],
+    seed: Math.floor(Math.random() * 0x7fffffff),
+    refreshes: { subject: 0, item: 0, verb: 0 },
+  }
   saveRun(run)
   goReward(grade, 'subject')
 }
@@ -626,15 +642,17 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
 
 function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
   const picks = [...(run.reward?.picks ?? [])]
+  const seed = run.reward?.seed ?? Math.floor(Math.random() * 0x7fffffff)
+  const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }
   if (pick) picks.push(pick)
   if (phase === 'subject') {
-    run.reward = { day: run.day, grade, phase: 'item', picks }
+    run.reward = { day: run.day, grade, phase: 'item', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'item')
     return
   }
   if (phase === 'item') {
-    run.reward = { day: run.day, grade, phase: 'verb', picks }
+    run.reward = { day: run.day, grade, phase: 'verb', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'verb')
     return
@@ -673,25 +691,46 @@ function goReward(
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
-  const options = genRewards(run.player, grade, run.day, phase)
+  const seed = run.reward?.seed ?? 0
+  const refreshes = run.reward?.refreshes?.[phase] ?? 0
+  const options = genRewards(run.player, grade, run.day, phase, rewardOfferRng(seed, phase, refreshes))
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
-    grade: rewardGradeForDay(grade, run.day),
+    inspiration: run.inspiration,
+    earned: Math.max(0, Math.round(grade)),
     phase,
     options,
     onPick: (opt) => {
+      const cost = rewardPrice(opt)
+      if (run.inspiration < cost) {
+        advanceReward(grade, phase)
+        return
+      }
       const pick = rewardPickRef(opt)
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
         if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, () => advanceReward(grade, phase, pick))
+          goDiscard(opt.word, result.candidates, () => {
+            spendInspiration(run, cost)
+            advanceReward(grade, phase, pick)
+          })
         } else {
+          spendInspiration(run, cost)
           advanceReward(grade, phase, pick)
         }
       } else if (opt.item) {
-        goItem(opt.item, grade, phase, pick)
+        goItem(opt.item, grade, phase, pick, cost)
       }
+    },
+    onRefresh: () => {
+      if (!spendInspiration(run, REWARD_REFRESH_COST)) return false
+      const pending = run.reward
+      if (!pending) return false
+      pending.refreshes[phase] += 1
+      saveRun(run)
+      goReward(grade, phase)
+      return true
     },
     onSkip: () => advanceReward(grade, phase),
   })
@@ -703,6 +742,7 @@ function goItem(
   grade = startGrade(run.player.stats.luck),
   rewardPhase?: RewardPhase,
   pick?: RewardPickRef,
+  inspirationCost = 0,
 ) {
   battleRequest++
   reset()
@@ -711,6 +751,10 @@ function goItem(
     item: itemDef,
     grade,
     onDone: (result) => {
+      if (inspirationCost > 0 && !spendInspiration(run, inspirationCost)) {
+        if (rewardPhase) advanceReward(grade, rewardPhase)
+        return
+      }
       applyItemReward(run.player, result)
       if (rewardPhase && pick) {
         advanceReward(grade, rewardPhase, pick)
@@ -755,7 +799,7 @@ function goDefeat() {
 }
 
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
-const params = new URLSearchParams(location.search)
+const params = import.meta.env.DEV ? new URLSearchParams(location.search) : new URLSearchParams()
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)

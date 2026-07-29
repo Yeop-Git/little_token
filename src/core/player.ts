@@ -7,6 +7,7 @@ import { RARITY_LABEL, type Rarity, type Word } from '@core/types'
 import { PASSIVES, type PassiveId } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { WORDS } from '@data/words'
+import { currentLocale } from '@/localization'
 
 export interface PlayerStats {
   hp: number // 최대 체력
@@ -59,11 +60,17 @@ export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; d
 ]
 
 export function defaultPlayer(): PlayerState {
+  const starterLines = currentLocale === 'en' ? ['Wow! Truly beautiful!','Hmm? Slightly sturdy!']
+    : currentLocale === 'ja' ? ['わあ！ 本当にきれい！','うーん？ ちょっと丈夫！']
+      : currentLocale === 'ru' ? ['Ух ты! По-настоящему красиво!','Хм? Немного прочно!']
+        : currentLocale === 'zh-Hans' ? ['哇！真的好漂亮！','嗯？有点结实！']
+          : currentLocale === 'zh-Hant' ? ['哇！真的好漂亮！','嗯？有點結實！']
+            : ['와! 정말 예뻐!','음? 살짝 튼튼해!']
   return {
     stats: { ...STARTING_COMBAT_STATS },
     items: [
-      { id: 'candle', name: '소년의 몽당연필', rarity: 'common', art: 'pencil', line: '와! 정말 예뻐!', stats: { atk: 1, heal: 1, luck: 1 } },
-      { id: 'ribbon', name: '아버지의 낡은 이야기책', rarity: 'common', art: 'book', line: '음? 살짝 튼튼해!', stats: { guard: 2, luck: 1 } },
+      { id: 'candle', name: currentLocale === 'ko' ? '소년의 몽당연필' : currentLocale === 'en' ? "Boy's Pencil Stub" : currentLocale === 'ja' ? '少年のちびた鉛筆' : currentLocale === 'ru' ? 'Огрызок карандаша мальчика' : currentLocale === 'zh-Hans' ? '少年的短铅笔' : '少年的短鉛筆', rarity: 'common', art: 'pencil', line: starterLines[0], stats: { atk: 1, heal: 1, luck: 1 } },
+      { id: 'ribbon', name: currentLocale === 'ko' ? '아버지의 낡은 이야기책' : currentLocale === 'en' ? "Father's Old Storybook" : currentLocale === 'ja' ? '父の古い物語本' : currentLocale === 'ru' ? 'Старая книга отца' : currentLocale === 'zh-Hans' ? '父亲的旧故事书' : '父親的舊故事書', rarity: 'common', art: 'book', line: starterLines[1], stats: { guard: 2, luck: 1 } },
     ],
     deck: WORDS,
   }

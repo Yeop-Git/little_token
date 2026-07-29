@@ -9,7 +9,7 @@ import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
-import { bossRewardRarity, genRewards, rewardGradeForDay, rewardRarityWeights } from '@data/rewards'
+import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardRarityWeights } from '@data/rewards'
 import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
@@ -28,9 +28,10 @@ import {
   summonCount,
   type BattleState,
 } from '../sim/reference'
+import { enemyDamageRange, enemySentenceFor } from '../sim/enemySentences'
 
 const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(message) }
-const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', ...extra })
+const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', weakEmotion: null, ...extra })
 const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
@@ -45,7 +46,9 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const counts = { common: 0, rare: 0, epic: 0, legendary: 0 }
   for (const item of Object.values(ALL_ITEMS)) {
     counts[item.rarity]++
-    assert(Object.values(item.base).every((value) => value === 0), `${item.name} has no fixed base stats`)
+    const baseBudget = item.base.hp / 2 + item.base.atk + item.base.guard + item.base.heal + item.base.luck
+    const expectedBaseBudget = item.rarity === 'common' ? 1 : item.rarity === 'rare' ? 2 : 0
+    assert(baseBudget === expectedBaseBudget, `${item.name} keeps its ${expectedBaseBudget}-point base stat budget`)
     assert((item.rarity === 'epic' || item.rarity === 'legendary') === !!item.passive, `${item.name} passive matches rarity tier`)
   }
   for (const [rarity, bonus] of Object.entries(EXCLAIM_RARITY_BONUS)) {
@@ -64,8 +67,10 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 {
   const legacy = {
+    schemaVersion: 0,
     player: { ...startingPlayer(), stats: { hp: 68, atk: 5, guard: 9, heal: 5, luck: 3 } },
     combat: { hp: 68, guard: 0 },
+    inspiration: 0,
     day: 9,
     record: emptyRunRecord(),
     balanceVersion: 0,
@@ -421,6 +426,12 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(first.length === 3 && first.every((option) => option.kind === 'word') && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward mixes subjects and modifiers')
   assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
   assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
+  assert(REWARD_PRICE.common < REWARD_PRICE.rare && REWARD_PRICE.rare < REWARD_PRICE.epic && REWARD_PRICE.epic < REWARD_PRICE.legendary, 'reward inspiration prices rise with rarity')
+  const seededA = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
+  const seededB = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
+  const refreshed = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 1)).map((option) => option.word?.id ?? option.item?.id)
+  assert(seededA.join(',') === seededB.join(','), 'saved reward seed restores the same offer')
+  assert(seededA.join(',') !== refreshed.join(','), 'paid refresh changes the reward offer')
   const rarityCurve = [1, 4, 5, 9, 10, 15].map((day) => rewardRarityWeights(5, day))
   assert(rarityCurve[0].common > rarityCurve[0].rare && rarityCurve[1].common > rarityCurve[1].rare, 'floors one to four remain normal-dominant')
   assert(rarityCurve[2].rare > rarityCurve[2].common && rarityCurve[3].rare > rarityCurve[3].epic, 'floors five to nine remain rare-dominant')
@@ -513,5 +524,45 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
   }
   const values = [...counts.values()]
   assert(Math.max(...values) - Math.min(...values) <= 1, `${kind} emotion balance`)
+}
+
+// 보스의 화면 문장은 별도 수치를 만들지 않고 현재 전투 상태를 그대로 설명한다.
+{
+  const mantis = makeEnemy(ENEMIES.mantis, 1, 1, 2)
+  const s = state([mantis])
+  mantis.attackPatternIndex = 1
+  let sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tokens.some((token) => token.text.includes('치켜든다')) && sentence.meta.includes('이번 행동 피해 없음'), 'mantis preparation sentence announces the harmless wind-up')
+  mantis.attackPatternIndex = 2
+  sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tone === 'danger' && sentence.meta.some((line) => line.startsWith('필요 방어 ')), 'mantis heavy sentence exposes the exact guard answer')
+  mantis.groggyUntilTurn = s.turn
+  mantis.groggyDamageMult = 1.5
+  sentence = enemySentenceFor(s, mantis)!
+  assert(sentence.tokens.some((token) => token.text === '휘청거린다'), 'mantis counter rewrites the promised attack into a stagger sentence')
+}
+{
+  const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
+  const s = state([queen])
+  summonAtTurnStart(s)
+  let sentence = enemySentenceFor(s, queen)!
+  assert(sentence.context?.tokens.some((token) => token.text.includes('일벌 넷')) && sentence.context.meta.includes('본체 무적'), 'queen escort count changes the sentence subject and exposes immunity')
+  queen.summonsLeft = 0
+  queen.summonsRight = 0
+  queen.summonHpLeft = []
+  queen.summonHpRight = []
+  queen.summonRespawnTurn = s.turn + 2
+  queen.groggyUntilTurn = s.turn
+  queen.groggyDamageMult = 1.5
+  sentence = enemySentenceFor(s, queen)!
+  assert(sentence.tokens.some((token) => token.text === '숨을 고른다') && sentence.meta.includes('다음 행동 스킵'), 'queen escort clear rewrites the attack into a recovery sentence')
+}
+{
+  const spider = makeEnemy(ENEMIES.elderSpider, 50, 1, 5)
+  const s = state([spider]); s.playerMax = 100
+  const sentence = enemySentenceFor(s, spider, { eventText: '「힘껏」 카드를 실로 묶었다.' })!
+  assert(sentence.manuscript?.length === 5 && sentence.manuscript[0].active && sentence.manuscript[0].emotion === 'joy', 'spider manuscript mirrors the active sequential weakness')
+  assert(sentence.eventText?.includes('힘껏') && sentence.meta.includes('방어 관통'), 'spider stolen word is written beside the persistent piercing intent')
+  assert(enemyDamageRange(s, spider)[1] === 20, 'spider sentence damage preview reads the same one-fifth hp cap as combat')
 }
 console.log('combat effects: ok')
