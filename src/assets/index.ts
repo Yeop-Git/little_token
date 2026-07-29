@@ -16,6 +16,8 @@ import rewardSubjectModifier from './ui/reward_subject_modifier.webp'
 import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
+import inkBottle from './ui/ink_bottle.webp'
+import inkBarFrame from './ui/ink_bar_frame.webp'
 import player001 from './sprites/player_001.webp'
 import playerModel from './models/player.glb?url'
 import tokenModel from './models/token.glb?url'
@@ -38,6 +40,7 @@ import token006 from './sprites/token/token_006.webp'
 import tutorialCard01 from './sprites/tutorial/tutorial_card_01.webp'
 import tutorialCard02 from './sprites/tutorial/tutorial_card_02.webp'
 import tutorialCard03 from './sprites/tutorial/tutorial_card_03.webp'
+import tutorialCard04 from './sprites/tutorial/tutorial_card_04.webp'
 import enemyMoth from './sprites/enemy_moth.webp'
 import enemyFlea from './sprites/enemy_flea.webp'
 import enemyTermite from './sprites/enemy_termite.webp'
@@ -214,6 +217,12 @@ export const REWARD_ART = {
   clear: rewardClear,
 }
 
+/** 잉크 HUD 전용 에셋. 교체할 때 소비 View 대신 이 매니페스트만 바꾼다. */
+export const INK_UI = {
+  bottle: inkBottle,
+  barFrame: inkBarFrame,
+} as const
+
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상과 화면 장식.
 // crown~gloom은 다이얼로그에 아직 안 쓰이고 장식으로 먼저 들어왔다.
 export const TOKEN_FACES = {
@@ -225,8 +234,13 @@ export const TOKEN_FACES = {
   gloom: token006, // 파랗게 질려 고개를 떨굼 — 패배·손실 자리
 }
 
-/** 튜토리얼 대사 선택 카드 원화. 요청한 3 → 2 → 1 순서로 카드 위치에 배치한다. */
-export const TUTORIAL_CARD_ART: readonly string[] = [tutorialCard01, tutorialCard02, tutorialCard03]
+/** 튜토리얼 대사 선택 카드 원화. 게임의 희·노·애·락 순서와 1:1로 대응한다. */
+export const TUTORIAL_CARD_ART = [
+  tutorialCard02, // 기쁨
+  tutorialCard01, // 분노
+  tutorialCard04, // 슬픔
+  tutorialCard03, // 즐거움
+] as const
 
 // 카드 감정 뱃지 — 사용자 제공 수채화 캐릭터를 런타임 WebP로 최적화한 아이콘.
 export const EMOTION_FACES: Record<string, string> = {

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { RUN_SAVE_SCHEMA_VERSION, gainInspiration, newRun, spendInspiration } from '@core/run'
 import { deserializeRun, serializeRun } from '@core/save'
+import { inkOverdraw, selectionInkCost, SENTENCE_INK, wordInkCost } from '@core/ink'
+import { EARLY_WORDS } from '@data/earlyWords'
+import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 
 const original = newRun()
 original.day = 7
@@ -28,6 +31,22 @@ assert.equal(spendInspiration(original, 3), true, 'affordable reward must spend 
 assert.equal(original.inspiration, 1, 'purchase must deduct its exact inspiration cost')
 assert.equal(spendInspiration(original, 2), false, 'unaffordable reward must be rejected')
 assert.equal(original.inspiration, 1, 'rejected purchase must preserve the wallet')
+
+const starterSentence = {
+  subj: EARLY_WORDS.subj[0],
+  adv: EARLY_WORDS.adv[0],
+  verb: EARLY_WORDS.verb[0],
+}
+assert(selectionInkCost(starterSentence) <= SENTENCE_INK, 'a starter sentence must fit in ten ink')
+assert(wordInkCost({ ...EARLY_WORDS.subj[0], rarity: 'legendary' }) > wordInkCost(EARLY_WORDS.subj[0]), 'higher rarity must cost more ink')
+assert(wordInkCost({ ...EARLY_WORDS.subj[0], bonus: 1 }) > wordInkCost(EARLY_WORDS.subj[0]), 'stronger rules must cost more within the same rarity')
+assert.equal(inkOverdraw(10), 0, 'spending exactly ten ink must be safe')
+assert.equal(inkOverdraw(11), 1, 'the first ink above ten must cost one health')
+assert.equal(inkOverdraw(13), 3, 'ink overdraw must equal health damage')
+const inkState = { playerHp: 9, playerMax: 9, guard: 4, counterMultiplier: 0, turn: 1, enemies: [], pending: null } satisfies BattleState
+assert.equal(applyInkOverdraw(inkState, 13), 3, 'overdraw must report its exact damage')
+assert.equal(inkState.playerHp, 6, 'overdraw must spend health')
+assert.equal(inkState.guard, 4, 'overdraw must bypass guard')
 
 const legacy = structuredClone(original) as unknown as Record<string, unknown>
 delete legacy.schemaVersion

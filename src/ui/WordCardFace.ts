@@ -10,6 +10,7 @@ import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
+import { wordInkCost } from '@core/ink'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -79,7 +80,8 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const emotion = emotionOrNeutral(word.emotion)
   const levelBadge = hideMeta ? '' : `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
   const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
-  const badges = `${levelBadge}${emotionBadge}${wordActionBadge(word)}`
+  const costBadge = hideMeta ? '' : `<span class="card-cost" title="잉크 비용" aria-label="잉크 ${wordInkCost(word)}">${wordInkCost(word)}</span>`
+  const badges = `${levelBadge}${emotionBadge}${costBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />

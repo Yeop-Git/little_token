@@ -31,7 +31,7 @@ import {
 import { enemyDamageRange, enemySentenceFor } from '../sim/enemySentences'
 
 const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(message) }
-const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', ...extra })
+const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', weakEmotion: null, ...extra })
 const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }

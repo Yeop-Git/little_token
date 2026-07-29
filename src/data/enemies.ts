@@ -70,7 +70,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     // 막아야 "지금 드러난 약점을 읽어 다리를 끊는다"가 유일한 활로가 된다.
     // 대신 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
     hp: 58, atk: 12, every: 2, initiative: 'first',
-    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, pierceGuard: true,
+    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, pierceGuard: true, weakEmotion: null,
     parts: [
       { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
       { id: 'leg-anger', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
@@ -83,7 +83,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 4, every: 2, initiative: 'second',
-    sprite: 'enemy_termite',
+    sprite: 'enemy_termite', weakEmotion: null,
     note: '특별한 능력 없이 종이 섬유를 차근차근 갉아 먹는다.',
   },
   moth: {
@@ -93,12 +93,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
     atk: 4,
     every: 2,
     initiative: 'second',
-    sprite: 'enemy_moth',
+    sprite: 'enemy_moth', weakEmotion: 'sorrow',
     note: '특별한 능력 없이 먼지 묻은 솔로 문장 가장자리를 털어 지운다.',
   },
   flea: {
     id: 'flea', name: '좀나방', hp: 7, atk: 5, every: 2, initiative: 'first',
-    sprite: 'enemy_flea',
+    sprite: 'enemy_flea', weakEmotion: 'joy',
     note: '빠른 날갯짓으로 문장이 시작되기 전 먼저 날아든다.',
   },
   roach: {
@@ -109,17 +109,17 @@ export const ENEMIES: Record<string, EnemyDef> = {
     every: 2,
     initiative: 'second',
     sprite: 'enemy_roach',
-    guard: 7,
+    guard: 7, weakEmotion: 'anger',
     note: '단단한 껍질의 방어 7이 피해를 먼저 받아 낸다.',
   },
   pillbug: {
     id: 'pillbug', name: '공벌레', hp: 12, atk: 5, every: 2, initiative: 'second',
-    sprite: 'enemy_pillbug', magicShield: 1,
+    sprite: 'enemy_pillbug', magicShield: 1, weakEmotion: null,
     note: '매직실드 1겹이 첫 타격을 완전히 막고 사라진다.',
   },
   mosquito: {
     id: 'mosquito', name: '모기', hp: 8, atk: 6, every: 2, initiative: 'second',
-    sprite: 'enemy_mosquito', pierceGuard: true,
+    sprite: 'enemy_mosquito', pierceGuard: true, weakEmotion: 'pleasure',
     note: '긴 침으로 방어막을 소모시키지 않고 체력에 직접 피해를 준다.',
   },
 }

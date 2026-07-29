@@ -27,6 +27,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
+import { selectionInkCost, SENTENCE_INK } from '@core/ink'
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -188,6 +189,8 @@ export class CombatGuideView {
     }).join('<span class="g-plus" aria-hidden="true">+</span>')
 
     const sentence = slots.map((slot) => slotWord(slot.key, EXAMPLE_IDS[slot.key])?.text ?? '____').join(' ')
+    const exampleSelection = Object.fromEntries(slots.map((slot) => [slot.key, slotWord(slot.key, EXAMPLE_IDS[slot.key]) ?? undefined]))
+    const exampleInk = selectionInkCost(exampleSelection)
 
     const phases: [string, string, string][] = [
       ['1', '단어 고르기', `${slots.map((s) => s.label).join(' → ')} 순서로 카드를 한 장씩 확정한다`],
@@ -206,6 +209,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
+      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_INK}</b> · 문장마다 잉크 ${SENTENCE_INK}을 새로 채운다. 합계가 넘더라도 완성할 수 있지만 초과분만큼 체력을 지불한다.</p>
 
       <h3 class="g-h3">한 턴의 순서</h3>
       <ol class="g-flow">

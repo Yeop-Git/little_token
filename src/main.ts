@@ -49,8 +49,8 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
-/** 개발 서버에서만 열리는 검수 기능. 프로덕션 번들에서는 Vite가 분기를 제거한다. */
-const DEV_CHEAT_ENABLED = import.meta.env.DEV
+/** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
+const DEV_CHEAT_ENABLED = true
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null

@@ -4,6 +4,12 @@
  */
 
 import { ITEM_ART } from '@/assets'
+import statAttack from '@/assets/ui/stat-icons/stat_attack.webp'
+import statHeal from '@/assets/ui/stat-icons/stat_heal.webp'
+import statLuck from '@/assets/ui/stat-icons/stat_luck.webp'
+
+const bakedStatIcon = (src: string): string =>
+  `<img class="baked-stat-icon" src="${src}" alt="" aria-hidden="true" draggable="false">`
 
 export const icon = (key: string): string => {
   switch (key) {
@@ -38,8 +44,7 @@ export const icon = (key: string): string => {
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
         <path d="M7 23 24 8l17 15"/><path d="M12 20v20h24V20" fill="currentColor" fill-opacity="0.14"/><path d="M20 40V28h8v12"/></svg>`
     case 'sword':
-      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
-        <path d="M34 8l6 6-16 16-6-6z" fill="currentColor" fill-opacity="0.2"/><path d="M12 30l6 6M10 34l4 4M18 30l-8 8"/></svg>`
+      return bakedStatIcon(statAttack)
     case 'shield':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
         <path d="M24 6l14 5v10c0 9-6 16-14 21-8-5-14-12-14-21V11z" fill="currentColor" fill-opacity="0.18"/></svg>`
@@ -47,12 +52,9 @@ export const icon = (key: string): string => {
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
         <path d="M24 40S8 30 8 18a8 8 0 0116-4 8 8 0 0116 4c0 12-16 22-16 22z" fill="currentColor" fill-opacity="0.18"/></svg>`
     case 'cross': // 회복
-      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
-        <path d="M24 13v22M13 24h22"/></svg>`
+      return bakedStatIcon(statHeal)
     case 'clover': // 행운
-      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
-        <path d="M24 24c-4-4-4-10 0-13 4 3 4 9 0 13zM24 24c4-4 10-4 13 0-3 4-9 4-13 0zM24 24c4 4 4 10 0 13-4-3-4-9 0-13zM24 24c-4 4-10 4-13 0 3-4 9-4 13 0z" fill="currentColor" fill-opacity="0.18"/>
-        <path d="M24 26v12"/></svg>`
+      return bakedStatIcon(statLuck)
     default:
       return ''
   }

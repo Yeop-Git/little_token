@@ -15,6 +15,8 @@ import { reinforceWord } from '@core/run'
 import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
 import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
+import { GameAudio } from '@/audio/GameAudio'
+import { SquareBurst } from '@/ui/SquareBurst'
 
 interface Opts {
   day: number
@@ -167,12 +169,14 @@ function rewardPickHtml(p: RewardOption, i: number): string {
   const nameLength = [...p.name.replace(/\s/g, '')].length
   const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
   const price = rewardPrice(p)
+  const ownedLabel = p.reinforce ? '강화 완료!' : p.kind === 'item' ? '내 소품으로 결정!' : '내 단어장에 기록!'
   return `
     <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}">
       ${bgHtml(p)}
       <span class="rp-tint" aria-hidden="true"></span>
       <span class="rp-veil" aria-hidden="true"></span>
       <span class="rp-foil" aria-hidden="true"></span>
+      <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
       <div class="rp-top">
         <span class="rp-type">${typeLabel(p)}</span>
         <span class="rp-tags">
@@ -187,7 +191,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
           <button class="rp-detail" type="button">자세히보기</button>
-          <span class="rp-take"><b class="rp-price">◈ ${price}</b> 기록하기 →</span>
+          <button class="rp-take" type="button"><b class="rp-price">◈ ${price}</b> 기록하기 →</button>
         </div>
       </div>
     </div>`
@@ -271,13 +275,96 @@ export class RewardView {
     if (this.locked) return
     const price = rewardPrice(opt)
     if (this.opts.inspiration < price) {
-      this.failAndSkip(`영감이 ${price - this.opts.inspiration} 부족해 이 보상을 기록하지 못했다.`)
+      this.denyPurchase(el, `영감이 ${price - this.opts.inspiration} 부족해 이 보상을 기록하지 못했다.`)
       return
     }
     this.locked = true
     this.disableChoices()
-    el.style.transform = 'translateY(-10px) scale(1.03)'
-    window.setTimeout(() => this.opts.onPick(opt), 220)
+    this.playPurchase(el, opt, price)
+  }
+
+  /** 영감이 지갑에서 카드로 건너가고, 소년의 기록 도장이 찍힌 뒤에만 다음 단계로 간다. */
+  private playPurchase(el: HTMLElement, opt: RewardOption, price: number) {
+    const scene = this.root.querySelector<HTMLElement>('.reward-scene')
+    const wallet = this.root.querySelector<HTMLElement>('.reward-wallet')
+    const balance = wallet?.querySelector<HTMLElement>('.reward-wallet-balance b')
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const flightMs = reduceMotion ? 90 : 430
+    const finishMs = reduceMotion ? 260 : 820
+
+    scene?.classList.add('is-buying-reward')
+    el.classList.add('is-purchasing')
+    this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
+      if (pick !== el) pick.classList.add('is-passed-over')
+    })
+    wallet?.classList.add('is-spending')
+    this.flyInspiration(wallet, el, price, flightMs)
+    this.countWallet(balance, this.opts.inspiration, this.opts.inspiration - price, flightMs)
+
+    window.setTimeout(() => {
+      wallet?.classList.remove('is-spending')
+      const stamp = el.querySelector<HTMLElement>('.rp-owned-stamp')
+      stamp?.setAttribute('aria-hidden', 'false')
+      stamp?.setAttribute('role', 'status')
+      el.classList.add('is-owned')
+      GameAudio.play('pencil')
+      SquareBurst.playOn(el, 'gold', { count: 18, spread: 92, duration: reduceMotion ? 180 : 520 })
+    }, flightMs)
+
+    window.setTimeout(() => this.opts.onPick(opt), finishMs)
+  }
+
+  private countWallet(target: HTMLElement | null | undefined, from: number, to: number, duration: number) {
+    if (!target) return
+    const started = performance.now()
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / Math.max(1, duration))
+      target.textContent = String(Math.round(from + (to - from) * progress))
+      if (progress < 1 && this.root.isConnected) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+    const wallet = target.closest<HTMLElement>('.reward-wallet')
+    wallet?.setAttribute('aria-label', `보유 영감 ${to}, 이번 클리어 획득 ${this.opts.earned}`)
+  }
+
+  private flyInspiration(wallet: HTMLElement | null, card: HTMLElement, price: number, duration: number) {
+    if (!wallet) return
+    const from = wallet.getBoundingClientRect()
+    const to = card.getBoundingClientRect()
+    const count = Math.max(2, Math.min(7, price))
+    for (let i = 0; i < count; i += 1) {
+      const mote = document.createElement('span')
+      mote.className = 'reward-inspiration-flight'
+      mote.textContent = '◈'
+      mote.style.left = `${from.left + from.width * .24}px`
+      mote.style.top = `${from.top + from.height * .5}px`
+      document.body.append(mote)
+      const dx = to.left + to.width * .5 - (from.left + from.width * .24)
+      const dy = to.top + to.height * .48 - (from.top + from.height * .5)
+      const arc = 28 + (i % 3) * 16
+      const animation = mote.animate([
+        { transform: 'translate(-50%, -50%) scale(.55) rotate(0deg)', opacity: 0 },
+        { transform: `translate(${dx * .42}px, ${dy * .42 - arc}px) scale(1.18) rotate(90deg)`, opacity: 1, offset: .45 },
+        { transform: `translate(${dx}px, ${dy}px) scale(.38) rotate(210deg)`, opacity: .15 },
+      ], { duration, delay: i * 34, easing: 'cubic-bezier(.2,.72,.2,1)', fill: 'forwards' })
+      const remove = () => mote.remove()
+      animation.onfinish = remove
+      window.setTimeout(remove, duration + i * 34 + 120)
+    }
+  }
+
+  private denyPurchase(el: HTMLElement, message: string) {
+    const wallet = this.root.querySelector<HTMLElement>('.reward-wallet')
+    el.classList.remove('is-denied')
+    wallet?.classList.remove('is-short')
+    void el.offsetWidth
+    el.classList.add('is-denied')
+    wallet?.classList.add('is-short')
+    this.showSystemMessage(message)
+    window.setTimeout(() => {
+      el.classList.remove('is-denied')
+      wallet?.classList.remove('is-short')
+    }, 620)
   }
 
   private refresh() {
@@ -285,13 +372,6 @@ export class RewardView {
     if (this.opts.inspiration < REWARD_REFRESH_COST || !this.opts.onRefresh()) {
       this.showSystemMessage('영감이 부족해 다른 발상을 떠올릴 수 없다.')
     }
-  }
-
-  private failAndSkip(message: string) {
-    this.locked = true
-    this.disableChoices()
-    this.showSystemMessage(message)
-    window.setTimeout(() => this.opts.onSkip(), 1100)
   }
 
   private showSystemMessage(message: string) {

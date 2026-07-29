@@ -12,6 +12,7 @@ import {
   type BossAttackStage,
 } from '@core/combatRules'
 import { effectiveBase, isDamageIntent } from '@core/compiler'
+import { inkOverdraw } from '@core/ink'
 import type { Emotion, EnemyDef, EnemyPartDef, Intent, TargetCount } from '@core/types'
 
 // 규칙 상수의 원본은 core/combatRules.ts다(도움말 화면이 같은 값을 읽는다).
@@ -110,6 +111,13 @@ export interface BattleState {
   turn: number
   enemies: EnemyInst[]
   pending: PendingAttack | null
+}
+
+/** Ink overdraw bypasses guard and directly spends health once per completed sentence. */
+export function applyInkOverdraw(state: BattleState, inkCost: number): number {
+  const damage = inkOverdraw(inkCost)
+  state.playerHp = Math.max(0, state.playerHp - damage)
+  return damage
 }
 
 export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1): EnemyInst {

@@ -245,9 +245,10 @@ function normalizedClip(
   source: THREE.AnimationClip,
   seamlessLoop: boolean,
   loopBlendSeconds = 0,
+  startTrimSeconds = 0,
   endTrimSeconds = 0,
 ): THREE.AnimationClip {
-  const cacheKey = `${seamlessLoop ? 1 : 0}:${loopBlendSeconds}:${endTrimSeconds}`
+  const cacheKey = `${seamlessLoop ? 1 : 0}:${loopBlendSeconds}:${startTrimSeconds}:${endTrimSeconds}`
   const variants = normalizedClipCache.get(source) ?? new Map<string, THREE.AnimationClip>()
   const cached = variants.get(cacheKey)
   if (cached) return cached
@@ -266,6 +267,31 @@ function normalizedClip(
   }
 
   clip.resetDuration()
+
+  if (startTrimSeconds > 0) {
+    const trimmedStartTime = Math.min(startTrimSeconds, clip.duration)
+    clip.tracks.forEach((track) => {
+      const valueSize = track.getValueSize()
+      const interpolatingTrack = track as typeof track & {
+        createInterpolant: (result: Float32Array) => { evaluate: (time: number) => ArrayLike<number> }
+      }
+      const startValue = Array.from(
+        interpolatingTrack.createInterpolant(new Float32Array(valueSize)).evaluate(trimmedStartTime),
+      )
+      let firstKeptKey = 0
+      while (firstKeptKey < track.times.length && track.times[firstKeptKey] < trimmedStartTime) firstKeptKey += 1
+
+      const times = [0, ...Array.from(track.times.slice(firstKeptKey), (time) => time - trimmedStartTime)]
+      const values = [...startValue, ...Array.from(track.values.slice(firstKeptKey * valueSize))]
+      if ((times[1] ?? -1) < 0.00001) {
+        times.splice(1, 1)
+        values.splice(valueSize, valueSize)
+      }
+      track.times = new Float32Array(times)
+      track.values = new Float32Array(values)
+    })
+    clip.resetDuration()
+  }
 
   if (endTrimSeconds > 0) {
     const trimmedEndTime = Math.max(0, clip.duration - endTrimSeconds)
@@ -637,6 +663,9 @@ class BattleCharacterModel {
         clip,
         animation === 'idle' || animation === 'idle2',
         (this.visual.animations?.idleLoopBlendMs ?? 0) / 1000,
+        (animation === 'idle'
+          ? this.visual.animations?.idleStartTrimMs ?? 0
+          : 0) / 1000,
         (animation === 'idle'
           ? this.visual.animations?.idleEndTrimMs ?? 0
           : this.visual.animations?.endTrimsMs?.[animation as OneShotAnimation] ?? 0) / 1000,

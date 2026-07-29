@@ -19,6 +19,7 @@ import {
   type ResolvedMult,
 } from '@core/compiler'
 import { wordNoteText, wordValueLines } from '@core/wordText'
+import { inkOverdraw, selectionInkCost, SENTENCE_INK, wordInkCost } from '@core/ink'
 import { eul } from '@core/josa'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
@@ -33,6 +34,7 @@ import {
   allDead,
   aliveIdx,
   applyIntent,
+  applyInkOverdraw,
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
@@ -71,6 +73,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { CARD_HAND_CONFIG, CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { GameAudio } from '@/audio/GameAudio'
+import { inkMeterHtml, updateInkMeter } from '@/ui/InkMeter'
 import { IntroDialogue } from '@views/IntroDialogue'
 import { AttackCinematic, attackCutFor, PUMP_MULT, PUMP_RATIO, type AttackCut } from '@/ui/AttackCinematic'
 import {
@@ -604,7 +607,10 @@ export class BattleView {
                 <span class="inspiration-mark" aria-hidden="true">◈</span>
                 <span class="inspiration-wallet-copy"><small>보유 영감</small><b>${this.inspiration}</b></span>
               </div>
-              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>클리어 보상</span><b id="grade"></b></div>
+              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다">
+                <span class="clear-reward-mark" aria-hidden="true">◈</span>
+                <span class="clear-reward-copy"><small>클리어 보상</small><b id="grade"></b></span>
+              </div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
             <aside class="action-order" aria-label="이번 문장 행동 순서">
@@ -642,6 +648,7 @@ export class BattleView {
         ${this.isBoss ? this.bossPlayerHudHtml() : ''}
 
         <div class="slot-step" id="steps" aria-label="문장 조립 단계"></div>
+        ${inkMeterHtml()}
 
         <div class="word-zone">
           <div class="card-table" aria-label="단어 카드 선택 영역">
@@ -661,8 +668,8 @@ export class BattleView {
             <div class="battle-help-heading">
               <span aria-hidden="true">✦</span>
               <div>
-                <small>토큰이 알려 줄게!</small>
-                <h2 id="battle-help-title">멋진 문장을 쓰는 법</h2>
+                <small>토큰의 메모</small>
+                <h2 id="battle-help-title">문장 규칙 다시보기</h2>
               </div>
             </div>
             <ul>
@@ -1461,7 +1468,6 @@ export class BattleView {
               <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
             </div>
           </div>
-          <div class="enemy-traits"></div>
         </div>
         <div class="enemy-intel" aria-label="${e.def.name} 전투 정보"></div>
         <span class="first-mark" title="선공 — 내 문장 직후, 나보다 먼저 때린다">
@@ -1585,7 +1591,15 @@ export class BattleView {
     const attackStep = nextEnemyAttackStep(e)
     const summonPattern = e.def.summonPattern
     const summons = summonCount(e)
-    const weak = activePart?.def.weakness ?? (e.def.weakEmotion ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: e.def.weakEmotion } : null)
+    const weak = activePart
+      ? activePart.def.weakness ?? null
+      : e.def.weakEmotion
+        ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: EMOTION_LABEL[e.def.weakEmotion] }
+        : null
+    const affinity = weak?.kind === 'emotion' ? weak.value as Emotion : 'neutral'
+    const affinityTip = weak?.kind === 'emotion'
+      ? tip(`${weak.label} 약점`, `${weak.label} 카드로 때리면 피해 1.5배`)
+      : tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
     const icons: string[] = []
     const add = (kind: string, glyph: string, tooltip: string) => {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
@@ -1595,21 +1609,24 @@ export class BattleView {
       ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-weakness-mark')
       : el.querySelector<HTMLElement>('.boss-weakness-mark')
     if (bossWeakness) {
-      bossWeakness.hidden = !weak
-      bossWeakness.className = `boss-weakness-mark${weak?.kind === 'emotion' ? ` emotion-${weak.value}` : ''}`
-      bossWeakness.setAttribute('aria-label', weak ? `${weak.label} 약점` : '')
+      bossWeakness.hidden = false
+      bossWeakness.className = `boss-weakness-mark emotion-${affinity}${weak ? '' : ' neutral'}`
+      bossWeakness.setAttribute('aria-label', weak ? `${weak.label} 약점` : '무속성')
+      bossWeakness.dataset.tooltip = affinityTip
+      bossWeakness.dataset.tipPlace = 'above'
+      bossWeakness.tabIndex = 0
       bossWeakness.innerHTML = weak?.kind === 'emotion'
         ? `${emotionIconContent(weak.value as Emotion)}<b>약점</b>`
-        : weak
-          ? '<strong aria-hidden="true">!</strong><b>약점</b>'
-          : ''
+        : '<strong aria-hidden="true">·</strong><b>무속성</b>'
     }
     // 보스 약점은 체력바 옆 전용 배지가 이미 보여 준다. 아래 정보 배지는 다음 행동과
     // 전투 규칙만 간결하게 붙여 같은 내용을 두 번 읽게 하지 않는다.
     if (!e.def.boss && weak?.kind === 'emotion') {
-      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), tip(`약점 · ${weak.label}`, `${weak.label} 카드로 때리면 피해 1.5배`))
+      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), affinityTip)
     } else if (!e.def.boss && weak) {
       add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
+    } else if (!e.def.boss) {
+      add('weak neutral emotion-neutral', '<b>·</b>', affinityTip)
     }
     if (attackStep) {
       const detail = attackStep.damageScale === 0
@@ -1625,7 +1642,7 @@ export class BattleView {
       const stage = bossAttackStage(e)
       add(`stage stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
     }
-    if (e.guard > 0) add('guard', icon('shield'), tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
+    if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
     if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
     if (e.def.pierceGuard) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
     if (summonPattern) add(
@@ -1649,6 +1666,20 @@ export class BattleView {
   private updateFoePlate(plate: HTMLElement, e: EnemyInst, bossHud: boolean) {
     const remainingBars = Math.ceil(Math.max(0, e.hp) / e.hpPerBar)
     const activePart = activeEnemyPart(e)
+    const activeWeakness = activePart ? activePart.def.weakness ?? null : null
+    const affinity = activePart
+      ? activeWeakness?.kind === 'emotion' ? activeWeakness.value as Emotion : 'neutral'
+      : e.def.weakEmotion ?? 'neutral'
+    const affinityLabel = affinity === 'neutral' ? '무속성' : `${EMOTION_LABEL[affinity]} 약점`
+    const affinityTooltip = affinity === 'neutral'
+      ? tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
+      : tip(affinityLabel, `${EMOTION_LABEL[affinity]} 카드로 때리면 피해 1.5배`)
+    ;(['joy', 'anger', 'sorrow', 'pleasure', 'neutral'] as const).forEach((emotion) => {
+      plate.classList.toggle(`emotion-${emotion}`, emotion === affinity)
+    })
+    plate.dataset.tooltip = affinityTooltip
+    plate.dataset.tipPlace = 'above'
+    plate.tabIndex = 0
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
       ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
       : `${Math.max(0, e.hp)}/${e.maxHp}`
@@ -1683,42 +1714,6 @@ export class BattleView {
       }
       return
     }
-    const traits = plate.querySelector<HTMLElement>('.enemy-traits')!
-    // 일반 적의 규칙은 머리 위 아이콘으로 옮긴다.
-    traits.hidden = true
-    const weak = e.def.weakEmotion
-    const attackStage = bossAttackStage(e)
-    const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
-    const attackStep = nextEnemyAttackStep(e)
-    const requiredGuard = enemyGuardBreakRequirement(e, this.state.turn)
-    const groggy = this.state.turn <= e.groggyUntilTurn
-    const partWeakness = activePart?.def.weakness
-    const partWeaknessHtml = partWeakness?.kind === 'emotion'
-      ? `<span class="trait weak emotion-${partWeakness.value}">${emotionBadgeContent(partWeakness.value as Emotion)}<strong>${partWeakness.label} ×1.5</strong></span>`
-      : partWeakness
-        ? `<span class="trait weak spider-tag-weak"><strong>${partWeakness.label} 태그 ×1.5</strong></span>`
-        : ''
-    const regularTraits = [
-      partWeaknessHtml || (weak ? `<span class="trait weak emotion-${weak}">${emotionBadgeContent(weak)}<strong>약점</strong></span>` : ''),
-      activePart ? `<span class="trait spider-active">${activePart.def.name} · ${Math.max(0, activePart.hp)}/${activePart.maxHp}</span>` : '',
-      e.def.boss
-        ? `<span class="trait boss-attack stage-${attackStage}">공격 ${attackStage}단계 · ×${attackMultiplier.toFixed(2)}</span>`
-        : '',
-      attackStep
-        ? `<span class="trait boss-attack">다음: ${attackStep.name}${attackStep.damageScale === 0 ? ' · 피해 없음' : attackStep.damageScale != null && attackStep.damageScale !== 1 ? ` · 위력 ${Math.round(attackStep.damageScale * 100)}%` : attackStep.bonusAtk > 0 ? ` · 공격 +${attackStep.bonusAtk}` : ''}</span>`
-        : '',
-      attackStep?.shatterGuard
-        ? `<span class="trait shatter">필요 방어 ${requiredGuard} · 성공: 피해 0+그로기</span>`
-        : '',
-      groggy
-        ? `<span class="trait groggy">그로기 · 받는 피해 ×${e.groggyDamageMult.toFixed(1)}</span>`
-        : '',
-      e.guard > 0 ? `<span class="trait guard">▰ 방어 ${e.guard}</span>` : '',
-      e.magicShield > 0 ? `<span class="trait magic">✧ 매직실드 ${e.magicShield}</span>` : '',
-      e.def.pierceGuard ? '<span class="trait pierce">◆ 방어 관통</span>' : '',
-    ].join('')
-    traits.hidden = regularTraits.length === 0
-    traits.innerHTML = regularTraits
     const partHost = plate.querySelector<HTMLElement>('.spider-parts')
     if (partHost) {
       partHost.hidden = !e.parts.length
@@ -1823,11 +1818,13 @@ export class BattleView {
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
             ...(currentPart?.def.weakness
               ? [['현재 약점', `${currentPart.def.weakness.label} · 공격 피해 ×1.5 · 방어·회복도 봉인 -1`]]
-              : []),
+              : currentPart ? [['현재 속성', '무속성 · 감정 추가 피해 없음']] : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
-            ...(enemy.def.weakEmotion
-              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
+            ...(!currentPart
+              ? [[enemy.def.weakEmotion ? '약점' : '속성', enemy.def.weakEmotion
+                ? `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`
+                : '무속성 · 감정 추가 피해 없음']]
               : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
@@ -1873,6 +1870,7 @@ export class BattleView {
         const emotion = emotionOrNeutral(w.emotion)
         return `<span class="chain-word emotion-${emotion}${attach}" data-i="${i}">
           <b class="cw-text">${toks[i]}</b>
+          <span class="cw-cost" title="잉크 비용">${wordInkCost(w)}</span>
           ${note ? `<em class="cw-note ${note.cls}">${note.text}</em>` : ''}
         </span>`
       })
@@ -1895,7 +1893,15 @@ export class BattleView {
     host.innerHTML = words + extra
     host.classList.toggle('has-sentence', anyPicked)
     host.classList.toggle('sentence-ready', this.complete())
+    this.renderInk()
     this.renderMultNow(anyPicked)
+  }
+
+  private renderInk(): void {
+    const meter = this.q<HTMLElement>('#ink-meter')
+    const spent = selectionInkCost(this.sel)
+    const over = inkOverdraw(spent)
+    updateInkMeter(meter, { spent, max: SENTENCE_INK, overdraw: over })
   }
 
   // 체인 아래 "지금 배율" — 카드를 고르는 즉시 숫자가 삐리릭 돌다가 팅! 하고 확정된다.
@@ -2166,7 +2172,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
         ${this.projectionHtml(w, key)}
-        <div class="wd-values">${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+        <div class="wd-values"><div class="v flat">잉크 ${wordInkCost(w)}</div>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
         ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
       </div>
@@ -2872,6 +2878,22 @@ export class BattleView {
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
     const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+    const inkCost = selectionInkCost(this.sel)
+    const overdraw = inkOverdraw(inkCost)
+    if (overdraw > 0) {
+      this.lastSentence = intent.sentence
+      this.lastHurtBy = { kind: 'self', sentence: intent.sentence }
+      this.setPhase('잉크 초과')
+      applyInkOverdraw(this.state, inkCost)
+      this.popPlayer(`잉크 초과 · 체력 -${overdraw}`, 'dmg big')
+      this.log(`잉크 ${inkCost}/${SENTENCE_INK} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
+      this.renderActors()
+      await sleep(420)
+      if (this.state.playerHp <= 0) {
+        await this.lose()
+        return
+      }
+    }
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
@@ -3948,7 +3970,7 @@ export class BattleView {
     const badge = this.q('#grade-badge')
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    this.q('#grade').textContent = `+ ◈ ${this.grade}`
+    this.q('#grade').textContent = `+${this.grade}`
   }
 
   /**

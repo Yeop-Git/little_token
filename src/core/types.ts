@@ -239,7 +239,8 @@ export interface EnemyDef {
   magicShield?: number
   /** 플레이어의 일반 방어막을 소모시키지 않고 체력에 직접 피해를 준다. */
   pierceGuard?: boolean
-  weakEmotion?: Emotion
+  /** 감정 약점. null은 감정 추가 피해를 받지 않는 무속성 적이다. */
+  weakEmotion: Emotion | null
   /** 장로거미처럼 하나의 적 안에 순차적으로 파괴되는 독립 체력 부위를 가진 경우. */
   parts?: readonly EnemyPartDef[]
   /** 매 문장 시작에 카드를 묶고, 약점 공략으로 해제하는 거미줄 패턴. */

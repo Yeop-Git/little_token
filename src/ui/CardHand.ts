@@ -3,6 +3,7 @@ import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { wordNoteText } from '@core/wordText'
+import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
@@ -528,7 +529,7 @@ export class CardHand {
       button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !this.inputEnabled || !!unavailable
-      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${wordNoteText(card.word)}`)
+      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, 잉크 ${wordInkCost(card.word)}, ${wordNoteText(card.word)}`)
       button.setAttribute('aria-pressed', String(selected))
       button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
       button.style.setProperty('--card-z', String(line.zIndex))
@@ -557,7 +558,7 @@ export class CardHand {
     const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
-    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, ${wordNoteText(card.word)}`
+    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, 잉크 ${wordInkCost(card.word)}, ${wordNoteText(card.word)}`
     const rarity = card.word.rarity ?? 'common'
     const emotion = emotionOrNeutral(card.word.emotion)
     // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.

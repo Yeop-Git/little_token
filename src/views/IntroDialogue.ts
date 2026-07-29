@@ -7,7 +7,7 @@
  */
 
 import { TOKEN_FACES, TUTORIAL_CARD_ART } from '@/assets'
-import type { Word } from '@core/types'
+import type { Emotion, Word } from '@core/types'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 import { currentLocale, t, type LocaleCode } from '@/localization'
 
@@ -26,28 +26,138 @@ type ScriptLine =
 const TOKEN_NAME = t('tokenName', '토큰')
 const PLAYER_NAME = t('playerName', '프롬')
 
-const PLAYER_LINES: Record<LocaleCode, string[][]> = {
-  ko: [['. . . 여긴 어디야?'], ['기억을', '잃다니', '무슨', '소리야.'], ['아무것도', '기억이', '안 나.'], ['그게', '누군데?']],
-  en: [['. . . Where am I?'], ['What do', 'you mean,', 'lost', 'my memory?'], ["I don't", 'remember', 'anything.'], ['Who', 'are they?']],
-  ja: [['. . . ここはどこ？'], ['記憶を', 'なくしたって', 'どういう', 'こと？'], ['何も', '思い出せ', 'ない。'], ['それって', '誰？']],
-  ru: [['. . . Где я?'], ['Что значит', 'я потерял', 'свою', 'память?'], ['Я ничего', 'не', 'помню.'], ['Кто', 'это?']],
-  'zh-Hans': [['. . . 这里是哪里？'], ['失忆', '到底是', '什么', '意思？'], ['我什么', '都不', '记得。'], ['那是', '谁？']],
-  'zh-Hant': [['. . . 這裡是哪裡？'], ['失憶', '到底是', '什麼', '意思？'], ['我什麼', '都不', '記得。'], ['那是', '誰？']],
+type PlayerTutorialLines = readonly [readonly string[], readonly string[], readonly string[], readonly string[]]
+type TokenTutorialLines = readonly [string, string, string, string, string, string, string, string, string, string, string, string, string]
+
+/** 튜토리얼 카드도 전투 카드와 같은 희·노·애·락 색 필터를 쓴다. */
+const TUTORIAL_CARD_EMOTIONS: readonly Emotion[] = ['joy', 'anger', 'sorrow', 'pleasure']
+
+const PLAYER_LINES: Record<LocaleCode, PlayerTutorialLines> = {
+  ko: [['. . . 여긴 어디야?'], ['기억을', '잃다니', '무슨', '소리야.'], ['아무것도', '기억이', '안 나.'], ['나는', '차근차근', '써 볼게.']],
+  en: [['. . . Where am I?'], ['What do', 'you mean,', 'lost', 'my memory?'], ["I don't", 'remember', 'anything.'], ['I will', 'take it slowly', 'and write.']],
+  ja: [['. . . ここはどこ？'], ['記憶を', 'なくしたって', 'どういう', 'こと？'], ['何も', '思い出せ', 'ない。'], ['ぼくは', '一つずつ', '書いてみる。']],
+  ru: [['. . . Где я?'], ['Что значит', 'я потерял', 'свою', 'память?'], ['Я ничего', 'не', 'помню.'], ['Я буду', 'шаг за шагом', 'писать.']],
+  'zh-Hans': [['. . . 这里是哪里？'], ['失忆', '到底是', '什么', '意思？'], ['我什么', '都不', '记得。'], ['我会', '一步一步', '写下去。']],
+  'zh-Hant': [['. . . 這裡是哪裡？'], ['失憶', '到底是', '什麼', '意思？'], ['我什麼', '都不', '記得。'], ['我會', '一步一步', '寫下去。']],
 }
 
-const TOKEN_LINES: Record<LocaleCode, string[]> = {
-  ko: ['어서 일어나!','이런... 설마 또 기억을 잃은 거야?','젠장... 또 이야기를 빼앗겼다니!','괜찮아...','다시 되찾을 수 있으니까. 매번 그래왔잖아 그치?','내가 다시 차근차근 알려줄게.','우린 최고의 파트너니까!','같은 색 감정을 모으면 강력한 힘이 나가!','우선 눈 앞에 이야기를 좀먹는 녀석들을 처리해야해!'],
-  en: ['Wake up!','Oh no... Did you lose your memory again?','Darn... They stole the story again!','It’s okay...','We can take it back. We always do, right?','I’ll teach you again, one step at a time.','Because we’re the best partners!','Gather emotions of the same color to unleash great power!','First, deal with those bugs eating the story!'],
-  ja: ['早く起きて！','まさか…また記憶をなくしたの？','くそっ…また物語を奪われた！','大丈夫…','また取り戻せるよ。いつもそうしてきたでしょ？','ぼくがまた一つずつ教えるよ。','ぼくらは最高の相棒だから！','同じ色の感情を集めると強い力が出るよ！','まずは目の前で物語を蝕むやつらを片づけよう！'],
-  ru: ['Просыпайся!','О нет... Ты снова потерял память?','Вот же... Историю снова украли!','Всё хорошо...','Мы вернём её. У нас всегда получалось, правда?','Я снова всё объясню, шаг за шагом.','Ведь мы лучшие напарники!','Собирай эмоции одного цвета — и высвободишь огромную силу!','Сначала разберёмся с теми, кто пожирает историю!'],
-  'zh-Hans': ['快醒醒！','不会吧……你又失忆了吗？','可恶……故事又被抢走了！','没关系……','我们还能夺回来。每次都做到了，对吧？','我会再一步步教你。','因为我们是最棒的搭档！','聚集同色的情绪，就能释放强大的力量！','先解决眼前这些啃食故事的家伙！'],
-  'zh-Hant': ['快醒醒！','不會吧……你又失憶了嗎？','可惡……故事又被搶走了！','沒關係……','我們還能奪回來。每次都做到了，對吧？','我會再一步步教你。','因為我們是最棒的搭檔！','聚集同色的情緒，就能釋放強大的力量！','先解決眼前這些啃食故事的傢伙！'],
+const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
+  ko: [
+    `어서 일어나, ${PLAYER_NAME}! 내 말 들려?`,
+    '네 일기장 속이야. 이런... 설마 또 기억을 잃은 거야?',
+    '이야기를 갉아먹는 벌레들이 네 기억까지 빼앗아 간 거야.',
+    '그래도 괜찮아.',
+    '우리가 다시 써 내려가면 되니까. 매번 그래왔잖아, 그렇지?',
+    '걱정 마. 내가 문장 쓰는 법부터 차근차근 알려 줄게.',
+    '우린 최고의 파트너니까!',
+    '좋아! 주어, 수식어, 동사를 차례로 고르면 한 문장이 완성돼.',
+    '앞뒤 단어가 잘 맞으면 좋은 「맥락」이 생기고, 같은 색 감정이 모이면 「공명」해서 더 강해져!',
+    '마지막 동사는 때릴지, 막을지, 회복할지를 정해.',
+    '문장마다 잉크는 10만큼 채워져. 여백 밖까지 더 쓸 수도 있지만, 넘친 만큼은 네 체력으로 대신 써야 해. 잉크병이 미리 알려 줄 거야!',
+    '피해가 남으면 앞의 벌레를 넘어 다음 녀석까지 이어져!',
+    '그럼 눈앞에서 이야기를 갉아먹는 녀석들부터 쫓아내자!',
+  ],
+  en: [
+    `Wake up, ${PLAYER_NAME}! Can you hear me?`,
+    'You are inside your diary. Oh no... Did you lose your memory again?',
+    'The bugs gnawing at the story stole your memories too.',
+    'But it is all right.',
+    'We can write it all back. We have done it every time, remember?',
+    'Do not worry. I will teach you how to build a sentence, one step at a time.',
+    'We are the best partners, after all!',
+    'Good! Choose a subject, modifier, and verb in order to complete one sentence.',
+    'When neighboring words fit, they create Context; words of the same emotion color Resonate and become even stronger!',
+    'The final verb decides whether you attack, guard, or heal.',
+    'Each sentence starts with 10 Ink. You may write past the margin, but the excess is paid with your health. The ink bottle will warn you first!',
+    'Any damage left over carries past the front bug into the next one!',
+    'Now let us chase away the bugs gnawing at the story in front of us!',
+  ],
+  ja: [
+    `起きて、${PLAYER_NAME}！ぼくの声が聞こえる？`,
+    'ここは君の日記の中だよ。まさか…また記憶をなくしたの？',
+    '物語をかじる虫たちが、君の記憶まで奪ったんだ。',
+    'でも大丈夫。',
+    'また書き直せばいい。いつもそうしてきたでしょ？',
+    '心配しないで。文の作り方から一つずつ教えるよ。',
+    'ぼくらは最高の相棒だから！',
+    'そう！主語、修飾語、動詞の順に選べば、一つの文が完成するよ。',
+    '前後の言葉が合えば「文脈」になり、同じ色の感情が集まれば「共鳴」してもっと強くなる！',
+    '最後の動詞が、攻撃するか、防ぐか、回復するかを決めるんだ。',
+    '文ごとにインクは10あるよ。余白を越えて書くこともできるけど、超えた分は体力で払うんだ。インク瓶が先に知らせてくれるよ！',
+    '余ったダメージは前の虫を越えて、次の虫まで届くよ！',
+    'さあ、目の前で物語をかじる虫たちを追い払おう！',
+  ],
+  ru: [
+    `Просыпайся, ${PLAYER_NAME}! Ты меня слышишь?`,
+    'Ты внутри своего дневника. О нет... Ты снова потерял память?',
+    'Жуки, пожирающие историю, украли и твои воспоминания.',
+    'Но всё хорошо.',
+    'Мы просто напишем всё заново. Мы всегда так делали, помнишь?',
+    'Не волнуйся. Я снова научу тебя составлять фразы, шаг за шагом.',
+    'Ведь мы лучшие напарники!',
+    'Отлично! Выбирай по порядку подлежащее, определение и глагол, чтобы закончить фразу.',
+    'Соседние слова создают Контекст, а эмоции одного цвета входят в Резонанс и усиливают фразу!',
+    'Последний глагол решает, атаковать, защищаться или лечиться.',
+    'На каждую фразу даётся 10 чернил. Можно писать за полями, но излишек оплачивается здоровьем. Чернильница предупредит заранее!',
+    'Лишний урон пройдёт сквозь первого жука и попадёт в следующего!',
+    'А теперь прогоним жуков, которые пожирают историю прямо перед нами!',
+  ],
+  'zh-Hans': [
+    `快醒醒，${PLAYER_NAME}！听得到我说话吗？`,
+    '这里是你的日记里面。不会吧……你又失忆了吗？',
+    '那些啃食故事的虫子连你的记忆也抢走了。',
+    '不过没关系。',
+    '我们重新写回来就好。以前每次都是这样，对吧？',
+    '别担心。我会从造句开始，一步步重新教你。',
+    '因为我们是最棒的搭档！',
+    '很好！依次选择主语、修饰语和动词，就能完成一句话。',
+    '前后词语契合会形成“语境”，同色情感聚集则会“共鸣”，让句子更强！',
+    '最后的动词决定攻击、防御还是治疗。',
+    '每句话有10点墨水。你也可以写到页边之外，但超出的部分会用体力支付，墨水瓶会提前提醒你！',
+    '多余的伤害会越过前面的虫子，继续打到下一只！',
+    '那么，先赶走眼前这些啃食故事的虫子吧！',
+  ],
+  'zh-Hant': [
+    `快醒醒，${PLAYER_NAME}！聽得到我說話嗎？`,
+    '這裡是你的日記裡面。不會吧……你又失憶了嗎？',
+    '那些啃食故事的蟲子連你的記憶也搶走了。',
+    '不過沒關係。',
+    '我們重新寫回來就好。以前每次都是這樣，對吧？',
+    '別擔心。我會從造句開始，一步步重新教你。',
+    '因為我們是最棒的搭檔！',
+    '很好！依次選擇主語、修飾語和動詞，就能完成一句話。',
+    '前後詞語契合會形成「語境」，同色情感聚集則會「共鳴」，讓句子更強！',
+    '最後的動詞決定攻擊、防禦還是治療。',
+    '每句話有10點墨水。你也可以寫到頁邊之外，但超出的部分會用體力支付，墨水瓶會提前提醒你！',
+    '多餘的傷害會越過前面的蟲子，繼續打到下一隻！',
+    '那麼，先趕走眼前這些啃食故事的蟲子吧！',
+  ],
 }
 
-let playerLineIndex = 0
-const playerLine = (): string[] => PLAYER_LINES[currentLocale][playerLineIndex++]
-let tokenLineIndex = 0
-const tokenLine = (): string => TOKEN_LINES[currentLocale][tokenLineIndex++]
+/** 인덱스를 전역에서 소모하지 않고 매 튜토리얼마다 같은 앞뒤 관계로 대사를 만든다. */
+function tutorialScript(locale: LocaleCode): ScriptLine[] {
+  const p = PLAYER_LINES[locale]
+  const token = TOKEN_LINES[locale]
+  return [
+    { kind: 'token', portrait: 'neutral', text: token[0] },
+    { kind: 'player', words: [...p[0]] },
+    { kind: 'token', portrait: 'neutral', text: token[1] },
+    { kind: 'player', words: [...p[1]] },
+    { kind: 'token', portrait: 'sad', text: token[2] },
+    { kind: 'token', portrait: 'sad', text: token[3] },
+    { kind: 'token', portrait: 'neutral', text: token[4] },
+    { kind: 'player', words: [...p[2]] },
+    { kind: 'token', portrait: 'neutral', text: token[5] },
+    { kind: 'token', portrait: 'smile', text: token[6] },
+    { kind: 'player', words: [...p[3]] },
+    { kind: 'token', portrait: 'smile', text: token[7] },
+    { kind: 'token', portrait: 'smile', text: token[8] },
+    { kind: 'token', portrait: 'neutral', text: token[9] },
+    { kind: 'token', portrait: 'neutral', text: token[10] },
+    { kind: 'token', portrait: 'smile', text: token[11] },
+    { kind: 'token', portrait: 'neutral', text: token[12] },
+  ]
+}
 
 // 타자 속도와, 다 출력된 뒤 클릭 진행 게이트: ADVANCE_LOCK_MS 동안 무시 →
 // 이후 클릭 또는 ADVANCE_TIMEOUT_MS 경과 시 다음 대사.
@@ -58,22 +168,6 @@ const ADVANCE_TIMEOUT_MS = 6000
 const PLAYER_ADVANCE_TIMEOUT_MS = 2800
 const PORTRAIT_SWAP_OUT_MS = 110
 const PORTRAIT_SWAP_IN_MS = 260
-
-const SCRIPT: ScriptLine[] = [
-  { kind: 'token', portrait: 'neutral', text: tokenLine() },
-  { kind: 'player', words: playerLine() },
-  { kind: 'token', portrait: 'neutral', text: tokenLine() },
-  { kind: 'player', words: playerLine() },
-  { kind: 'token', portrait: 'sad', text: tokenLine() },
-  { kind: 'token', portrait: 'sad', text: tokenLine() },
-  { kind: 'token', portrait: 'neutral', text: tokenLine() },
-  { kind: 'player', words: playerLine() },
-  { kind: 'token', portrait: 'neutral', text: tokenLine() },
-  { kind: 'token', portrait: 'smile', text: tokenLine() },
-  { kind: 'token', portrait: 'smile', text: tokenLine() },
-  { kind: 'token', portrait: 'smile', text: tokenLine() },
-  { kind: 'player', words: playerLine() },
-]
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -176,7 +270,7 @@ export class IntroDialogue {
     this.root.classList.add('is-box-visible')
     await wait(250)
 
-    for (const line of SCRIPT) {
+    for (const line of tutorialScript(currentLocale)) {
       if (this.skipped) break
       if (line.kind === 'token') await this.showLine(line.portrait, line.text)
       else await this.showChoiceLine(line.words)
@@ -294,18 +388,19 @@ export class IntroDialogue {
     this.choiceEl.innerHTML = ''
     this.choiceEl.classList.remove('is-leaving')
     const chips = words.map((word, i) => {
+      const emotion = TUTORIAL_CARD_EMOTIONS[i % TUTORIAL_CARD_EMOTIONS.length]
       const cardWord: Word = {
         id: `tutorial-dialogue-${i}`,
         text: word,
         slot: 'dialogue',
         tags: [],
-        emotion: 'neutral',
+        emotion,
         note: '문장에 넣기',
         rarity: 'common',
       }
       const chip = document.createElement('button')
       chip.type = 'button'
-      chip.className = `intro-word-chip word-card mood-${wordMood(cardWord)} is-entering`
+      chip.className = `intro-word-chip word-card mood-${wordMood(cardWord)} emotion-${emotion} is-entering`
       chip.dataset.word = word
       chip.setAttribute('aria-label', `${word} 선택`)
       chip.innerHTML = wordCardInnerHtml(cardWord, {
