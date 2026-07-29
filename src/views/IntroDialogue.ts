@@ -47,7 +47,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '네 일기장 속이야. 이런... 설마 또 기억을 잃은 거야?',
     '이야기를 갉아먹는 벌레들이 네 기억까지 빼앗아 간 거야.',
     '그래도 괜찮아.',
-    '우리가 다시 써 내려가면 되니까. 매번 그래왔잖아, 그렇지?',
+    '그래도 괜찮아. 우리가 다시 써 내려가면 되니까. 내가 옆에서 차근차근 알려 줄게.',
     '걱정 마. 내가 문장 쓰는 법부터 차근차근 알려 줄게.',
     '우린 최고의 파트너니까!',
     '좋아! 주어, 수식어, 동사를 차례로 고르면 한 문장이 완성돼.',
@@ -62,7 +62,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'You are inside your diary. Oh no... Did you lose your memory again?',
     'The bugs gnawing at the story stole your memories too.',
     'But it is all right.',
-    'We can write it all back. We have done it every time, remember?',
+    'But it is all right. We can write it all back. I will stay beside you and guide you step by step.',
     'Do not worry. I will teach you how to build a sentence, one step at a time.',
     'We are the best partners, after all!',
     'Good! Choose a subject, modifier, and verb in order to complete one sentence.',
@@ -77,7 +77,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'ここは君の日記の中だよ。まさか…また記憶をなくしたの？',
     '物語をかじる虫たちが、君の記憶まで奪ったんだ。',
     'でも大丈夫。',
-    'また書き直せばいい。いつもそうしてきたでしょ？',
+    'でも大丈夫。また書き直せばいい。ぼくがそばで一つずつ教えるよ。',
     '心配しないで。文の作り方から一つずつ教えるよ。',
     'ぼくらは最高の相棒だから！',
     'そう！主語、修飾語、動詞の順に選べば、一つの文が完成するよ。',
@@ -92,7 +92,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'Ты внутри своего дневника. О нет... Ты снова потерял память?',
     'Жуки, пожирающие историю, украли и твои воспоминания.',
     'Но всё хорошо.',
-    'Мы просто напишем всё заново. Мы всегда так делали, помнишь?',
+    'Но всё хорошо. Мы просто напишем всё заново. Я буду рядом и подскажу шаг за шагом.',
     'Не волнуйся. Я снова научу тебя составлять фразы, шаг за шагом.',
     'Ведь мы лучшие напарники!',
     'Отлично! Выбирай по порядку подлежащее, определение и глагол, чтобы закончить фразу.',
@@ -107,7 +107,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '这里是你的日记里面。不会吧……你又失忆了吗？',
     '那些啃食故事的虫子连你的记忆也抢走了。',
     '不过没关系。',
-    '我们重新写回来就好。以前每次都是这样，对吧？',
+    '不过没关系。我们重新写回来就好。我会陪在你身边，一步步告诉你。',
     '别担心。我会从造句开始，一步步重新教你。',
     '因为我们是最棒的搭档！',
     '很好！依次选择主语、修饰语和动词，就能完成一句话。',
@@ -122,7 +122,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '這裡是你的日記裡面。不會吧……你又失憶了嗎？',
     '那些啃食故事的蟲子連你的記憶也搶走了。',
     '不過沒關係。',
-    '我們重新寫回來就好。以前每次都是這樣，對吧？',
+    '不過沒關係。我們重新寫回來就好。我會陪在你身邊，一步步告訴你。',
     '別擔心。我會從造句開始，一步步重新教你。',
     '因為我們是最棒的搭檔！',
     '很好！依次選擇主語、修飾語和動詞，就能完成一句話。',
@@ -144,19 +144,28 @@ function tutorialScript(locale: LocaleCode): ScriptLine[] {
     { kind: 'token', portrait: 'neutral', text: token[1] },
     { kind: 'player', words: [...p[1]] },
     { kind: 'token', portrait: 'sad', text: token[2] },
-    { kind: 'token', portrait: 'sad', text: token[3] },
     { kind: 'token', portrait: 'neutral', text: token[4] },
-    { kind: 'player', words: [...p[2]] },
-    { kind: 'token', portrait: 'neutral', text: token[5] },
-    { kind: 'token', portrait: 'smile', text: token[6] },
     { kind: 'player', words: [...p[3]] },
-    { kind: 'token', portrait: 'smile', text: token[7] },
-    { kind: 'token', portrait: 'smile', text: token[8] },
-    { kind: 'token', portrait: 'neutral', text: token[9] },
-    { kind: 'token', portrait: 'neutral', text: token[10] },
-    { kind: 'token', portrait: 'smile', text: token[11] },
     { kind: 'token', portrait: 'neutral', text: token[12] },
   ]
+}
+
+/** 새 튜토리얼 대사가 한 언어에만 추가되는 회귀를 빌드 검사에서 막는다. */
+export function introDialogueLocalizationErrors(): string[] {
+  const errors: string[] = []
+  for (const [locale, lines] of Object.entries(TOKEN_LINES) as Array<[LocaleCode, TokenTutorialLines]>) {
+    lines.forEach((text, index) => {
+      if (!text.trim()) errors.push(`${locale}: empty Token tutorial line ${index}`)
+      if (locale !== 'ko' && /[가-힣]/.test(text)) errors.push(`${locale}: Korean remains in Token tutorial line ${index}`)
+    })
+  }
+  for (const [locale, lines] of Object.entries(PLAYER_LINES) as Array<[LocaleCode, PlayerTutorialLines]>) {
+    lines.flat().forEach((text, index) => {
+      if (!text.trim()) errors.push(`${locale}: empty player tutorial word ${index}`)
+      if (locale !== 'ko' && /[가-힣]/.test(text)) errors.push(`${locale}: Korean remains in player tutorial word ${index}`)
+    })
+  }
+  return errors
 }
 
 // 타자 속도와, 다 출력된 뒤 클릭 진행 게이트: ADVANCE_LOCK_MS 동안 무시 →

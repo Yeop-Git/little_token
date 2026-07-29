@@ -67,6 +67,7 @@ import { TooltipLayer } from '@/ui/TooltipLayer'
 import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
+import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
 import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -83,8 +84,9 @@ import {
   type FieldBackground,
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
-import { t } from '@/localization'
+import { currentLocale, t } from '@/localization'
 import { bossTokenLine, type TokenLine } from '@/localization/bossToken'
+import { enemySentenceText as bossText } from '@/localization/enemySentences'
 import {
   characterAnimationOf,
   destroyCharacterModels,
@@ -201,6 +203,17 @@ const TOKEN_BOSS_LINES = [
   bossTokenLine('idleStand'),
   bossTokenLine('idleIncoming'),
 ] as const
+const TOKEN_COACH_LINES: Record<CombatCoachHint, TokenLine> = {
+  subject: bossTokenLine('coachSubject'),
+  modifier: bossTokenLine('coachModifier'),
+  verb: bossTokenLine('coachVerb'),
+  resonance: bossTokenLine('coachResonance', 'relief'),
+  context: bossTokenLine('coachContext', 'relief'),
+  'ink-low': bossTokenLine('coachInkLow'),
+  'ink-overdraw': bossTokenLine('coachInkOverdraw', 'warn'),
+  'enemy-first': bossTokenLine('coachEnemyFirst', 'warn'),
+  overflow: bossTokenLine('coachOverflow', 'relief'),
+}
 /**
  * 토큰의 말투 세기. 보스 패턴 경고와 파훼 방법은 전부 토큰의 말풍선으로 나가고,
  * 지금 놓치면 아픈 것만 `warn`으로 올려 빨간 색연필 쪽지가 된다.
@@ -579,6 +592,14 @@ export class BattleView {
     if (this.spiderCastReady) return
     this.spiderCastReady = true
     this.cardHand.setInputEnabled(true)
+    if (!this.isBoss) {
+      this.timers.push(window.setTimeout(() => {
+        const front = this.state.enemies[frontIdx(this.state)]
+        if (!this.showCombatCoach('subject') && front?.initiativePhase === 'first') {
+          this.showCombatCoach('enemy-first')
+        }
+      }, 480))
+    }
     const pending = this.pendingSpiderSeal
     if (!pending) return
     const current = this.order()[this.slotIndex]
@@ -1159,6 +1180,7 @@ export class BattleView {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="${t('playerName', '프롬')}과 도우미 ${t('tokenName', '토큰')} 상세 보기">
+        ${this.isBoss ? '' : '<div class="token-speech token-companion-speech" role="status" aria-live="polite"></div>'}
         ${this.isBoss ? '' : `<div class="nameplate glass">
           <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
@@ -1200,8 +1222,9 @@ export class BattleView {
 
   private bossSentenceTokenHtml(token: EnemySentenceToken): string {
     const emotion = token.emotion ? ` emotion-${token.emotion}` : ''
+    const roleLabel = bossText(token.role === 'subject' ? 'roleSubject' : token.role === 'modifier' ? 'roleModifier' : token.role === 'object' ? 'roleObject' : 'roleAction')
     return `<span class="boss-sentence-token role-${token.role}${emotion}${token.crossed ? ' is-crossed' : ''}">
-      <small>${token.role === 'subject' ? '주어' : token.role === 'modifier' ? '수식' : token.role === 'object' ? '목적' : '행동'}</small>
+      <small>${roleLabel}</small>
       <b>${token.text}</b>
     </span>`
   }
@@ -1239,8 +1262,8 @@ export class BattleView {
         </div>`
       : ''
     const manuscript = view.manuscript?.length
-      ? `<div class="boss-manuscript" aria-label="장로거미가 훼손 중인 문장">
-          <span class="boss-sentence-side-label">훼손 중인 긴 문장</span>
+      ? `<div class="boss-manuscript" aria-label="${bossText('manuscriptAria')}">
+          <span class="boss-sentence-side-label">${bossText('damagedLongSentence')}</span>
           <div class="boss-manuscript-line">${view.manuscript.map((clause) => `
             <span class="boss-manuscript-clause${clause.active ? ' is-active' : ''}${clause.crossed ? ' is-crossed' : ''}${clause.emotion ? ` emotion-${clause.emotion}` : ''}" data-clause-id="${clause.id}">
               <b>${clause.text}</b>
@@ -1249,7 +1272,7 @@ export class BattleView {
       : ''
     host.className = `boss-sentence-board tone-${view.tone}`
     host.innerHTML = `
-      <div class="boss-sentence-heading"><span>${view.label}</span><b>${view.tone === 'danger' ? '곧 실행' : view.tone === 'relief' ? '결말 수정' : '적의 의도'}</b></div>
+      <div class="boss-sentence-heading"><span>${view.label}</span><b>${bossText(view.tone === 'danger' ? 'executeSoon' : view.tone === 'relief' ? 'endingRevision' : 'enemyIntent')}</b></div>
       ${context}
       <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
       <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
@@ -1301,12 +1324,14 @@ export class BattleView {
             <div class="boss-hp-segments" hidden></div>
             <div class="spellshield-overlay" hidden><span>✦</span><b></b></div>
           </div>
+        </div>
+        <div class="boss-badge-row">
           <span class="boss-weakness-mark" hidden></span>
           <span class="boss-first-mark" hidden title="선공 — 내 문장 직후, 나보다 먼저 때린다">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
           </span>
+          <div class="boss-intel enemy-intel" aria-label="${bossText('bossBattleInfo', { boss: bossName })}" hidden></div>
         </div>
-        <div class="boss-intel enemy-intel" aria-label="${bossName} 전투 정보" hidden></div>
       </section>`
   }
 
@@ -1348,7 +1373,7 @@ export class BattleView {
       // 한가한 응원은 경고를 밀어내지 않는다. 큰낫이 올라간 채로 "힘내!"가 뜨면
       // 화면이 지금 무엇이 급한지 스스로 뒤집는 셈이다.
       if (this.tokenHolding) return this.scheduleBossTokenSpeech(7600)
-      this.showBossTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
+      this.showTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
       this.tokenSpeechIndex += 1
       this.scheduleBossTokenSpeech(7600)
     }, delay)
@@ -1361,14 +1386,14 @@ export class BattleView {
     this.tokenSpeechTimer = window.setTimeout(() => {
       if (this.over) return
       const next = this.bossPatternHint ?? line
-      this.showBossTokenSpeech(next)
+      this.showTokenSpeech(next)
       if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
       else this.scheduleBossTokenHint(next, 7600)
     }, delay)
     this.timers.push(this.tokenSpeechTimer)
   }
 
-  private showBossTokenSpeech(line: TokenLine) {
+  private showTokenSpeech(line: TokenLine) {
     const bubble = this.root.querySelector<HTMLElement>('.token-speech')
     const token = this.root.querySelector<HTMLElement>('.boss-token')
     if (!bubble) return
@@ -1391,11 +1416,28 @@ export class BattleView {
     this.timers.push(this.tokenSpeechHideTimer)
   }
 
+  /** 일반전의 동반 토큰이 최초 상황에만 짧게 개입한다. 보스의 고정 경고가 우선이다. */
+  private showCombatCoach(hint: CombatCoachHint): boolean {
+    if (this.isBoss || this.over || this.tokenHolding || hasSeenCombatCoach(hint)) return false
+    markCombatCoachSeen(hint)
+    this.showTokenSpeech(TOKEN_COACH_LINES[hint])
+    return true
+  }
+
+  private clearNormalTokenWarning() {
+    if (this.isBoss) return
+    this.tokenHolding = false
+    const bubble = this.root.querySelector<HTMLElement>('.token-companion-speech')
+    if (!bubble) return
+    bubble.classList.remove('is-speaking')
+    bubble.removeAttribute('data-tone')
+  }
+
   private showBossTokenHint(line: TokenLine) {
     if (!this.isBoss || this.over) return
     this.bossPatternHint = line
     clearTimeout(this.tokenSpeechTimer)
-    this.showBossTokenSpeech(line)
+    this.showTokenSpeech(line)
     if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
     else this.scheduleBossTokenHint(line, 7600)
   }
@@ -1405,7 +1447,7 @@ export class BattleView {
     this.bossPatternSolved = true
     this.bossPatternHint = null
     clearTimeout(this.tokenSpeechTimer)
-    this.showBossTokenSpeech(line)
+    this.showTokenSpeech(line)
     this.scheduleBossTokenSpeech(7600)
   }
 
@@ -1622,7 +1664,9 @@ export class BattleView {
     // 보스 약점은 체력바 옆 전용 배지가 이미 보여 준다. 아래 정보 배지는 다음 행동과
     // 전투 규칙만 간결하게 붙여 같은 내용을 두 번 읽게 하지 않는다.
     if (!e.def.boss && weak?.kind === 'emotion') {
-      add(`weak emotion-${weak.value}`, emotionBadgeContent(weak.value as Emotion), affinityTip)
+      // 머리 위 작은 배지는 표정만 보여 준다. 감정명은 좁은 배지 밖으로 세로로 흘러내리므로
+      // 접근성 라벨과 툴팁에만 남기고, 이름이 필요한 상세·부위 UI는 기존 배지를 유지한다.
+      add(`weak emotion-${weak.value}`, emotionIconContent(weak.value as Emotion), affinityTip)
     } else if (!e.def.boss && weak) {
       add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
     } else if (!e.def.boss) {
@@ -2082,8 +2126,8 @@ export class BattleView {
         : `선택지를 남기기 위해 이번 거미줄은 빗나갔다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`,
     )
     this.showBossSentenceEvent(sealed
-      ? `장로거미가 네 문장에서 「${sealed.word.text}」 카드를 실로 묶었다.`
-      : '선택 가능한 단어를 남기기 위해 거미줄이 빗나갔다.')
+      ? bossText('sealCard', { word: sealed.word.text })
+      : bossText('webMiss'))
     if (this.cardHand.sealedCount >= pending.maxSealed) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderWebReady)
     this.renderActors()
   }
@@ -2549,12 +2593,30 @@ export class BattleView {
     this.renderChain()
     GameAudio.play('pencil')
     this.renderWords()
+    this.coachAfterPick()
     // 전부 채우면 자동 완성(반짝 → 발동)
     if (this.complete()) {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       GameAudio.playSentenceComplete(intent.emotions)
       void this.autoComplete()
     }
+  }
+
+  /** 한 번의 카드 선택에서는 가장 급한 상황 하나만 말한다. */
+  private coachAfterPick() {
+    if (this.isBoss || this.over) return
+    const spent = selectionInkCost(this.sel)
+    const overdraw = inkOverdraw(spent)
+    if (overdraw > 0 && this.showCombatCoach('ink-overdraw')) return
+    if (SENTENCE_INK - spent <= 3 && this.showCombatCoach('ink-low')) return
+
+    const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+    if (intent.emotionResonance > 1 && this.showCombatCoach('resonance')) return
+    if (intent.combos.length > 0 && this.showCombatCoach('context')) return
+
+    const chosen = this.order().filter((key) => !!this.sel[key]).length
+    if (chosen === 1) this.showCombatCoach('modifier')
+    else if (chosen === 2) this.showCombatCoach('verb')
   }
 
   private complete(): boolean {
@@ -2889,6 +2951,7 @@ export class BattleView {
       this.log(`잉크 ${inkCost}/${SENTENCE_INK} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
       this.renderActors()
       await sleep(420)
+      this.clearNormalTokenWarning()
       if (this.state.playerHp <= 0) {
         await this.lose()
         return
@@ -2974,6 +3037,7 @@ export class BattleView {
     } else {
       this.setPhase('선공 상대 행동')
       await this.enemyPhase('first')
+      this.clearNormalTokenWarning()
       if (this.state.playerHp <= 0) {
         await this.lose()
         return
@@ -3037,7 +3101,10 @@ export class BattleView {
       return
     }
 
-    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+    if (res.overflow > 0 && !allDead(this.state)) {
+      this.showCombatCoach('overflow')
+      kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+    }
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
     // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
@@ -3108,6 +3175,7 @@ export class BattleView {
     // 채로 굳는다 — 실제로 "어두워진 화면이 안 돌아온다"는 사고가 여기서 났다.
     this.endSlowmo()
     this.sel = {}
+    this.clearNormalTokenWarning()
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++
@@ -3435,9 +3503,7 @@ export class BattleView {
     scene.classList.add('spider-web-cut')
     this.popAt(enemyIdx, released > 0 ? '약점 파훼! 카드 봉인 -1' : '약점 파훼!', 'buff big')
     this.log(`현재 다리의 약점을 문장에 담아 카드 봉인 ${released}개를 풀었다.`)
-    this.showBossSentenceEvent(released > 0
-      ? `약점에 맞는 문장이 거미줄 한 겹을 고쳐 썼다.`
-      : '약점에 맞는 문장이 장로거미의 구절을 흔들었다.')
+    this.showBossSentenceEvent(released > 0 ? bossText('weakenWeb') : bossText('shakeClause'))
     this.resolveBossPattern(TOKEN_BOSS_HINTS.elderSpiderWebCut)
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-cut'), 720))
   }
@@ -3463,8 +3529,8 @@ export class BattleView {
     // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
     const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
     this.showBossSentenceEvent(nextWeak
-      ? `한 구절을 지웠다. 다음에는 ${eul(nextWeak)} 되찾아야 한다.`
-      : '네 감정을 묶던 네 구절을 모두 지웠다.')
+      ? bossText('nextLegRecover', { weakness: currentLocale === 'ko' ? eul(nextWeak) : nextWeak })
+      : bossText('allClausesErased'))
     this.resolveBossPattern(spiderNextWeaknessLine(nextWeak))
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-burst'), 880))
   }
@@ -4189,10 +4255,10 @@ export class BattleView {
       this.popAt(enemyIdx, '일벌 전멸! 다음 턴 행동 불가!', 'buff big')
       this.log('일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 그 다음 턴에 일벌 넷을 다시 부른다.')
       this.resolveBossPattern(bossTokenLine('queenOpportunity', 'relief'))
-      this.showBossSentenceEvent('일벌이 모두 흩어져 공격 문장이 지워졌다.')
+      this.showBossSentenceEvent(bossText('workersGone'))
       await sleep(260)
     } else if (count > 0) {
-      this.showBossSentenceEvent(`일벌 ${count}마리가 문장에서 지워졌다.`)
+      this.showBossSentenceEvent(bossText('workersErased', { count }))
     }
     if (renderAfter) this.renderActors()
     if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
@@ -4322,7 +4388,7 @@ export class BattleView {
         // 흡혈은 내려베기를 못 막았다는 뜻이다. 실패한 그 순간에 다음 대응을 다시 말해 준다.
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisPunished)
-          this.showBossSentenceEvent('「내려벤다」를 막지 못해 사마귀가 상처의 먹물을 빨아들였다.')
+          this.showBossSentenceEvent(bossText('mantisFailed'))
         }
       }
       if (st.groggyEntered) {
@@ -4330,7 +4396,7 @@ export class BattleView {
         this.log(`${this.state.enemies[st.idx].def.name}이 빈틈을 보였다 — 받는 피해 ×${st.groggyDamageMult.toFixed(1)} · 예정된 다음 공격을 한 턴 거른다`)
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.resolveBossPattern(TOKEN_BOSS_HINTS.mantisGroggy)
-          this.showBossSentenceEvent('「큰낫을 내려벤다」를 지우고 「휘청거린다」로 고쳐 썼다.')
+          this.showBossSentenceEvent(bossText('mantisCorrected'))
         }
       }
       if (st.summonsReleased > 0) {

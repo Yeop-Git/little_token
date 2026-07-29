@@ -2,10 +2,16 @@ import { localizationCoverageErrors, wordTextFor } from '@/localization/content'
 import { EARLY_WORDS } from '@data/earlyWords'
 import { PROPER_NAMES, SUPPORTED_LOCALES } from '@/localization'
 import { localizedGuidePages } from '@/localization/guide'
-import { missingLocalizationTexts, translateText } from '@/localization/dom'
+import { domLocalizationErrors, missingLocalizationTexts, translateText } from '@/localization/dom'
 import { bossTokenLocalizationErrors } from '@/localization/bossToken'
+import { enemySentenceLocalizationErrors } from '@/localization/enemySentences'
 
-const errors = [...localizationCoverageErrors(), ...bossTokenLocalizationErrors()]
+const errors = [
+  ...localizationCoverageErrors(),
+  ...domLocalizationErrors(),
+  ...bossTokenLocalizationErrors(),
+  ...enemySentenceLocalizationErrors(),
+]
 const samples = Object.values(EARLY_WORDS).flat()
 const EXPECTED_PROPER_NAMES = {
   ko: { player: '프롬', token: '토큰' },

@@ -1558,23 +1558,6 @@ html[data-postprocessing='off'] .tip-bubble {
   font-size: 23px;
   text-shadow: 0 0 10px var(--wglow, #8fe8ff);
 }
-.clear-reward-mark::after {
-  content: '+';
-  position: absolute;
-  right: -4px;
-  bottom: -3px;
-  width: 17px;
-  height: 17px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: #173048;
-  background: #c7f7ff;
-  box-shadow: 0 0 8px var(--wglow, #8fe8ff);
-  font-size: 14px;
-  font-weight: 1000;
-  line-height: 1;
-}
 .clear-reward-copy { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
 .clear-reward-copy small { margin-bottom: 4px; color: #d5eaf0; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
 .hud-left-status .grade-badge b { color: #f0fdff; font-size: 29px; text-shadow: 0 0 13px var(--wglow, #8fe8ff); }
@@ -1891,10 +1874,22 @@ html[data-postprocessing='off'] .tip-bubble {
   font-weight: 900;
 }
 .boss-health-hud .hpbar { height: 17px; border-radius: 5px; }
-.boss-health-hud .boss-intel {
+.boss-badge-row {
+  position: absolute;
   top: calc(100% + 7px);
-  bottom: auto;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.boss-health-hud .boss-intel {
+  position: static;
   gap: 4px;
+  transform: none;
   pointer-events: auto;
 }
 .boss-health-hud .boss-intel .enemy-intel-icon {
@@ -1910,7 +1905,7 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 보스가 쓰는 다음 문장 — 규칙 툴팁이 아니라 플레이어가 매 턴 읽는 주된 의도판이다. */
 .boss-sentence-board {
   position: absolute;
-  top: 108px;
+  top: 122px;
   left: 50%;
   z-index: 88;
   width: min(920px, 67vw);
@@ -2354,6 +2349,20 @@ html[data-postprocessing='off'] .tip-bubble {
   transform: rotate(14deg);
 }
 .token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
+
+/* 일반전은 프롬 모델 안에 이미 동반 토큰이 렌더된다. 모델을 하나 더 만들지 않고
+   전장 중앙 쪽에 말풍선만 세운다. 좌측 HUD·보유 아이템 열(308px)과는 가로축부터
+   분리하고, 하단 손패 위로 내려가지 않게 배우 상단에 붙인다. */
+.scene.battle:not([data-boss='true']) .actor.you > .token-companion-speech {
+  left: 175px;
+  top: 10px;
+  z-index: 24;
+  width: 288px;
+  min-height: 66px;
+  padding: 12px 22px 14px;
+  font-size: 16px;
+  pointer-events: none;
+}
 
 /* 말머리 뱃지 — 종이에 눌러 그린 동그라미 안의 「!」·「✓」. */
 .token-speech-mark {
@@ -3245,6 +3254,11 @@ html[data-postprocessing='off'] .tip-bubble {
   transform: translateX(-50%);
   pointer-events: auto;
 }
+/* 일반 적의 상태·약점 뱃지는 이름/체력 태그를 읽은 시선이 그대로 내려오도록
+   태그 바로 아래에 붙인다. 보스는 상단 전용 HUD 아래 배치를 계속 사용한다. */
+.scene.battle:not([data-boss='true']) .actor.foe .enemy-intel {
+  bottom: calc(100% - 34px);
+}
 .enemy-intel[hidden] { display: none; }
 .enemy-intel-icon {
   position: relative;
@@ -3458,7 +3472,6 @@ html[data-postprocessing='off'] .tip-bubble {
   display: none;
 }
 .boss-health-hud .boss-weakness-mark {
-  position: static;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -4840,7 +4853,8 @@ html[data-postprocessing='off'] .tip-bubble {
 .slot-step .sep { color: var(--ink-faint); opacity: 0.5; }
 .ink-meter {
   --ink-meter-left: 34px;
-  --ink-meter-bottom: 77px;
+  /* 일반전 문장 단계판과 시각적으로 붙지 않도록 한 줄 여백을 둔다. */
+  --ink-meter-bottom: 99px;
   --ink-meter-width: 350px;
   --ink-meter-height: 76px;
   --ink-fill: 100%;
@@ -4854,8 +4868,9 @@ html[data-postprocessing='off'] .tip-bubble {
   filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .42));
 }
 .scene.battle[data-boss='true'] .ink-meter {
-  --ink-meter-left: 424px;
-  --ink-meter-bottom: 84px;
+  /* 보스전은 단계판 오른쪽이 아니라 플레이어 체력 HUD 위에 독립된 세로 열로 쌓는다. */
+  --ink-meter-left: 38px;
+  --ink-meter-bottom: 116px;
 }
 .scene.battle.is-tutorial-dialogue .ink-meter { display: none; }
 .ink-meter-bottle {
@@ -4886,29 +4901,86 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .ink-meter-track {
   position: absolute;
-  left: 47px;
-  right: 43px;
+  left: 48px;
+  right: 44px;
   top: 17px;
   z-index: 3;
   height: 20px;
   overflow: hidden;
-  border-radius: 48% 42% 46% 40%;
-  background: rgba(59, 44, 35, .16);
-  box-shadow: inset 0 1px 5px rgba(56, 34, 24, .42);
+  isolation: isolate;
+  border-radius: 12px 9px 11px 8px;
+  background:
+    repeating-linear-gradient(1deg, rgba(68, 47, 34, .09) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, rgba(73, 52, 42, .28), rgba(30, 24, 29, .2));
+  box-shadow:
+    inset 0 2px 5px rgba(38, 24, 24, .5),
+    inset 0 -1px 0 rgba(255, 250, 224, .32),
+    0 1px 0 rgba(255, 246, 215, .2);
+}
+/* 열 칸은 장식이면서 실제 10잉크의 눈금이다. 잉크 위에서도 종이에 연필로 그은 듯 희미하게 남는다. */
+.ink-meter-track::after {
+  content: '';
+  position: absolute;
+  inset: 2px 0;
+  z-index: 4;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg,
+    transparent 0 calc(10% - 1px),
+    rgba(229, 246, 255, .22) calc(10% - 1px) 10%);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 .ink-meter-fill {
   position: absolute;
   left: 0;
   top: 1px;
   bottom: 1px;
+  z-index: 2;
   width: var(--ink-fill);
-  border-radius: inherit;
+  min-width: 0;
+  overflow: visible;
+  border-radius: 10px 5px 7px 10px;
+  clip-path: polygon(0 9%, 8% 4%, 17% 10%, 28% 3%, 39% 8%, 51% 2%, 64% 9%, 76% 3%, 88% 8%, 100% 1%, 100% 91%, 87% 96%, 72% 91%, 57% 98%, 42% 92%, 26% 97%, 12% 91%, 0 96%);
   background:
-    radial-gradient(circle at 82% 38%, rgba(144, 231, 255, .9) 0 2px, transparent 3px),
-    repeating-linear-gradient(-8deg, transparent 0 9px, rgba(117, 210, 255, .15) 10px 12px),
-    linear-gradient(90deg, #132d64, #176fa9 58%, #32b9dd);
-  box-shadow: inset 0 2px 4px rgba(202, 244, 255, .38), 0 0 9px rgba(41, 161, 225, .7);
-  transition: width .3s cubic-bezier(.2,.85,.3,1), filter .25s ease;
+    radial-gradient(circle at 18% 68%, rgba(80, 191, 235, .32) 0 1px, transparent 2px),
+    radial-gradient(circle at 63% 32%, rgba(176, 235, 255, .38) 0 1px, transparent 2px),
+    repeating-linear-gradient(-8deg, transparent 0 12px, rgba(108, 211, 255, .1) 13px 15px),
+    linear-gradient(180deg, #4bc2eb 0%, #167eaf 25%, #0a568f 60%, #09285e 100%);
+  background-size: 37px 18px, 53px 18px, auto, auto;
+  box-shadow:
+    inset 0 3px 2px rgba(213, 249, 255, .32),
+    inset 0 -4px 4px rgba(2, 19, 66, .58),
+    0 0 8px rgba(34, 161, 223, .7);
+  transition: width .38s cubic-bezier(.2,.82,.28,1), filter .25s ease, opacity .2s ease;
+}
+.ink-meter-fill::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 8px;
+  top: 3px;
+  height: 2px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, rgba(218, 250, 255, .7) 22%, rgba(174, 235, 255, .42) 72%, transparent);
+  filter: blur(.35px);
+}
+.ink-meter-fill::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  top: 0;
+  width: 12px;
+  height: 18px;
+  border-radius: 44% 66% 41% 59%;
+  background: linear-gradient(180deg, #40bde5, #1175aa 42%, #092b63);
+  box-shadow: inset 3px 2px 2px rgba(207, 245, 255, .32), 2px 0 6px rgba(23, 139, 197, .5);
+  transform: rotate(1deg);
+}
+.ink-meter.is-empty .ink-meter-fill,
+.ink-meter.is-empty .ink-meter-fill::after { opacity: 0; }
+.ink-meter.is-low .ink-meter-fill {
+  filter: saturate(.78) brightness(.82) hue-rotate(9deg);
+  box-shadow: inset 0 3px 2px rgba(209, 231, 255, .22), inset 0 -4px 4px rgba(11, 13, 62, .66), 0 0 7px rgba(92, 102, 209, .58);
 }
 .ink-meter-copy {
   position: absolute;
@@ -4942,7 +5014,6 @@ html[data-postprocessing='off'] .tip-bubble {
   box-shadow: 0 0 12px rgba(255, 67, 48, .46);
 }
 .ink-meter-overdraw[hidden] { display: none; }
-.ink-meter.is-low .ink-meter-fill { filter: saturate(.7) brightness(.85); }
 .ink-meter.is-overdrawn { animation: ink-warning .68s ease-in-out infinite alternate; }
 .ink-meter.is-overdrawn .ink-meter-bottle { filter: grayscale(.25) drop-shadow(0 0 9px rgba(255, 75, 54, .62)); }
 @keyframes ink-warning { to { transform: translateX(1px); filter: drop-shadow(0 8px 10px rgba(0,0,0,.42)) drop-shadow(0 0 12px rgba(255, 65, 45, .5)); } }
@@ -5232,24 +5303,39 @@ html[data-postprocessing='off'] .tip-bubble {
     inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--wglow)) 55%, transparent),
     0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
 }
+.card-resource-meta {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  width: 54px;
+  height: 54px;
+  pointer-events: none;
+}
+.card-resource-meta .card-emotion {
+  position: relative;
+  top: auto;
+  left: auto;
+}
 .card-cost {
   position: absolute;
-  top: 48px;
-  left: 10px;
-  z-index: 5;
+  top: 28px;
+  left: 28px;
+  z-index: 6;
   display: grid;
-  width: 31px;
-  height: 31px;
+  width: 26px;
+  height: 26px;
   place-items: center;
-  border: 2px solid #b8eaff;
+  border: 2px solid #d3f3ff;
   border-radius: 52% 48% 56% 44%;
   color: #f5fcff;
   background: radial-gradient(circle at 35% 28%, #7fd6ff, #176ca6 68%, #0b365d);
-  box-shadow: 0 0 12px rgba(66, 182, 255, .65), inset 0 0 6px rgba(255,255,255,.48);
-  font-size: 17px;
+  box-shadow: 0 0 10px rgba(66, 182, 255, .72), inset 0 0 5px rgba(255,255,255,.5), 0 2px 3px rgba(0,0,0,.48);
+  font-size: 14px;
   font-weight: 1000;
   text-shadow: 0 2px 4px #063250;
 }
+.card-resource-meta.without-emotion .card-cost { top: 0; left: 0; }
 .cw-cost {
   position: absolute;
   top: -9px;

@@ -1,5 +1,7 @@
 import { eul } from '@core/josa'
 import type { Emotion } from '@core/types'
+import { currentLocale } from '@/localization'
+import { enemySentenceText as tx, type EnemySentenceTextKey } from '@/localization/enemySentences'
 import {
   activeEnemyPart,
   enemyAttackDamageRange,
@@ -57,8 +59,8 @@ const tokens = (...items: Array<[EnemySentenceRole, string]>): EnemySentenceToke
 
 const timingText = (state: BattleState, enemy: EnemyInst): string => {
   const left = Math.max(0, enemy.nextAttackTurn - state.turn)
-  if (left > 0) return `${left}턴 뒤`
-  return enemy.initiativePhase === 'first' ? '선공' : '후공'
+  if (left > 0) return tx('turnsLater', { count: left })
+  return tx(enemy.initiativePhase === 'first' ? 'first' : 'second')
 }
 
 /** enemyTurn과 같은 원본값으로 다음 공격의 RNG 0~2 범위를 미리 보여 준다. */
@@ -68,20 +70,20 @@ export function enemyDamageRange(state: BattleState, enemy: EnemyInst): [number,
 
 const damageMeta = (state: BattleState, enemy: EnemyInst): string => {
   const [min, max] = enemyDamageRange(state, enemy)
-  return min === max ? `예상 피해 ${min}` : `예상 피해 ${min}~${max}`
+  return min === max ? tx('expectedDamage', { value: min }) : tx('expectedDamageRange', { min, max })
 }
 
-const nativeCount = (count: number): string =>
-  ['영', '하나', '둘', '셋', '넷'][count] ?? `${count}`
+const workerCount = (count: number): string =>
+  tx((['workerZero', 'workerOne', 'workerTwo', 'workerThree', 'workerFour'][count] ?? 'workerCount') as EnemySentenceTextKey, { count })
 
 function mantisSentence(state: BattleState, enemy: EnemyInst, eventText?: string): EnemySentenceView {
   if (state.turn <= enemy.groggyUntilTurn) {
     return {
       key: `mantis-groggy-${enemy.groggyUntilTurn}`,
-      label: '고쳐 쓴 결말',
+      label: tx('correctedEnding'),
       tone: 'relief',
-      tokens: tokens(['subject', '사마귀가'], ['modifier', '충격을 견디지 못하고'], ['verb', '휘청거린다']),
-      meta: [`받는 피해 ×${enemy.groggyDamageMult.toFixed(1)}`, '예정 공격 1회 스킵'],
+      tokens: tokens(['subject', tx('mantisSubject')], ['modifier', tx('mantisStaggerModifier')], ['verb', tx('mantisStaggerVerb')]),
+      meta: [tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }), tx('scheduledAttackSkip')],
       eventText,
     }
   }
@@ -90,10 +92,10 @@ function mantisSentence(state: BattleState, enemy: EnemyInst, eventText?: string
   if (step?.damageScale === 0) {
     return {
       key: `mantis-ready-${enemy.attackPatternIndex}`,
-      label: '문장을 준비한다',
+      label: tx('preparesSentence'),
       tone: 'warn',
-      tokens: tokens(['subject', '사마귀가'], ['modifier', '온 힘을 모아'], ['verb', '큰낫을 치켜든다']),
-      meta: ['이번 행동 피해 없음', '다음 문장: 큰낫 내려베기'],
+      tokens: tokens(['subject', tx('mantisSubject')], ['modifier', tx('mantisGather')], ['verb', tx('mantisRaise')]),
+      meta: [tx('noDamageThisAction'), tx('nextScythe')],
       eventText,
     }
   }
@@ -101,19 +103,19 @@ function mantisSentence(state: BattleState, enemy: EnemyInst, eventText?: string
     const required = enemyGuardBreakRequirement(enemy, state.turn)
     return {
       key: `mantis-heavy-${required}-${enemy.initiativePhase}`,
-      label: '다음 보스 문장',
+      label: tx('nextBossSentence'),
       tone: 'danger',
-      tokens: tokens(['subject', '사마귀가'], ['modifier', '방어를 부수며'], ['verb', '큰낫을 내려벤다']),
-      meta: [timingText(state, enemy), `필요 방어 ${required}`, '성공: 피해 0 · 그로기', '실패: 체력 피해의 절반 흡혈'],
+      tokens: tokens(['subject', tx('mantisSubject')], ['modifier', tx('mantisBreakGuard')], ['verb', tx('mantisSlam')]),
+      meta: [timingText(state, enemy), tx('requiredGuard', { value: required }), tx('successGroggy'), tx('failLifesteal')],
       eventText,
     }
   }
   return {
     key: `mantis-plain-${enemy.attackPatternIndex}-${enemy.initiativePhase}-${enemy.nextAttackTurn}`,
-    label: '다음 보스 문장',
+    label: tx('nextBossSentence'),
     tone: state.turn >= enemy.nextAttackTurn ? 'warn' : 'calm',
-    tokens: tokens(['subject', '사마귀가'], ['modifier', '날카롭게'], ['verb', '낫을 휘두른다']),
-    meta: [timingText(state, enemy), damageMeta(state, enemy), '슬픔 피해 ×1.25'],
+    tokens: tokens(['subject', tx('mantisSubject')], ['modifier', tx('mantisSharp')], ['verb', tx('mantisSwing')]),
+    meta: [timingText(state, enemy), damageMeta(state, enemy), tx('sorrowDamage')],
     eventText,
   }
 }
@@ -123,31 +125,31 @@ function queenSentence(state: BattleState, enemy: EnemyInst, eventText?: string)
   if (escorts === 0 && state.turn < enemy.summonRespawnTurn) {
     return {
       key: `queen-groggy-${enemy.summonRespawnTurn}`,
-      label: '고쳐 쓴 결말',
+      label: tx('correctedEnding'),
       tone: 'relief',
-      tokens: tokens(['subject', '여왕벌이'], ['modifier', '홀로 비틀거리며'], ['verb', '숨을 고른다']),
-      meta: [`받는 피해 ×${enemy.groggyDamageMult.toFixed(1)}`, '다음 행동 스킵', '이후 일벌 넷 재소환'],
+      tokens: tokens(['subject', tx('queenSubject')], ['modifier', tx('queenStagger')], ['verb', tx('queenRest')]),
+      meta: [tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }), tx('nextActionSkip'), tx('respawnWorkers')],
       eventText,
     }
   }
 
-  const escortLabel = `일벌 ${nativeCount(escorts)}`
+  const escortLabel = workerCount(escorts)
   const ready = state.turn >= enemy.nextAttackTurn
   return {
     key: `queen-${escorts}-${enemy.nextAttackTurn}-${enemy.initiativePhase}`,
-    label: '다음 보스 문장',
+    label: tx('nextBossSentence'),
     tone: ready ? 'danger' : 'warn',
     tokens: tokens(
-      ['subject', escorts > 0 ? `여왕벌과 ${escortLabel}이` : '여왕벌이'],
-      ['modifier', escorts > 0 ? '방패의 틈으로' : '정면에서'],
-      ['verb', '독침을 찌른다'],
+      ['subject', escorts > 0 ? tx('queenWithWorkers', { workers: escortLabel }) : tx('queenSubject')],
+      ['modifier', tx(escorts > 0 ? 'throughShield' : 'fromFront')],
+      ['verb', tx('queenSting')],
     ),
-    meta: [timingText(state, enemy), damageMeta(state, enemy), ...(escorts > 0 ? ['방어 관통'] : [])],
+    meta: [timingText(state, enemy), damageMeta(state, enemy), ...(escorts > 0 ? [tx('guardPierce')] : [])],
     context: escorts > 0
       ? {
-          label: '이어지는 문장',
-          tokens: tokens(['subject', '여왕벌이'], ['modifier', `${escortLabel}에게 둘러싸여`], ['verb', '모습을 감춘다']),
-          meta: ['본체 무적', '범위·관통: 빠른 전멸', '분노 단일: 퇴치 반동 ×2'],
+          label: tx('continuedSentence'),
+          tokens: tokens(['subject', tx('queenSubject')], ['modifier', tx('surroundedByWorkers', { workers: escortLabel })], ['verb', tx('queenHide')]),
+          meta: [tx('bodyInvulnerable'), tx('areaPierce'), tx('angerSingle')],
         }
       : undefined,
     eventText,
@@ -162,8 +164,10 @@ function spiderManuscript(enemy: EnemyInst): EnemySentenceClause[] {
     return {
       id: part.def.id,
       text: part.def.kind === 'body'
-        ? '결말을 고쳐 쓴다'
-        : `${eul(part.def.weakness?.label ?? part.def.name)} ${part.def.id === 'leg-sorrow' ? '지우고' : part.def.id === 'leg-pleasure' ? '삼키고' : part.def.id === 'leg-anger' ? '얽고' : '묶고'}`,
+        ? tx('spiderEnding')
+        : tx(part.def.id === 'leg-sorrow' ? 'spiderErase' : part.def.id === 'leg-pleasure' ? 'spiderSwallow' : part.def.id === 'leg-anger' ? 'spiderEntangle' : 'spiderBind', {
+            weakness: currentLocale === 'ko' ? eul(part.def.weakness?.label ?? part.def.name) : part.def.weakness?.label ?? part.def.name,
+          }),
       emotion,
       active: part === activeEnemyPart(enemy),
       crossed: part.broken,
@@ -178,15 +182,15 @@ function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string
   const web = spiderWebTension(enemy)
   return {
     key: `spider-${active?.def.id ?? 'done'}-${web}-${enemy.nextAttackTurn}-${eventText ?? ''}`,
-    label: '다음 보스 문장',
+    label: tx('nextBossSentence'),
     tone: state.turn >= enemy.nextAttackTurn ? 'danger' : web >= webMax ? 'warn' : 'calm',
-    tokens: tokens(['subject', '장로거미가'], ['modifier', '방패 너머까지'], ['verb', '거미줄을 조인다']),
+    tokens: tokens(['subject', tx('spiderSubject')], ['modifier', tx('beyondGuard')], ['verb', tx('tightenWeb')]),
     meta: [
       timingText(state, enemy),
       damageMeta(state, enemy),
-      '방어 관통',
-      `봉인 ${web}/${webMax}`,
-      ...(weakness ? [`현재 약점 ${weakness.label}`, '약점 행동: 봉인 -1', '약점+관용구 공격: 다음 부위 관통'] : ['본체에는 약점 없음']),
+      tx('guardPierce'),
+      tx('sealCount', { current: web, max: webMax }),
+      ...(weakness ? [tx('currentWeakness', { weakness: weakness.label }), tx('weaknessAction'), tx('weaknessComboPierce')] : [tx('bodyNoWeakness')]),
     ],
     manuscript: spiderManuscript(enemy),
     eventText,

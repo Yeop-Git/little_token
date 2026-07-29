@@ -30,6 +30,8 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   const fill = Math.max(0, Math.min(1, remaining / max))
 
   meter.style.setProperty('--ink-fill', `${fill * 100}%`)
+  meter.classList.toggle('is-full', remaining >= max)
+  meter.classList.toggle('is-empty', remaining <= 0)
   meter.classList.toggle('is-overdrawn', overdraw > 0)
   meter.classList.toggle('is-low', remaining > 0 && remaining <= Math.ceil(max * 0.3))
   meter.querySelector<HTMLElement>('[data-ink-now]')!.textContent = String(remaining)

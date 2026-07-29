@@ -81,7 +81,10 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const levelBadge = hideMeta ? '' : `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
   const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
   const costBadge = hideMeta ? '' : `<span class="card-cost" title="잉크 비용" aria-label="잉크 ${wordInkCost(word)}">${wordInkCost(word)}</span>`
-  const badges = `${levelBadge}${emotionBadge}${costBadge}${wordActionBadge(word)}`
+  const resourceBadge = hideMeta
+    ? ''
+    : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
+  const badges = `${levelBadge}${resourceBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />

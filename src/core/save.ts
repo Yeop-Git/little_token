@@ -17,6 +17,18 @@ const CORRUPT_SAVE_KEY = 'little-token.run.corrupt.v1'
 // 세이브가 있으면 튜토리얼을 영구히 놓칠 수 있었다. 완료 시점에 기록하는 v2로
 // 한 번 갱신해 해당 사용자도 복구된 오프닝을 볼 수 있게 한다.
 const TUTORIAL_KEY = 'little-token.tutorial-seen.v2'
+const COMBAT_COACH_KEY = 'little-token.combat-coach-seen.v1'
+
+export type CombatCoachHint =
+  | 'subject'
+  | 'modifier'
+  | 'verb'
+  | 'resonance'
+  | 'context'
+  | 'ink-low'
+  | 'ink-overdraw'
+  | 'enemy-first'
+  | 'overflow'
 
 // v0.3.25 이전 런에는 이 주어들이 무감정으로 저장됐다. 현재 데이터의 감정 분포로
 // 한 번만 올려, 이어하기 런도 새 공명 경로를 바로 사용할 수 있게 한다.
@@ -248,9 +260,31 @@ export function markTutorialSeen(): void {
   }
 }
 
+/** 전투 훈수는 최초 발견에만 나온다. 새 스테이지마다 같은 설명을 반복하지 않는다. */
+export function hasSeenCombatCoach(hint: CombatCoachHint): boolean {
+  try {
+    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    return raw ? (JSON.parse(raw) as unknown[]).includes(hint) : false
+  } catch {
+    return false
+  }
+}
+
+export function markCombatCoachSeen(hint: CombatCoachHint): void {
+  try {
+    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    const seen = new Set<CombatCoachHint>(raw ? JSON.parse(raw) : [])
+    seen.add(hint)
+    localStorage.setItem(COMBAT_COACH_KEY, JSON.stringify([...seen]))
+  } catch {
+    // Storage가 막혀도 현재 전투 진행은 계속한다.
+  }
+}
+
 function clearTutorialHistory(): void {
   try {
     localStorage.removeItem(TUTORIAL_KEY)
+    localStorage.removeItem(COMBAT_COACH_KEY)
   } catch {
     // 저장소를 못 쓰는 환경에서는 완료 기록도 남아 있지 않다.
   }
