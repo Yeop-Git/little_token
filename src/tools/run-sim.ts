@@ -6,7 +6,7 @@
  * 실제 난이도는 개별 전투 승률이 아니라 **1층부터 누적되는 소모전**에서 나온다.
  *
  * 이 도구는 1층부터 15층까지 한 런을 통째로 굴린다. 보상 3단계(주어·수식어 →
- * 아이템 → 동사)를 실제 `genRewards`로 뽑아 고르고, 남은 체력과 방어막을 다음
+ * 아이템 → 동사)를 실제 `genRewards`로 뽑아 영감 잔액 안에서 사고, 남은 체력과 방어막을 다음
  * 층으로 그대로 넘긴다. 여러 시드를 돌려 **어느 층에서 몇 %가 죽는지**를 센다.
  *
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
@@ -21,7 +21,7 @@ import { applyItemReward, registerWord, startingPlayer } from '@core/run'
 import { makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { STORY_FLOORS, stageFor } from '@data/stages'
-import { genRewards, type RewardOption } from '@data/rewards'
+import { genRewards, rewardPrice, type RewardOption } from '@data/rewards'
 import { EXCLAIM_SLOTS, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers, type StatKey } from '@data/items'
 import {
   aliveIdx,
@@ -176,9 +176,10 @@ function applyOption(player: PlayerState, opt: RewardOption, skill: RewardSkill,
 }
 
 /** 한 층 클리어 보상 3단계를 실제 genRewards로 뽑아 고른다. */
-function takeRewards(player: PlayerState, grade: number, day: number, skill: RewardSkill, rng: () => number): void {
+function takeRewards(player: PlayerState, grade: number, day: number, skill: RewardSkill, rng: () => number, wallet: { inspiration: number }): void {
+  wallet.inspiration += Math.max(0, Math.round(grade))
   for (const phase of ['subject', 'item', 'verb'] as const) {
-    const options = genRewards(player, grade, day, phase)
+    const options = genRewards(player, grade, day, phase).filter((option) => rewardPrice(option) <= wallet.inspiration)
     if (!options.length) continue
     let chosen = options[Math.floor(rng() * options.length)]
     if (skill !== 'random') {
@@ -196,6 +197,7 @@ function takeRewards(player: PlayerState, grade: number, day: number, skill: Rew
       // ok는 최선을 늘 알아보지는 못한다 — 3할은 아무거나 고른다.
       if (skill === 'ok' && rng() < 0.3) chosen = options[Math.floor(rng() * options.length)]
     }
+    wallet.inspiration -= rewardPrice(chosen)
     applyOption(player, chosen, skill, rng)
   }
 }
@@ -470,6 +472,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, verbose
   Math.random = rng // genRewards의 shuffle까지 시드에 묶는다
   try {
     const player = startingPlayer()
+    const wallet = { inspiration: 0 }
     const carried = { hp: player.stats.hp, guard: 0 }
     const hpTrace: RunResult['hpTrace'] = []
     const log: string[] = []
@@ -485,7 +488,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, verbose
       }
       carried.hp = result.hp
       carried.guard = result.guard
-      takeRewards(player, result.grade, day, reward, rng)
+      takeRewards(player, result.grade, day, reward, rng, wallet)
     }
     return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log }
   } finally {

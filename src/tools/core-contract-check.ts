@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { RUN_SAVE_SCHEMA_VERSION, newRun } from '@core/run'
+import { RUN_SAVE_SCHEMA_VERSION, gainInspiration, newRun, spendInspiration } from '@core/run'
 import { deserializeRun, serializeRun } from '@core/save'
 
 const original = newRun()
@@ -20,6 +20,14 @@ assert.equal(roundTrip.schemaVersion, RUN_SAVE_SCHEMA_VERSION, 'save schema vers
 assert.equal(roundTrip.day, 7, 'day must survive a round trip')
 assert.deepEqual(roundTrip.combat, original.combat, 'persistent hp and guard must survive a round trip')
 assert.deepEqual(roundTrip.reward, original.reward, 'pending reward must survive a round trip')
+assert.equal(roundTrip.inspiration, original.inspiration, 'inspiration wallet must survive a round trip')
+
+assert.equal(gainInspiration(original, 4), 4, 'reward value must convert to inspiration')
+assert.equal(original.inspiration, 4, 'inspiration must accumulate across clears')
+assert.equal(spendInspiration(original, 3), true, 'affordable reward must spend inspiration')
+assert.equal(original.inspiration, 1, 'purchase must deduct its exact inspiration cost')
+assert.equal(spendInspiration(original, 2), false, 'unaffordable reward must be rejected')
+assert.equal(original.inspiration, 1, 'rejected purchase must preserve the wallet')
 
 const legacy = structuredClone(original) as unknown as Record<string, unknown>
 delete legacy.schemaVersion
@@ -27,6 +35,7 @@ delete legacy.combat
 delete legacy.record
 delete legacy.endless
 delete legacy.endingSeen
+delete legacy.inspiration
 legacy.reward = { day: 7, grade: 2, phase: 'subject' }
 const legacyPlayer = legacy.player as typeof original.player
 legacyPlayer.deck.subj[0] = { ...legacyPlayer.deck.subj[0], text: '오래된 카드명', emotion: undefined } as unknown as typeof legacyPlayer.deck.subj[number]
@@ -46,6 +55,9 @@ assert.deepEqual(migrated.combat, { hp: migrated.player.stats.hp, guard: 0 }, 'l
 assert.deepEqual(migrated.record.kills, {}, 'legacy save must gain an empty run record')
 assert.equal(migrated.endless, false, 'story run must not migrate into endless mode')
 assert.equal(migrated.reward?.picks.length, 0, 'legacy pending reward must gain pick history')
+assert.equal(migrated.reward?.refreshes.subject, 0, 'legacy pending reward must gain refresh history')
+assert.equal(typeof migrated.reward?.seed, 'number', 'legacy pending reward must gain a stable offer seed')
+assert.equal(migrated.inspiration, 0, 'legacy save must start with an empty inspiration wallet')
 assert.equal(migrated.player.deck.subj[0].text, '나는', 'stale card definition must migrate to current data')
 assert.equal(migrated.player.items.some((item) => item.id === 'removed-by-update'), false, 'unknown item must be removed')
 assert.equal(migrated.player.stats.atk, original.player.stats.atk, 'removed item stats must be subtracted')

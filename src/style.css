@@ -1488,8 +1488,42 @@ html[data-postprocessing='off'] .tip-bubble {
   gap: 10px;
   pointer-events: auto;
 }
+.inspiration-wallet {
+  min-width: 184px;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 9px 20px;
+  border-radius: 20px;
+  color: #fff4d2;
+  background: rgba(38, 25, 50, .9);
+  box-shadow: inset 0 0 0 2px rgba(255, 210, 112, .4), 0 8px 24px rgba(0, 0, 0, .42), 0 0 22px rgba(255, 194, 84, .12);
+}
+.inspiration-mark {
+  flex: none;
+  color: #ffd166;
+  font-size: 31px;
+  line-height: 1;
+  text-shadow: 0 0 7px #ff9f43, 0 0 18px rgba(255, 193, 82, .72);
+}
+.inspiration-wallet-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.inspiration-wallet-copy small {
+  margin-bottom: 4px;
+  color: #e9d9ba;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.inspiration-wallet-copy b { color: #fff2bb; font-size: 29px; text-shadow: 0 0 13px rgba(255, 209, 102, .6); }
 .hud-left-status .grade-badge {
-  min-width: 164px;
+  min-width: 150px;
   min-height: 64px;
   justify-content: center;
   padding: 11px 24px;
@@ -6417,9 +6451,9 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 
 .reward-card {
   position: relative;
-  width: 1080px;
+  width: 1180px;
   flex: none;
-  padding: 40px 48px 46px;
+  padding: 42px 54px 36px;
   border-radius: 28px;
   /* 뒤 전장이 살짝 비치는 정도까지만 연다 — 글자 대비는 흐림으로 지킨다. */
   background: rgba(20, 14, 24, .62);
@@ -6452,13 +6486,15 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-skip:disabled { opacity: .42; }
 .reward-controls {
-  position: absolute;
-  right: 22px;
-  bottom: 12px;
+  position: relative;
   z-index: 5;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 9px;
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(255, 231, 180, .18);
 }
 .reward-controls .reward-skip { position: static; }
 .reward-refresh {
@@ -6553,7 +6589,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   .reward-token { animation: none; opacity: 1; }
 }
 
-.reward-head { text-align: center; margin-bottom: 8px; }
+.reward-head { text-align: center; margin-bottom: 18px; }
 .reward-head .k { font-size: 18px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 0 14px var(--glow); }
 .reward-head .t { font-size: 46px; font-weight: 900; margin-top: 4px; color: #fff6e2; text-shadow: 0 0 24px var(--glow); }
 .reward-progress { display: flex; justify-content: center; gap: 9px; margin-top: 10px; }
@@ -6601,7 +6637,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
-  gap: 22px;
+  gap: 26px;
 }
 .reward-pick {
   min-width: 0;
@@ -8151,18 +8187,33 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   100% { opacity: 0; transform: translateY(-22px) scale(1); }
 }
 
-/* 보상 화면 — 등급 표시와 카드 희귀도 칩 */
-.reward-grade {
-  margin-top: 8px;
-  font-size: 15px;
+/* 보상 화면 — 구매 전에 잔액을 놓치지 않도록 제목 바로 아래에 지갑을 독립시킨다. */
+.reward-wallet {
+  width: fit-content;
+  min-width: 286px;
+  min-height: 66px;
+  margin: 14px auto 0;
+  padding: 9px 16px 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 18px 7px 18px 7px;
+  color: #fff4d2;
+  background: rgba(39, 25, 48, .88);
+  box-shadow: inset 0 0 0 2px rgba(255, 211, 116, .42), 0 8px 22px rgba(0, 0, 0, .34), 0 0 26px rgba(255, 190, 76, .13);
+}
+.reward-wallet-balance { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+.reward-wallet-balance small { margin-bottom: 4px; color: #e7d5b5; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+.reward-wallet-balance b { color: #fff1b0; font-size: 30px; text-shadow: 0 0 13px rgba(255, 209, 102, .62); }
+.reward-wallet-earned {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 227, 170, .25);
+  color: #e7d5b5;
+  font-size: 13px;
   font-weight: 800;
-  color: var(--ink-dim);
 }
-.reward-grade b {
-  color: var(--rarity-color, var(--gold));
-  text-shadow: 0 0 10px var(--rarity-color, var(--glow));
-}
-.reward-grade span { margin-left: 9px; color: #ffd58a; font-size: 13px; }
+.reward-wallet-earned b { display: block; margin-top: 2px; color: #9de5ab; font-size: 18px; }
 .rp-tags {
   display: flex;
   align-items: center;

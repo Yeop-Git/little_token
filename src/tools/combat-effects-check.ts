@@ -9,7 +9,7 @@ import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
-import { bossRewardRarity, genRewards, rewardGradeForDay, rewardRarityWeights } from '@data/rewards'
+import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardRarityWeights } from '@data/rewards'
 import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
@@ -426,6 +426,12 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(first.length === 3 && first.every((option) => option.kind === 'word') && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward mixes subjects and modifiers')
   assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
   assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
+  assert(REWARD_PRICE.common < REWARD_PRICE.rare && REWARD_PRICE.rare < REWARD_PRICE.epic && REWARD_PRICE.epic < REWARD_PRICE.legendary, 'reward inspiration prices rise with rarity')
+  const seededA = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
+  const seededB = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
+  const refreshed = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 1)).map((option) => option.word?.id ?? option.item?.id)
+  assert(seededA.join(',') === seededB.join(','), 'saved reward seed restores the same offer')
+  assert(seededA.join(',') !== refreshed.join(','), 'paid refresh changes the reward offer')
   const rarityCurve = [1, 4, 5, 9, 10, 15].map((day) => rewardRarityWeights(5, day))
   assert(rarityCurve[0].common > rarityCurve[0].rare && rarityCurve[1].common > rarityCurve[1].rare, 'floors one to four remain normal-dominant')
   assert(rarityCurve[2].rare > rarityCurve[2].common && rarityCurve[3].rare > rarityCurve[3].epic, 'floors five to nine remain rare-dominant')

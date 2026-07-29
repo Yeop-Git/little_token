@@ -187,7 +187,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
           <button class="rp-detail" type="button">자세히보기</button>
-          <span class="rp-take"><b class="rp-price">✦ ${price}</b> 기록하기 →</span>
+          <span class="rp-take"><b class="rp-price">◈ ${price}</b> 기록하기 →</span>
         </div>
       </div>
     </div>`
@@ -215,14 +215,18 @@ export class RewardView {
               <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
               </div>
-              <div class="reward-grade">보유 영감 <b>✦ ${opts.inspiration}</b><span>이번 클리어 +${opts.earned}</span></div>
+              <div class="reward-wallet" aria-label="보유 영감 ${opts.inspiration}, 이번 클리어 획득 ${opts.earned}">
+                <span class="inspiration-mark" aria-hidden="true">◈</span>
+                <span class="reward-wallet-balance"><small>보유 영감</small><b>${opts.inspiration}</b></span>
+                <span class="reward-wallet-earned">이번 클리어 <b>+${opts.earned}</b></span>
+              </div>
             </header>
             <div class="reward-system-message" role="status" aria-live="assertive" hidden></div>
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
             <div class="reward-controls">
-              <button class="reward-refresh" type="button">다른 발상 떠올리기 <b>✦ ${REWARD_REFRESH_COST}</b></button>
+              <button class="reward-refresh" type="button">다른 발상 떠올리기 <b>◈ ${REWARD_REFRESH_COST}</b></button>
               <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
             </div>
           </div>

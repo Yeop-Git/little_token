@@ -160,7 +160,7 @@ export class ItemExclaimView {
       const value = gains[stat] ?? 0
       const mote = document.createElement('span')
       mote.className = `forge-mote forge-mote-${stat}`
-      mote.innerHTML = `<i>✦</i><b>${STAT_LABEL[stat]} +${value}</b>`
+      mote.innerHTML = `<i>+</i><b>${STAT_LABEL[stat]} +${value}</b>`
       mote.style.left = `${from.left + from.width / 2 - 34 + index * 12}px`
       mote.style.top = `${from.top + from.height * 0.34 + index * 14}px`
       document.body.append(mote)
@@ -341,7 +341,7 @@ export class ItemExclaimView {
           .join(' · ')
         const extraNote = bless ? `${STAT_LABEL[bless.stat]} +${bless.n}` : ''
         const cardNote = `<span class="item-card-main-stat">${effectiveNote}</span>${extraNote
-          ? `<span class="item-card-extra-stat">✦ ${extraNote}</span>`
+          ? `<span class="item-card-extra-stat">${extraNote}</span>`
           : ''}`
         const accessibleNote = [effectiveNote, extraNote].filter(Boolean).join(', ')
         const rarityBoosted = rarityMultiplier > 1

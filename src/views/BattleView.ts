@@ -99,6 +99,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 interface Opts {
   field: FieldDef
   encounter: string[]
+  /** 런 전체에서 보유 중인 영감. 전투 HUD에서는 이번 전투 획득 예정치와 분리해 보여 준다. */
+  inspiration?: number
   /** 전투가 끝난 시점의 영감 획득량을 들고 나간다 — 런 재화와 보상 희귀도 확률에 함께 쓰인다. */
   onWin: (grade: number, resources: { hp: number; guard: number }) => void
   onLose: (cause: DefeatCause | null) => void
@@ -276,6 +278,7 @@ export class BattleView {
   private modeLabel = ''
   // 획득 예정 영감 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
   private grade = 0
+  private inspiration = 0
   private player: PlayerState
   private state: BattleState
   /**
@@ -371,6 +374,7 @@ export class BattleView {
       ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI, companion: undefined }
       : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
+    this.inspiration = Math.max(0, Math.floor(opts.inspiration ?? 0))
     this.t = tablesForEncounter(opts.tables ?? TABLES, opts.encounter[0])
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
@@ -596,7 +600,11 @@ export class BattleView {
         <div class="hud-top">
           <div class="hud-left-stack">
             <div class="hud-left-status" aria-label="전투 상태">
-              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>영감</span><b id="grade"></b></div>
+              <div class="inspiration-wallet glass" title="런 동안 쌓아 두고 보상 카드를 구입할 때 사용한다">
+                <span class="inspiration-mark" aria-hidden="true">◈</span>
+                <span class="inspiration-wallet-copy"><small>보유 영감</small><b>${this.inspiration}</b></span>
+              </div>
+              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>이번 전투</span><b id="grade"></b></div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
             <aside class="action-order" aria-label="이번 문장 행동 순서">
@@ -3940,7 +3948,7 @@ export class BattleView {
     const badge = this.q('#grade-badge')
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    this.q('#grade').textContent = `✦ ${this.grade}`
+    this.q('#grade').textContent = `+${this.grade}`
   }
 
   /**
