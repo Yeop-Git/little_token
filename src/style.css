@@ -1525,11 +1525,13 @@ html[data-postprocessing='off'] .tip-bubble {
 .hud-left-status .grade-badge {
   min-width: 150px;
   min-height: 64px;
+  flex-direction: column;
   justify-content: center;
-  padding: 11px 24px;
-  font-size: 18px;
-  gap: 14px;
+  padding: 8px 22px;
+  font-size: 13px;
+  gap: 3px;
 }
+.hud-left-status .grade-badge span { color: #e9d9ba; font-weight: 900; letter-spacing: .08em; }
 .hud-left-status .grade-badge b { font-size: 27px; }
 .hud-player-stats {
   display: flex;

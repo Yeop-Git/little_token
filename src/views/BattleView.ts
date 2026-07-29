@@ -604,7 +604,7 @@ export class BattleView {
                 <span class="inspiration-mark" aria-hidden="true">◈</span>
                 <span class="inspiration-wallet-copy"><small>보유 영감</small><b>${this.inspiration}</b></span>
               </div>
-              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>이번 전투</span><b id="grade"></b></div>
+              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다"><span>클리어 보상</span><b id="grade"></b></div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
             <aside class="action-order" aria-label="이번 문장 행동 순서">
@@ -3948,7 +3948,7 @@ export class BattleView {
     const badge = this.q('#grade-badge')
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    this.q('#grade').textContent = `+${this.grade}`
+    this.q('#grade').textContent = `+ ◈ ${this.grade}`
   }
 
   /**
