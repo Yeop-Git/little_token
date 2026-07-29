@@ -118,7 +118,16 @@ const WRITE_TARGETS = [
 ].join(', ')
 
 /** 눌러서 쓰는 게 아니라 올려 두고 읽는 곳(기존 `cursor: help` 자리). */
-const READ_TARGETS = ['.hud-stat', '.relic-icon', '.enemy-intel-icon', '.first-mark'].join(', ')
+const READ_TARGETS = [
+  '.inspiration-wallet',
+  '.grade-badge',
+  '.hud-stat',
+  '.action-order',
+  '.relic-icon',
+  '.ink-meter',
+  '.enemy-intel-icon',
+  '.first-mark',
+].join(', ')
 
 /** 모순 차단·비활성. 클래스 선택자라 위의 요소 선택자보다 항상 뒤에 이긴다. */
 const BLOCKED_TARGETS = [':disabled', '[aria-disabled="true"]', '.blocked'].join(', ')

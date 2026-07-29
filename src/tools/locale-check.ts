@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import ts from 'typescript'
 import { localizationCoverageErrors, wordTextFor } from '@/localization/content'
 import { EARLY_WORDS } from '@data/earlyWords'
 import { PROPER_NAMES, SUPPORTED_LOCALES } from '@/localization'
@@ -6,11 +8,51 @@ import { domLocalizationErrors, missingLocalizationTexts, translateText } from '
 import { bossTokenLocalizationErrors } from '@/localization/bossToken'
 import { enemySentenceLocalizationErrors } from '@/localization/enemySentences'
 
+function introDialogueSourceErrors(): string[] {
+  const source = readFileSync(new URL('../views/IntroDialogue.ts', import.meta.url), 'utf8')
+  const file = ts.createSourceFile('IntroDialogue.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const errors: string[] = []
+  const expected = new Set(SUPPORTED_LOCALES)
+  const textParts = (node: ts.Node): string[] => {
+    if (ts.isStringLiteralLike(node)) return [node.text]
+    if (ts.isTemplateExpression(node)) return [node.head.text, ...node.templateSpans.flatMap((span) => [span.literal.text])]
+    return node.getChildren(file).flatMap(textParts)
+  }
+  for (const tableName of ['PLAYER_LINES', 'TOKEN_LINES']) {
+    let table: ts.ObjectLiteralExpression | null = null
+    const find = (node: ts.Node) => {
+      if (ts.isVariableDeclaration(node) && node.name.getText(file) === tableName && node.initializer && ts.isObjectLiteralExpression(node.initializer)) table = node.initializer
+      node.forEachChild(find)
+    }
+    find(file)
+    if (!table) {
+      errors.push(`tutorial: ${tableName} table missing`)
+      continue
+    }
+    const found = new Set<string>()
+    for (const property of (table as ts.ObjectLiteralExpression).properties) {
+      if (!ts.isPropertyAssignment(property)) continue
+      const locale = ts.isStringLiteralLike(property.name) ? property.name.text : property.name.getText(file)
+      found.add(locale)
+      for (const text of textParts(property.initializer)) {
+        if (!text.trim()) {
+          errors.push(`${locale}: empty text in ${tableName}`)
+          continue
+        }
+        if (locale !== 'ko' && /[가-힣]/.test(text)) errors.push(`${locale}: Korean remains in ${tableName}`)
+      }
+    }
+    for (const locale of expected) if (!found.has(locale)) errors.push(`${locale}: ${tableName} locale missing`)
+  }
+  return errors
+}
+
 const errors = [
   ...localizationCoverageErrors(),
   ...domLocalizationErrors(),
   ...bossTokenLocalizationErrors(),
   ...enemySentenceLocalizationErrors(),
+  ...introDialogueSourceErrors(),
 ]
 const samples = Object.values(EARLY_WORDS).flat()
 const EXPECTED_PROPER_NAMES = {

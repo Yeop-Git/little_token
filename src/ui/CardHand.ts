@@ -529,15 +529,12 @@ export class CardHand {
       button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !this.inputEnabled || !!unavailable
-      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, 잉크 ${wordInkCost(card.word)}, ${wordNoteText(card.word)}`)
+      button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : this.cardAriaLabel(card.word))
       button.setAttribute('aria-pressed', String(selected))
       button.style.setProperty('--card-x', `${line.translateX.toFixed(1)}px`)
       button.style.setProperty('--card-z', String(line.zIndex))
       button.style.setProperty('--selected-lift', `${CARD_HAND_CONFIG.selectedLift}px`)
       button.style.setProperty('--selected-scale', String(CARD_HAND_CONFIG.selectedScale))
-      const level = card.word.level ?? 1
-      const badge = button.querySelector<HTMLElement>('.card-level')
-      if (badge) badge.textContent = `${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}`
       const note = button.querySelector<HTMLElement>('.card-note')
       if (note) note.textContent = unavailable ?? wordNoteText(card.word)
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
@@ -558,7 +555,7 @@ export class CardHand {
     const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
-    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : `${card.word.text}, 잉크 ${wordInkCost(card.word)}, ${wordNoteText(card.word)}`
+    const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : this.cardAriaLabel(card.word)
     const rarity = card.word.rarity ?? 'common'
     const emotion = emotionOrNeutral(card.word.emotion)
     // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.
@@ -577,6 +574,13 @@ export class CardHand {
         ${front}
       </span></span>
     </button>`
+  }
+
+  /** 앞면에서 덜어낸 등급·강화 단계도 보조기기에서는 잃지 않게 읽는다. */
+  private cardAriaLabel(word: Word): string {
+    const rarity = RARITY_LABEL[word.rarity ?? 'common']
+    const level = word.level ?? 1
+    return `${word.text}, ${rarity}${level > 1 ? `, Lv.${level}` : ''}, 잉크 ${wordInkCost(word)}, ${wordNoteText(word)}`
   }
 
   // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.

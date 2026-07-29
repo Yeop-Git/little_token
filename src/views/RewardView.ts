@@ -5,7 +5,7 @@
 
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { REWARD_REFRESH_COST, rewardPrice, type RewardOption } from '@data/rewards'
-import { BACKGROUNDS, ITEM_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
+import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type ItemDef, type StatKey } from '@data/items'
@@ -230,7 +230,7 @@ export class RewardView {
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
             <div class="reward-controls">
-              <button class="reward-refresh" type="button">다른 발상 떠올리기 <b>◈ ${REWARD_REFRESH_COST}</b></button>
+              <button class="reward-refresh" type="button"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />다른 발상 떠올리기 <b>◈ ${REWARD_REFRESH_COST}</b></button>
               <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
             </div>
           </div>

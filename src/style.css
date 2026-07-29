@@ -1489,6 +1489,7 @@ html[data-postprocessing='off'] .tip-bubble {
   pointer-events: auto;
 }
 .inspiration-wallet {
+  position: relative;
   min-width: 184px;
   min-height: 64px;
   display: flex;
@@ -1522,6 +1523,60 @@ html[data-postprocessing='off'] .tip-bubble {
   letter-spacing: .08em;
 }
 .inspiration-wallet-copy b { color: #fff2bb; font-size: 29px; text-shadow: 0 0 13px rgba(255, 209, 102, .6); }
+.inspiration-wallet.is-collecting {
+  animation: inspiration-wallet-collect .78s cubic-bezier(.2, .9, .25, 1) both;
+}
+.inspiration-wallet.is-collecting .inspiration-mark {
+  animation: inspiration-mark-collect .42s ease-in-out infinite alternate;
+}
+.inspiration-wallet.is-collecting .inspiration-wallet-copy b {
+  color: #fff7cf;
+  text-shadow: 0 0 9px #ffd166, 0 0 24px rgba(255, 175, 52, .9);
+}
+.inspiration-gain-pop {
+  position: absolute;
+  right: -8px;
+  top: -12px;
+  z-index: 4;
+  color: #fff2a8;
+  font-size: 24px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 0 8px #ffaf34, 0 2px 3px rgba(0, 0, 0, .72);
+  pointer-events: none;
+  animation: inspiration-gain-pop .9s cubic-bezier(.18, .9, .28, 1) both;
+}
+.clear-inspiration-flight {
+  position: fixed;
+  z-index: 9999;
+  color: #ffe075;
+  font-size: 27px;
+  font-weight: 1000;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px #ffaf34) drop-shadow(0 2px 2px rgba(0, 0, 0, .7));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+@keyframes inspiration-wallet-collect {
+  0%, 100% { transform: scale(1) rotate(0); }
+  38% { transform: scale(1.09) rotate(-1deg); box-shadow: inset 0 0 0 3px rgba(255, 230, 150, .86), 0 0 38px rgba(255, 179, 52, .52); }
+  68% { transform: scale(1.04) rotate(.6deg); }
+}
+@keyframes inspiration-mark-collect {
+  to { transform: scale(1.2) rotate(12deg); filter: brightness(1.28); }
+}
+@keyframes inspiration-gain-pop {
+  0% { opacity: 0; transform: translateY(10px) scale(.65) rotate(5deg); }
+  28% { opacity: 1; transform: translateY(-4px) scale(1.18) rotate(-3deg); }
+  76% { opacity: 1; transform: translateY(-13px) scale(1); }
+  100% { opacity: 0; transform: translateY(-24px) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inspiration-wallet.is-collecting,
+  .inspiration-wallet.is-collecting .inspiration-mark,
+  .inspiration-gain-pop { animation-duration: .01ms; }
+  .clear-inspiration-flight { display: none; }
+}
 .hud-left-status .grade-badge {
   overflow: hidden;
   min-width: 150px;
@@ -1805,7 +1860,7 @@ html[data-postprocessing='off'] .tip-bubble {
   display: none;
 }
 
-/* 보스 HUD는 이름·체력·현재 약점과 바로 아래의 축약 정보 배지를 보여 준다. */
+/* 보스 HUD는 이름·체력과 바로 아래의 축약 정보 배지를 보여 준다. */
 .boss-health-hud {
   position: absolute;
   top: 24px;
@@ -3254,7 +3309,7 @@ html[data-postprocessing='off'] .tip-bubble {
   transform: translateX(-50%);
   pointer-events: auto;
 }
-/* 일반 적의 상태·약점 뱃지는 이름/체력 태그를 읽은 시선이 그대로 내려오도록
+/* 일반 적의 상태 뱃지는 이름/체력 태그를 읽은 시선이 그대로 내려오도록
    태그 바로 아래에 붙인다. 보스는 상단 전용 HUD 아래 배치를 계속 사용한다. */
 .scene.battle:not([data-boss='true']) .actor.foe .enemy-intel {
   bottom: calc(100% - 34px);
@@ -3286,12 +3341,6 @@ html[data-postprocessing='off'] .tip-bubble {
 .enemy-intel-icon.guard > b { color: #082d3b; background: #a9efff; }
 .enemy-intel-icon:hover,
 .enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
-.enemy-intel-icon.weak { color: #ffe69a; border-color: rgba(255, 220, 113, .7); }
-.enemy-intel-icon.weak.emotion-joy { color: #ffdf72; }
-.enemy-intel-icon.weak.emotion-anger { color: #ff9587; }
-.enemy-intel-icon.weak.emotion-sorrow { color: #8fc5ff; }
-.enemy-intel-icon.weak.emotion-pleasure { color: #f5a0eb; }
-.enemy-intel-icon.weak.neutral { color: #d4cec2; border-color: rgba(212, 206, 194, .62); }
 .enemy-intel-icon.attack, .enemy-intel-icon.stage { color: #ffb37d; border-color: rgba(255, 137, 83, .7); }
 .enemy-intel-icon.guard { color: #8ee4f4; border-color: rgba(142, 228, 244, .65); }
 .enemy-intel-icon.magic { color: #d9aaff; border-color: rgba(217, 170, 255, .72); }
@@ -3467,51 +3516,6 @@ html[data-postprocessing='off'] .tip-bubble {
 .actor.foe.back .first-mark { display: none; }
 .scene.battle[data-boss='true'] .actor.foe.boss .first-mark {
   display: none;
-}
-.boss-weakness-mark {
-  display: none;
-}
-.boss-health-hud .boss-weakness-mark {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 27px;
-  padding: 2px 8px 2px 4px;
-  color: var(--emotion-color, #ffe69a);
-  border: 1px solid color-mix(in srgb, var(--emotion-color, #ffe69a) 48%, transparent);
-  border-radius: 999px;
-  background: rgba(17, 9, 16, .72);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--emotion-color, #ffe69a) 75%, transparent),
-    0 3px 5px rgba(0, 0, 0, .92);
-  white-space: nowrap;
-  pointer-events: auto;
-  cursor: help;
-  outline: none;
-}
-.boss-health-hud .boss-weakness-mark:hover,
-.boss-health-hud .boss-weakness-mark:focus-visible { filter: brightness(1.18); }
-.boss-health-hud .boss-weakness-mark.neutral { color: #d4cec2; }
-.boss-health-hud .boss-weakness-mark[hidden] {
-  display: none;
-}
-.boss-health-hud .boss-weakness-mark .emotion-face {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--emotion-color, #ffe69a) 65%, transparent));
-}
-.boss-health-hud .boss-weakness-mark .emotion-symbol,
-.boss-health-hud .boss-weakness-mark > strong {
-  font-size: 19px;
-  line-height: 1;
-}
-.boss-health-hud .boss-weakness-mark b {
-  color: #fff4d6;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: .06em;
-  white-space: nowrap;
 }
 .boss-first-mark {
   flex: 0 0 auto;
@@ -4864,7 +4868,7 @@ html[data-postprocessing='off'] .tip-bubble {
   z-index: 951;
   width: var(--ink-meter-width);
   height: var(--ink-meter-height);
-  pointer-events: none;
+  pointer-events: auto;
   filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .42));
 }
 .scene.battle[data-boss='true'] .ink-meter {
@@ -5284,43 +5288,25 @@ html[data-postprocessing='off'] .tip-bubble {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
 }
 
-/* 반복강화 단계 배지 */
-.card-level {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 4;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(8, 6, 14, 0.72);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.4px;
-  color: var(--rarity-color, #fff);
-  text-shadow: 0 0 8px var(--rarity-color, var(--wglow));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--wglow)) 55%, transparent),
-    0 0 10px color-mix(in srgb, var(--rarity-color, var(--wglow)) 45%, transparent);
-}
+/* 카드 앞면은 감정과 비용만 두 모서리에 둔다. 등급·반복강화 단계는 카드의
+   테두리/포일과 우측 상세 패널에서 확인해 일러스트 위의 정보 밀도를 낮춘다. */
 .card-resource-meta {
   position: absolute;
   top: 8px;
+  right: 8px;
   left: 8px;
   z-index: 5;
-  width: 54px;
-  height: 54px;
+  height: 38px;
   pointer-events: none;
 }
 .card-resource-meta .card-emotion {
-  position: relative;
-  top: auto;
-  left: auto;
+  top: 0;
+  left: 0;
 }
 .card-cost {
   position: absolute;
-  top: 28px;
-  left: 28px;
+  top: 0;
+  right: 0;
   z-index: 6;
   display: grid;
   width: 26px;
@@ -5335,7 +5321,7 @@ html[data-postprocessing='off'] .tip-bubble {
   font-weight: 1000;
   text-shadow: 0 2px 4px #063250;
 }
-.card-resource-meta.without-emotion .card-cost { top: 0; left: 0; }
+.card-resource-meta.without-emotion .card-cost { top: 0; right: 0; }
 .cw-cost {
   position: absolute;
   top: -9px;
@@ -6824,6 +6810,9 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-controls .reward-skip { position: static; }
 .reward-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 8px 14px;
   color: #fff0c8;
   border-radius: 12px 4px 12px 4px;
@@ -6832,9 +6821,19 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-size: 13px;
   font-weight: 900;
 }
+.reward-refresh img {
+  width: 24px;
+  height: 24px;
+  margin: -4px 0;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 1px rgba(45, 25, 9, .5));
+  transition: transform .25s cubic-bezier(.2, 1.4, .4, 1);
+}
 .reward-refresh b { color: #ffd166; margin-left: 5px; }
 .reward-refresh:hover,
 .reward-refresh:focus-visible { background: rgba(143, 94, 40, .78); transform: translateY(-2px) rotate(.4deg); }
+.reward-refresh:hover img,
+.reward-refresh:focus-visible img { transform: rotate(22deg) scale(1.06); }
 .reward-refresh:disabled { opacity: .42; }
 .reward-system-message {
   position: absolute;

@@ -101,6 +101,12 @@ import {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+const hudTip = (key: string, korean: string, values: Record<string, string | number> = {}): string => {
+  let text = t(key, korean)
+  for (const [name, value] of Object.entries(values)) text = text.split(`{${name}}`).join(String(value))
+  return text
+}
+
 interface Opts {
   field: FieldDef
   encounter: string[]
@@ -624,17 +630,17 @@ export class BattleView {
         <div class="hud-top">
           <div class="hud-left-stack">
             <div class="hud-left-status" aria-label="전투 상태">
-              <div class="inspiration-wallet glass" title="런 동안 쌓아 두고 보상 카드를 구입할 때 사용한다">
+              <div class="inspiration-wallet glass" role="img" tabindex="0" aria-label="보유 영감 ${this.inspiration}" data-tooltip="${hudTip('hudInspirationTip', `보유 영감 ${this.inspiration}\n전투에서 모아 보상 카드를 구입하거나 보상 목록을 새로 고칠 때 사용한다.`, { value: this.inspiration })}">
                 <span class="inspiration-mark" aria-hidden="true">◈</span>
                 <span class="inspiration-wallet-copy"><small>보유 영감</small><b>${this.inspiration}</b></span>
               </div>
-              <div class="grade-badge glass" id="grade-badge" title="획득 예정 영감 — 오래 끌면 줄고, 한 턴에 쓸어담으면 늘어난다">
+              <div class="grade-badge glass" id="grade-badge" role="img" tabindex="0">
                 <span class="clear-reward-mark" aria-hidden="true">◈</span>
                 <span class="clear-reward-copy"><small>클리어 보상</small><b id="grade"></b></span>
               </div>
               <div class="hud-player-stats glass" id="stats" aria-label="주인공 상태"></div>
             </div>
-            <aside class="action-order" aria-label="이번 문장 행동 순서">
+            <aside class="action-order" tabindex="0" aria-label="이번 문장 행동 순서" data-tooltip="${hudTip('hudActionOrderTip', '행동 순서\n누가 먼저 행동하고, 문장 뒤에 누가 행동하며, 누가 레일에서 기다리는지 보여 준다.')}">
               <div class="action-order-head"><span>이번 문장</span><b>행동 순서</b></div>
               <ol id="action-order-list"></ol>
             </aside>
@@ -643,9 +649,9 @@ export class BattleView {
           <div class="hud-status">
             <div class="hud-status-bar">
               <div class="hud-actions glass" aria-label="시스템 메뉴">
-                <button id="settings-btn" type="button" title="설정" aria-label="설정">${icon('settings')}</button>
-                <button id="codex-btn" type="button" title="도감" aria-label="그림일기 도감">${icon('collection')}</button>
-                <button id="home-btn" type="button" title="홈" aria-label="홈으로">${icon('home')}</button>
+                <button id="settings-btn" type="button" aria-label="설정" data-tooltip="${hudTip('hudSettingsTip', '설정\n그래픽, 소리, 언어와 플레이 기록을 조정한다.')}">${icon('settings')}</button>
+                <button id="codex-btn" type="button" aria-label="그림일기 도감" data-tooltip="${hudTip('hudCodexTip', '그림일기 도감\n단어, 카드, 만난 벌레와 획득한 아이템을 살펴본다.')}">${icon('collection')}</button>
+                <button id="home-btn" type="button" aria-label="홈으로" data-tooltip="${hudTip('hudHomeTip', '홈\n전투를 나가 타이틀 화면으로 돌아간다.')}">${icon('home')}</button>
               </div>
             </div>
             <div class="effect-log" id="log"></div>
@@ -700,7 +706,7 @@ export class BattleView {
               <li><i aria-hidden="true">쾅!</i><span>초과 데미지는 짜릿한 <b>오버킬</b>을 선사!</span></li>
             </ul>
           </aside>
-          <button class="battle-help-button" id="battle-help-button" type="button" aria-label="전투 도움말 열기" aria-controls="battle-help-note" aria-expanded="false">?</button>
+          <button class="battle-help-button" id="battle-help-button" type="button" aria-label="전투 도움말 열기" aria-controls="battle-help-note" aria-expanded="false" data-tooltip="${hudTip('hudHelpTip', '전투 도움말\n문장을 조립하는 핵심 규칙을 다시 살펴본다.')}">?</button>
         </div>
 
         <div id="overlay"></div>
@@ -1326,7 +1332,6 @@ export class BattleView {
           </div>
         </div>
         <div class="boss-badge-row">
-          <span class="boss-weakness-mark" hidden></span>
           <span class="boss-first-mark" hidden title="선공 — 내 문장 직후, 나보다 먼저 때린다">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
           </span>
@@ -1629,49 +1634,14 @@ export class BattleView {
     const host = e.def.boss
       ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-intel')!
       : el.querySelector<HTMLElement>('.enemy-intel')!
-    const activePart = activeEnemyPart(e)
     const attackStep = nextEnemyAttackStep(e)
     const summonPattern = e.def.summonPattern
     const summons = summonCount(e)
-    const weak = activePart
-      ? activePart.def.weakness ?? null
-      : e.def.weakEmotion
-        ? { kind: 'emotion' as const, value: e.def.weakEmotion, label: EMOTION_LABEL[e.def.weakEmotion] }
-        : null
-    const affinity = weak?.kind === 'emotion' ? weak.value as Emotion : 'neutral'
-    const affinityTip = weak?.kind === 'emotion'
-      ? tip(`${weak.label} 약점`, `${weak.label} 카드로 때리면 피해 1.5배`)
-      : tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
     const icons: string[] = []
     const add = (kind: string, glyph: string, tooltip: string) => {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
     }
 
-    const bossWeakness = e.def.boss
-      ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-weakness-mark')
-      : el.querySelector<HTMLElement>('.boss-weakness-mark')
-    if (bossWeakness) {
-      bossWeakness.hidden = false
-      bossWeakness.className = `boss-weakness-mark emotion-${affinity}${weak ? '' : ' neutral'}`
-      bossWeakness.setAttribute('aria-label', weak ? `${weak.label} 약점` : '무속성')
-      bossWeakness.dataset.tooltip = affinityTip
-      bossWeakness.dataset.tipPlace = 'above'
-      bossWeakness.tabIndex = 0
-      bossWeakness.innerHTML = weak?.kind === 'emotion'
-        ? `${emotionIconContent(weak.value as Emotion)}<b>약점</b>`
-        : '<strong aria-hidden="true">·</strong><b>무속성</b>'
-    }
-    // 보스 약점은 체력바 옆 전용 배지가 이미 보여 준다. 아래 정보 배지는 다음 행동과
-    // 전투 규칙만 간결하게 붙여 같은 내용을 두 번 읽게 하지 않는다.
-    if (!e.def.boss && weak?.kind === 'emotion') {
-      // 머리 위 작은 배지는 표정만 보여 준다. 감정명은 좁은 배지 밖으로 세로로 흘러내리므로
-      // 접근성 라벨과 툴팁에만 남기고, 이름이 필요한 상세·부위 UI는 기존 배지를 유지한다.
-      add(`weak emotion-${weak.value}`, emotionIconContent(weak.value as Emotion), affinityTip)
-    } else if (!e.def.boss && weak) {
-      add('weak', '<b>!</b>', tip(`약점 · ${weak.label}`, `${weak.label} 단어로 때리면 피해 1.5배`))
-    } else if (!e.def.boss) {
-      add('weak neutral emotion-neutral', '<b>·</b>', affinityTip)
-    }
     if (attackStep) {
       const detail = attackStep.damageScale === 0
         ? '이번엔 안 때리고 다음 공격을 준비한다'
@@ -2313,7 +2283,7 @@ export class BattleView {
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
-          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}" title="${m.label}: ${value} — ${m.desc}">
+          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
       </div>`
@@ -2335,7 +2305,7 @@ export class BattleView {
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
       <div class="relic-icons">
-        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
+        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" tabindex="0" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
       </div>`
   }
 
@@ -4036,6 +4006,9 @@ export class BattleView {
     const badge = this.q('#grade-badge')
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
+    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${this.grade}\n획득 예정 영감이다. 전투가 길어지면 줄고, 한 턴에 쓸어담으면 늘어난다.`, { value: this.grade })
+    badge.setAttribute('aria-label', `클리어 보상 +${this.grade}`)
+    badge.dataset.tooltip = tooltip
     this.q('#grade').textContent = `+${this.grade}`
   }
 
@@ -4057,6 +4030,7 @@ export class BattleView {
     }
     await sleep(pause)
     await this.gradeFinale()
+    await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)
     this.onWin(this.grade, this.combatResources())
@@ -4115,6 +4089,69 @@ export class BattleView {
     await Promise.race([anim.finished.catch(() => undefined), sleep(900)])
     // CLEAR 원화와 최종 보상등급을 빵빠레 첫 구절 동안 읽을 수 있게 유지한다.
     await sleep(1300)
+  }
+
+  /** 클리어 보상을 중앙 배지에서 좌상단 보유 영감으로 옮기고 실제 지급값까지 카운트업한다. */
+  private async collectClearInspiration() {
+    const gained = Math.max(0, Math.round(this.grade))
+    const wallet = this.q<HTMLElement>('.inspiration-wallet')
+    const balance = wallet.querySelector<HTMLElement>('.inspiration-wallet-copy b')
+    const source = this.q<HTMLElement>('#grade-badge')
+    if (!balance || gained <= 0) return
+
+    const finalBalance = this.inspiration + gained
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const duration = reduceMotion ? 80 : 720
+    const sourceRect = source.getBoundingClientRect()
+    const targetRect = wallet.querySelector<HTMLElement>('.inspiration-mark')?.getBoundingClientRect()
+      ?? wallet.getBoundingClientRect()
+    const pop = document.createElement('span')
+    pop.className = 'inspiration-gain-pop'
+    pop.textContent = `+${gained}`
+    wallet.appendChild(pop)
+    wallet.classList.add('is-collecting')
+    wallet.setAttribute('aria-label', `보유 영감 ${finalBalance}`)
+
+    if (!reduceMotion) {
+      const moteCount = Math.max(3, Math.min(9, gained))
+      for (let i = 0; i < moteCount; i += 1) {
+        const mote = document.createElement('span')
+        mote.className = 'clear-inspiration-flight'
+        mote.textContent = '◈'
+        mote.style.left = `${sourceRect.left + sourceRect.width * (.36 + (i % 4) * .09)}px`
+        mote.style.top = `${sourceRect.top + sourceRect.height * (.38 + (i % 3) * .12)}px`
+        document.body.appendChild(mote)
+        const startX = Number.parseFloat(mote.style.left)
+        const startY = Number.parseFloat(mote.style.top)
+        const dx = targetRect.left + targetRect.width * .5 - startX
+        const dy = targetRect.top + targetRect.height * .5 - startY
+        const arc = 54 + (i % 3) * 24
+        const delay = i * 55
+        const animation = mote.animate([
+          { transform: 'translate(-50%, -50%) scale(.45) rotate(0deg)', opacity: 0 },
+          { transform: `translate(${dx * .28}px, ${dy * .28 - arc}px) scale(1.16) rotate(80deg)`, opacity: 1, offset: .3 },
+          { transform: `translate(${dx * .72}px, ${dy * .72 - arc * .35}px) scale(.82) rotate(190deg)`, opacity: 1, offset: .72 },
+          { transform: `translate(${dx}px, ${dy}px) scale(.18) rotate(280deg)`, opacity: 0 },
+        ], { duration: duration - 70, delay, easing: 'cubic-bezier(.22,.75,.2,1)', fill: 'forwards' })
+        const remove = () => mote.remove()
+        animation.onfinish = remove
+        this.timers.push(window.setTimeout(remove, duration + delay + 120))
+      }
+    }
+
+    const started = performance.now()
+    const count = (now: number) => {
+      const progress = Math.min(1, (now - started) / Math.max(1, duration))
+      const eased = 1 - Math.pow(1 - progress, 3)
+      balance.textContent = String(this.inspiration + Math.round(gained * eased))
+      if (progress < 1 && this.root.isConnected) requestAnimationFrame(count)
+    }
+    requestAnimationFrame(count)
+    GameAudio.play('contextBonus')
+    await sleep(duration + (reduceMotion ? 20 : 430))
+    balance.textContent = String(finalBalance)
+    wallet.classList.remove('is-collecting')
+    pop.remove()
   }
 
   // 턴 경과 감쇠 — 배지가 살짝 가라앉으며 식는다.

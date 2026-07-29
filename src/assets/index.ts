@@ -16,6 +16,7 @@ import rewardSubjectModifier from './ui/reward_subject_modifier.webp'
 import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
+import rewardRefresh from './ui/reward_refresh.svg'
 import inkBottle from './ui/ink_bottle.webp'
 import inkBarFrame from './ui/ink_bar_frame.webp'
 import player001 from './sprites/player_001.webp'
@@ -215,6 +216,7 @@ export const REWARD_ART = {
   item: rewardItem,
   verb: rewardVerb,
   clear: rewardClear,
+  refresh: rewardRefresh,
 }
 
 /** 잉크 HUD 전용 에셋. 교체할 때 소비 View 대신 이 매니페스트만 바꾼다. */

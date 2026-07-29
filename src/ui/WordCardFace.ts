@@ -8,7 +8,7 @@
 import { SKILL_ART } from '@/assets'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
-import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
+import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 
@@ -65,9 +65,9 @@ export interface WordCardFaceOpts {
   overlay?: string
   /** 스킬 카드 외의 화면에서 공용 앞면에 넣을 별도 일러스트 URL. */
   artUrl?: string
-  /** 튜토리얼 대사처럼 레어도와 감정 정보가 의미 없는 카드에서 메타 배지를 숨긴다. */
+  /** 튜토리얼 대사처럼 감정과 잉크 정보가 의미 없는 카드에서 메타 배지를 숨긴다. */
   hideMeta?: boolean
-  /** 레어도는 남기되 감정 아이콘만 의미 없는 화면에서 숨긴다. */
+  /** 잉크 비용은 남기되 감정 아이콘만 의미 없는 화면에서 숨긴다. */
   hideEmotion?: boolean
 }
 
@@ -75,16 +75,13 @@ export interface WordCardFaceOpts {
 export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): string {
   const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false, hideEmotion = false } = opts
   const artUrl = opts.artUrl ?? (word.art ? SKILL_ART[word.art] : undefined)
-  const level = word.level ?? 1
-  const rarity = word.rarity ?? 'common'
   const emotion = emotionOrNeutral(word.emotion)
-  const levelBadge = hideMeta ? '' : `<span class="card-level rarity-${rarity}">${RARITY_LABEL[rarity]}${level > 1 ? ` Lv.${level}` : ''}</span>`
   const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
   const costBadge = hideMeta ? '' : `<span class="card-cost" title="잉크 비용" aria-label="잉크 ${wordInkCost(word)}">${wordInkCost(word)}</span>`
   const resourceBadge = hideMeta
     ? ''
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
-  const badges = `${levelBadge}${resourceBadge}${wordActionBadge(word)}`
+  const badges = `${resourceBadge}${wordActionBadge(word)}`
   if (artUrl) {
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
