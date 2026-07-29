@@ -1,0 +1,43 @@
+name: Claude Code
+
+# 이슈/PR 댓글에 @claude 를 멘션하면 Claude Code가 응답한다.
+# 필요 조건 2가지:
+#   1) https://github.com/apps/claude 를 이 저장소(Yeop-Git/little_token)에 설치
+#   2) Settings > Secrets and variables > Actions 에 ANTHROPIC_API_KEY 시크릿 등록
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    # @claude 가 실제로 포함된 이벤트에서만 실행해 Actions 사용량을 아낀다.
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --max-turns 15
