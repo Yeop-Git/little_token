@@ -77,7 +77,6 @@ export function applyDetailedContentLocalization(locale: ForeignLocale): void {
   }
   CHARACTER_VISUALS.player.name = PROPER_NAMES[locale].player
   CHARACTER_VISUALS.token.name = PROPER_NAMES[locale].token
-  if (CHARACTER_VISUALS.player.companion) CHARACTER_VISUALS.player.companion.name = CHARACTER_VISUALS.token.name
 
   for (const [id, enemy] of Object.entries(ENEMIES)) {
     enemy.note = ENEMY_NOTES[locale][id] ?? enemy.note

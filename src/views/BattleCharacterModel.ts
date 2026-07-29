@@ -11,7 +11,6 @@ type OneShotAnimation = Exclude<BattleAnimation, 'idle' | 'idle2' | 'walk'>
 const MODEL_VIEW_HEIGHT = 3.6
 // 360px 셸에서 약 278px로 보이게 해 전방 적 스프라이트의 불투명 픽셀 높이와 맞춘다.
 const MODEL_FIT_HEIGHT = 2.78
-const COMPANION_FIT_HEIGHT = 0.72
 const TRANSITION_SECONDS = 0.18
 const LOOP_BLEND_SAMPLE_RATE = 30
 const MODEL_YAW_RETURN_SPEED = 9
@@ -53,25 +52,6 @@ function makeBattleToonGradient(): THREE.DataTexture {
 }
 
 const BATTLE_TOON_GRADIENT = makeBattleToonGradient()
-let companionGlowTexture: THREE.CanvasTexture | null = null
-
-function getCompanionGlowTexture(): THREE.CanvasTexture {
-  if (companionGlowTexture) return companionGlowTexture
-  const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
-  const context = canvas.getContext('2d')!
-  const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 62)
-  gradient.addColorStop(0, 'rgba(255,244,188,.12)')
-  gradient.addColorStop(0.26, 'rgba(255,220,116,.16)')
-  gradient.addColorStop(0.58, 'rgba(255,185,72,.1)')
-  gradient.addColorStop(1, 'rgba(255,174,56,0)')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, 128, 128)
-  companionGlowTexture = new THREE.CanvasTexture(canvas)
-  companionGlowTexture.colorSpace = THREE.SRGBColorSpace
-  return companionGlowTexture
-}
 
 /**
  * 전장의 배경색을 캐릭터 텍스처에 아주 얕게 섞는다. 자체광 비중을 높여
@@ -403,11 +383,6 @@ class BattleCharacterModel {
   private actions: Partial<Record<BattleAnimation, THREE.AnimationAction>> = {}
   private current: THREE.AnimationAction | null = null
   private model: THREE.Object3D | null = null
-  private companion: THREE.Group | null = null
-  private companionMixer: THREE.AnimationMixer | null = null
-  private companionGlow: THREE.Sprite | null = null
-  private companionElapsed = 0
-  private companionActionElapsed = 0
   private cameraZoom = 1
   private cameraZoomTarget = 1
   private frozen = false
@@ -520,137 +495,9 @@ class BattleCharacterModel {
       }
       this.mixer.addEventListener('finished', this.onAnimationFinished)
       this.play(this.requestedAnimation)
-      await this.loadCompanion()
     } catch (error) {
       console.warn(`3D 캐릭터 모델을 불러오지 못해 2D 초상을 사용합니다: ${this.visual.id}`, error)
       this.useFallbackPortrait()
-    }
-  }
-
-  private async loadCompanion() {
-    const companion = this.visual.companion
-    if (!companion) return
-    try {
-      const gltf = await loadModel(companion.model3d)
-      if (this.disposed) return
-
-      const model = cloneSkeleton(gltf.scene)
-      model.rotation.y = companion.modelYaw ?? 0
-      this.useBattleMaterials(model)
-      model.updateMatrixWorld(true)
-      const bounds = new THREE.Box3().setFromObject(model)
-      const size = bounds.getSize(new THREE.Vector3())
-      if (!Number.isFinite(size.y) || size.y <= 0) return
-      model.scale.multiplyScalar(COMPANION_FIT_HEIGHT / size.y)
-      model.updateMatrixWorld(true)
-      const fitted = new THREE.Box3().setFromObject(model)
-      const center = fitted.getCenter(new THREE.Vector3())
-      model.position.sub(center)
-
-      const group = new THREE.Group()
-      const glow = this.makeCompanionGlow()
-      glow.position.z = -0.08
-      group.add(glow, model)
-      group.position.set(-1.08, 1.8, 0.45)
-      this.scene.add(group)
-      this.companion = group
-      this.companionGlow = glow
-
-      const clip = gltf.animations.find((candidate) => candidate.name === companion.idleAnimation)
-        ?? gltf.animations.find((candidate) => candidate.name.toLowerCase().includes('fly'))
-      if (clip) {
-        this.companionMixer = new THREE.AnimationMixer(model)
-        const action = this.companionMixer.clipAction(normalizedClip(clip, true, 0.35))
-        action.setLoop(THREE.LoopRepeat, Infinity).play()
-      }
-    } catch (error) {
-      console.warn(`도우미 3D 모델을 불러오지 못했습니다: ${companion.name}`, error)
-    }
-  }
-
-  private makeCompanionGlow(): THREE.Sprite {
-    const material = new THREE.SpriteMaterial({
-      map: getCompanionGlowTexture(),
-      color: 0xffd878,
-      transparent: true,
-      opacity: 0.16,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      toneMapped: false,
-    })
-    const glow = new THREE.Sprite(material)
-    glow.scale.setScalar(1.24)
-    glow.renderOrder = -1
-    return glow
-  }
-
-  private updateCompanion(delta: number) {
-    if (!this.companion) return
-    this.companionElapsed += delta
-    this.companionActionElapsed += delta
-    this.companionMixer?.update(delta)
-
-    const t = this.companionElapsed
-    const actionTime = this.companionActionElapsed
-    const animation = this.requestedAnimation
-    let x = -1.08 + Math.sin(t * 1.15) * 0.07
-    let y = 1.8 + Math.sin(t * 2.1) * 0.1
-    let z = 0.45 + Math.cos(t * 1.6) * 0.05
-    let roll = Math.sin(t * 1.7) * 0.08
-    let glowColor = 0xffd878
-    let glowStrength = 0.16
-    let pulseSpeed = 2.2
-
-    if (animation === 'attack') {
-      const p = Math.min(1, actionTime / 0.44)
-      x += Math.sin(p * Math.PI) * 0.95
-      y += Math.sin(p * Math.PI * 2) * 0.23
-      roll = -Math.sin(p * Math.PI) * 0.55
-      glowColor = 0xff745e
-      glowStrength = 0.28
-      pulseSpeed = 7
-    } else if (animation === 'heal') {
-      const p = Math.min(1, actionTime / 0.9)
-      x = -0.9 + Math.cos(p * Math.PI * 2) * 0.32
-      y = 1.72 + Math.sin(p * Math.PI * 2) * 0.38
-      roll = p * Math.PI * 2
-      glowColor = 0x7cff9d
-      glowStrength = 0.24
-      pulseSpeed = 4.6
-    } else if (animation === 'shield') {
-      const p = Math.min(1, actionTime / 1.1)
-      x = -0.72 + Math.cos(p * Math.PI * 2 + Math.PI) * 0.48
-      y = 1.6 + Math.sin(p * Math.PI * 2 + Math.PI) * 0.5
-      roll = -p * Math.PI * 2
-      glowColor = 0x75ccff
-      glowStrength = 0.27
-      pulseSpeed = 5.2
-    } else if (animation === 'victory1' || animation === 'victory2') {
-      x = -0.88 + Math.sin(actionTime * 3.6) * 0.4
-      y = 2.02 + Math.sin(actionTime * 7.2) * 0.27
-      z = 0.5 + Math.cos(actionTime * 3.6) * 0.12
-      roll = Math.cos(actionTime * 3.6) * 0.38
-      glowColor = 0xffec76
-      glowStrength = 0.3
-      pulseSpeed = 6
-    } else if (animation === 'defeat') {
-      x = -1.02 + Math.sin(actionTime * 1.8) * 0.05
-      y = 1.24 + Math.sin(actionTime * 2.5) * 0.07
-      z = 0.36
-      roll = 0.42 + Math.sin(actionTime * 1.4) * 0.08
-      glowColor = 0x9ba7d8
-      glowStrength = 0.1
-      pulseSpeed = 1.4
-    }
-
-    this.companion.position.set(x, y, z)
-    this.companion.rotation.z = roll
-    if (this.companionGlow) {
-      const pulse = 0.5 + 0.5 * Math.sin(t * pulseSpeed)
-      this.companionGlow.material.color.setHex(glowColor)
-      this.companionGlow.material.opacity = glowStrength * (0.76 + pulse * 0.24)
-      this.companionGlow.scale.setScalar(1.16 + pulse * 0.18)
     }
   }
 
@@ -1253,7 +1100,6 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
    *   강타 연출은 같은 attack 클립을 느리게 늘려 예비 동작을 읽히게 한다.
    */
   play(animation: BattleAnimation, stretchMs?: number): number {
-    if (animation !== this.requestedAnimation) this.companionActionElapsed = 0
     this.requestedAnimation = animation
     this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
     this.shell.dataset.modelAnimation = animation
@@ -1289,10 +1135,19 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
         ?? next.getClip().duration * 1000 / (this.visual.animations?.playbackRates?.[animation as OneShotAnimation] ?? 1))
   }
 
+  /**
+   * 바깥에서 정하는 몸통 방향. 매니페스트의 기본 방향에 더해 쓰므로, 0을 넣으면
+   * 매니페스트가 정한 자세 그대로다. 드래그 중에는 사용자의 손이 이긴다.
+   */
+  setYaw(yaw: number) {
+    if (!this.model || this.dragPointerId !== null) return
+    this.returningToDefaultYaw = false
+    this.model.rotation.y = (this.visual.modelYaw ?? 0) + yaw
+  }
+
   /** 풀에서 재사용할 때 이전 one-shot 자세를 한 프레임도 노출하지 않고 idle로 되돌린다. */
   resetToIdle() {
     this.requestedAnimation = 'idle'
-    this.companionActionElapsed = 0
     this.cameraZoom = 1
     this.cameraZoomTarget = 1
     this.camera.zoom = 1
@@ -1421,7 +1276,6 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const motionDelta = this.frozen ? 0 : frameDelta
     this.mixer?.update(motionDelta)
     this.updateModelYawReturn(frameDelta)
-    this.updateCompanion(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
     const zoomBlend = 1 - Math.exp(-frameDelta * 8)
@@ -1494,7 +1348,6 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.shell.removeEventListener('click', this.onClickCapture, true)
     this.mixer?.removeEventListener('finished', this.onAnimationFinished)
     this.mixer?.stopAllAction()
-    this.companionMixer?.stopAllAction()
     this.model?.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const materials = Array.isArray(object.material) ? object.material : [object.material]
@@ -1503,11 +1356,6 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.effects.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       object.geometry.dispose()
-      const materials = Array.isArray(object.material) ? object.material : [object.material]
-      materials.forEach((material) => material.dispose())
-    })
-    this.companion?.traverse((object) => {
-      if (!(object instanceof THREE.Mesh || object instanceof THREE.Sprite)) return
       const materials = Array.isArray(object.material) ? object.material : [object.material]
       materials.forEach((material) => material.dispose())
     })
@@ -1547,10 +1395,7 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
 
 /** GLB 다운로드뿐 아니라 GLTF 파싱·텍스처 디코딩이 끝날 때까지 기다린다. */
 export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): Promise<void> {
-  const urls = [...new Set(visuals.flatMap((visual) => [
-    ...(visual.model3d ? [visual.model3d] : []),
-    ...(visual.companion ? [visual.companion.model3d] : []),
-  ]))]
+  const urls = [...new Set(visuals.flatMap((visual) => (visual.model3d ? [visual.model3d] : [])))]
   return Promise.all(urls.map((url) => loadModel(url).then(() => undefined).catch(() => undefined)))
     .then(() => undefined)
 }
@@ -1586,6 +1431,17 @@ export function characterAnimationOf(actor: HTMLElement | null): BattleAnimation
   const shell = actor.querySelector<HTMLElement>('.model-shell')
   if (!shell) return null
   return mountedModels.get(shell)?.animation ?? null
+}
+
+/**
+ * 몸통이 바라보는 방향을 바깥에서 정한다(라디안, 매니페스트 modelYaw 기준의 상대값).
+ * 자유 비행하는 토큰이 진행 방향이나 들여다보는 대상 쪽으로 도는 데 쓴다. 드래그로
+ * 돌리는 중이면 사용자의 손이 우선이라 무시한다.
+ */
+export function setCharacterModelYaw(actor: HTMLElement | null, yaw: number) {
+  if (!actor) return
+  const shell = modelShellFor(actor)
+  if (shell) mountedModels.get(shell)?.setYaw(yaw)
 }
 
 export function freezeCharacterAnimation(actor: HTMLElement | null, frozen: boolean) {

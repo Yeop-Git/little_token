@@ -29,11 +29,10 @@ export function preloadBattleResources(
   })
   const visuals = [
     CHARACTER_VISUALS.player,
+    // 토큰은 보스전에서만 서는 배우가 아니라 모든 전투를 함께 나는 동행이다.
+    CHARACTER_VISUALS.token,
     ...encounterVisuals,
     ...(encounter.includes('queenBee') ? [CHARACTER_VISUALS.workerBee] : []),
-    ...(encounter.some((id) => id === 'queenBee' || id === 'elderSpider')
-      ? [CHARACTER_VISUALS.token]
-      : []),
   ]
   const characterArt = visuals.map((visual) => visual.portrait2d)
   const urls = [

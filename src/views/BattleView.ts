@@ -98,6 +98,7 @@ import {
   suspendCharacterModel,
   type BattleAnimation,
 } from '@views/BattleCharacterModel'
+import { TokenActor } from '@views/TokenActor'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -368,15 +369,14 @@ export class BattleView {
   private killsThisBattle = 0
   private tokenSpeechIndex = 0
   private tokenSpeechTimer = 0
-  private tokenSpeechHideTimer = 0
   private bossPatternSolved = false
   private bossPatternHint: TokenLine | null = null
   /** 보스 문장은 전투 상태에서 다시 만들고, 방금 일어난 사건 한 줄만 짧게 덧쓴다. */
   private bossSentenceEvent: string | null = null
   private bossSentenceEventTimer = 0
   private bossSentenceSignature = ''
-  /** 지금 화면에 붙잡아 둔 핵심 경고가 있는가. 한가한 응원이 이걸 덮지 못하게 한다. */
-  private tokenHolding = false
+  /** 프롬 곁을 자유롭게 나는 토큰. 일반전·보스전이 같은 한 몸을 쓴다. */
+  private token: TokenActor | null = null
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
   private pendingSpiderSeal: { enemyIdx: number; maxSealed: number; slotKey: string } | null = null
 
@@ -391,9 +391,8 @@ export class BattleView {
     this.isBoss = !!opts.isBoss
     // 보스전은 카드 뒤에서 보스를 올려다보는 3인칭 구도다. 공용 플레이어
     // 매니페스트의 일반 전투 측면 방향은 유지하고, 이 뷰에서만 등을 돌린다.
-    // 토큰은 보스전 전용 배우로 따로 렌더하므로 플레이어 모델의 동반자는 뺀다.
     this.playerVisual = this.isBoss
-      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI, companion: undefined }
+      ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI }
       : CHARACTER_VISUALS.player
     this.modeLabel = opts.modeLabel ?? ''
     this.inspiration = Math.max(0, Math.floor(opts.inspiration ?? 0))
@@ -473,6 +472,8 @@ export class BattleView {
     this.introDialogue?.destroy()
     this.attackCine?.destroy()
     this.tooltips?.destroy()
+    this.token?.destroy()
+    this.token = null
     destroyCharacterModels(this.root)
     this.enemyPool.forEach((pool) => pool.forEach((actor) => destroyCharacterModels(actor)))
     this.enemyPool.clear()
@@ -661,7 +662,6 @@ export class BattleView {
         <div class="stage-area" id="pbox">
           ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? this.bossHudHtml() : ''}
-          ${this.isBoss ? this.bossTokenHtml() : ''}
           ${this.isBoss ? '<section class="boss-sentence-board" id="boss-sentence-board" role="status" aria-live="polite" hidden></section>' : ''}
           <div class="chain-rail" id="chain"></div>
           <div class="mult-now" id="mult-now" aria-live="polite"></div>
@@ -866,10 +866,11 @@ export class BattleView {
     }
     this.updatePlayer(you)
     mountCharacterModel(you, this.playerVisual)
-    if (this.isBoss) {
-      const token = this.root.querySelector<HTMLElement>('.boss-token')
-      if (token) this.queueDeferredCharacterModel(token, CHARACTER_VISUALS.token, 1)
-    }
+    // 토큰은 배우 레일에 속하지 않는다 — 한 번 띄워 두고 프롬이 다시 그려질 때마다
+    // 맴돌 대상만 새 요소로 바꿔 준다.
+    const stage = this.root.querySelector<HTMLElement>('.stage-area')
+    if (stage && !this.token) this.token = new TokenActor(stage)
+    this.token?.attachTo(you)
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -1186,7 +1187,6 @@ export class BattleView {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="${t('playerName', '프롬')}과 도우미 ${t('tokenName', '토큰')} 상세 보기">
-        ${this.isBoss ? '' : '<div class="token-speech token-companion-speech" role="status" aria-live="polite"></div>'}
         ${this.isBoss ? '' : `<div class="nameplate glass">
           <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
@@ -1340,19 +1340,6 @@ export class BattleView {
       </section>`
   }
 
-  private bossTokenHtml(): string {
-    const token = CHARACTER_VISUALS.token
-    const modelStatus = token.model3d ? 'preparing-3d' : 'fallback-2d'
-    return `
-      <div class="boss-token" aria-label="불안해하며 프롬을 응원하는 토큰">
-        <div class="token-speech" role="status" aria-live="polite"></div>
-        <div class="token-panic-lines" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="model-shell" data-model-status="${modelStatus}">
-          <img class="battle-sprite" src="${token.portrait2d}" alt="토큰">
-        </div>
-      </div>`
-  }
-
   /**
    * 전투를 여는 한마디. 보스 HUD에 상시 패턴표가 없으므로 이 첫 대사가 약점과
    * 대응법을 모두 지고 간다. 파훼에 성공할 때까지 토큰이 계속 되뇐다.
@@ -1377,7 +1364,7 @@ export class BattleView {
       if (this.over) return
       // 한가한 응원은 경고를 밀어내지 않는다. 큰낫이 올라간 채로 "힘내!"가 뜨면
       // 화면이 지금 무엇이 급한지 스스로 뒤집는 셈이다.
-      if (this.tokenHolding) return this.scheduleBossTokenSpeech(7600)
+      if (this.token?.isHolding) return this.scheduleBossTokenSpeech(7600)
       this.showTokenSpeech(TOKEN_BOSS_LINES[this.tokenSpeechIndex % TOKEN_BOSS_LINES.length])
       this.tokenSpeechIndex += 1
       this.scheduleBossTokenSpeech(7600)
@@ -1398,32 +1385,17 @@ export class BattleView {
     this.timers.push(this.tokenSpeechTimer)
   }
 
+  /**
+   * 한마디는 전부 토큰 자신이 낸다. 말풍선도 감정 이펙트도 그의 몸에 달려 있어서,
+   * 뷰는 무엇을 말할지만 정하고 어디에 띄울지는 신경 쓰지 않는다.
+   */
   private showTokenSpeech(line: TokenLine) {
-    const bubble = this.root.querySelector<HTMLElement>('.token-speech')
-    const token = this.root.querySelector<HTMLElement>('.boss-token')
-    if (!bubble) return
-    clearTimeout(this.tokenSpeechHideTimer)
-    const mark = line.tone === 'warn' ? '!' : line.tone === 'relief' ? '✓' : ''
-    bubble.innerHTML = `${mark ? `<b class="token-speech-mark" aria-hidden="true">${mark}</b>` : ''}<span class="token-speech-text">${line.text}</span>`
-    bubble.dataset.tone = line.tone
-    token?.setAttribute('data-tone', line.tone)
-    bubble.classList.remove('is-speaking')
-    // 연속 대사도 말풍선의 손글씨 팝업을 첫 프레임부터 다시 재생한다.
-    void bubble.offsetWidth
-    bubble.classList.add('is-speaking')
-    this.tokenHolding = line.tone === 'warn'
-    // 핵심 경고는 스스로 꺼지지 않는다. 다음 대사가 덮거나 파훼에 성공할 때까지 남는다.
-    if (this.tokenHolding) return
-    this.tokenSpeechHideTimer = window.setTimeout(() => {
-      bubble.classList.remove('is-speaking')
-      token?.removeAttribute('data-tone')
-    }, line.tone === 'relief' ? 4200 : 3600)
-    this.timers.push(this.tokenSpeechHideTimer)
+    this.token?.say(line)
   }
 
   /** 일반전의 동반 토큰이 최초 상황에만 짧게 개입한다. 보스의 고정 경고가 우선이다. */
   private showCombatCoach(hint: CombatCoachHint): boolean {
-    if (this.isBoss || this.over || this.tokenHolding || hasSeenCombatCoach(hint)) return false
+    if (this.isBoss || this.over || this.token?.isHolding || hasSeenCombatCoach(hint)) return false
     markCombatCoachSeen(hint)
     this.showTokenSpeech(TOKEN_COACH_LINES[hint])
     return true
@@ -1431,11 +1403,7 @@ export class BattleView {
 
   private clearNormalTokenWarning() {
     if (this.isBoss) return
-    this.tokenHolding = false
-    const bubble = this.root.querySelector<HTMLElement>('.token-companion-speech')
-    if (!bubble) return
-    bubble.classList.remove('is-speaking')
-    bubble.removeAttribute('data-tone')
+    this.token?.clearSpeech()
   }
 
   private showBossTokenHint(line: TokenLine) {

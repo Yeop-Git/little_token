@@ -2326,20 +2326,28 @@ html[data-postprocessing='off'] .tip-bubble {
   16% { opacity: 1; }
   100% { opacity: 0; transform: rotate(var(--angle)) translateX(var(--distance)) scaleX(1.35) rotate(18deg); }
 }
-/* 좌하단 플레이어 체력 위에서 토큰 GLB가 불안하게 부산을 떤다. */
-.boss-token {
+/* 토큰은 무대를 자유롭게 나는 배우다. 자리는 CSS가 아니라 TokenActor의 비행
+   컨트롤러가 매 프레임 transform으로 정한다 — 여기서는 좌표를 잡지 않는다.
+   .stage-area(z-index 3) 안에 살기 때문에 HUD와 손패 뒤로 지나간다. */
+.token-actor {
   position: absolute;
-  left: 68px;
-  bottom: -206px;
+  left: 0;
+  top: 0;
   z-index: 57;
-  width: 220px;
-  height: 220px;
+  width: 320px;
+  height: 320px;
+  /* 지금은 만질 수 없다. 나중에 붙잡아 흔드는 장난을 넣는다면 .token-body에만
+     포인터를 열어 손패 클릭을 가로채지 않게 한다. */
   pointer-events: none;
-  transform-origin: 50% 80%;
-  animation: token-float 3.4s ease-in-out infinite;
+  will-change: transform;
+}
+.token-body {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
   filter: drop-shadow(0 0 14px rgba(255, 222, 112, .5));
 }
-.boss-token .model-shell {
+.token-actor .model-shell {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2347,14 +2355,19 @@ html[data-postprocessing='off'] .tip-bubble {
   transform-origin: 50% 62%;
   animation: token-fret .86s ease-in-out infinite alternate;
 }
-.boss-token .battle-sprite { object-position: center; }
+.token-actor .battle-sprite { object-position: center; }
+/* 가로지르는 중에는 잔상처럼 꼬리를 남기고, 들여다보는 중에는 빛을 키워 시선을 끈다. */
+.token-actor[data-behavior='wander'] .token-body { filter: drop-shadow(0 0 22px rgba(255, 230, 140, .68)); }
+.token-actor[data-behavior='peer'] .token-body { filter: drop-shadow(0 0 26px rgba(255, 236, 160, .72)); }
 .token-speech {
   position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
-  left: 158px;
-  top: 8px;
+  /* 토큰 상자(320px)의 오른쪽 어깨에 선다. 상자가 곧 좌표계라 토큰이 어디로 날든
+     따라붙는다. 몸통과 달리 거리 축척을 타지 않는다 — 멀다고 글씨가 작아지면 못 읽는다. */
+  left: 206px;
+  top: -6px;
   z-index: 5;
   box-sizing: border-box;
   width: 330px;
@@ -2403,21 +2416,19 @@ html[data-postprocessing='off'] .tip-bubble {
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
   transform: rotate(14deg);
 }
-.token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
-
-/* 일반전은 프롬 모델 안에 이미 동반 토큰이 렌더된다. 모델을 하나 더 만들지 않고
-   전장 중앙 쪽에 말풍선만 세운다. 좌측 HUD·보유 아이템 열(308px)과는 가로축부터
-   분리하고, 하단 손패 위로 내려가지 않게 배우 상단에 붙인다. */
-.scene.battle:not([data-boss='true']) .actor.you > .token-companion-speech {
-  left: 175px;
-  top: 10px;
-  z-index: 24;
-  width: 288px;
-  min-height: 66px;
-  padding: 12px 22px 14px;
-  font-size: 16px;
-  pointer-events: none;
+/* 무대 오른쪽 끝에서는 종이를 왼쪽으로 넘긴다. 안 넘기면 말풍선이 무대 밖으로 잘린다. */
+.token-speech[data-side='left'] {
+  left: auto;
+  right: 206px;
+  transform-origin: right bottom;
 }
+.token-speech[data-side='left']::after {
+  left: auto;
+  right: -17px;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  transform: rotate(-14deg);
+}
+.token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
 
 /* 말머리 뱃지 — 종이에 눌러 그린 동그라미 안의 「!」·「✓」. */
 .token-speech-mark {
@@ -2525,16 +2536,16 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 
 /* 토큰 본체도 말투를 따라간다 — 놀란 선이 붉게 곤두서거나, 안심하고 잦아든다. */
-.boss-token[data-tone='warn'] { filter: drop-shadow(0 0 16px rgba(255, 116, 82, .62)); }
-.boss-token[data-tone='warn'] .model-shell { animation-duration: .4s; }
-.boss-token[data-tone='warn'] .token-panic-lines i {
+.token-actor[data-tone='warn'] .token-body { filter: drop-shadow(0 0 16px rgba(255, 116, 82, .62)); }
+.token-actor[data-tone='warn'] .model-shell { animation-duration: .4s; }
+.token-actor[data-tone='warn'] .token-panic-lines i {
   height: 24px;
   background: #ff8a6a;
   box-shadow: 0 0 10px rgba(255, 92, 56, .95);
 }
-.boss-token[data-tone='relief'] { filter: drop-shadow(0 0 16px rgba(150, 240, 180, .55)); }
-.boss-token[data-tone='relief'] .model-shell { animation-duration: 2.2s; }
-.boss-token[data-tone='relief'] .token-panic-lines i { opacity: .35; }
+.token-actor[data-tone='relief'] .token-body { filter: drop-shadow(0 0 16px rgba(150, 240, 180, .55)); }
+.token-actor[data-tone='relief'] .model-shell { animation-duration: 2.2s; }
+.token-actor[data-tone='relief'] .token-panic-lines i { opacity: .35; }
 .token-panic-lines {
   position: absolute;
   top: 14px;
@@ -2556,11 +2567,6 @@ html[data-postprocessing='off'] .tip-bubble {
 .token-panic-lines i:nth-child(1) { left: 4px; transform: rotate(-42deg); }
 .token-panic-lines i:nth-child(2) { left: 23px; top: -7px; transform: rotate(-5deg); }
 .token-panic-lines i:nth-child(3) { right: 4px; transform: rotate(34deg); }
-@keyframes token-float {
-  0%, 100% { transform: translate(-4px, 7px) rotate(-2.5deg); }
-  45% { transform: translate(7px, -12px) rotate(2deg); }
-  72% { transform: translate(2px, -5px) rotate(-1deg); }
-}
 @keyframes token-fret {
   from { transform: translateX(-3px) rotate(-3deg) scale(.985); }
   to { transform: translateX(4px) rotate(3.5deg) scale(1.02); }
@@ -2592,7 +2598,7 @@ html[data-postprocessing='off'] .tip-bubble {
   100% { opacity: 1; transform: rotate(-11deg) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .boss-token, .boss-token .model-shell { animation-duration: 8s; }
+  .token-actor .model-shell { animation-duration: 8s; }
   .token-speech.is-speaking { animation-timing-function: ease; }
   /* 경고는 계속 떠 있는 요소라 숨쉬기까지 끄고 색과 뱃지만으로 세기를 전한다. */
   .token-speech[data-tone='warn'].is-speaking { animation: token-speech-slam .5s ease both; }

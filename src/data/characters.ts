@@ -59,12 +59,6 @@ export interface CharacterVisualDef {
   portrait2d: string
   title: string
   description: string
-  companion?: {
-    name: string
-    model3d: string
-    idleAnimation: string
-    modelYaw?: number
-  }
 }
 
 // 전장의 3D 모델과 상세 화면의 2D 스프라이트를 한 곳에서 1:1로 연결한다.
@@ -105,11 +99,6 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     // 화면 정면에서 90° 돌아 오른쪽의 적을 완전히 바라보는 측면 자세.
     modelYaw: Math.PI / 2,
     modelGroundOffset: -0.34,
-    companion: {
-      name: '토큰',
-      model3d: MODELS.token,
-      idleAnimation: 'Armature|fly|BaseLayer',
-    },
     portrait2d: SPRITES.player_001,
     title: '이야기를 지키는 소년',
     description: '비에 젖은 일기장을 품고, 올바른 문장으로 이야기를 지켜낸다.',
