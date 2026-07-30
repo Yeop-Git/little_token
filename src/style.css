@@ -1276,75 +1276,23 @@ button {
   position: absolute;
   top: 0;
   left: calc(50% + 320px);
-  width: 430px;
-  min-height: 72px;
-  padding: 9px 14px 10px;
+  display: flex;
+  width: auto;
+  min-height: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
   border: 1px solid rgba(255, 220, 157, .5);
-  border-radius: 8px;
+  border-radius: 999px;
   color: #fff1d2;
   background: rgba(24, 17, 29, .82);
   box-shadow: inset 0 0 0 2px rgba(255, 247, 218, .05), 0 8px 24px rgba(0, 0, 0, .42);
   transform: translateX(-50%);
   pointer-events: auto;
 }
-.stage-progress-copy {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: baseline;
-  gap: 12px;
-  white-space: nowrap;
-}
-.stage-progress-copy > span {
-  overflow: hidden;
-  color: var(--ink-dim);
-  font-size: 10px;
-  font-weight: 900;
-  text-overflow: ellipsis;
-}
-.stage-progress-copy > b { font-size: 18px; letter-spacing: 0; }
-.stage-progress-copy > b i { margin-left: 3px; color: var(--ink-dim); font-size: 12px; font-style: normal; }
-.stage-progress-copy > small {
-  overflow: hidden;
-  color: #ffd989;
-  font-size: 10px;
-  font-weight: 900;
-  text-align: right;
-  text-overflow: ellipsis;
-}
-.stage-progress-track {
-  display: grid;
-  grid-template-columns: repeat(15, 1fr);
-  align-items: center;
-  gap: 4px;
-  height: 16px;
-  margin-top: 8px;
-}
-.stage-progress-track i {
-  position: relative;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 240, 205, .16);
-}
-.stage-progress-track i.is-reached { background: rgba(255, 210, 111, .72); }
-.stage-progress-track i.is-current {
-  height: 8px;
-  background: #fff0b0;
-  box-shadow: 0 0 12px rgba(255, 205, 92, .75);
-}
-.stage-progress-track i.is-boss::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border: 2px solid #ffb078;
-  border-radius: 50%;
-  background: #34202b;
-  transform: translate(-50%, -50%);
-}
-.stage-progress-track i.is-boss.is-reached::after { background: #ffd477; }
-.stage-progress-track i span { display: none; }
+.stage-progress > span { color: #ffd989; font-size: 12px; }
+.stage-progress > b { font-size: 17px; letter-spacing: 0; white-space: nowrap; }
+.stage-progress > b i { margin-left: 3px; color: var(--ink-dim); font-size: 11px; font-style: normal; }
 .hud-left-stack {
   justify-self: start;
   align-self: start;
@@ -1357,7 +1305,7 @@ button {
 .action-order {
   width: 196px;
   margin-left: 4px;
-  pointer-events: none;
+  pointer-events: auto;
   filter: drop-shadow(0 9px 16px rgba(0, 0, 0, .5));
 }
 .action-order-head {
@@ -1745,6 +1693,24 @@ html[data-postprocessing='off'] .tip-bubble {
   background: rgba(18, 13, 24, .78);
   box-shadow: inset 0 0 0 1px rgba(255, 225, 170, .18), 0 8px 22px rgba(0, 0, 0, .42);
 }
+/* 보스전 중앙 HUD와 한 줄에서 경쟁하지 않는다. 프롬 수치는 좌측 두 번째 줄,
+   행동 순서는 그 아래로 내려 세 정보가 서로 겹치지 않게 한다. */
+.scene.battle[data-boss='true'] .hud-player-stats {
+  position: absolute;
+  top: 58px;
+  left: 4px;
+  gap: 2px;
+  min-height: 46px;
+  padding: 4px 7px;
+}
+.scene.battle[data-boss='true'] .hud-player-stats .hud-player-name { display: none; }
+.scene.battle[data-boss='true'] .hud-player-stats .hud-stat {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 8px;
+}
+.scene.battle[data-boss='true'] .hud-player-stats .hud-stat:first-of-type { min-width: 68px; }
+.scene.battle[data-boss='true'] .action-order { margin-top: 52px; }
 .hud-player-name {
   padding: 0 9px 0 5px;
   border-right: 1px solid rgba(255, 225, 170, .2);
@@ -1932,21 +1898,6 @@ html[data-postprocessing='off'] .tip-bubble {
   width: 300px;
   opacity: .72;
 }
-.scene.battle[data-boss='true'] .boss-player-health-hud {
-  left: 38px;
-  bottom: 28px;
-  z-index: 58;
-  width: 360px;
-  margin: 0;
-  padding: 14px 18px 16px;
-  transform: none;
-  border: 1px solid rgba(255, 225, 170, .34);
-  box-shadow: inset 0 0 0 3px rgba(255, 245, 214, .05), 0 10px 28px rgba(0, 0, 0, .56);
-}
-.scene.battle[data-boss='true'] .boss-player-health-hud .row { margin-bottom: 9px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .nm { font-size: 19px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 15px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
   /* 모델 원점은 카드 쪽으로 내려가지만 실제 발끝은 카드 위에 남는다. 투명 여백을
      포함한 박스가 아니라 화면에 보이는 실루엣을 기준으로 보스별 위치를 맞춘다. */
@@ -2099,11 +2050,12 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 보스가 쓰는 다음 문장 — 규칙 툴팁이 아니라 플레이어가 매 턴 읽는 주된 의도판이다. */
 .boss-sentence-board {
   position: absolute;
-  top: 122px;
+  /* 체력 HUD 아래의 선공·상태 배지가 한 줄을 온전히 차지한 뒤 문장판을 연다. */
+  top: 158px;
   left: 50%;
   z-index: 88;
-  width: min(920px, 67vw);
-  padding: 11px 22px 13px;
+  width: min(1120px, 78vw);
+  padding: 14px 28px 17px;
   color: #38251d;
   transform: translateX(-50%) rotate(-.15deg);
   clip-path: polygon(0 6%, 2% 0, 6% 3%, 11% 0, 17% 2%, 24% 0, 31% 3%, 39% 0, 47% 2%, 55% 0, 63% 3%, 71% 0, 78% 2%, 85% 0, 92% 3%, 98% 0, 100% 7%, 99% 24%, 100% 43%, 99% 64%, 100% 83%, 98% 100%, 91% 97%, 84% 100%, 76% 97%, 68% 100%, 60% 98%, 52% 100%, 44% 97%, 35% 100%, 27% 98%, 19% 100%, 11% 97%, 3% 100%, 0 94%, 1% 76%, 0 58%, 1% 37%);
@@ -2161,7 +2113,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-manuscript-line > i {
   flex: none;
   color: rgba(82, 50, 36, .38);
-  font: italic 800 18px Georgia, serif;
+  font: italic 800 24px Georgia, serif;
 }
 .boss-sentence-token {
   position: relative;
@@ -2169,20 +2121,15 @@ html[data-postprocessing='off'] .tip-bubble {
   flex-direction: column;
   align-items: center;
   min-width: 0;
-  padding: 1px 6px 3px;
+  padding: 1px 8px 4px;
   border-bottom: 2px solid rgba(78, 47, 34, .28);
-}
-.boss-sentence-token small {
-  color: rgba(91, 60, 45, .62);
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: .16em;
 }
 .boss-sentence-token b {
   overflow: hidden;
   color: #35221b;
-  font-size: clamp(17px, 1.35vw, 23px);
+  font-size: clamp(22px, 1.65vw, 31px);
   font-weight: 900;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2229,7 +2176,6 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .boss-sentence-context .boss-sentence-line { justify-content: flex-start; }
 .boss-sentence-context .boss-sentence-token b { font-size: 13px; }
-.boss-sentence-context .boss-sentence-token small { display: none; }
 .boss-sentence-context .boss-sentence-meta { justify-content: flex-end; margin: 0; }
 .boss-sentence-side-label {
   color: #76513e;
@@ -2754,8 +2700,6 @@ html[data-postprocessing='off'] .tip-bubble {
   .token-speech[data-tone='warn'].is-speaking { animation: token-speech-slam .5s ease both; }
   .token-speech-mark { animation: none; }
 }
-.scene.battle[data-boss='true'] .hud-player-stats .hud-stat[data-stat-key='hp'] { display: none; }
-
 /* 배우 */
 .actor {
   position: absolute;
@@ -4826,77 +4770,6 @@ html[data-postprocessing='off'] .tip-bubble {
   flex-direction: column;
   align-items: center;
 }
-.combat-forecast {
-  position: relative;
-  z-index: 925;
-  display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(0, 1.35fr);
-  width: min(100%, 1080px);
-  min-height: 58px;
-  margin-bottom: 7px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 231, 180, .3);
-  border-radius: 6px;
-  color: #fff7df;
-  background: rgba(14, 11, 18, .9);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .34), inset 0 1px rgba(255, 255, 255, .06);
-  transition: opacity .18s ease, transform .18s ease;
-}
-.forecast-side {
-  min-width: 0;
-  padding: 8px 12px 7px;
-  border-left: 4px solid #5ccf99;
-}
-.forecast-side.enemy {
-  border-left-color: #ef765f;
-  border-inline-start: 1px solid rgba(255, 255, 255, .14);
-  box-shadow: inset 4px 0 #ef765f;
-}
-.forecast-side small {
-  display: block;
-  margin-bottom: 3px;
-  color: #b7cbd0;
-  font-size: 11px;
-  font-weight: 900;
-}
-.forecast-main,
-.forecast-values {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  min-width: 0;
-  line-height: 1.25;
-}
-.forecast-main b {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-}
-.forecast-main span,
-.forecast-values span {
-  flex: none;
-  color: #d8c99e;
-  font-size: 11px;
-  font-weight: 800;
-}
-.forecast-values {
-  margin-top: 3px;
-  flex-wrap: wrap;
-}
-.forecast-values strong {
-  color: #9ee6bd;
-  font-size: 12px;
-}
-.forecast-values em {
-  color: #ffb09f;
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 900;
-}
-.word-zone.is-resolving .combat-forecast {
-  opacity: 0;
-  transform: translateY(10px);
-}
 /* 단어 영역 아래 은은한 어둠 스크림(가독성) — 경계선이 안 보이게 아주 흐리게만 */
 .word-zone::before {
   content: '';
@@ -5690,7 +5563,7 @@ html[data-postprocessing='off'] .tip-bubble {
   right: 8px;
   left: 8px;
   z-index: 5;
-  height: 38px;
+  height: 48px;
   pointer-events: none;
 }
 .card-resource-meta .card-emotion {
@@ -5699,20 +5572,20 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .card-cost {
   position: absolute;
-  top: -5px;
-  right: -6px;
+  top: -8px;
+  right: -8px;
   z-index: 6;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   color: #fff5c7;
   background-image: var(--ink-cost-badge-image, radial-gradient(circle at 35% 28%, #7fd6ff, #176ca6 68%, #0b365d));
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
-  filter: drop-shadow(0 3px 3px rgba(19, 11, 23, .58)) drop-shadow(0 0 7px rgba(77, 201, 235, .36));
-  font-size: 15px;
+  filter: drop-shadow(0 4px 4px rgba(5, 4, 16, .85)) drop-shadow(0 0 10px rgba(91, 219, 255, .72));
+  font-size: 20px;
   font-weight: 1000;
   line-height: 1;
   text-shadow:
@@ -5745,8 +5618,7 @@ html[data-postprocessing='off'] .tip-bubble {
     -1px 0 0 #1c1a5d,
     0 -1px 0 #1c1a5d;
 }
-.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; width: max-content; min-width: 38px; max-width: 116px; height: 38px; align-items: center; gap: 3px; padding: 3px 7px 3px 3px; border-radius: 19px; color: #fff8e7; background: rgba(8, 6, 14, .82); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 12px color-mix(in srgb, var(--emotion-color) 34%, transparent); }
-.card-emotion b { min-width: 0; overflow: hidden; font-size: 10px; font-weight: 1000; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; width: 38px; min-width: 38px; height: 38px; align-items: center; justify-content: center; padding: 3px; border-radius: 19px; color: #fff8e7; background: rgba(8, 6, 14, .82); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 12px color-mix(in srgb, var(--emotion-color) 34%, transparent); }
 .card-emotion .emotion-face {
   width: 32px;
   height: 32px;
@@ -7534,16 +7406,24 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .rp-facts {
   position: relative;
   z-index: 2;
-  display: grid;
+  display: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
-  margin: 0 14px;
+  margin: 14px 14px 0;
   padding: 7px;
   border-radius: 6px;
   color: #fff;
   background: rgba(8, 6, 14, .76);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16), 0 4px 14px rgba(0, 0, 0, .35);
   backdrop-filter: blur(5px);
+}
+.reward-pick.detailing .rp-facts {
+  display: grid;
+  animation: reward-facts-in .16s ease both;
+}
+@keyframes reward-facts-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .rp-facts > span {
   min-width: 0;
@@ -7562,7 +7442,8 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-size: 10px;
   font-weight: 800;
 }
-.rp-facts b {
+.rp-facts b,
+.rp-fact-value {
   min-width: 0;
   overflow: hidden;
   color: #fff;
@@ -7572,6 +7453,11 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   white-space: nowrap;
   text-shadow: 0 0 8px var(--wglow, var(--gold));
 }
+.rp-fact-value .card-action-inline {
+  justify-content: flex-end;
+  font-size: 12px;
+}
+.rp-fact-value .card-action-inline svg { width: 16px; height: 16px; }
 .is-reinforce { --wglow: #ffb24d; }
 .rp-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 0 14px 14px; text-align: center; }
 .rp-name {
@@ -7622,39 +7508,61 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   overflow-wrap: anywhere;
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
-.rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .rp-detail {
-  padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #fff;
-  background: rgba(8, 6, 14, 0.5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 900; color: #fff;
+  background: rgba(8, 6, 14, 0.68); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); transition: box-shadow 0.15s;
 }
 .rp-detail:hover { box-shadow: inset 0 0 0 1px var(--wglow, var(--gold)), 0 0 12px color-mix(in srgb, var(--wglow, var(--gold)) 50%, transparent); }
-.rp-take {
-  padding: 7px 11px;
-  border-radius: 12px 4px 12px 4px;
-  color: #fff;
-  background: rgba(18, 12, 25, .76);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 58%, transparent), 0 4px 10px rgba(0, 0, 0, .36);
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 5px rgba(0, 0, 0, 0.95);
-  transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
-}
-.rp-take:hover,
-.rp-take:focus-visible { transform: translateY(-2px); filter: brightness(1.18); box-shadow: inset 0 0 0 2px var(--wglow, var(--gold)), 0 0 18px color-mix(in srgb, var(--wglow, var(--gold)) 44%, transparent); }
-.rp-take:active { transform: translateY(1px) scale(.97); }
-.rp-price {
-  display: inline-block;
-  margin-right: 4px;
-  padding: 3px 7px;
-  color: #ffe089;
+.rp-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(15, 10, 20, .72);
-  box-shadow: inset 0 0 0 1px rgba(255, 220, 133, .42);
+  color: #ffe089;
+  background: rgba(15, 10, 20, .76);
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 133, .48), 0 3px 10px rgba(0, 0, 0, .34);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 9px rgba(255, 195, 67, .7);
 }
-.reward-pick.is-unaffordable .rp-price { color: #ff9d8b; box-shadow: inset 0 0 0 1px rgba(255, 118, 91, .62); }
-.reward-pick.is-unaffordable .rp-take { color: #ffd0c5; }
+.rp-cost i {
+  color: #fff0a8;
+  font-style: normal;
+  font-size: 17px;
+}
+.rp-unavailable {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  min-width: 88px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff1ed;
+  background: rgba(91, 24, 26, .92);
+  box-shadow: inset 0 0 0 1px rgba(255, 151, 126, .7), 0 4px 16px rgba(0, 0, 0, .46);
+  transform: rotate(2deg);
+}
+.rp-unavailable b,
+.rp-unavailable small { display: block; }
+.rp-unavailable b { font-size: 14px; letter-spacing: .5px; }
+.rp-unavailable small { margin-top: 2px; color: #ffc2b3; font-size: 10px; font-weight: 800; }
+.reward-pick.is-unaffordable {
+  filter: saturate(.45) brightness(.72);
+  box-shadow: 0 9px 22px rgba(0, 0, 0, .5), inset 0 0 0 2px rgba(255, 112, 88, .36);
+}
+.reward-pick.is-unaffordable .rp-unavailable { display: block; }
+.reward-pick.is-unaffordable .rp-cost {
+  color: #ffd0c5;
+  background: rgba(80, 21, 24, .84);
+  box-shadow: inset 0 0 0 1px rgba(255, 118, 91, .75);
+}
+.reward-pick.is-unaffordable:hover { filter: saturate(.55) brightness(.78); }
 .reward-pick.is-unaffordable::before { opacity: .18; }
 .reward-pick.detailing { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 45%, transparent), inset 0 1px 0 var(--glass-hi); }
 .rp-owned-stamp {
@@ -7696,22 +7604,13 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   will-change: transform, opacity;
 }
 
-/* 아이템은 단어 카드의 둥근 사각 프레임과 다른 비대칭 이중 금속 프레임을 쓴다. */
-.reward-pick.is-item { border-radius: 30px 9px 30px 9px; box-shadow: 0 12px 30px rgba(0,0,0,.54), inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 7px rgba(65,43,35,.58); }
-.reward-pick.is-item::after {
-  content: '';
-  position: absolute;
-  inset: 9px;
-  z-index: 3;
-  border: 3px double rgba(255,224,151,.72);
-  border-radius: 21px 5px 21px 5px;
-  pointer-events: none;
-  box-shadow: inset 0 0 18px rgba(255,181,72,.16);
-}
-.reward-pick.is-item .rp-bg { inset: 7px; border-radius: 22px 4px; overflow: hidden; }
+/* 단어와 아이템이 같은 선택 규칙으로 읽히도록 프레임 문법도 하나로 맞춘다. */
+.reward-pick.is-item { border-radius: 20px; }
+.reward-pick.is-item::after { display: none; }
+.reward-pick.is-item .rp-bg { inset: 0; border-radius: 20px; overflow: hidden; }
 /* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
 .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
-.reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+.reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 0; border-radius: 20px; }
 
 /* 우측 상세 칸은 참고 화면의 카드 선택 구성을 복원한다. 날씨·다음 날 안내는 두지 않는다. */
 .reward-dock {

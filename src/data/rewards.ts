@@ -28,10 +28,10 @@ export interface RewardOption {
 
 /** 영감 가격은 희귀도만 읽는다. 같은 등급 안에서는 새 카드와 반복강화가 같은 선택 무게를 갖는다. */
 export const REWARD_PRICE: Readonly<Record<Rarity, number>> = {
-  common: 2,
-  rare: 4,
-  epic: 7,
-  legendary: 10,
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
 }
 export const REWARD_REFRESH_COST = 1
 
@@ -73,7 +73,7 @@ function nearestPool(pools: Map<Rarity, RewardOption[]>, want: Rarity): RewardOp
 export const GUARANTEED_LEGENDARY_ITEM_FLOOR = 10
 export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
 export const EARLY_BUILD_REWARD_DAY = 2
-export const EARLY_BUILD_CARD_IDS = ['storedResolve', 'overflowingHeart', 'drinkInk'] as const
+export const EARLY_BUILD_CARD_IDS = ['counterOne', 'overflowingHeart', 'drinkInk'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -255,6 +255,15 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
     if (option) picks.push(option)
   }
+  // 동사 보상은 공격 카드만 셋 겹쳐 나오지 않게 한다. 이미 보장 카드가 들어왔다면
+  // 남은 칸부터 비어 있는 행동 축을 채워 공격·방어·회복 빌드를 화면에서 함께 읽힌다.
+  if (phase === 'verb') {
+    for (const kind of ['guard', 'heal', 'attack'] as const) {
+      if (picks.length >= 3 || picks.some((entry) => entry.word?.kind === kind)) continue
+      const option = pickOne(all.filter((entry) => entry.word?.kind === kind), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
+  }
   if (emotionProfile.preferred && picks.length < 3 && !picks.some((entry) => entry.word?.emotion === emotionProfile.preferred)) {
     const option = pickOne(all.filter((entry) => entry.word?.emotion === emotionProfile.preferred), grade, day, used, rng)
     if (option) picks.push(option)
@@ -295,10 +304,46 @@ export function genRewards(
   day = 1,
   phase: RewardPhase = 'subject',
   rng: () => number = Math.random,
+  availableInspiration = Number.POSITIVE_INFINITY,
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
-  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day, rng)
-  return generateWordRewards(player, effectiveGrade, day, phase, rng)
+  const candidates = phase === 'item'
+    ? itemOptions(player)
+    : wordOptions(player, phase === 'subject' ? ['subj', 'adv'] : ['verb'])
+  const picks = phase === 'item'
+    ? generateItemRewards(player, effectiveGrade, day, rng)
+    : generateWordRewards(player, effectiveGrade, day, phase, rng)
+  if (!picks.length || picks.some((option) => rewardPrice(option) <= availableInspiration)) return picks
+
+  // 구매 불가 카드를 고급 선택지로 보여 줄 수는 있지만 셋 전부 잠기지는 않는다.
+  // 같은 단계의 후보 중 현재 잔액으로 살 수 있는 가장 좋은 한 장을 마지막 칸에 보장한다.
+  const shownIds = new Set(picks.map((option) => option.word?.id ?? option.item?.id ?? option.name))
+  const affordable = candidates
+    .filter((option) => rewardPrice(option) <= availableInspiration)
+    .sort((a, b) => rewardPrice(b) - rewardPrice(a))
+  const replacements = affordable.filter((option) => !shownIds.has(option.word?.id ?? option.item?.id ?? option.name))
+  if (!replacements.length && affordable[0]) replacements.push(affordable[0])
+  if (!replacements.length) return picks
+
+  let best = { score: Number.NEGATIVE_INFINITY, picks }
+  const milestoneRarity = bossRewardRarity(day)
+  for (let index = 0; index < picks.length; index++) {
+    const removesOnlyMilestone = milestoneRarity
+      && picks[index].rarity === milestoneRarity
+      && picks.filter((option) => option.rarity === milestoneRarity).length === 1
+    for (const replacement of replacements) {
+      const proposal = picks.map((option, optionIndex) => optionIndex === index ? replacement : option)
+      const actionKinds = phase === 'verb'
+        ? new Set(proposal.map((option) => option.word?.kind).filter(Boolean)).size
+        : 0
+      const grammarSlots = phase === 'subject'
+        ? new Set(proposal.map((option) => option.word?.slot).filter(Boolean)).size
+        : 0
+      const score = actionKinds * 100 + grammarSlots * 20 + (removesOnlyMilestone ? -1_000 : 0) + rewardPrice(replacement)
+      if (score > best.score) best = { score, picks: proposal }
+    }
+  }
+  return shuffle(best.picks, rng)
 }
 
 /** 저장된 씨앗·단계·새로고침 횟수에서 같은 진열을 재현하는 작은 PRNG. */

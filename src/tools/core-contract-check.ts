@@ -18,7 +18,7 @@ import { clearRewardValue, gradeFloor, gradeForElapsedTurns, startGrade } from '
 import { EARLY_BUILD_CARD_IDS, EARLY_BUILD_REWARD_DAY, genRewards } from '@data/rewards'
 
 const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(3, elapsed))
-assert.deepEqual(speedGrades, [5, 4, 3, 3, 3, 3, 3], 'reward grade must only fall with elapsed turns until the luck floor')
+assert.deepEqual(speedGrades, [5, 5, 5, 4, 4, 4, 3], 'reward grade falls once per three completed sentences until the luck floor')
 assert.equal(gradeForElapsedTurns(3, 0), startGrade(3), 'a first-turn clear keeps the full starting grade')
 assert.equal(speedGrades[speedGrades.length - 1], gradeFloor(3), 'a long battle stops at the luck floor')
 assert.equal(clearRewardValue(4, 2), 6, 'unused free draws add to earned inspiration without changing speed grade')

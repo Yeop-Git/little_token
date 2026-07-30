@@ -74,7 +74,7 @@ import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
-import { clearRewardValue, decayGrade, gradeTier, startGrade } from '@core/grade'
+import { clearRewardValue, gradeForElapsedTurns, gradeTier, startGrade } from '@core/grade'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
@@ -732,13 +732,10 @@ export class BattleView {
           <div class="model-prewarm-stage" aria-hidden="true"></div>
         </div>
 
-        ${this.isBoss ? this.bossPlayerHudHtml() : ''}
-
         <div class="slot-step" id="steps" aria-label="문장 조립 단계"></div>
         ${inkMeterHtml()}
 
         <div class="word-zone">
-          <div class="combat-forecast" id="combat-forecast" role="status" aria-live="polite"></div>
           <div class="card-table" aria-label="단어 카드 선택 영역">
             <div class="card-hand" id="card-hand" aria-label="현재 손패"></div>
             <button class="draw-deck" id="draw-deck" type="button"></button>
@@ -878,23 +875,10 @@ export class BattleView {
       total: DISPLAY_FLOORS,
       next,
     })
-    const marks = Array.from({ length: DISPLAY_FLOORS }, (_, index) => {
-      const markFloor = index + 1
-      const classes = [
-        markFloor <= floor ? 'is-reached' : '',
-        markFloor === floor ? 'is-current' : '',
-        BOSS_BY_FLOOR[markFloor] ? 'is-boss' : '',
-      ].filter(Boolean).join(' ')
-      return `<i class="${classes}" aria-hidden="true"><span>${BOSS_BY_FLOOR[markFloor] ? markFloor : ''}</span></i>`
-    }).join('')
     return `
-      <section class="stage-progress glass" role="img" tabindex="0" aria-label="${aria}" data-tooltip="${aria}">
-        <div class="stage-progress-copy">
-          <span>${cycle}</span>
-          <b>${t('hudStageLabel', '스테이지')} ${floor}<i>/${DISPLAY_FLOORS}</i></b>
-          <small>${next}</small>
-        </div>
-        <div class="stage-progress-track">${marks}</div>
+      <section class="stage-progress glass" role="img" tabindex="0" aria-label="${aria}" data-tooltip="${aria.split('. ').join('\n')}">
+        <span aria-hidden="true">✦</span>
+        <b>${t('hudStageLabel', '스테이지')} ${floor}<i>/${DISPLAY_FLOORS}</i></b>
       </section>`
   }
 
@@ -1315,7 +1299,7 @@ export class BattleView {
     host.closest('.action-order')?.classList.toggle('is-preempting', this.playerPreempting)
     host.innerHTML = entries.map((entry, index) => `
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
-        data-order-key="${entry.key}" style="--order-i:${index}">
+        data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
         <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
         <div class="action-order-copy"><b>${entry.name}</b><span>${entry.note}</span></div>
       </li>`).join('')
@@ -1330,6 +1314,7 @@ export class BattleView {
         { duration: 520, easing: 'cubic-bezier(.2, .9, .25, 1)' },
       )
     })
+    this.renderCombatForecast()
   }
 
   private playerHtml(): string {
@@ -1377,9 +1362,7 @@ export class BattleView {
 
   private bossSentenceTokenHtml(token: EnemySentenceToken): string {
     const emotion = token.emotion ? ` emotion-${token.emotion}` : ''
-    const roleLabel = bossText(token.role === 'subject' ? 'roleSubject' : token.role === 'modifier' ? 'roleModifier' : token.role === 'object' ? 'roleObject' : 'roleAction')
     return `<span class="boss-sentence-token role-${token.role}${emotion}${token.crossed ? ' is-crossed' : ''}">
-      <small>${roleLabel}</small>
       <b>${token.text}</b>
     </span>`
   }
@@ -1453,14 +1436,6 @@ export class BattleView {
       this.renderBossSentence()
     }, duration)
     this.timers.push(this.bossSentenceEventTimer)
-  }
-
-  private bossPlayerHudHtml(): string {
-    return `
-      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="${t('playerName', '프롬')} 체력">
-        <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
-        <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
-      </section>`
   }
 
   private bossHudHtml(): string {
@@ -1581,11 +1556,11 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
+    if (this.isBoss) return
     const guardLimit = playerGuardLimit(s.playerMax)
-    const hud = this.isBoss ? this.q('#boss-player-health-hud') : el
-    hud.querySelector<HTMLElement>('.hpn')!.innerHTML =
+    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
       `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
-    this.paintGuardedHpBar(hud.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+    this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
   /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
@@ -2185,16 +2160,9 @@ export class BattleView {
     // 테이블 목록을 먼저 본다 — 덱에 없는 문장부호·조우 전용 카드가 여기에만 있다.
     // 덱을 먼저 보면 아이템과 보스 공략이 연 임시 선택지가 사라진다.
     const slotWords = this.t.words[key] ?? this.player.deck[key] ?? []
-    // 체력이 가득 찬 턴에는 순수 회복 동사를 드로우 풀에서도 뺀다. 다만 현재 문맥에서
-    // 선택 가능한 비회복 동사가 기본 네 장보다 적으면 소프트락을 피하려고 회복도 허용한다.
-    const verbSlot = key === 'verb' || key === 'verb2'
-    const usableNonHealCount = verbSlot
-      ? slotWords.filter((word) => word.kind !== 'heal' && !conflictReason(word, this.slotIndex, this.sel, this.t)).length
-      : 0
-    const hideHealVerbs = this.state.playerHp >= this.state.playerMax
-      && verbSlot
-      && usableNonHealCount >= CARD_HAND_CONFIG.verbInitialHand
-    const words = hideHealVerbs ? slotWords.filter((word) => word.kind !== 'heal') : slotWords
+    // 회복은 체력이 가득 차도 숨기지 않는다. 초과 회복 전환과 회복 기반 관용구는
+    // 만피에서 시작하는 빌드이므로 드로우 단계가 임의로 전략을 지우면 안 된다.
+    const words = slotWords
     const front = this.state.enemies[frontIdx(this.state)]
     const needsQueenAnswer = front?.def.id === 'queenBee'
       && summonCount(front) > 0
@@ -2211,9 +2179,8 @@ export class BattleView {
     this.renderCombatForecast()
   }
 
-  /** 손패를 고르는 자리에서 현재 문장과 다음 적 공격의 실제 규칙 기반 예상값을 보여 준다. */
+  /** 카드 위를 가리지 않고 좌상단 행동 순서의 각 초상화 호버에 실제 예상값을 붙인다. */
   private renderCombatForecast(): void {
-    const host = this.q<HTMLElement>('#combat-forecast')
     const selected = this.order().some((key) => !!this.sel[key])
     let sentenceValue = bossText('forecastWaiting')
     let sentenceLabel = bossText('forecastMySentence')
@@ -2276,7 +2243,7 @@ export class BattleView {
     }
 
     const enemy = this.state.enemies[frontIdx(this.state)]
-    let enemyHtml = ''
+    let enemyTooltip = ''
     if (enemy) {
       const forecast = enemyAttackForecast(this.state, enemy)
       const timing = forecast.attackTurn > this.state.turn
@@ -2293,17 +2260,20 @@ export class BattleView {
             : forecast.dealt[1] === 0 && this.state.guard > 0
               ? bossText('forecastGuardBlock')
               : ''
-      enemyHtml = `<div class="forecast-side enemy">
-        <small>${bossText('forecastEnemy')}</small>
-        <div class="forecast-main"><b>${bossText('forecastEnemyAction', { name: action, timing })}</b><span>${bossText('forecastTargetPlayer')}</span></div>
-        <div class="forecast-values"><span>${bossText('forecastRawDamage', { min: forecast.raw[0], max: forecast.raw[1] })}</span><strong>${bossText('forecastHpAfter', { min: forecast.hpAfter[0], max: forecast.hpAfter[1] })}</strong>${defense ? `<em>${defense}</em>` : ''}</div>
-      </div>`
+      enemyTooltip = [
+        bossText('forecastEnemy'),
+        bossText('forecastEnemyAction', { name: action, timing }),
+        `${bossText('forecastTargetPlayer')} · ${bossText('forecastRawDamage', { min: forecast.raw[0], max: forecast.raw[1] })}`,
+        bossText('forecastHpAfter', { min: forecast.hpAfter[0], max: forecast.hpAfter[1] }),
+        defense,
+      ].filter(Boolean).join('\n')
     }
 
-    host.innerHTML = `<div class="forecast-side player">
-      <small>${sentenceLabel}</small>
-      <div class="forecast-main"><b>${sentenceValue}</b>${sentenceMeta ? `<span>${sentenceMeta}</span>` : ''}</div>
-    </div>${enemyHtml}`
+    const playerTooltip = [sentenceLabel, sentenceValue, sentenceMeta].filter(Boolean).join('\n')
+    const playerOrder = this.root.querySelector<HTMLElement>('.action-order-item.player')
+    const enemyOrder = this.root.querySelector<HTMLElement>('.action-order-item.enemy:not(.timing-waiting):not(.timing-summary)')
+    if (playerOrder) playerOrder.dataset.tooltip = playerTooltip
+    if (enemyOrder && enemyTooltip) enemyOrder.dataset.tooltip = enemyTooltip
   }
 
   /** 장로거미는 문장마다 슬롯을 순환 지정한다. 해당 슬롯이 열릴 때 카드 한 장만 묶는다. */
@@ -2525,7 +2495,9 @@ export class BattleView {
       `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
-          const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
+          const value = m.key === 'hp'
+            ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}${this.state.guard ? ` ◈${this.state.guard}` : ''}${this.state.playerMagicShield ? ' ✦1' : ''}`
+            : String(this.player.stats[m.key])
           return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
@@ -3694,9 +3666,10 @@ export class BattleView {
     const turnSummons = summonAtTurnStart(this.state)
     this.renderActors()
     if (turnSummons.length > 0) await this.playTurnSummons(turnSummons)
-    // 턴이 넘어가면 등급이 식는다 — 운이 보장하는 바닥까지만.
+    // 세 문장을 쓸 때마다 등급이 한 번 식는다. 방어·회복이 공격보다 한 문장 길다는
+    // 이유만으로 매번 보상을 잃지 않되, 아주 오래 끄는 전투에는 여전히 비용이 남는다.
     const prevGrade = this.grade
-    this.grade = decayGrade(this.grade, this.player.stats.luck)
+    this.grade = gradeForElapsedTurns(this.player.stats.luck, Math.max(0, this.state.turn - 1))
     if (this.grade < prevGrade) this.tickGradeDown()
     this.setPhase('주어 선택')
     this.busy = false

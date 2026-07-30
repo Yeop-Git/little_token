@@ -132,10 +132,10 @@ function checkBudget(): string[] {
     const rarity = w.rarity ?? 'common'
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
     if (slot === 'adv') {
-      const staleStats = w.bonus != null || w.crit != null || w.stat != null
+      const staleStats = w.crit != null || w.stat != null
       if (staleStats) {
-        out.push(`${pool}/${w.text}: 수식어에 배율·대성공·룰렛 스탯이 남아 있다`)
-        console.log(`  위반  ${pool} · ${w.text} — 수식어는 배율·대성공·룰렛 스탯을 가질 수 없다`)
+        out.push(`${pool}/${w.text}: 수식어에 대성공·룰렛 스탯이 남아 있다`)
+        console.log(`  위반  ${pool} · ${w.text} — 수식어는 대성공·룰렛 스탯을 가질 수 없다`)
       }
       if (!hasModifierTactic(w)) {
         out.push(`${pool}/${w.text}: 공개 전술 기능이 없다`)

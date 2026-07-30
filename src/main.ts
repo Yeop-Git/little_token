@@ -721,9 +721,17 @@ function goReward(
   stage.setAttribute('data-theme', 'day')
   const seed = run.reward?.seed ?? 0
   const refreshes = run.reward?.refreshes?.[phase] ?? 0
-  const options = genRewards(run.player, grade, run.day, phase, rewardOfferRng(seed, phase, refreshes))
-  // 엔드리스에서 모든 고유 아이템을 모으면 빈 아이템 단계를 자동으로 넘긴다.
-  if (options.length === 0) {
+  const options = genRewards(
+    run.player,
+    grade,
+    run.day,
+    phase,
+    rewardOfferRng(seed, phase, refreshes),
+    run.inspiration,
+  )
+  // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
+  // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
+  if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {
     advanceReward(grade, phase)
     return
   }

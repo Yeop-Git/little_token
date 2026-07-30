@@ -13,8 +13,9 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
+import { wordActionInline } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
-import { STAT_LABEL, type ItemDef, type StatKey } from '@data/items'
+import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
 import { reinforceWord } from '@core/run'
@@ -107,6 +108,11 @@ function roleLabel(opt: RewardOption): string {
   return text('rewardRoleTactic', '전술')
 }
 
+function roleHtml(opt: RewardOption): string {
+  if (opt.kind === 'word' && opt.word) return wordActionInline(opt.word) || roleLabel(opt)
+  return roleLabel(opt)
+}
+
 function acquireLabel(opt: RewardOption): string {
   if (opt.reinforce) return text('rewardAcquireReinforce', '반복강화 +1')
   if (opt.kind === 'item') return text('rewardAcquireItem', '새 아이템')
@@ -130,25 +136,6 @@ function mainEffect(opt: RewardOption): string {
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
   return wordNoteText(opt.word!)
-}
-
-/** 아이템 카드 앞면에서 상세창 없이 비교하는 고유 기본 스탯 칩. */
-function itemBaseStatsHtml(item?: ItemDef): string {
-  if (!item) return ''
-  const stats = STAT_ORDER.filter((key) => item.base[key])
-  if (!stats.length) return ''
-  const label = stats.map((key) => `${STAT_LABEL[key]} +${item.base[key]}`).join(', ')
-  return `<div class="rp-base-stats" aria-label="고유 기본 스탯: ${label}">
-    <span class="rp-base-label">고유 기본</span>
-    ${stats.map((key) => `<span class="rp-base-stat stat-${key}"><b>${STAT_LABEL[key]}</b> +${item.base[key]}</span>`).join('')}
-  </div>`
-}
-
-/** 보상 선택 단계에서도 감정을 즉시 읽게 한다. 상세 창을 열 필요가 없다. */
-function emotionBadge(opt: RewardOption): string {
-  if (opt.kind !== 'word' || !opt.word) return ''
-  const emotion = emotionOrNeutral(opt.word.emotion)
-  return emotionIconBadge(emotion, 'rp-emotion')
 }
 
 function influenceNote(w: Word): string {
@@ -233,7 +220,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
   const price = rewardPrice(p)
   const role = roleLabel(p)
   const acquire = acquireLabel(p)
-  const currency = text('rewardCurrencyInspiration', '런 재화 · 영감')
+  const currency = text('rewardCurrencyInspiration', '영감')
   const cardLabel = text(
     'rewardCardAria',
     '{name}, 희귀도 {rarity}, 역할 {role}, 획득 {acquire}, 비용 {currency} {price}',
@@ -241,31 +228,28 @@ function rewardPickHtml(p: RewardOption, i: number): string {
   )
   const ownedLabel = p.reinforce ? '강화 완료!' : p.kind === 'item' ? '내 소품으로 결정!' : '내 단어장에 기록!'
   return `
-    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="group" aria-label="${cardLabel}">
+    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="button" tabindex="0" aria-label="${cardLabel}">
       ${bgHtml(p)}
       <span class="rp-tint" aria-hidden="true"></span>
       <span class="rp-veil" aria-hidden="true"></span>
       <span class="rp-foil" aria-hidden="true"></span>
       <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
-      <div class="rp-top">
-        <span class="rp-type">${typeLabel(p)}</span>
-        <span class="rp-tags">
-          ${emotionBadge(p)}
-        </span>
-      </div>
+      <span class="rp-unavailable" aria-hidden="true">
+        <b>${text('rewardUnavailable', '구매 불가')}</b>
+        <small>${text('rewardInsufficient', '영감 부족')}</small>
+      </span>
       <div class="rp-facts" aria-hidden="true">
         <span><small>${text('rewardFactRarity', '희귀도')}</small><b class="rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</b></span>
-        <span><small>${text('rewardFactRole', '역할')}</small><b>${role}</b></span>
+        <span><small>${text('rewardFactRole', '역할')}</small><span class="rp-fact-value">${roleHtml(p)}</span></span>
         <span><small>${text('rewardFactAcquire', '획득')}</small><b>${acquire}</b></span>
         <span><small>${text('rewardFactCost', '비용')}</small><b>${currency} ${price}</b></span>
       </div>
       <div class="rp-foot">
         <div class="rp-name">${p.name}</div>
-        ${p.kind === 'item' ? itemBaseStatsHtml(p.item) : ''}
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
-          <button class="rp-detail" type="button">자세히보기</button>
-          <button class="rp-take" type="button" aria-label="${currency} ${price}, 기록하기"><b class="rp-price">${currency} ${price}</b> 기록하기 →</button>
+          <button class="rp-detail" type="button">상세보기</button>
+          <span class="rp-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>
         </div>
       </div>
     </div>`
@@ -314,7 +298,7 @@ export class RewardView {
             </div>
           </div>
           <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
-            <div class="rd-hint">카드의 <b>자세히보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
+            <div class="rd-hint">카드의 <b>상세보기</b>를 누르면<br>효과·확률·영향 스탯이 여기 표시된다.</div>
           </aside>
         </div>
       </div>`
@@ -326,6 +310,11 @@ export class RewardView {
         el.classList.add('is-unaffordable')
       }
       el.addEventListener('click', () => this.take(el, opts.options[i]))
+      el.addEventListener('keydown', (event) => {
+        if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return
+        event.preventDefault()
+        this.take(el, opts.options[i])
+      })
       el.querySelector<HTMLElement>('.rp-detail')?.addEventListener('click', (event) => {
         event.stopPropagation()
         this.showDetail(opts.options[i], el)
@@ -349,7 +338,10 @@ export class RewardView {
     const dock = this.root.querySelector<HTMLElement>('#rdetail')!
     dock.className = 'info-dock glass reward-dock deck-overview'
     dock.innerHTML = deckSummaryHtml(this.opts.deck ?? EARLY_WORDS)
-    this.root.querySelectorAll('.reward-pick').forEach((pick) => pick.classList.remove('detailing'))
+    this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
+      pick.classList.remove('detailing')
+      pick.querySelector('.rp-facts')?.setAttribute('aria-hidden', 'true')
+    })
   }
 
   private showDetail(opt: RewardOption, el: HTMLElement) {
@@ -357,8 +349,12 @@ export class RewardView {
     const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
     dock.className = `info-dock glass reward-dock mood-${mood}`
     dock.innerHTML = detailHtml(opt, this.opts.deck)
-    this.root.querySelectorAll('.reward-pick').forEach((pick) => pick.classList.remove('detailing'))
+    this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
+      pick.classList.remove('detailing')
+      pick.querySelector('.rp-facts')?.setAttribute('aria-hidden', 'true')
+    })
     el.classList.add('detailing')
+    el.querySelector('.rp-facts')?.setAttribute('aria-hidden', 'false')
   }
 
   private take(el: HTMLElement, opt: RewardOption) {

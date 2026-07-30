@@ -50,13 +50,14 @@ export const gambleExpectation = (w: Word): number =>
 export const expectedMult = (w: Word): number =>
   (1 + (w.bonus ?? 0)) * gambleExpectation(w) * (1 + 0.5 * (w.crit ?? 0))
 
-/** 수식어는 배율 대신 선택의 성격을 바꾸는 공개 전술을 최소 하나 가져야 한다. */
+/** 수식어는 즉시 읽히는 배율 풀 기여나 공개 전술을 최소 하나 가져야 한다. */
 export const hasModifierTactic = (w: Word): boolean => {
   const effects = w.effects
   const numericEffect = effects && Object.values(effects).some((value) =>
     typeof value === 'number' ? value > 0 : value === true,
   )
-  return !!numericEffect
+  return (w.bonus ?? 0) > 0
+    || !!numericEffect
     || w.tags.includes('preempt')
     || w.aoe === 'all'
     || w.targetCount === 'all'

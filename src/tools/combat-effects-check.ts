@@ -10,7 +10,7 @@ import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, bossEliteRarityForDay, eliteRarityForEncounter, enemyDefForEncounter, enemyRarityWeightsForDay } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
-import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardRarityWeights } from '@data/rewards'
+import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardPrice, rewardRarityWeights } from '@data/rewards'
 import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, EXCLAIM_SLOTS, ITEM_BLESS_POOL, itemStatBudget, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
@@ -551,6 +551,21 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(first.length === 3 && first.every((option) => option.kind === 'word') && first.some((option) => option.word?.slot === 'subj') && first.some((option) => option.word?.slot === 'adv'), 'first reward mixes subjects and modifiers')
   assert(second.length === 3 && second.every((option) => option.kind === 'item'), 'second reward offers three items')
   assert(third.length === 3 && third.every((option) => option.word?.slot === 'verb'), 'third reward offers three verbs')
+  assert(
+    new Set(third.map((option) => option.word?.kind)).size === 3,
+    'a regular verb reward exposes attack, guard, and heal as three visible build directions',
+  )
+  assert(
+    genRewards(player, 5, 10, 'subject', () => 0, REWARD_PRICE.common)
+      .some((option) => rewardPrice(option) <= REWARD_PRICE.common),
+    'a reward offer keeps at least one choice within the current Inspiration budget',
+  )
+  const budgetVerb = genRewards(player, 5, 6, 'verb', () => 0.5, REWARD_PRICE.common)
+  assert(
+    budgetVerb.some((option) => rewardPrice(option) <= REWARD_PRICE.common)
+      && new Set(budgetVerb.map((option) => option.word?.kind)).size === 3,
+    'the affordable verb replacement preserves attack, guard, and heal diversity',
+  )
   assert(REWARD_PRICE.common < REWARD_PRICE.rare && REWARD_PRICE.rare < REWARD_PRICE.epic && REWARD_PRICE.epic < REWARD_PRICE.legendary, 'reward inspiration prices rise with rarity')
   const seededA = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
   const seededB = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)

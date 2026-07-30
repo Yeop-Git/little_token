@@ -7,7 +7,7 @@
 
 import { INK_UI, SKILL_ART } from '@/assets'
 import { currentLocale, type LocaleCode } from '@/localization'
-import { emotionNamedBadge } from '@/ui/EmotionBadge'
+import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
@@ -117,7 +117,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const emotion = emotionOrNeutral(word.emotion)
   const inkCost = wordInkCost(word)
   const inkCostStyle = `style="--ink-cost-badge-image:url('${INK_UI.costBadge}')"`
-  const emotionBadge = hideMeta || hideEmotion ? '' : emotionNamedBadge(emotion, 'card-emotion')
+  const emotionBadge = hideMeta || hideEmotion ? '' : emotionIconBadge(emotion, 'card-emotion')
   const costBadge = hideMeta ? '' : `<span class="card-cost" ${inkCostStyle} title="잉크 비용" aria-label="잉크 ${inkCost}">${inkCost}</span>`
   const resourceBadge = hideMeta
     ? ''

@@ -9,6 +9,8 @@
 import type { Rarity } from './types'
 
 export const GRADE_MAX = 10
+/** 방어·회복 전개가 한 문장 길다는 이유만으로 매번 보상을 잃지 않게 하는 완충 구간. */
+export const GRADE_DECAY_INTERVAL = 3
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
@@ -23,7 +25,10 @@ export const decayGrade = (grade: number, luck: number): number => Math.max(grad
 
 /** 첫 턴을 0으로 센 경과 턴에서 확정되는 속도 등급. */
 export const gradeForElapsedTurns = (luck: number, elapsedTurns: number): number =>
-  Math.max(gradeFloor(luck), startGrade(luck) - Math.max(0, Math.floor(elapsedTurns)))
+  Math.max(
+    gradeFloor(luck),
+    startGrade(luck) - Math.floor(Math.max(0, elapsedTurns) / GRADE_DECAY_INTERVAL),
+  )
 
 /** 희귀도용 속도 등급과 별개로, 남긴 무료 드로우를 최종 영감 획득량에 더한다. */
 export const clearRewardValue = (grade: number, unusedDraws: number): number =>

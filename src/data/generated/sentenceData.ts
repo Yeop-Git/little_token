@@ -74,12 +74,13 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "emotion": "joy",
       "inkCost": 1,
+      "bonus": 0.2,
       "rarity": "common",
       "art": "2002",
-      "note": "다음 적 공격 −3",
-      "lore": "거친 벌레의 기세를 부드럽게 누그러뜨린다.",
+      "note": "배율 ×1.20 · 카운터 ×0.75",
+      "lore": "다정히 막아 낸 충격을 작게 되돌려준다.",
       "effects": {
-        "enemyAttackDown": 3
+        "counterMultiplier": 0.75
       }
     },
     {
@@ -87,18 +88,15 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "text": "살짝",
       "slot": "adv",
       "tags": [
-        "soft"
+        "soft",
+        "preempt"
       ],
       "emotion": "pleasure",
       "inkCost": 1,
       "rarity": "common",
       "art": "2003",
-      "note": "문장 비용 −1 · 다음 첫 손패 +1",
-      "lore": "잉크를 아끼고 다음 낱말을 살짝 당겨 둔다.",
-      "effects": {
-        "inkDiscount": 1,
-        "drawCards": 1
-      }
+      "note": "선공 상대보다 먼저 행동",
+      "lore": "상대의 공격보다 살짝 먼저 움직인다."
     }
   ],
   "verb": [
@@ -552,11 +550,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2005",
-    "note": "카운터 ×1.00 · 다음 적 공격 −2",
+    "note": "카운터 ×1.00",
     "lore": "막아 낸 충격을 참았다가 그대로 돌려준다.",
     "effects": {
-      "counterMultiplier": 1,
-      "enemyAttackDown": 2
+      "counterMultiplier": 1
     }
   },
   {
@@ -568,14 +565,11 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 2,
+    "bonus": 0.4,
     "rarity": "rare",
     "art": "2006",
-    "note": "다음 적 공격 −4 · 다음 첫 손패 +1",
-    "lore": "번진 글씨가 적의 기세를 흐리고 다음 낱말을 드러낸다.",
-    "effects": {
-      "enemyAttackDown": 4,
-      "drawCards": 1
-    }
+    "note": "배율 ×1.40",
+    "lore": "눈물로 쓴 행동은 공격도 방어도 회복도 크게 번진다."
   },
   {
     "id": "jikyeot",
@@ -625,11 +619,8 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2007",
-    "note": "다음 첫 손패 +1 · 선공 상대보다 먼저 행동",
-    "lore": "숨 돌릴 틈 없이 다음 낱말까지 챙긴다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "선공 상대보다 먼저 행동",
+    "lore": "상대의 공격이 닿기 전에 먼저 움직인다."
   },
   {
     "id": "motdohage",
@@ -642,11 +633,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2008",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1",
-    "lore": "안 하려 했는데, 손이 먼저 나갔다.",
+    "note": "카운터 ×1.00",
+    "lore": "못 이기는 척 막아 낸 뒤 그 힘을 되돌려준다.",
     "effects": {
-      "counterMultiplier": 1,
-      "carryInk": 1
+      "counterMultiplier": 1
     }
   },
   {
@@ -733,11 +723,8 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2011",
-    "note": "다음 문장 잉크 +1 · 선공 상대보다 먼저 행동",
-    "lore": "빛나는 줄을 따라 손이 가벼워진다.",
-    "effects": {
-      "carryInk": 1
-    }
+    "note": "선공 상대보다 먼저 행동",
+    "lore": "빛을 따라 상대보다 먼저 움직인다."
   },
   {
     "id": "pogeunhage",
@@ -748,14 +735,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
+    "bonus": 0.4,
     "rarity": "rare",
     "art": "2012",
-    "note": "문장 비용 −1 · 다음 문장 잉크 +1 · 다음 적 공격 −2",
-    "lore": "한 줄을 아껴 덮고 다음 줄까지 숨을 고른다.",
+    "note": "배율 ×1.40 · 카운터 ×1.00",
+    "lore": "포근하게 막고, 막은 힘까지 그대로 돌려준다.",
     "effects": {
-      "inkDiscount": 1,
-      "carryInk": 1,
-      "enemyAttackDown": 2
+      "counterMultiplier": 1
     }
   },
   {
@@ -767,13 +753,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
+    "bonus": 0.3,
     "rarity": "rare",
     "art": "2013",
-    "note": "문장 비용 −1 · 다음 첫 손패 +1",
-    "lore": "새 페이지를 만나 다음 낱말을 앞당긴다.",
+    "note": "배율 ×1.30 · 관통",
+    "lore": "반가운 기세가 방어를 넘어 행동을 밀어 넣는다.",
     "effects": {
-      "inkDiscount": 1,
-      "drawCards": 1
+      "pierceGuard": true
     }
   },
   {
@@ -785,14 +771,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
+    "bonus": 0.15,
     "targetCount": 2,
     "rarity": "rare",
     "art": "2014",
-    "note": "2명(100%·70%) · 다음 첫 손패 +1",
-    "lore": "웃음이 옆 칸과 다음 줄까지 번진다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "배율 ×1.15 · 2명(100%·70%)",
+    "lore": "웃음이 커져 앞의 두 벌레에게 번진다."
   },
   {
     "id": "geochilge",
@@ -806,11 +790,8 @@ export const REWARD_WORDS: Word[] = [
     "targetCount": 2,
     "rarity": "rare",
     "art": "2015",
-    "note": "2명(100%·70%) · 다음 적 공격 −3",
-    "lore": "거친 기세로 적의 줄을 흔든다.",
-    "effects": {
-      "enemyAttackDown": 3
-    }
+    "note": "2명(100%·70%)",
+    "lore": "거친 기세로 앞의 두 벌레를 함께 뒤흔든다."
   },
   {
     "id": "sseulsseulhi",
@@ -821,14 +802,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 3,
+    "bonus": 0.3,
     "rarity": "rare",
     "art": "2016",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1 · 다음 적 공격 −4",
-    "lore": "텅 빈 여백이 공격을 삼키고 다음 줄에 잉크를 남긴다.",
+    "note": "배율 ×1.30 · 카운터 ×1.00",
+    "lore": "빈 자리를 방패 삼아 막은 힘을 크게 되튕긴다.",
     "effects": {
-      "counterMultiplier": 1,
-      "carryInk": 1,
-      "enemyAttackDown": 4
+      "counterMultiplier": 1
     }
   },
   {
@@ -840,13 +820,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 2,
+    "bonus": 0.4,
     "rarity": "rare",
     "art": "2017",
-    "note": "문장 비용 −1 · 다음 문장 잉크 +1",
-    "lore": "흔들리는 손으로도 두 줄의 잉크를 아껴 쓴다.",
+    "note": "배율 ×1.40 · 관통",
+    "lore": "애써 밀어붙인 행동이 방어를 뚫고 닿는다.",
     "effects": {
-      "inkDiscount": 1,
-      "carryInk": 1
+      "pierceGuard": true
     }
   },
   {
@@ -858,14 +838,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
+    "bonus": 0.15,
     "targetCount": 2,
     "rarity": "rare",
     "art": "2018",
-    "note": "2명(100%·70%) · 다음 첫 손패 +1",
-    "lore": "낙서가 통통 튀며 다음 줄까지 달린다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "배율 ×1.15 · 2명(100%·70%)",
+    "lore": "신나는 낙서가 커져 앞의 두 칸으로 튄다."
   },
   {
     "id": "deulsseogimyeo",
@@ -876,14 +854,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
+    "bonus": 0.2,
     "rarity": "rare",
     "art": "2019",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1 · 다음 첫 손패 +1",
-    "lore": "되튀는 박자가 막은 힘과 다음 낱말을 함께 남긴다.",
+    "note": "배율 ×1.20 · 카운터 ×1.00",
+    "lore": "되튀는 박자가 막은 힘을 더 크게 돌려준다.",
     "effects": {
-      "counterMultiplier": 1,
-      "carryInk": 1,
-      "drawCards": 1
+      "counterMultiplier": 1
     }
   },
   {
@@ -898,12 +875,8 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2020",
-    "note": "문장 비용 −1 · 다음 첫 손패 +1 · 선공 상대보다 먼저 행동",
-    "lore": "가벼운 박자로 잉크와 낱말을 앞질러 챙긴다.",
-    "effects": {
-      "inkDiscount": 1,
-      "drawCards": 1
-    }
+    "note": "선공 상대보다 먼저 행동",
+    "lore": "가벼운 박자로 상대를 앞질러 움직인다."
   }
 ]
 
