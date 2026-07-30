@@ -62,7 +62,12 @@ function writeChoice(key: string, value: string) {
   }
 }
 
-const savedQuality = () => readChoice(KEYS.graphics, GRAPHICS_QUALITIES, 'high')
+const defaultQuality = (): GraphicsQuality => {
+  if (!matchMedia('(pointer: coarse)').matches) return 'high'
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  return deviceMemory != null && deviceMemory <= 4 ? 'low' : 'medium'
+}
+const savedQuality = () => readChoice(KEYS.graphics, GRAPHICS_QUALITIES, defaultQuality())
 const presetFallback = () => PRESETS[savedQuality()]
 const savedAntiAliasing = () => readChoice(KEYS.antialiasing, ANTI_ALIASING_QUALITIES, presetFallback().antialiasing)
 const savedResolution = () => readChoice(KEYS.resolution, RESOLUTION_SCALES, presetFallback().resolution)

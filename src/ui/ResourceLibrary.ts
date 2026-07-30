@@ -1,3 +1,6 @@
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
+
 interface VideoAsset {
   key: string
   src: string
@@ -20,16 +23,21 @@ export function preloadImage(src: string): Promise<void> {
   const cached = imageLoads.get(src)
   if (cached) return cached
 
-  const pending = new Promise<void>((resolve) => {
+  const pending = new Promise<void>((resolve, reject) => {
     const image = new Image()
     image.decoding = 'async'
     image.onload = () => {
-      void image.decode().catch(() => undefined).finally(resolve)
+      void image.decode().then(resolve).catch(() => {
+        imageLoads.delete(src)
+        if (STRICT_RESOURCE_LOADING) reject(reportResourceFailure('image decode', src))
+        else resolve()
+      })
     }
     image.onerror = () => {
       // 일시적인 네트워크/HMR 오류를 성공으로 영구 캐시하지 않는다.
       imageLoads.delete(src)
-      resolve()
+      if (STRICT_RESOURCE_LOADING) reject(reportResourceFailure('image load', src))
+      else resolve()
     }
     image.src = src
   })
@@ -97,6 +105,11 @@ function createVideo(asset: VideoAsset): HTMLVideoElement {
   source.src = asset.src
   source.type = asset.type
   video.append(source)
+  if (STRICT_RESOURCE_LOADING) {
+    video.addEventListener('error', () => {
+      reportResourceFailure('video load', asset.src)
+    }, { once: true })
+  }
   video.load()
   return video
 }

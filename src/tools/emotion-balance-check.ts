@@ -153,6 +153,31 @@ function primaryPower(selection: Selection): { kind: CheckedAction; value: numbe
 let failed = false
 const powerSummaries: PowerSummary[] = []
 
+const starterActionCounts: Record<CheckedAction, number> = { attack: 0, guard: 0, heal: 0 }
+let starterAngerSentences = 0
+for (const subj of EARLY_WORDS.subj) {
+  for (const adv of EARLY_WORDS.adv) {
+    for (const verb of EARLY_WORDS.verb) {
+      if (!ACTION_KINDS.includes(verb.kind as CheckedAction)) continue
+      const hasAnger = [subj, adv, verb].some((word) => word.emotion === 'anger')
+      if (!hasAnger) continue
+      starterAngerSentences++
+      starterActionCounts[verb.kind as CheckedAction]++
+    }
+  }
+}
+const starterAngerVerbKinds = new Set(
+  EARLY_WORDS.verb.filter((word) => word.emotion === 'anger').map((word) => word.kind),
+)
+const starterAngerAttackRate = starterActionCounts.attack / Math.max(1, starterAngerSentences)
+console.log(
+  `Starter anger association: ${starterAngerSentences} sentences · attack ${starterActionCounts.attack} (${Math.round(starterAngerAttackRate * 100)}%) · guard ${starterActionCounts.guard} · heal ${starterActionCounts.heal}`,
+)
+if (starterAngerAttackRate > .5 || !starterAngerVerbKinds.has('attack') || !starterAngerVerbKinds.has('guard')) {
+  console.error('  [FAIL] starting anger cards teach a single attack-only action')
+  failed = true
+}
+
 const selfContainedCombos = EARLY_COMBOS.flatMap((combo) =>
   catalog
     .filter((word) => containsTagMultiset(word.tags, combo.need))

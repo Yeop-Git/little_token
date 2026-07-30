@@ -353,7 +353,9 @@ class FoilShaderRenderer {
 
     const cssWidth = Math.max(1, Math.round(surface.host.clientWidth))
     const cssHeight = Math.max(1, Math.round(surface.host.clientHeight))
-    const scale = Math.min(window.devicePixelRatio || 1, 1.5)
+    // The fixed stage is downscaled on touch screens. Rendering foil at desktop
+    // DPR there only spends memory on pixels the compositor immediately removes.
+    const scale = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1 : 1.5)
     const width = Math.round(cssWidth * scale)
     const height = Math.round(cssHeight * scale)
     if (surface.canvas.width !== width || surface.canvas.height !== height) {

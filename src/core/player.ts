@@ -69,7 +69,7 @@ export function defaultPlayer(): PlayerState {
   return {
     stats: { ...STARTING_COMBAT_STATS },
     items: [
-      { id: 'candle', name: currentLocale === 'ko' ? '소년의 몽당연필' : currentLocale === 'en' ? "Boy's Pencil Stub" : currentLocale === 'ja' ? '少年のちびた鉛筆' : currentLocale === 'ru' ? 'Огрызок карандаша мальчика' : currentLocale === 'zh-Hans' ? '少年的短铅笔' : '少年的短鉛筆', rarity: 'common', art: 'pencil', line: starterLines[0], stats: { atk: 1, heal: 1, luck: 1 } },
+      { id: 'candle', name: currentLocale === 'ko' ? '소년의 몽당연필' : currentLocale === 'en' ? "Boy's Pencil Stub" : currentLocale === 'ja' ? '少年のちびた鉛筆' : currentLocale === 'ru' ? 'Огрызок карандаша мальчика' : currentLocale === 'zh-Hans' ? '少年的短铅笔' : '少年的短鉛筆', rarity: 'common', art: 'pencil', line: starterLines[0], stats: { atk: 0.5, heal: 1, luck: 1 } },
       { id: 'ribbon', name: currentLocale === 'ko' ? '아버지의 낡은 이야기책' : currentLocale === 'en' ? "Father's Old Storybook" : currentLocale === 'ja' ? '父の古い物語本' : currentLocale === 'ru' ? 'Старая книга отца' : currentLocale === 'zh-Hans' ? '父亲的旧故事书' : '父親的舊故事書', rarity: 'common', art: 'book', line: starterLines[1], stats: { guard: 2, luck: 1 } },
     ],
     deck: WORDS,

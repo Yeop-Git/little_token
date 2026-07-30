@@ -72,6 +72,8 @@ function nearestPool(pools: Map<Rarity, RewardOption[]>, want: Rarity): RewardOp
 
 export const GUARANTEED_LEGENDARY_ITEM_FLOOR = 10
 export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
+export const EARLY_BUILD_REWARD_DAY = 2
+export const EARLY_BUILD_CARD_IDS = ['storedResolve', 'overflowingHeart', 'drinkInk'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -200,9 +202,11 @@ const toItemOption = (item: ItemDef): RewardOption => ({
 
 function itemOptions(player: PlayerState): RewardOption[] {
   const owned = new Set(player.items.map((item) => item.id))
-  const unownedPassives = Object.values(PASSIVE_ITEMS).filter((item) => !owned.has(item.id))
-  const passives = unownedPassives.length ? unownedPassives : Object.values(PASSIVE_ITEMS)
-  return [...Object.values(ITEMS), ...passives].map(toItemOption)
+  // 아이템은 슬롯 제한 없이 영구 누적되므로 같은 정의를 다시 주면 감탄사 스탯만
+  // 무한히 쌓인다. 한 런에서는 일반 스탯 아이템과 규칙 아이템 모두 한 번만 등장한다.
+  return [...Object.values(ITEMS), ...Object.values(PASSIVE_ITEMS)]
+    .filter((item) => !owned.has(item.id))
+    .map(toItemOption)
 }
 
 function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb', rng: () => number): RewardOption[] {
@@ -211,6 +215,16 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   const used = new Set<string>()
   const picks: RewardOption[] = []
   const emotionProfile = deckEmotionProfile(player)
+
+  // 첫 보스 전에 방어 전환·초과 회복·흡혈 중 하나를 직접 고르게 한다. 핵심 빌드가
+  // 무작위 보상에 묻히면 스탯만 올리고 그 스탯을 쓸 문장을 끝내 못 얻을 수 있다.
+  if (phase === 'verb' && day === EARLY_BUILD_REWARD_DAY) {
+    for (const id of EARLY_BUILD_CARD_IDS) {
+      const option = pickOne(all.filter((entry) => entry.word?.id === id), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
+    if (picks.length === 3) return shuffle(picks, rng)
+  }
 
   // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)

@@ -1,8 +1,8 @@
 /**
- * 전투 보상등급 — 운이 바닥을 깔고, 오버킬이 천장을 당긴다.
- * 전투 시작 등급은 운에서 나오고, 턴이 길어질수록 1씩 내려가되 운이 보장하는
- * 바닥 아래로는 떨어지지 않는다. 한 턴에 두 마리 이상을 쓸어담으면 처치 수만큼
- * 튀어오르고(전멸 마무리면 +1), 최종 등급은 보상 희귀도의 "확률 가중치"가 된다 —
+ * 전투 보상등급 — 운이 시작값과 바닥을 정하고, 빠른 클리어가 높은 값을 지킨다.
+ * 전투 시작 등급은 운에서 나오고, 전투가 끝나지 않은 채 턴이 길어질수록 1씩 내려가되
+ * 운이 보장하는 바닥 아래로는 떨어지지 않는다. 전투 중 등급을 다시 올리는 경로는 없다.
+ * 최종 등급은 보상 희귀도의 "확률 가중치"가 된다 —
  * 상한 캡이 아니므로 높다고 반드시 좋은 것만 나오지는 않는다.
  */
 
@@ -21,11 +21,13 @@ export const startGrade = (luck: number): number => clamp(gradeFloor(luck) + 2, 
 /** 턴 경과 감쇠 — 턴마다 1씩, 운의 바닥까지만. */
 export const decayGrade = (grade: number, luck: number): number => Math.max(gradeFloor(luck), grade - 1)
 
-export const bumpGrade = (grade: number, n: number): number => clamp(grade + n, 0, GRADE_MAX)
+/** 첫 턴을 0으로 센 경과 턴에서 확정되는 속도 등급. */
+export const gradeForElapsedTurns = (luck: number, elapsedTurns: number): number =>
+  Math.max(gradeFloor(luck), startGrade(luck) - Math.max(0, Math.floor(elapsedTurns)))
 
-/** 한 턴(한 문장)의 처치 수 → 등급 상승량. 2마리부터 인정, 전멸 마무리면 +1 보너스. */
-export const overkillGain = (kills: number, wipedAll: boolean): number =>
-  kills >= 2 ? kills + (wipedAll ? 1 : 0) : 0
+/** 희귀도용 속도 등급과 별개로, 남긴 무료 드로우를 최종 영감 획득량에 더한다. */
+export const clearRewardValue = (grade: number, unusedDraws: number): number =>
+  Math.max(0, Math.round(grade)) + Math.max(0, Math.floor(unusedDraws))
 
 /** 등급 → 희귀도 가중치. 등급이 오르면 노멀이 줄고 상위 희귀도 확률이 열린다. */
 export function rarityWeights(grade: number): Record<Rarity, number> {

@@ -10,8 +10,9 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
-import { currentLocale } from '@/localization'
-import { localizedWordText } from '@/localization/content'
+import { currentLocale, type LocaleCode } from '@/localization'
+import { wordTextFor } from '@/localization/content'
+import { sentenceSlotText, sentenceUsesCompactSpacing } from '@/localization/sentenceGrammar'
 
 export const isDamageIntent = (intent: Pick<Intent, 'kind'>): boolean =>
   intent.kind !== 'heal' && intent.kind !== 'guard'
@@ -57,7 +58,7 @@ const sameEmotionHint = (count: number): string => currentLocale === 'ko'
 export function wordFlat(w: Word, stats: StatBlock, mods: CompileMods = {}): number {
   const base = w.stat && w.statMult != null ? Math.round(stats[w.stat] * w.statMult) : w.power || 0
   // 깡수치를 내는 단어(동사·목적어)에만 운을 얹는다. 주어·수식은 애초에 0이라 대상이 아니다.
-  const luck = mods.verbLuck && (w.stat != null || w.power) ? stats.luck : 0
+  const luck = mods.verbLuck && (w.stat != null || w.power) ? Math.round(stats.luck * mods.verbLuck) : 0
   return Math.max(0, base + luck)
 }
 
@@ -110,26 +111,34 @@ export function comboLeads(w: Word, combos: Combo[]): ComboLead[] {
 // 완성 문장 토큰 배열(빈 슬롯은 '____'). josa 슬롯만 조사 부착.
 // 다만 무럭무럭은 문장 성분이 아니라 그냥 자라는 카드다. 목적어 칸에서 "무럭무럭을"이
 // 되면 여러 칸에 겹쳤을 때의 말맛("무럭무럭 무럭무럭 무럭무럭")이 죽으므로 그대로 둔다.
-export function sentenceTokens(sel: Selection, t: Tables): string[] {
-  return t.template.slots.map((s) => {
+export function sentenceTokens(sel: Selection, t: Tables, locale: LocaleCode = currentLocale): string[] {
+  return t.template.slots.map((s, slotIndex) => {
     const w = sel[s.key]
     if (!w) return '____'
-    const text = localizedWordText(w)
-    if (!s.josa || w.growHp) return text
-    if (currentLocale === 'ko') return eul(text)
-    if (currentLocale === 'ja') return `${text}を`
-    return text
+    let text = wordTextFor(locale, w)
+    if (s.josa && !w.growHp) {
+      if (locale === 'ko') text = eul(text)
+      else if (locale === 'ja') text = `${text}を`
+    }
+    const hasPreviousVerb = t.template.slots
+      .slice(0, slotIndex)
+      .some((previous) => previous.role === 'verb' && !!sel[previous.key])
+    return sentenceSlotText(locale, s.key, text, hasPreviousVerb)
   })
 }
 
 // 토큰을 문장으로 — attach 슬롯(문장부호)은 앞 단어에 공백 없이 붙인다.
-export function joinTokens(tokens: string[], t: Tables): string {
+export function joinTokens(tokens: string[], t: Tables, locale: LocaleCode = currentLocale): string {
   return tokens.reduce((out, tok, i) => {
     if (!out) return tok
-    return t.template.slots[i]?.attach || currentLocale === 'ja' || currentLocale === 'zh-Hans' || currentLocale === 'zh-Hant'
+    return t.template.slots[i]?.attach || sentenceUsesCompactSpacing(locale)
       ? out + tok
       : `${out} ${tok}`
   }, '')
+}
+
+export function sentenceText(sel: Selection, t: Tables, locale: LocaleCode = currentLocale): string {
+  return joinTokens(sentenceTokens(sel, t, locale), t, locale)
 }
 
 /** 이 태그가 붙은 문장은 선공 상대보다 먼저 행동한다(문장부호 '!'). */
@@ -286,7 +295,7 @@ export function compile(
       return n + (typeof value === 'number' ? value : 0)
     }, 0)
 
-  const sentence = joinTokens(sentenceTokens(sel, t), t)
+  const sentence = sentenceText(sel, t)
 
   return {
     sentence: doubting ? `${sentence} ${DOUBT_SUFFIX}` : sentence,
@@ -309,8 +318,13 @@ export function compile(
     castScale: Math.min(1, ...order.map((key) => sel[key]?.effects?.castScale ?? 1)),
     overdrawHitCount: Math.max(0, ...order.map((key) => sel[key]?.effects?.overdrawHitCount ?? 0)),
     counterMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.counterMultiplier ?? 0)),
+    magicShield: Math.max(0, ...order.map((key) => sel[key]?.effects?.magicShield ?? 0)),
+    guardAttackMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.guardAttackMultiplier ?? 0)),
+    overhealDamageMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.overhealDamageMultiplier ?? 0)),
+    lifeStealRate: Math.max(0, ...order.map((key) => sel[key]?.effects?.lifeStealRate ?? 0)),
     enemyAttackDown: sumEffect('enemyAttackDown'),
     drawCards: sumEffect('drawCards'),
+    summonExecuteCount: Math.max(0, ...order.map((key) => sel[key]?.effects?.summonExecuteCount ?? 0)),
     emotions,
     emotionResonance,
     tags: allTags,

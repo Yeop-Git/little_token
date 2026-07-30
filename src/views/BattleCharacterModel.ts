@@ -4,6 +4,8 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
 import { GraphicsSettings } from '@/ui/GameSettings'
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 export type BattleAnimation = 'idle' | 'idle2' | 'walk' | 'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 /** 한 번만 재생하고 끝나는 동작. idle 계열과 walk는 계속 도는 클립이라 여기 안 든다. */
@@ -157,6 +159,7 @@ function loadModel(url: string): Promise<GLTF> {
   const pending = modelLoader.loadAsync(url).catch((error) => {
     // 한 번의 전송/파싱 실패를 세션 전체의 영구 실패로 만들지 않는다.
     modelLoads.delete(url)
+    reportResourceFailure('model load', url, error)
     throw error
   })
   modelLoads.set(url, pending)
@@ -414,6 +417,8 @@ class BattleCharacterModel {
   private readonly brokenSpiderParts = new Set<string>()
   private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
   private spiderPartDissolves: SpiderPartDissolve[] = []
+  private eliteElapsed = 0
+  private readonly eliteTimeUniforms: Array<{ value: number }> = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = acquireRenderer()
@@ -568,6 +573,8 @@ class BattleCharacterModel {
     atmosphere: BattleAtmosphere,
     weather: BattleWeather,
   ) {
+    const rarity = this.shell.dataset.enemyRarity
+    const eliteTier = rarity === 'rare' ? 1 : rarity === 'epic' ? 2 : rarity === 'legendary' ? 3 : 0
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uBattleSkyTint = { value: atmosphere.skyTint }
       shader.uniforms.uBattleGroundTint = { value: atmosphere.groundTint }
@@ -577,15 +584,27 @@ class BattleCharacterModel {
       shader.uniforms.uBattleExposure = { value: atmosphere.exposure * (boss ? BOSS_EXPOSURE_BOOST : 1) }
       shader.uniforms.uBattleShadowFloor = { value: atmosphere.shadowFloor }
       shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
+      shader.uniforms.uEliteTier = { value: eliteTier }
+      const eliteTime = { value: this.eliteElapsed }
+      shader.uniforms.uEliteTime = eliteTime
+      this.eliteTimeUniforms.push(eliteTime)
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
 varying float vBattleHeight;
-varying float vBattleSide;`)
+varying float vBattleSide;
+varying vec3 vEliteNormalView;
+varying vec3 vEliteViewDir;`)
         .replace('#include <project_vertex>', `#include <project_vertex>
 vec4 battleWorldPosition = modelMatrix * vec4(transformed, 1.0);
 vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);
-vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);`)
+vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);
+#if defined ( USE_SKINNING ) || defined ( USE_ENVMAP )
+  vEliteNormalView = normalize(transformedNormal);
+#else
+  vEliteNormalView = normalize(normalMatrix * normal);
+#endif
+vEliteViewDir = normalize(-mvPosition.xyz);`)
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
@@ -596,8 +615,17 @@ uniform float uBattleGroundMix;
 uniform float uBattleExposure;
 uniform float uBattleShadowFloor;
 uniform float uPartDissolve;
+uniform float uEliteTier;
+uniform float uEliteTime;
 varying float vBattleHeight;
-varying float vBattleSide;`)
+varying float vBattleSide;
+varying vec3 vEliteNormalView;
+varying vec3 vEliteViewDir;
+
+vec3 eliteSpectrum(float h) {
+  vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return k * k * (3.0 - 2.0 * k);
+}`)
         // The stepped directional term exposes individual low-poly faces. Keep
         // ambient/AO darkness and emissive texture color, but omit only that term.
         .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.indirectDiffuse + totalEmissiveRadiance;
@@ -617,6 +645,54 @@ vec3 battleTintedAlbedo = diffuseColor.rgb;
 battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleGroundTint, battleGroundWeight * 0.3);
 battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleSkyTint, battleSkyWeight * 0.3);
 outgoingLight = max(outgoingLight, battleTintedAlbedo * uBattleShadowFloor);
+
+// Enemy rarity is a separate fantasy material language layered over the model.
+// Rare gets a clean cool rim, Epic adds a moving holographic band, and Legendary
+// breaks the surface into refracting crystal facets with white-hot highlights.
+if (uEliteTier > 0.5) {
+  vec3 eliteNormal = normalize(vEliteNormalView);
+  vec3 eliteView = normalize(vEliteViewDir);
+  float eliteRim = pow(1.0 - clamp(dot(eliteNormal, eliteView), 0.0, 1.0), 2.4);
+  vec3 rareRim = vec3(0.46, 0.82, 1.0);
+  outgoingLight += rareRim * eliteRim * 0.42;
+
+  if (uEliteTier > 1.5) {
+    float auroraPhase = vBattleHeight * 3.8 + vBattleSide * 2.2 + uEliteTime * 0.42;
+    vec3 aurora = 0.58 + 0.42 * cos(6.28318 * (auroraPhase + vec3(0.0, 0.34, 0.67)));
+    float auroraBand = pow(0.5 + 0.5 * sin(auroraPhase * 4.2), 4.0);
+    outgoingLight = mix(outgoingLight, outgoingLight * (0.82 + aurora * 0.58), 0.22 + auroraBand * 0.16);
+    outgoingLight += aurora * eliteRim * 0.34;
+  }
+
+  if (uEliteTier > 2.5) {
+    // Model-following facets from the reference shader keep the crystal split attached
+    // to animated limbs. A faint triangular screen lattice adds readable cut lines.
+    vec3 quantizedNormal = floor(eliteNormal * 3.4 + 0.5) / 3.4;
+    float normalFacetId = fract(sin(dot(quantizedNormal, vec3(12.99, 78.23, 37.71))) * 43758.5453);
+    vec3 normalPrism = eliteSpectrum(fract(normalFacetId + uEliteTime * 0.035));
+    vec2 prismGrid = gl_FragCoord.xy / 22.0;
+    vec2 prismCell = floor(prismGrid);
+    vec2 prismLocal = fract(prismGrid);
+    float prismSeed = fract(sin(dot(prismCell, vec2(12.9898, 78.233))) * 43758.5453);
+    float prismDiagonal = step(prismSeed, 0.5) > 0.5
+      ? prismLocal.x + prismLocal.y
+      : prismLocal.x + (1.0 - prismLocal.y);
+    float prismFacet = floor(prismDiagonal * 2.0 + prismSeed * 3.0);
+    float spectrumPhase = prismSeed + prismFacet * 0.17 + vBattleHeight * 0.22 - uEliteTime * 0.075;
+    vec3 spectrum = mix(eliteSpectrum(fract(spectrumPhase)), normalPrism, 0.58);
+    float edgeX = 1.0 - smoothstep(0.0, 0.075, min(prismLocal.x, 1.0 - prismLocal.x));
+    float edgeY = 1.0 - smoothstep(0.0, 0.075, min(prismLocal.y, 1.0 - prismLocal.y));
+    float diagonalEdge = 1.0 - smoothstep(0.0, 0.075, abs(fract(prismDiagonal) - 0.5));
+    float crystalEdge = max(max(edgeX, edgeY), diagonalEdge * 0.72);
+    float normalFacetSeam = clamp(fwidth(normalFacetId) * 2.2, 0.0, 1.0);
+    float crystalFlash = pow(max(0.0, sin(uEliteTime * 1.35 + normalFacetId * 40.0)), 12.0);
+    outgoingLight = mix(outgoingLight, vec3(0.86, 0.94, 1.0), 0.04);
+    outgoingLight = mix(outgoingLight, outgoingLight * (0.72 + spectrum * 0.56), 0.36);
+    outgoingLight += spectrum * (crystalEdge * 0.28 + eliteRim * 0.52);
+    outgoingLight += vec3(1.0) * (eliteRim * eliteRim * 0.46 + crystalFlash * (0.34 + crystalEdge * 0.66));
+    outgoingLight *= 1.0 - normalFacetSeam * 0.24;
+  }
+}
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
@@ -1278,6 +1354,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.updateModelYawReturn(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
+    this.eliteElapsed += frameDelta
+    this.eliteTimeUniforms.forEach((uniform) => { uniform.value = this.eliteElapsed })
     const zoomBlend = 1 - Math.exp(-frameDelta * 8)
     const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
     if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {
@@ -1396,7 +1474,8 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
 /** GLB 다운로드뿐 아니라 GLTF 파싱·텍스처 디코딩이 끝날 때까지 기다린다. */
 export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): Promise<void> {
   const urls = [...new Set(visuals.flatMap((visual) => (visual.model3d ? [visual.model3d] : [])))]
-  return Promise.all(urls.map((url) => loadModel(url).then(() => undefined).catch(() => undefined)))
+  const pending = urls.map((url) => loadModel(url).then(() => undefined))
+  return Promise.all(STRICT_RESOURCE_LOADING ? pending : pending.map((load) => load.catch(() => undefined)))
     .then(() => undefined)
 }
 

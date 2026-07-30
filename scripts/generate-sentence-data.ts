@@ -235,14 +235,50 @@ function groupWords(words: Record<string, unknown>[]): Record<string, Record<str
 
 const comboRows = load('combos.csv')
 const combosByPool = emptyByPool<Record<string, unknown>>()
+const comboIds = new Set<string>()
 comboRows.forEach((row, index) => {
   const line = index + 2
   const pool = poolOf(row, 'combos.csv', line)
+  const id = required(row, 'id', 'combos.csv', line)
+  if (comboIds.has(id)) throw new Error(`combos.csv:${line}: id '${id}'가 중복되었습니다.`)
+  comboIds.add(id)
   combosByPool[pool].push(compact({
-    id: required(row, 'id', 'combos.csv', line),
+    id,
     name: required(row, 'name', 'combos.csv', line),
     need: required(row, 'need', 'combos.csv', line).split('|'),
     mult: optionalNumber(required(row, 'mult', 'combos.csv', line), 'combos.csv', line, 'mult'),
+    flavor: row.flavor || undefined,
+  }))
+})
+
+const LOCALES = ['ko', 'en', 'ja', 'ru', 'zh-Hans', 'zh-Hant'] as const
+const localizedComboRows = load('localized_combos.csv')
+const localizedCombosByPool: Record<'early' | 'expansion', Record<string, Record<string, unknown>[]>> = {
+  early: {},
+  expansion: {},
+}
+localizedComboRows.forEach((row, index) => {
+  const line = index + 2
+  const pool = poolOf(row, 'localized_combos.csv', line)
+  if (pool !== 'early' && pool !== 'expansion') {
+    throw new Error(`localized_combos.csv:${line}: 관용구 pool은 early 또는 expansion이어야 합니다.`)
+  }
+  const locale = required(row, 'locale', 'localized_combos.csv', line)
+  if (!LOCALES.includes(locale as (typeof LOCALES)[number])) {
+    throw new Error(`localized_combos.csv:${line}: 알 수 없는 locale '${locale}'입니다.`)
+  }
+  const id = required(row, 'id', 'localized_combos.csv', line)
+  if (comboIds.has(id)) throw new Error(`localized_combos.csv:${line}: id '${id}'가 중복되었습니다.`)
+  comboIds.add(id)
+  const source = required(row, 'source', 'localized_combos.csv', line)
+  if (!source.startsWith('https://')) {
+    throw new Error(`localized_combos.csv:${line}: source는 HTTPS 주소여야 합니다.`)
+  }
+  ;(localizedCombosByPool[pool][locale] ??= []).push(compact({
+    id,
+    name: required(row, 'name', 'localized_combos.csv', line),
+    need: required(row, 'need', 'localized_combos.csv', line).split('|'),
+    mult: requiredNumber(row, 'mult', 'localized_combos.csv', line),
     flavor: row.flavor || undefined,
   }))
 })
@@ -288,12 +324,17 @@ export const WORDS: Record<string, Word[]> = ${serialize(groupWords(wordsByPool.
 /** 문장부호 — 아이템 패시브 '올림프의 당근'이 열어 주는 슬롯 전용 풀. */
 export const PUNCT_WORDS: Word[] = ${serialize(wordsByPool.punct)}
 
-/** 무럭무럭 — '잭의 하늘나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
+/** 무럭무럭 — 보상으로 덱에 등록되는 성장 카드의 단일 원본. */
 export const GROW_WORDS: Word[] = ${serialize(wordsByPool.grow)}
 
 export const EARLY_COMBOS: Combo[] = ${serialize(combosByPool.early)}
 
 export const COMBOS: Combo[] = ${serialize(combosByPool.expansion)}
+
+/** Locale-native idioms. These are added only to the matching language catalog. */
+export const LOCALE_EARLY_COMBOS: Record<string, Combo[]> = ${serialize(localizedCombosByPool.early)}
+
+export const LOCALE_COMBOS: Record<string, Combo[]> = ${serialize(localizedCombosByPool.expansion)}
 
 export const EARLY_CONFLICTS: Conflict[] = ${serialize(conflictsByPool.early)}
 
@@ -330,12 +371,12 @@ itemRows.forEach((row, index) => {
     heal: requiredNumber(row, 'heal', 'items.csv', line),
     luck: requiredNumber(row, 'luck', 'items.csv', line),
   }
-  if (Object.values(base).some((value) => value < 0 || !Number.isInteger(value))) {
-    throw new Error(`items.csv:${line}: 기본 스탯은 0 이상의 정수여야 합니다.`)
+  if (Object.values(base).some((value) => value < 0 || value * 2 !== Math.round(value * 2))) {
+    throw new Error(`items.csv:${line}: 기본 스탯은 0 이상의 0.5 단위여야 합니다.`)
   }
 
   const passive = row.passive?.trim() || undefined
-  const budget = base.hp / 2 + base.atk + base.guard + base.heal + base.luck
+  const budget = base.hp / 2 + base.atk / 0.5 + base.guard + base.heal + base.luck
   const expectedBudget = typedRarity === 'common' ? 1 : typedRarity === 'rare' ? 2 : 0
   if (budget !== expectedBudget) {
     throw new Error(`items.csv:${line}: ${typedRarity} 기본 스탯 예산은 ${expectedBudget}점이어야 합니다. (현재 ${budget}점)`)
@@ -381,4 +422,4 @@ export const RULE_ITEMS: Record<string, ItemDef> = ${serialize(ruleItems)}
 mkdirSync(outputDir, { recursive: true })
 writeFileSync(outputFile, generated, 'utf8')
 writeFileSync(itemOutputFile, generatedItems, 'utf8')
-console.log(`CSV 생성 완료: 단어 ${wordRows.length}개 · 관용구 ${comboRows.length}개 · 모순 ${conflictRows.length}개 · 부조화 ${dissonanceRows.length}개 · 아이템 ${itemRows.length}개 (${ITEM_RARITIES.map((rarity) => `${rarity} ${itemRarityCounts[rarity]}`).join(' · ')})`)
+console.log(`CSV 생성 완료: 단어 ${wordRows.length}개 · 공통 관용구 ${comboRows.length}개 · 언어 전용 관용구 ${localizedComboRows.length}개 · 모순 ${conflictRows.length}개 · 부조화 ${dissonanceRows.length}개 · 아이템 ${itemRows.length}개 (${ITEM_RARITIES.map((rarity) => `${rarity} ${itemRarityCounts[rarity]}`).join(' · ')})`)

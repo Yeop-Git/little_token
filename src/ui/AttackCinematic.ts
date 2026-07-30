@@ -20,6 +20,7 @@ import {
   markVideoWarmed,
   releaseVideo,
 } from '@/ui/ResourceLibrary'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 export type AttackCut = 'pump' | 'wipe'
 
@@ -130,7 +131,9 @@ export class AttackCinematic {
     this.el.classList.remove('is-out')
     this.el.classList.add('is-in')
     GameAudio.play('cutscene')
-    void video.play().catch(() => {}) // 못 틀어도 패널 자체는 지나가게 둔다
+    void video.play().catch((error) => {
+      reportResourceFailure('attack video play', video.currentSrc || video.src, error)
+    })
     return true
   }
 
@@ -207,8 +210,9 @@ export class AttackCinematic {
       video.currentTime = 0
       if (ready) markVideoWarmed(video)
       return ready
-    } catch {
+    } catch (error) {
       if (!this.destroyed) video.pause()
+      reportResourceFailure('attack video warmup', video.currentSrc || video.src, error)
       // 재생 시점의 기존 fallback이 처리한다. 워밍업 실패는 전투를 막을 이유가 없다.
       return false
     }

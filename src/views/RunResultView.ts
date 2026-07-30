@@ -13,6 +13,12 @@ import { GameAudio } from '@/audio/GameAudio'
 import { ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import type { DefeatCause, RunRecord } from '@core/run'
 import { STARTING_COMBAT_STATS } from '@core/player'
+import { stageFor } from '@data/stages'
+import { t } from '@/localization'
+import { DISPLAY_FLOORS } from '@/config/edition'
+import { EARLY_WORDS, makeEarlyTables } from '@data/earlyWords'
+import { availableCombos } from '@core/deckInsights'
+import { discoveredComboIds } from '@core/comboDiscovery'
 
 export type RunOutcome = 'lost' | 'won'
 
@@ -24,8 +30,10 @@ interface Opts {
   record: RunRecord
   /** 패배일 때 무엇에게 쓰러졌는지. 승리면 없다. */
   cause?: DefeatCause | null
-  /** 엔들리스 회차에 들어간 런인지 — 종이 머리말이 달라진다. */
-  endless?: boolean
+  /** 5층 전용 데모를 완주했을 때 정식판과 다른 마무리 정보를 보여 준다. */
+  demoComplete?: boolean
+  buildVersion?: string
+  feedbackUrl?: string
   onNewRun: () => void
   onTitle: () => void
   /**
@@ -52,11 +60,30 @@ const STAMP: Record<RunOutcome, { kicker: string; title: string; token: string; 
   },
 }
 
+const DEMO_STAMP = {
+  kicker: 'DEMO COMPLETE',
+  title: '첫 장을 지켜 냈다!',
+  token: TOKEN_FACES.party,
+  tokenAlt: '나팔을 부는 토큰',
+}
+
 /**
  * 종이 위아래로 삐져나오는 토큰이 잘리지 않게 남기는 여백. 축소 배율을 잴 때
  * 무대 높이에서 미리 뺀다.
  */
 const FIT_PADDING = 28
+
+function text(key: string, korean: string, values: Record<string, string | number> = {}): string {
+  return t(key, korean).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`))
+}
+
+function stageProgressLabel(day: number): string {
+  const stage = stageFor(day)
+  const cycle = stage.endlessCycle > 0
+    ? text('hudEndlessCycle', '엔드리스 {cycle}주기', { cycle: stage.endlessCycle })
+    : text('hudStoryCycle', '첫 이야기')
+  return `${cycle} · ${text('hudStageLabel', '스테이지')} ${stage.floor}/${DISPLAY_FLOORS}`
+}
 
 export class RunResultView {
   private acted = false
@@ -101,10 +128,10 @@ export class RunResultView {
       GameAudio.play('gameOver')
       GameAudio.playDefeatBgm()
     }
-    const stamp = STAMP[outcome]
+    const stamp = this.opts.demoComplete ? DEMO_STAMP : STAMP[outcome]
 
     this.root.innerHTML = `
-      <main class="scene result-scene" data-outcome="${outcome}" style="background-image:url(${BACKGROUNDS.bg001})">
+      <main class="scene result-scene" data-outcome="${outcome}" data-demo="${this.opts.demoComplete ? 'true' : 'false'}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="result-stage">
           <div class="result-paper" role="status" aria-live="polite">
             <div class="result-token" aria-hidden="true">
@@ -112,13 +139,14 @@ export class RunResultView {
             </div>
             <div class="result-head">
               <div class="k">${stamp.kicker}</div>
-              <h1 class="t hand">${stamp.title}</h1>
-              <div class="result-day">${this.opts.endless ? 'ENDLESS · ' : ''}${day}일째${
-                outcome === 'lost' ? '에서 멈췄다' : '까지 써 냈다'
-              }</div>
+              <h1 class="t hand">${this.opts.demoComplete ? text('demoResultTitle', stamp.title) : stamp.title}</h1>
+              <div class="result-day">${stageProgressLabel(day)}${this.opts.demoComplete
+                ? text('demoResultCleared', ' 완주')
+                : outcome === 'lost' ? '에서 멈췄다' : '까지 써 냈다'}</div>
             </div>
 
             ${this.causeHtml()}
+            ${this.opts.demoComplete ? this.demoDiscoveriesHtml(player) : ''}
 
             <div class="result-cols">
               <section class="rs-block rs-stats">
@@ -136,11 +164,12 @@ export class RunResultView {
             </div>
 
             <div class="result-records">${this.recordsHtml(record)}</div>
+            ${this.opts.demoComplete ? this.demoReleaseHtml() : ''}
 
             <div class="result-actions">
               ${this.opts.onContinue
                 ? '<button class="result-new" type="button" data-act="continue">계속 쓰기</button>'
-                : '<button class="result-new" type="button" data-act="new">새 일기 시작</button>'}
+                : `<button class="result-new" type="button" data-act="new">${this.opts.demoComplete ? text('demoResultReplay', '데모 다시 시작') : '새 일기 시작'}</button>`}
               <button class="result-title" type="button" data-act="title">타이틀로</button>
             </div>
           </div>
@@ -164,6 +193,14 @@ export class RunResultView {
   /** 나를 갉아먹은 것 — 종이에서 가장 크게 적히는 한 줄. */
   private causeHtml(): string {
     const { outcome, cause } = this.opts
+    if (this.opts.demoComplete) {
+      return `
+        <div class="result-cause is-won is-demo">
+          <div class="rc-label">${text('demoResultFirstBoss', '첫 번째 보스')}</div>
+          <div class="rc-name">${text('demoResultMantis', '사마귀를 물리쳤다')}</div>
+          <div class="rc-note">${text('demoResultNote', '다섯 장의 문장을 지키며 첫 번째 이야기를 완성했다.')}</div>
+        </div>`
+    }
     if (outcome === 'won') {
       return `
         <div class="result-cause is-won">
@@ -198,6 +235,42 @@ export class RunResultView {
           <div class="rc-note">${cause.note}</div>
         </div>
       </div>`
+  }
+
+  private demoDiscoveriesHtml(player: PlayerState): string {
+    const startingIds = new Set(Object.values(EARLY_WORDS).flat().map((word) => word.id))
+    const deckWords = Object.values(player.deck).flat()
+    const newWords = deckWords.filter((word) => !startingIds.has(word.id))
+    const reinforced = deckWords.filter((word) => (word.level ?? 1) > 1)
+    const discovered = discoveredComboIds()
+    const combos = availableCombos(player.deck, makeEarlyTables(player.deck, player).combos).filter((combo) => discovered.has(combo.id))
+    const names = (values: string[]) => {
+      if (!values.length) return text('demoResultNone', '없음')
+      const shown = values.slice(0, 6)
+      return `${shown.join(' · ')}${values.length > shown.length ? ` +${values.length - shown.length}` : ''}`
+    }
+    return `
+      <section class="demo-discoveries" aria-label="${text('demoResultDiscoveries', '데모 발견 기록')}">
+        <div><span>${text('demoResultNewWords', '새 단어')} <b>${newWords.length}</b></span><p>${names(newWords.map((word) => word.text))}</p></div>
+        <div><span>${text('demoResultReinforced', '반복강화')} <b>${reinforced.length}</b></span><p>${names(reinforced.map((word) => `${word.text} Lv.${word.level}`))}</p></div>
+        <div><span>${text('demoResultCombos', '완성 관용구')} <b>${combos.length}</b></span><p>${names(combos.map((combo) => combo.name))}</p></div>
+        <div><span>${text('demoResultItems', '아이템')} <b>${player.items.length}</b></span><p>${names(player.items.map((item) => item.name))}</p></div>
+      </section>`
+  }
+
+  private demoReleaseHtml(): string {
+    const feedback = this.opts.feedbackUrl
+      ? `<a class="demo-feedback" href="${this.opts.feedbackUrl}" target="_blank" rel="noreferrer">${text('demoResultFeedback', '플레이 후기 남기기')}</a>`
+      : ''
+    return `
+      <section class="demo-release">
+        <div>
+          <h2>${text('demoResultFullTitle', '이야기는 정식판에서 계속된다')}</h2>
+          <p>${text('demoResultFullBody', '정식판은 15스테이지, 세 보스, 후반 보상과 클리어 후 엔드리스를 담는다.')}</p>
+          <small>${text('demoResultSaveScope', '데모 저장은 데모 안에서만 이어지며 정식판으로 이전되지 않는다.')} · v${this.opts.buildVersion ?? '0.0.0'}</small>
+        </div>
+        ${feedback}
+      </section>`
   }
 
   private statsHtml(player: PlayerState): string {

@@ -56,6 +56,10 @@ export interface RunState {
   endless: boolean
   /** 첫 장로거미 승리 뒤 엔딩 컷씬을 끝까지 본 런인지 저장한다. */
   endingSeen: boolean
+  /** 마지막 보스 격파 뒤 엔딩이 끝나기 전의 재개 지점. 값은 이어서 지급할 보상 등급이다. */
+  pendingEndingGrade: number | null
+  /** 엔딩 뒤 적립할 실제 영감. 속도 등급에 미사용 무료 드로우 보너스를 더한 값이다. */
+  pendingEndingEarned: number | null
   /** 전투를 다시 치러 보상을 중복 획득하지 않도록 3단계 보상 진행을 저장한다. */
   reward: PendingReward | null
   /**
@@ -81,7 +85,10 @@ export interface RewardPickRef {
 
 export interface PendingReward {
   day: number
+  /** 희귀도 확률에만 쓰는 클리어 속도 등급. */
   grade: number
+  /** 이번 클리어로 이미 지갑에 적립한 실제 영감. */
+  earned: number
   phase: RewardPhase | 'complete'
   picks: RewardPickRef[]
   /** 이어하기로 현재 진열을 공짜로 바꾸지 못하게 하는 클리어별 난수 씨앗. */
@@ -91,7 +98,7 @@ export interface PendingReward {
 }
 
 export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
-export const RUN_SAVE_SCHEMA_VERSION = 3
+export const RUN_SAVE_SCHEMA_VERSION = 6
 export const COMBAT_BALANCE_VERSION = 1
 
 function cloneDeck(d: Record<string, Word[]>): Record<string, Word[]> {
@@ -121,6 +128,8 @@ export function newRun(): RunState {
     balanceVersion: COMBAT_BALANCE_VERSION,
     endless: false,
     endingSeen: false,
+    pendingEndingGrade: null,
+    pendingEndingEarned: null,
     reward: null,
   }
 }
@@ -140,8 +149,41 @@ export function spendInspiration(run: RunState, cost: number): boolean {
   return true
 }
 
+/** 마지막 보스 직후 엔딩 도중 닫혀도 같은 보상 등급으로 엔딩부터 재개한다. */
+export function checkpointStoryEnding(run: RunState, grade: number, earned: number = grade): void {
+  run.pendingEndingGrade = Math.max(0, Number.isFinite(grade) ? grade : 0)
+  run.pendingEndingEarned = Math.max(0, Number.isFinite(earned) ? Math.round(earned) : run.pendingEndingGrade)
+}
+
+/** 엔딩 완료와 엔드리스 해금을 한 전이로 묶어 중간 상태가 저장되지 않게 한다. */
+export function completeStoryEnding(run: RunState): void {
+  run.pendingEndingGrade = null
+  run.pendingEndingEarned = null
+  run.endingSeen = true
+  run.endless = true
+}
+
+/** 같은 날 이미 준비된 보상이 있으면 그대로 돌려줘 영감과 선택지를 중복 지급하지 않는다. */
+export function preparePendingReward(run: RunState, grade: number, seed: number, earned: number = grade): PendingReward {
+  if (run.reward?.day === run.day) return run.reward
+  const normalizedGrade = Math.max(0, Number.isFinite(grade) ? grade : 0)
+  const normalizedEarned = Math.max(0, Number.isFinite(earned) ? Math.round(earned) : Math.round(normalizedGrade))
+  gainInspiration(run, normalizedEarned)
+  run.reward = {
+    day: run.day,
+    grade: normalizedGrade,
+    earned: normalizedEarned,
+    phase: 'subject',
+    picks: [],
+    seed: Number.isFinite(seed) ? Math.floor(seed) : 0,
+    refreshes: { subject: 0, item: 0, verb: 0 },
+  }
+  return run.reward
+}
+
 // 아이템 보상 = 스탯 수치 상승(스펙업).
 export function applyItemReward(player: PlayerState, item: OwnedItem): void {
+  if (player.items.some((owned) => owned.id === item.id)) return
   for (const k of Object.keys(item.stats) as (keyof PlayerStats)[]) {
     player.stats[k] = (player.stats[k] ?? 0) + (item.stats[k] ?? 0)
   }

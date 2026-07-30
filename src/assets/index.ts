@@ -29,10 +29,8 @@ import enemyTermiteModel from './models/enemy_termite.glb?url'
 import enemyFleaModel from './models/enemy_flea.glb?url'
 import enemyPillbugModel from './models/enemy_pillbug.glb?url'
 import enemyMosquitoModel from './models/enemy_mosquito.glb?url'
-import enemyWorkerBeeModel from './models/enemy_worker_bee.glb?url'
 import bossMantisModel from './models/boss_mantis.glb?url'
-import bossQueenBeeModel from './models/boss_queen_bee.glb?url'
-import bossElderSpiderModel from './models/boss_elder_spider.glb?url'
+import { LATE_ASSETS } from '@/assets/late'
 import token001 from './sprites/token/token_001.webp'
 import token002 from './sprites/token/token_002.webp'
 import token003 from './sprites/token/token_003.webp'
@@ -49,10 +47,7 @@ import enemyTermite from './sprites/enemy_termite.webp'
 import enemyRoach from './sprites/enemy_roach.webp'
 import enemyPillbug from './sprites/enemy_pillbug.webp'
 import enemyMosquito from './sprites/enemy_mosquito.webp'
-import enemyWorkerBee from './sprites/enemy_worker_bee.webp'
 import bossMantis from './sprites/boss_mantis.webp'
-import bossQueenBee from './sprites/boss_queen_bee.webp'
-import bossElderSpider from './sprites/boss_elder_spider.webp'
 import cardWebSeal from './sprites/effects/card_web_seal.webp'
 import emotionJoy from './sprites/emotions/emotion_joy.webp'
 import emotionAnger from './sprites/emotions/emotion_anger.webp'
@@ -168,8 +163,6 @@ import battlePaperPages from './audio/battle-paper-pages.mp3'
 import battlePaperTaiko from './audio/battle-paper-taiko.mp3'
 import battleHeroicMarch from './audio/battle-heroic-march.mp3'
 import bossSaltSkaterBgm from './audio/boss-salt-skater.mp3'
-import bossQueenBeeBgm from './audio/boss-queen-bee.mp3'
-import bossElderSpiderBgm from './audio/boss-elder-spider.mp3'
 import resonanceJoy from './audio/resonance-joy.mp3'
 import resonanceAnger from './audio/resonance-anger.mp3'
 import resonanceSorrow from './audio/resonance-sorrow.mp3'
@@ -263,10 +256,8 @@ export const SPRITES: Record<string, string> = {
   enemy_roach: enemyRoach,
   enemy_pillbug: enemyPillbug,
   enemy_mosquito: enemyMosquito,
-  enemy_worker_bee: enemyWorkerBee,
   boss_mantis: bossMantis,
-  boss_queen_bee: bossQueenBee,
-  boss_elder_spider: bossElderSpider,
+  ...LATE_ASSETS.sprites,
   effect_card_web_seal: cardWebSeal,
 }
 
@@ -280,10 +271,8 @@ export const MODELS: Record<string, string> = {
   enemy_flea: enemyFleaModel,
   enemy_pillbug: enemyPillbugModel,
   enemy_mosquito: enemyMosquitoModel,
-  enemy_worker_bee: enemyWorkerBeeModel,
   boss_mantis: bossMantisModel,
-  boss_queen_bee: bossQueenBeeModel,
-  boss_elder_spider: bossElderSpiderModel,
+  ...LATE_ASSETS.models,
 }
 
 // 맥락카드 일러스트 — Word.art가 이 키를 참조한다.
@@ -437,8 +426,7 @@ export const AUDIO = {
   battlePaperTaiko,
   battleHeroicMarch,
   bossSaltSkaterBgm,
-  bossQueenBeeBgm,
-  bossElderSpiderBgm,
+  ...LATE_ASSETS.audio,
   resonanceJoy,
   resonanceAnger,
   resonanceSorrow,

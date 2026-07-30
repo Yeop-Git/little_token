@@ -9,6 +9,7 @@
  */
 
 import { VIDEO } from '@/assets'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 interface Opts {
   /** 영상이 완전히 걷힌 뒤 — 이 시점엔 타이틀만 남는다. */
@@ -122,7 +123,10 @@ export class CinematicIntro {
     // 잡혀 있어서, 여기서 finish를 부르면 남은 페이드가 잘려 화면이 툭 튄다.
     // 마지막 프레임에 멈춘 채로 남은 페이드를 마저 진행한다(그 프레임이 곧 타이틀 배경이다).
     this.video.addEventListener('ended', this.beginFade)
-    this.video.addEventListener('error', this.finish)
+    this.video.addEventListener('error', () => {
+      reportResourceFailure('opening video load', this.video.currentSrc || this.video.src)
+      this.finish()
+    })
     // rAF은 탭이 화면에 안 그려지면 멈춘다 — 페이드 시점은 미디어 시계로 잡는다.
     this.video.addEventListener('timeupdate', this.tick)
     // 첫 프레임이 준비돼야 검은 화면을 걷는다 — 안 그러면 흰 깜빡임이 생긴다.
@@ -177,7 +181,8 @@ export class CinematicIntro {
       this.video.muted = true
       try {
         await this.video.play()
-      } catch {
+      } catch (error) {
+        reportResourceFailure('opening video play', this.video.currentSrc || this.video.src, error)
         return this.finish() // 그래도 안 되면 영상 없이 타이틀로
       }
     }

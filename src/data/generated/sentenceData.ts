@@ -1311,7 +1311,7 @@ export const PUNCT_WORDS: Word[] = [
   }
 ]
 
-/** 무럭무럭 — '잭의 하늘나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
+/** 무럭무럭 — 보상으로 덱에 등록되는 성장 카드의 단일 원본. */
 export const GROW_WORDS: Word[] = [
   {
     "id": "gr",
@@ -1706,6 +1706,222 @@ export const COMBOS: Combo[] = [
     "flavor": "모두를 적시는 비"
   }
 ]
+
+/** Locale-native idioms. These are added only to the matching language catalog. */
+export const LOCALE_EARLY_COMBOS: Record<string, Combo[]> = {
+  "ko": [
+    {
+      "id": "lc_ko_blessing",
+      "name": "전화위복",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.75,
+      "flavor": "상처를 더 밝은 다음 줄로 바꾼다"
+    },
+    {
+      "id": "lc_ko_after_rain",
+      "name": "비 온 뒤에 땅이 굳어진다",
+      "need": [
+        "hurt",
+        "solid",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "시련을 견딘 자리가 더 단단해진다"
+    },
+    {
+      "id": "lc_ko_smiling_face",
+      "name": "웃는 낯에 침 못 뱉는다",
+      "need": [
+        "calm",
+        "smile",
+        "grd"
+      ],
+      "mult": 1.65,
+      "flavor": "부드러운 웃음으로 적의를 누그러뜨린다"
+    }
+  ],
+  "en": [
+    {
+      "id": "lc_en_grin",
+      "name": "Grin and Bear It",
+      "need": [
+        "grit",
+        "smile",
+        "grd"
+      ],
+      "mult": 1.75,
+      "flavor": "Meet the hard moment with a steady smile"
+    },
+    {
+      "id": "lc_en_silver_lining",
+      "name": "Every Cloud Has a Silver Lining",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "Find a hopeful edge inside a hard turn"
+    },
+    {
+      "id": "lc_en_many_hands",
+      "name": "Many Hands Make Light Work",
+      "need": [
+        "both",
+        "warm",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "Shared effort makes a heavy task easier"
+    }
+  ],
+  "ja": [
+    {
+      "id": "lc_ja_rise",
+      "name": "七転び八起き",
+      "need": [
+        "hurt",
+        "endure",
+        "mend"
+      ],
+      "mult": 1.75,
+      "flavor": "何度転んでも、また立ち上がる"
+    },
+    {
+      "id": "lc_ja_after_rain",
+      "name": "雨降って地固まる",
+      "need": [
+        "hurt",
+        "solid",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "困難の後で結びつきが強くなる"
+    },
+    {
+      "id": "lc_ja_laughing_gate",
+      "name": "笑う門には福来る",
+      "need": [
+        "bright",
+        "smile",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "笑顔のある所へ幸せが訪れる"
+    }
+  ],
+  "ru": [
+    {
+      "id": "lc_ru_will",
+      "name": "Собрать волю в кулак",
+      "need": [
+        "grit",
+        "force",
+        "atk"
+      ],
+      "mult": 1.75,
+      "flavor": "Собрать всю решимость для одного удара"
+    },
+    {
+      "id": "lc_ru_blessing",
+      "name": "Не было бы счастья, да несчастье помогло",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "Обратить испытание в неожиданную удачу"
+    },
+    {
+      "id": "lc_ru_together",
+      "name": "Один в поле не воин",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "Вместе легче устоять перед угрозой"
+    }
+  ],
+  "zh-Hans": [
+    {
+      "id": "lc_zh_hans_boats",
+      "name": "破釜沉舟",
+      "need": [
+        "force",
+        "reckless",
+        "atk"
+      ],
+      "mult": 1.75,
+      "flavor": "断绝退路，决心一战"
+    },
+    {
+      "id": "lc_zh_hans_old_man",
+      "name": "塞翁失马",
+      "need": [
+        "hurt",
+        "soft",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "从眼前的损失中发现转机"
+    },
+    {
+      "id": "lc_zh_hans_one_city",
+      "name": "众志成城",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "众人同心便能筑成坚城"
+    }
+  ],
+  "zh-Hant": [
+    {
+      "id": "lc_zh_hant_soft",
+      "name": "以柔克剛",
+      "need": [
+        "force",
+        "soft",
+        "grd"
+      ],
+      "mult": 1.75,
+      "flavor": "用柔弱之道戰勝剛強"
+    },
+    {
+      "id": "lc_zh_hant_old_man",
+      "name": "塞翁失馬",
+      "need": [
+        "hurt",
+        "endure",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "從眼前的損失中發現轉機"
+    },
+    {
+      "id": "lc_zh_hant_one_city",
+      "name": "眾志成城",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "眾人同心便能築成堅城"
+    }
+  ]
+}
+
+export const LOCALE_COMBOS: Record<string, Combo[]> = {}
 
 export const EARLY_CONFLICTS: Conflict[] = []
 

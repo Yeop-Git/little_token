@@ -78,12 +78,21 @@ export const tacticalVerbPower = (w: Word): number => {
     const coverage = Array.from({ length: count }, (_, i) =>
       TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
     ).reduce((sum, value) => sum + value, 0)
-    return coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
+    const direct = coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
+    return direct
+      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
+      + direct * Math.max(0, w.effects?.lifeStealRate ?? 0)
+      + Math.max(0, w.effects?.enemyAttackDown ?? 0) * .25
   }
   if (w.kind === 'guard' && w.effects?.counterMultiplier) {
     return coefficient + Math.max(0, w.effects.counterMultiplier - 1)
   }
   return coefficient
+    + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
+    + Math.max(0, w.effects?.overhealDamageMultiplier ?? 0) * .25
+    + Math.max(0, w.effects?.carryInk ?? 0) * .25
+    + Math.max(0, w.effects?.drawCards ?? 0) * .25
+    + Math.max(0, w.effects?.enemyAttackDown ?? 0) * .25
 }
 
 /** 다중 대상 관통은 방어를 건너뛰는 희소 유틸리티를 총량의 15%로 평가한다. */

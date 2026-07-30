@@ -9,7 +9,7 @@ import type { StatBlock, TargetCount, Variance, Word } from './types'
 import { currentLocale } from '@/localization'
 
 const L = {
-  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', carryInk:'다음 문장 잉크', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발' },
+  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', carryInk:'다음 문장 잉크', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발', magicShield:'매직실드', guardAttack:'현재 방어도 피해', overhealAttack:'초과 회복 피해', lifeSteal:'흡혈' },
   en: { chance:'chance for multiplier', rest:'otherwise', mult:'Multiplier', crit:'Critical', power:'Power', guard:'Guard', heal:'Heal', hp:'Max HP', allHit:'Hits all enemies', next:'Activates next turn', self:'40% damage returns to self', preempt:'Acts before first-strike enemies', adapt:'Uses current part weakness', attack:' targets', unit:' targets', pierce:'Pierces guard', hits:' hits', casts:' verb casts', each:'each', counter:'Counter', inkDiscount:'Sentence cost', carryInk:'Next sentence Ink', all:'All', noMult:'Unaffected by multipliers', pool:'Multiplier pool', safe:'safe move', immediate:'Immediate' },
   ja: { chance:'の確率で倍率', rest:'それ以外', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'回復', hp:'最大体力', allHit:'敵全体に命中', next:'次のターンに発動', self:'ダメージ40%が自分に戻る', preempt:'先攻の敵より先に行動', adapt:'現在の部位弱点を適用', attack:'体を攻撃', unit:'体', pierce:'防御貫通', hits:'連打', casts:'回動詞発動', each:'各', counter:'カウンター', inkDiscount:'文のコスト', carryInk:'次の文のインク', all:'全体', noMult:'倍率を受けない', pool:'倍率プール', safe:'安全な一手', immediate:'即時' },
   ru: { chance:'шанс на множитель', rest:'иначе', mult:'Множитель', crit:'Критический успех', power:'Сила', guard:'Защита', heal:'Лечение', hp:'Макс. здоровье', allHit:'Попадает по всем врагам', next:'Сработает в следующий ход', self:'40% урона возвращается герою', preempt:'Действует раньше быстрых врагов', adapt:'Использует слабость текущей части', attack:' цели', unit:' цели', pierce:'Пробивает защиту', hits:' ударов', casts:' срабатывания глагола', each:'каждый', counter:'Контратака', inkDiscount:'Стоимость фразы', carryInk:'Чернила следующей фразы', all:'Все', noMult:'Не получает множитель', pool:'Пул множителя', safe:'надёжный ход', immediate:'Сразу' },
@@ -24,6 +24,15 @@ const EXTRA_EFFECT_LABEL = {
   ru: { enemyAttackDown: 'Следующая атака врага', drawCards: 'Следующая начальная рука' },
   'zh-Hans': { enemyAttackDown: '下次敌方攻击', drawCards: '下句起始手牌' },
   'zh-Hant': { enemyAttackDown: '下次敵方攻擊', drawCards: '下句起始手牌' },
+}[currentLocale]
+
+const BUILD_EFFECT_LABEL = {
+  ko: { magicShield: '매직실드 1겹', guardAttack: '현재 방어도 피해', overhealAttack: '초과 회복 피해', lifeSteal: '흡혈' },
+  en: { magicShield: 'Magic Shield 1 layer', guardAttack: 'Current Guard damage', overhealAttack: 'Overheal damage', lifeSteal: 'Lifesteal' },
+  ja: { magicShield: 'マジックシールド1層', guardAttack: '現在の防御ダメージ', overhealAttack: '超過回復ダメージ', lifeSteal: '吸収' },
+  ru: { magicShield: 'Магический щит: 1 слой', guardAttack: 'Урон от текущей защиты', overhealAttack: 'Урон от избытка лечения', lifeSteal: 'Вампиризм' },
+  'zh-Hans': { magicShield: '魔法盾1层', guardAttack: '当前防御伤害', overhealAttack: '过量治疗伤害', lifeSteal: '吸血' },
+  'zh-Hant': { magicShield: '魔法盾1層', guardAttack: '目前防禦傷害', overhealAttack: '過量治療傷害', lifeSteal: '吸血' },
 }[currentLocale]
 
 const OVERDRAW_HIT_LABEL = {
@@ -82,7 +91,7 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   const out: ValueLine[] = []
   const lane = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
-  if (w.stat && w.statMult != null) {
+  if (w.stat && w.statMult != null && w.statMult > 0) {
     const applied = stats ? ` = ${wordFlat(w, stats)}` : ''
     out.push({ text: `${STAT_NAME[w.stat]} ×${w.statMult}${applied}`, cls: lane })
   } else if (w.power) {
@@ -109,6 +118,10 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   }
   if (w.effects?.overdrawHitCount) out.push({ text: `${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`, cls: 'dmg' })
   if (w.effects?.counterMultiplier) out.push({ text: `${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
+  if (w.effects?.magicShield) out.push({ text: BUILD_EFFECT_LABEL.magicShield, cls: 'guard' })
+  if (w.effects?.guardAttackMultiplier) out.push({ text: `${BUILD_EFFECT_LABEL.guardAttack} ${Math.round(w.effects.guardAttackMultiplier * 100)}%`, cls: 'dmg' })
+  if (w.effects?.overhealDamageMultiplier) out.push({ text: `${BUILD_EFFECT_LABEL.overhealAttack} ${Math.round(w.effects.overhealDamageMultiplier * 100)}%`, cls: 'dmg' })
+  if (w.effects?.lifeStealRate) out.push({ text: `${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`, cls: 'heal' })
   if (w.effects?.inkDiscount) out.push({ text: `${L.inkDiscount} −${w.effects.inkDiscount}`, cls: 'buff' })
   if (w.effects?.carryInk) out.push({ text: `${L.carryInk} +${w.effects.carryInk}`, cls: 'buff' })
   if (w.effects?.enemyAttackDown) out.push({ text: `${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`, cls: 'buff' })
@@ -156,7 +169,7 @@ function noteParts(w: Word): string[] {
   if (w.person && w.person !== 'first') return []
 
   const out: string[] = []
-  if (w.stat && w.statMult != null) out.push(`${STAT_NAME[w.stat]} ×${w.statMult}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${w.statMult}`)
   else if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.variance) out.push(gambleText(w.variance))
   // 배율 풀에 보태는 칸(주어·어미)은 0이어도 "배율 ×1.00"을 적는다.
@@ -176,6 +189,10 @@ function noteParts(w: Word): string[] {
   }
   if (w.effects?.overdrawHitCount) out.push(`${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`)
   if (w.effects?.counterMultiplier) out.push(`${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`)
+  if (w.effects?.magicShield) out.push(BUILD_EFFECT_LABEL.magicShield)
+  if (w.effects?.guardAttackMultiplier) out.push(`${BUILD_EFFECT_LABEL.guardAttack} ${Math.round(w.effects.guardAttackMultiplier * 100)}%`)
+  if (w.effects?.overhealDamageMultiplier) out.push(`${BUILD_EFFECT_LABEL.overhealAttack} ${Math.round(w.effects.overhealDamageMultiplier * 100)}%`)
+  if (w.effects?.lifeStealRate) out.push(`${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`)
   if (w.effects?.inkDiscount) out.push(`${L.inkDiscount} −${w.effects.inkDiscount}`)
   if (w.effects?.carryInk) out.push(`${L.carryInk} +${w.effects.carryInk}`)
   if (w.effects?.enemyAttackDown) out.push(`${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`)
@@ -190,7 +207,7 @@ function noteParts(w: Word): string[] {
 
 export function numericNoteParts(w: Word): string[] {
   const out: string[] = []
-  if (w.stat && w.statMult != null) out.push(`×${w.statMult}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`×${w.statMult}`)
   if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.bonus) out.push(multText(w.bonus))
   if (w.variance) out.push(gambleText(w.variance))

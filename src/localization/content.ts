@@ -85,6 +85,39 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
   ]),
 }
 
+const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
+  en: {
+    magicVeil: 'wrapped myself in a veil of light', storedResolve: 'thrust out the strength I had held',
+    overflowingHeart: 'passed on the feeling that overflowed', drinkInk: 'drank back the spilled ink',
+    stainedTomorrow: "stained tomorrow's line", savedBreath: 'saved my next breath',
+    dampenMomentum: 'pressed down their momentum in writing', readAhead: 'read the line ahead',
+  },
+  ja: {
+    magicVeil: '光の幕をまとった', storedResolve: '耐えた力を突き出した',
+    overflowingHeart: 'あふれた想いを渡した', drinkInk: 'こぼれたインクを飲み戻した',
+    stainedTomorrow: '明日の一行を染めた', savedBreath: '次の息をためておいた',
+    dampenMomentum: '勢いを押さえて書いた', readAhead: '先の一行を読んだ',
+  },
+  ru: {
+    magicVeil: 'укрылся завесой света', storedResolve: 'высвободил накопленную стойкость',
+    overflowingHeart: 'передал переполнившее чувство', drinkInk: 'выпил пролитые чернила обратно',
+    stainedTomorrow: 'окрасил завтрашнюю строку', savedBreath: 'сберёг следующий вдох',
+    dampenMomentum: 'усмирил их напор на бумаге', readAhead: 'прочитал следующую строку заранее',
+  },
+  'zh-Hans': {
+    magicVeil: '披上了光幕', storedResolve: '打出了忍耐积蓄的力量',
+    overflowingHeart: '递出了满溢的心意', drinkInk: '饮回了洒落的墨水',
+    stainedTomorrow: '染上了明日的一行', savedBreath: '存下了下一口气',
+    dampenMomentum: '落笔压住了气势', readAhead: '提前读了下一行',
+  },
+  'zh-Hant': {
+    magicVeil: '披上了光幕', storedResolve: '打出了忍耐積蓄的力量',
+    overflowingHeart: '遞出了滿溢的心意', drinkInk: '飲回了灑落的墨水',
+    stainedTomorrow: '染上了明日的一行', savedBreath: '存下了下一口氣',
+    dampenMomentum: '落筆壓住了氣勢', readAhead: '提前讀了下一行',
+  },
+}
+
 const COMBO_IDS = [...Array.from({ length: 31 }, (_, i) => `ec${i + 1}`), ...Array.from({ length: 6 }, (_, i) => `c${i + 1}`)]
 const COMBO_NAMES: Record<ForeignLocale, string[]> = {
   en: ['Head-on Charge','Iron Wall','Together','Standing Alone','Today’s Resolve','Pain’s Price','Echo','Leave Yesterday Behind','A Careful Touch','One Step Through Grit','Unstoppable','Gritted Teeth','Drying Tears','Turn and Sway','Joyful Flame','Rise Again','Warm Embrace','In a Blink','Frenzied Blow','No Way Back','Bright Mending','Welcome Touch','Mending with a Smile','Angry Blow','Lonely Shield','Struggling Up','Dancing Attack','Lively Recovery','Shine and Spread','Joyful Barrage','Mischief Wave','Lone Warrior','Flame Frenzy','Perfect Silence','Rite of Forgetting','Mutual Ruin','Monsoon Rain'],
@@ -120,15 +153,15 @@ const LABELS: Record<ForeignLocale, { slots: string[]; rarities: string[]; emoti
 }
 
 const ENEMY_NAMES: Record<ForeignLocale, Record<string, string>> = {
-  en: { inkDevourer:'Ink Devourer',mantis:'Mantis',queenBee:'Queen Bee',elderSpider:'Elder Spider',termite:'Termite',moth:'Dust Bug',flea:'Clothes Moth',roach:'Roach',pillbug:'Pill Bug',mosquito:'Mosquito' },
-  ja: { inkDevourer:'インク喰らい',mantis:'カマキリ',queenBee:'女王蜂',elderSpider:'長老グモ',termite:'シロアリ',moth:'ホコリムシ',flea:'イガ',roach:'ゴキブリ',pillbug:'ダンゴムシ',mosquito:'蚊' },
-  ru: { inkDevourer:'Чернильный пожиратель',mantis:'Богомол',queenBee:'Пчелиная матка',elderSpider:'Старый паук',termite:'Термит',moth:'Пыльный жук',flea:'Моль',roach:'Таракан',pillbug:'Мокрица',mosquito:'Комар' },
-  'zh-Hans': { inkDevourer:'墨水吞噬者',mantis:'螳螂',queenBee:'蜂后',elderSpider:'长老蜘蛛',termite:'白蚁',moth:'尘虫',flea:'衣蛾',roach:'蟑螂',pillbug:'鼠妇',mosquito:'蚊子' },
-  'zh-Hant': { inkDevourer:'墨水吞噬者',mantis:'螳螂',queenBee:'蜂后',elderSpider:'長老蜘蛛',termite:'白蟻',moth:'塵蟲',flea:'衣蛾',roach:'蟑螂',pillbug:'鼠婦',mosquito:'蚊子' },
+  en: { mantis:'Mantis',queenBee:'Queen Bee',elderSpider:'Elder Spider',termite:'Termite',moth:'Dust Bug',flea:'Clothes Moth',roach:'Roach',pillbug:'Pill Bug',mosquito:'Mosquito' },
+  ja: { mantis:'カマキリ',queenBee:'女王蜂',elderSpider:'長老グモ',termite:'シロアリ',moth:'ホコリムシ',flea:'イガ',roach:'ゴキブリ',pillbug:'ダンゴムシ',mosquito:'蚊' },
+  ru: { mantis:'Богомол',queenBee:'Пчелиная матка',elderSpider:'Старый паук',termite:'Термит',moth:'Пыльный жук',flea:'Моль',roach:'Таракан',pillbug:'Мокрица',mosquito:'Комар' },
+  'zh-Hans': { mantis:'螳螂',queenBee:'蜂后',elderSpider:'长老蜘蛛',termite:'白蚁',moth:'尘虫',flea:'衣蛾',roach:'蟑螂',pillbug:'鼠妇',mosquito:'蚊子' },
+  'zh-Hant': { mantis:'螳螂',queenBee:'蜂后',elderSpider:'長老蜘蛛',termite:'白蟻',moth:'塵蟲',flea:'衣蛾',roach:'蟑螂',pillbug:'鼠婦',mosquito:'蚊子' },
 }
 
 export function wordTextFor(locale: LocaleCode, word: Pick<Word, 'id' | 'text'>): string {
-  return locale === 'ko' ? word.text : WORD_TEXT[locale][word.id] ?? (word.id.startsWith('gr_') ? WORD_TEXT[locale].gr : undefined) ?? word.text
+  return locale === 'ko' ? word.text : EXTRA_WORD_TEXT[locale][word.id] ?? WORD_TEXT[locale][word.id] ?? (word.id.startsWith('gr_') ? WORD_TEXT[locale].gr : undefined) ?? word.text
 }
 
 export function localizedWordText(word: Pick<Word, 'id' | 'text'>): string {
@@ -142,7 +175,7 @@ export function localizationCoverageErrors(): string[] {
     ...PUNCT_WORDS, ...GROW_WORDS,
   ].map((word) => word.id))
   for (const locale of ['en','ja','ru','zh-Hans','zh-Hant'] as ForeignLocale[]) {
-    for (const id of sourceWordIds) if (!WORD_TEXT[locale][id] && !(id.startsWith('gr_') && WORD_TEXT[locale].gr)) errors.push(`${locale}: word ${id} missing`)
+    for (const id of sourceWordIds) if (!EXTRA_WORD_TEXT[locale][id] && !WORD_TEXT[locale][id] && !(id.startsWith('gr_') && WORD_TEXT[locale].gr)) errors.push(`${locale}: word ${id} missing`)
     if (COMBO_NAMES[locale].length !== COMBO_IDS.length) errors.push(`${locale}: combo count mismatch`)
     if (ITEM_NAMES[locale].length !== ITEM_IDS.length) errors.push(`${locale}: item count mismatch`)
     for (const slot of EXCLAIM_SLOTS) for (const word of slot.words) {
@@ -161,7 +194,7 @@ export function applyContentLocalization(): void {
     ...Object.values(WORDS).flat(), ...PUNCT_WORDS, ...GROW_WORDS,
   ]
   for (const word of allWords) {
-    const text = texts[word.id] ?? (word.id.startsWith('gr_') ? texts.gr : undefined)
+    const text = EXTRA_WORD_TEXT[locale][word.id] ?? texts[word.id] ?? (word.id.startsWith('gr_') ? texts.gr : undefined)
     if (text) word.text = text
   }
 

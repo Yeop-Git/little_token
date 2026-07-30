@@ -11,6 +11,26 @@ import { RULE_ITEMS, STAT_ITEMS } from './generated/itemData'
 
 export type StatKey = 'hp' | 'atk' | 'guard' | 'heal' | 'luck'
 
+/** 아이템 예산 1점이 실제로 올리는 수치. 공격은 모든 문장 배율을 받으므로 반 단위다. */
+export const ITEM_STAT_PER_POINT: Readonly<Record<StatKey, number>> = {
+  hp: 2,
+  atk: 0.5,
+  guard: 1,
+  heal: 1,
+  luck: 1,
+}
+
+/** 보상등급으로 붙는 행운 감탄도 일반 아이템과 같은 1점 가치표를 쓴다. */
+export const ITEM_BLESS_POOL: readonly { stat: StatKey; n: number }[] = (
+  Object.keys(ITEM_STAT_PER_POINT) as StatKey[]
+).map((stat) => ({ stat, n: ITEM_STAT_PER_POINT[stat] }))
+export const ITEM_BLESS_CHANCE_PER_GRADE = 0.04
+
+export function itemStatBudget(stats: Partial<Record<StatKey, number>>): number {
+  return (Object.keys(ITEM_STAT_PER_POINT) as StatKey[])
+    .reduce((total, stat) => total + (stats[stat] ?? 0) / ITEM_STAT_PER_POINT[stat], 0)
+}
+
 export interface ItemDef {
   id: string
   name: string
@@ -30,7 +50,7 @@ export interface ItemDef {
 export interface ExclaimWord {
   id: string
   text: string
-  // 이 단어가 주는 스탯 보정(가산). 정직하게 +1씩, 체력만 +2.
+  // 이 단어가 주는 스탯 보정(가산). 아이템 1점 가치표를 그대로 따른다.
   mods: Partial<Record<StatKey, number>>
   note: string
 }
@@ -42,7 +62,7 @@ export interface ExclaimSlot {
 }
 
 // 노멀·희귀는 각각 1점·2점의 소품별 기본 스탯을 갖고, 영웅·전설은 기본 스탯 대신
-// 보수적인 감탄사 등급 보정과 고유효과를 함께 가진다(체력 +2 = 1점).
+// 보수적인 감탄사 등급 보정과 고유효과를 함께 가진다(체력 +2·공격 +0.5 = 1점).
 export const ITEMS: Record<string, ItemDef> = STAT_ITEMS
 export const PASSIVE_ITEMS: Record<string, ItemDef> = RULE_ITEMS
 export const ALL_ITEMS: Record<string, ItemDef> = { ...ITEMS, ...PASSIVE_ITEMS }
@@ -74,7 +94,7 @@ export function exclaimModsFor(
 }
 
 // 감탄 슬롯: 감탄(느낌) → 정도(강조) → 평가(가치판단).
-// 기본 보정은 스탯 +1씩(체력만 +2). 실제 획득량은 위 등급별 슬롯 배수를 적용한다.
+// 기본 보정은 체력 +2·공격 +0.5·나머지 +1. 실제 획득량은 등급별 슬롯 배수를 적용한다.
 //
 // 칸마다 다섯 스탯을 한 장씩 모두 갖춘다. 재련마다 이 중 EXCLAIM_CHOICES장만
 // 무작위로 열리므로(rollExclaimChoices), 어느 칸이 비어도 특정 스탯만 계속
@@ -84,7 +104,7 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
     key: 'excl',
     label: '감탄',
     words: [
-      { id: 'wow', text: '와!', mods: { atk: 1 }, note: '공격 +1' },
+      { id: 'wow', text: '와!', mods: { atk: 0.5 }, note: '공격 +0.5' },
       { id: 'hmm', text: '음?', mods: { guard: 1 }, note: '방어 +1' },
       { id: 'oh', text: '오,', mods: { heal: 1 }, note: '회복 +1' },
       { id: 'gasp', text: '헉!', mods: { hp: 2 }, note: '체력 +2' },
@@ -95,7 +115,7 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
     key: 'deg',
     label: '정도',
     words: [
-      { id: 'super', text: '엄청', mods: { atk: 1 }, note: '공격 +1' },
+      { id: 'super', text: '엄청', mods: { atk: 0.5 }, note: '공격 +0.5' },
       { id: 'kinda', text: '살짝', mods: { luck: 1 }, note: '운 +1' },
       { id: 'really', text: '정말', mods: { heal: 1 }, note: '회복 +1' },
       { id: 'full', text: '한가득', mods: { hp: 2 }, note: '체력 +2' },
@@ -106,7 +126,7 @@ export const EXCLAIM_SLOTS: ExclaimSlot[] = [
     key: 'val',
     label: '평가',
     words: [
-      { id: 'sharp', text: '날카로워!', mods: { atk: 1 }, note: '공격 +1' },
+      { id: 'sharp', text: '날카로워!', mods: { atk: 0.5 }, note: '공격 +0.5' },
       { id: 'strong', text: '튼튼해!', mods: { guard: 1 }, note: '방어 +1' },
       { id: 'pretty', text: '예뻐!', mods: { luck: 1 }, note: '운 +1' },
       { id: 'hearty', text: '든든해!', mods: { hp: 2 }, note: '체력 +2' },

@@ -4,13 +4,17 @@ import {
   RUN_SAVE_SCHEMA_VERSION,
   emptyRunRecord,
   reinforceWord,
+  type PendingReward,
+  type RewardPhase,
+  type RewardPickRef,
+  type RunRecord,
   type RunState,
 } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import { ALL_ITEMS } from '@data/items'
-import type { Emotion, Word } from './types'
-import type { PlayerStats } from './player'
-
+import type { Word } from './types'
+import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerStats } from './player'
+import { IS_DEMO } from '@/config/edition'
 /**
  * 이 게임이 브라우저에 남기는 모든 진행도의 접두사. 기록 초기화는 키를 하나씩
  * 지우는 게 아니라 이 접두사를 통째로 쓸어 낸다 — 하나씩 지우면 새로 늘어난 키가
@@ -19,8 +23,8 @@ import type { PlayerStats } from './player'
  */
 export const STORAGE_PREFIX = 'little-token.'
 
-const SAVE_KEY = 'little-token.run.v1'
-const CORRUPT_SAVE_KEY = 'little-token.run.corrupt.v1'
+const SAVE_KEY = IS_DEMO ? 'little-token.demo-run.v1' : 'little-token.run.v1'
+const CORRUPT_SAVE_KEY = IS_DEMO ? 'little-token.demo-run.corrupt.v1' : 'little-token.run.corrupt.v1'
 // v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
 // 세이브가 있으면 튜토리얼을 영구히 놓칠 수 있었다. 완료 시점에 기록하는 v2로
 // 한 번 갱신해 해당 사용자도 복구된 오프닝을 볼 수 있게 한다.
@@ -38,13 +42,6 @@ export type CombatCoachHint =
   | 'enemy-first'
   | 'overflow'
 
-// v0.3.25 이전 런에는 이 주어들이 무감정으로 저장됐다. 현재 데이터의 감정 분포로
-// 한 번만 올려, 이어하기 런도 새 공명 경로를 바로 사용할 수 있게 한다.
-const LEGACY_SUBJECT_EMOTIONS: Record<string, Emotion> = {
-  na: 'joy', eoje: 'sorrow', nado: 'pleasure', oneul: 'joy',
-  gyeop: 'sorrow', naman: 'anger', dachin: 'anger', uri: 'pleasure',
-}
-
 // 리뉴얼에서 사라진 고밀도 공격 카드는 같은 감정의 현행 특수 보상으로 바꾼다.
 // 저장된 강화 단계는 아래 동기화 과정에서 그대로 계승한다.
 const CARD_REPLACEMENTS: Record<string, string> = {
@@ -57,6 +54,14 @@ const REMOVED_ITEM_IDS = new Set(['inkBottle', 'softEraser'])
 const CURRENT_CARD_BY_ID = new Map(
   [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS].map((word) => [word.id, word]),
 )
+const STAT_KEYS = Object.keys(STARTING_COMBAT_STATS) as (keyof PlayerStats)[]
+const MAX_SAVED_CARD_LEVEL = 1000
+
+function safeCardLevel(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(1, Math.min(MAX_SAVED_CARD_LEVEL, Math.floor(value)))
+    : 1
+}
 
 function cloneCurrentCard(base: Word, level: number): Word {
   const card: Word = {
@@ -72,43 +77,182 @@ function cloneCurrentCard(base: Word, level: number): Word {
 
 /** 저장된 카드가 이전 CSV 정의를 품고 있어도 현행 카드와 감정으로 동기화한다. */
 function migrateCardDefinitions(run: RunState): boolean {
-  let migrated = false
-  for (const [slot, savedCards] of Object.entries(run.player.deck)) {
-    const merged = new Map<string, Word>()
+  const before = JSON.stringify(run.player.deck)
+  const levelsBySlot = new Map<string, Map<string, number>>()
+  for (const savedCards of Object.values(run.player.deck)) {
+    if (!Array.isArray(savedCards)) continue
     for (const saved of savedCards) {
+      if (!saved || typeof saved !== 'object' || typeof saved.id !== 'string') continue
       const id = CARD_REPLACEMENTS[saved.id] ?? saved.id
       const base = CURRENT_CARD_BY_ID.get(id)
-      if (!base) {
-        merged.set(saved.id, saved)
-        continue
-      }
-      const existing = merged.get(id)
-      const level = (existing?.level ?? 0) + (saved.level ?? 1)
-      merged.set(id, cloneCurrentCard(base, level))
-      if (id !== saved.id || saved.text !== base.text || saved.emotion !== base.emotion) migrated = true
-    }
-    run.player.deck[slot] = [...merged.values()]
-    const limit = DECK_LIMITS[slot]
-    if (limit != null && run.player.deck[slot].length > limit) {
-      run.player.deck[slot] = run.player.deck[slot].slice(0, limit)
-      migrated = true
+      if (!base) continue
+      const slotLevels = levelsBySlot.get(base.slot) ?? new Map<string, number>()
+      slotLevels.set(id, Math.min(MAX_SAVED_CARD_LEVEL, (slotLevels.get(id) ?? 0) + safeCardLevel(saved.level)))
+      levelsBySlot.set(base.slot, slotLevels)
     }
   }
-  return migrated
+
+  // 필수 슬롯이 전부 손상됐거나 삭제된 카드만 남았어도 완성 가능한 시작 덱을 복구한다.
+  for (const [slot, starters] of Object.entries(EARLY_WORDS)) {
+    const slotLevels = levelsBySlot.get(slot) ?? new Map<string, number>()
+    if (slotLevels.size === 0) for (const starter of starters) slotLevels.set(starter.id, 1)
+    levelsBySlot.set(slot, slotLevels)
+  }
+
+  const normalized: Record<string, Word[]> = {}
+  for (const [slot, levels] of levelsBySlot) {
+    normalized[slot] = [...levels].map(([id, level]) => cloneCurrentCard(CURRENT_CARD_BY_ID.get(id)!, level))
+    const limit = DECK_LIMITS[slot]
+    if (limit != null) normalized[slot] = normalized[slot].slice(0, limit)
+  }
+  run.player.deck = normalized
+  return JSON.stringify(normalized) !== before
 }
 
-/** 삭제된 아이템은 기존 런에서도 보유 목록과 누적 스탯을 함께 거두어 들인다. */
-function migrateRemovedItems(run: RunState): boolean {
-  const removed = run.player.items.filter((item) => REMOVED_ITEM_IDS.has(item.id) || !ALL_ITEMS[item.id])
-  if (!removed.length) return false
+function normalizedItemStats(value: unknown): Partial<PlayerStats> {
+  if (!value || typeof value !== 'object') return {}
+  const source = value as Partial<Record<keyof PlayerStats, unknown>>
+  const stats: Partial<PlayerStats> = {}
+  for (const key of STAT_KEYS) {
+    const amount = source[key]
+    if (typeof amount === 'number' && Number.isFinite(amount) && amount >= 0) stats[key] = amount
+  }
+  return stats
+}
 
-  for (const item of removed) {
-    for (const key of Object.keys(item.stats) as (keyof PlayerStats)[]) {
-      run.player.stats[key] = Math.max(0, run.player.stats[key] - (item.stats[key] ?? 0))
+function subtractItemStats(run: RunState, value: unknown): void {
+  const stats = normalizedItemStats(value)
+  for (const key of STAT_KEYS) {
+    run.player.stats[key] = Math.max(0, run.player.stats[key] - (stats[key] ?? 0))
+  }
+}
+
+/** 삭제 ID는 제거하고, 살아 있는 아이템의 표시 정보와 패시브는 현행 정의를 사용한다. */
+function migrateItems(run: RunState): boolean {
+  const before = JSON.stringify(run.player.items)
+  const normalized: OwnedItem[] = []
+  const seen = new Set<string>()
+  for (const saved of run.player.items) {
+    if (!saved || typeof saved !== 'object' || typeof saved.id !== 'string') continue
+    const def = ALL_ITEMS[saved.id]
+    if (REMOVED_ITEM_IDS.has(saved.id) || !def || seen.has(saved.id)) {
+      subtractItemStats(run, saved.stats)
+      continue
+    }
+    seen.add(saved.id)
+    normalized.push({
+      id: def.id,
+      name: def.name,
+      rarity: def.rarity,
+      art: def.art,
+      line: typeof saved.line === 'string' ? saved.line : def.flavor,
+      stats: normalizedItemStats(saved.stats),
+      ...(def.passive ? { passive: def.passive } : {}),
+    })
+  }
+  run.player.items = normalized
+  return JSON.stringify(normalized) !== before
+}
+
+function normalizePlayerStats(run: RunState): boolean {
+  let changed = false
+  for (const key of STAT_KEYS) {
+    const current = run.player.stats[key]
+    const floor = key === 'hp' ? 1 : 0
+    const fallback = STARTING_COMBAT_STATS[key]
+    const normalized = typeof current === 'number' && Number.isFinite(current)
+      ? Math.max(floor, current)
+      : fallback
+    if (normalized !== current) {
+      run.player.stats[key] = normalized
+      changed = true
     }
   }
-  run.player.items = run.player.items.filter((item) => !REMOVED_ITEM_IDS.has(item.id) && !!ALL_ITEMS[item.id])
-  return true
+  return changed
+}
+
+const REWARD_PHASES = new Set<PendingReward['phase']>(['subject', 'item', 'verb', 'complete'])
+const REWARD_PICK_KINDS = new Set<RewardPickRef['kind']>(['word', 'item'])
+
+function normalizePendingReward(run: RunState): boolean {
+  const before = JSON.stringify(run.reward)
+  const value = run.reward as unknown
+  if (value == null) {
+    run.reward = null
+    return before !== 'null'
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    run.reward = null
+    return true
+  }
+
+  const source = value as Record<string, unknown>
+  const phase = REWARD_PHASES.has(source.phase as PendingReward['phase'])
+    ? source.phase as PendingReward['phase']
+    : 'subject'
+  const picks: RewardPickRef[] = []
+  if (Array.isArray(source.picks)) {
+    for (const value of source.picks) {
+      if (!value || typeof value !== 'object') continue
+      const pick = value as Record<string, unknown>
+      if (!REWARD_PICK_KINDS.has(pick.kind as RewardPickRef['kind']) || typeof pick.id !== 'string') continue
+      const kind = pick.kind as RewardPickRef['kind']
+      const id = kind === 'word' ? CARD_REPLACEMENTS[pick.id] ?? pick.id : pick.id
+      if (kind === 'word' ? !CURRENT_CARD_BY_ID.has(id) : !ALL_ITEMS[id]) continue
+      picks.push({ kind, id, ...(pick.reinforce === true ? { reinforce: true } : {}) })
+    }
+  }
+  const refreshSource = source.refreshes && typeof source.refreshes === 'object'
+    ? source.refreshes as Partial<Record<RewardPhase, unknown>>
+    : {}
+  const refreshes = Object.fromEntries((['subject', 'item', 'verb'] as RewardPhase[]).map((key) => {
+    const amount = refreshSource[key]
+    return [key, typeof amount === 'number' && Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0]
+  })) as Record<RewardPhase, number>
+  run.reward = {
+    day: typeof source.day === 'number' && Number.isFinite(source.day) ? Math.max(1, Math.floor(source.day)) : run.day,
+    grade: typeof source.grade === 'number' && Number.isFinite(source.grade) ? Math.max(0, source.grade) : 0,
+    earned: typeof source.earned === 'number' && Number.isFinite(source.earned)
+      ? Math.max(0, Math.round(source.earned))
+      : typeof source.grade === 'number' && Number.isFinite(source.grade) ? Math.max(0, Math.round(source.grade)) : 0,
+    phase,
+    picks,
+    seed: typeof source.seed === 'number' && Number.isFinite(source.seed) ? Math.floor(source.seed) : 0,
+    refreshes,
+  }
+  return JSON.stringify(run.reward) !== before
+}
+
+function normalizeRunRecord(run: RunState): boolean {
+  const before = JSON.stringify(run.record)
+  const source = run.record && typeof run.record === 'object'
+    ? run.record as Partial<RunRecord>
+    : {}
+  const base = emptyRunRecord()
+  const kills: Record<string, number> = {}
+  if (source.kills && typeof source.kills === 'object') {
+    for (const [id, count] of Object.entries(source.kills)) {
+      if (typeof count === 'number' && Number.isFinite(count) && count > 0) kills[id] = Math.floor(count)
+    }
+  }
+  const bestHit = source.bestHit && typeof source.bestHit === 'object'
+    && typeof source.bestHit.dmg === 'number' && Number.isFinite(source.bestHit.dmg)
+    && typeof source.bestHit.sentence === 'string'
+    ? { dmg: Math.max(0, source.bestHit.dmg), sentence: source.bestHit.sentence }
+    : null
+  const count = (value: unknown, fallback = 0) => typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : fallback
+  run.record = {
+    ...base,
+    kills,
+    bestHit,
+    bestMult: typeof source.bestMult === 'number' && Number.isFinite(source.bestMult) ? Math.max(0, source.bestMult) : 0,
+    bestCombo: count(source.bestCombo),
+    sentences: count(source.sentences),
+    daysCleared: count(source.daysCleared),
+  }
+  return JSON.stringify(run.record) !== before
 }
 
 /**
@@ -129,11 +273,11 @@ function isRunState(value: unknown): value is RunState {
   const player = run.player
   return (
     typeof run.day === 'number' &&
-    run.day >= 1 &&
+    Number.isFinite(run.day) &&
     !!player &&
     typeof player === 'object' &&
     !!player.stats &&
-    typeof player.stats.hp === 'number' &&
+    typeof player.stats === 'object' &&
     Array.isArray(player.items) &&
     !!player.deck &&
     typeof player.deck === 'object'
@@ -145,9 +289,16 @@ export function deserializeRun(raw: string): RunState | null {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!isRunState(parsed)) return null
+    if (typeof parsed.schemaVersion === 'number' && parsed.schemaVersion > RUN_SAVE_SCHEMA_VERSION) return null
 
     // 감정 속성 도입 전 저장된 카드도 현재 데이터 형식으로 올린다.
     let migrated = false
+    const day = Math.max(1, Math.floor(parsed.day))
+    if (day !== parsed.day) {
+      parsed.day = day
+      migrated = true
+    }
+    migrated = normalizePlayerStats(parsed) || migrated
     // 엔드리스 상태 도입 전 16일 이상 진행한 런은 이미 첫 이야기를 마친 것으로 본다.
     if (typeof parsed.endless !== 'boolean') {
       parsed.endless = parsed.day > 15
@@ -157,14 +308,24 @@ export function deserializeRun(raw: string): RunState | null {
       parsed.endingSeen = parsed.day > 15
       migrated = true
     }
-    if (parsed.reward === undefined) {
-      parsed.reward = null
+    if (typeof parsed.pendingEndingGrade !== 'number' || !Number.isFinite(parsed.pendingEndingGrade)) {
+      if (parsed.pendingEndingGrade !== null) migrated = true
+      parsed.pendingEndingGrade = null
+    } else if (parsed.pendingEndingGrade < 0) {
+      parsed.pendingEndingGrade = 0
       migrated = true
     }
-    if (parsed.reward && !Array.isArray(parsed.reward.picks)) {
-      parsed.reward.picks = []
+    if (parsed.pendingEndingGrade == null) {
+      if (parsed.pendingEndingEarned !== null) migrated = true
+      parsed.pendingEndingEarned = null
+    } else if (typeof parsed.pendingEndingEarned !== 'number' || !Number.isFinite(parsed.pendingEndingEarned)) {
+      parsed.pendingEndingEarned = Math.max(0, Math.round(parsed.pendingEndingGrade))
+      migrated = true
+    } else if (parsed.pendingEndingEarned < 0) {
+      parsed.pendingEndingEarned = 0
       migrated = true
     }
+    migrated = normalizePendingReward(parsed) || migrated
     if (typeof parsed.inspiration !== 'number' || !Number.isFinite(parsed.inspiration)) {
       parsed.inspiration = 0
       migrated = true
@@ -172,20 +333,8 @@ export function deserializeRun(raw: string): RunState | null {
       parsed.inspiration = 0
       migrated = true
     }
-    if (parsed.reward && typeof parsed.reward.seed !== 'number') {
-      parsed.reward.seed = Math.floor(Math.random() * 0x7fffffff)
-      migrated = true
-    }
-    if (parsed.reward && !parsed.reward.refreshes) {
-      parsed.reward.refreshes = { subject: 0, item: 0, verb: 0 }
-      migrated = true
-    }
-    // 결과 화면 기록 도입 전 저장된 런은 빈 기록으로 시작한다 — 지난 판을 소급해
-    // 셈할 방법은 없으니 0에서 이어 적는다.
-    if (!parsed.record || typeof parsed.record !== "object") {
-      parsed.record = emptyRunRecord()
-      migrated = true
-    }
+    // 결과 화면 기록 도입 전 저장은 빈 기록으로 시작하고, 부분 손상은 유효한 값만 살린다.
+    migrated = normalizeRunRecord(parsed) || migrated
     migrated = migrateCombatBalance(parsed) || migrated
     // 이전 저장은 전투마다 풀피·방어 0으로 시작했으므로 보정된 최대 체력에서 새 지속 규칙을 시작한다.
     if (!parsed.combat || typeof parsed.combat.hp !== 'number' || typeof parsed.combat.guard !== 'number') {
@@ -199,17 +348,8 @@ export function deserializeRun(raw: string): RunState | null {
         migrated = true
       }
     }
-    for (const words of Object.values(parsed.player.deck)) {
-      for (const word of words) {
-        const subjectEmotion = LEGACY_SUBJECT_EMOTIONS[word.id]
-        if (!word.emotion || (subjectEmotion && word.emotion === 'neutral')) {
-          word.emotion = subjectEmotion ?? 'neutral'
-          migrated = true
-        }
-      }
-    }
     migrated = migrateCardDefinitions(parsed) || migrated
-    migrated = migrateRemovedItems(parsed) || migrated
+    migrated = migrateItems(parsed) || migrated
     if (parsed.schemaVersion !== RUN_SAVE_SCHEMA_VERSION) {
       parsed.schemaVersion = RUN_SAVE_SCHEMA_VERSION
       migrated = true

@@ -5,7 +5,8 @@
 
 import type { Tables, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
-import { hasPassive, slotOrderFor } from '@core/passives'
+import { currentLocale, type LocaleCode } from '@/localization'
+import { hasPassive, slotOrderFor, TWIN_VERB_SCALE } from '@core/passives'
 import { buildTemplate } from './slots'
 import {
   EARLY_COMBOS,
@@ -13,6 +14,7 @@ import {
   EARLY_DISSONANCES,
   EARLY_WORDS,
   GROW_WORDS,
+  LOCALE_EARLY_COMBOS,
   PUNCT_WORDS,
   REWARD_WORDS,
 } from './generated/sentenceData'
@@ -23,6 +25,7 @@ export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, RE
 const QUEEN_BEE_TACTIC: Word = {
   ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
   id: 'queenBeeTactic',
+  effects: { summonExecuteCount: 2 },
   note: '토큰의 공략 단어 · 공격 ×0.9 · 일벌 2마리 퇴치',
   lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
 }
@@ -33,7 +36,6 @@ const ELDER_SPIDER_TACTIC: Word = {
   slot: 'verb',
   tags: ['adapt', 'atk'],
   emotion: 'neutral',
-  inkCost: 2,
   stat: 'atk',
   statMult: 1,
   kind: 'attack',
@@ -62,8 +64,6 @@ export function tablesForEncounter(tables: Tables, enemyId?: string): Tables {
 
 export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']
 
-const MULT_CAP = 2.5
-
 /**
  * 슬롯을 가리지 않는 카드의 slot 값. 무럭무럭은 특정 성분이 아니라 "어느 칸에나
  * 끼어드는 한 장"이라 CSV에 슬롯별로 적지 않고 이 한 행만 둔다.
@@ -83,7 +83,7 @@ const GROW_LORE: Record<string, string> = {
   adv: '수식하지 않는다. 그냥 자란다.',
   obj: '무엇을 자라게 했느냐 물으면, 그냥 자랐다고 답한다.',
   verb: '때리지도 막지도 않는다. 그냥 자란다.',
-  verb2: '두 번 자란다. 문법은 나중에 생각한다.',
+  verb2: '그리고 또 자란다. 두 동작 사이에도 숨을 고른다.',
   end: '문장을 맺지 않는다. 맺을 새도 없이 자란다.',
   punct: '문장 끝에 붙어서도 자란다. 숙주는 어디서든 자란다.',
 }
@@ -108,6 +108,25 @@ export function growCardFor(slotKey: string): Word {
 export const LEGENDARY_REWARD_WORDS: Word[] = ['subj', 'adv', 'verb'].map(growCardFor)
 export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORDS, ...LEGENDARY_REWARD_WORDS]
 
+/** 두 번째 동사는 새 행동 갈래를 열되 첫 동사의 연타·반복을 문장 전체에 복제하지 않는다. */
+function secondaryVerb(word: Word): Word {
+  const effects = word.effects ? { ...word.effects } : undefined
+  if (effects) {
+    if (typeof effects.guard === 'number') effects.guard *= TWIN_VERB_SCALE
+    if (typeof effects.heal === 'number') effects.heal *= TWIN_VERB_SCALE
+    delete effects.hitCount
+    delete effects.castCount
+    delete effects.castScale
+    delete effects.overdrawHitCount
+  }
+  return {
+    ...word,
+    power: word.power ? word.power * TWIN_VERB_SCALE : word.power,
+    statMult: word.statMult != null ? word.statMult * TWIN_VERB_SCALE : word.statMult,
+    effects,
+  }
+}
+
 /**
  * 아이템 패시브가 슬롯을 늘리면 그 칸의 단어 목록도 함께 채워야 한다.
  * 겹동사는 동사 덱을 그대로 다시 쓰고, 문장부호는 전용 풀을 쓴다.
@@ -115,30 +134,19 @@ export const ALL_REWARD_WORDS: Word[] = [...REWARD_WORDS, ...SPECIAL_REWARD_WORD
 export function makeEarlyTables(
   deck: Record<string, Word[]> = EARLY_WORDS,
   player?: PlayerState,
+  locale: LocaleCode = currentLocale,
 ): Tables {
   const order = slotOrderFor(EARLY_TEMPLATE, player)
   const words: Record<string, Word[]> = { ...deck }
   if (hasPassive(player, 'punct')) words.punct = PUNCT_WORDS
   // 겹슬롯은 원본 칸의 목록을 그대로 다시 쓴다.
   if (hasPassive(player, 'twinSubj')) words.subj2 = words.subj ?? []
-  if (hasPassive(player, 'twinVerb')) words.verb2 = words.verb ?? []
-  // 잭과 숙주나물 — 열려 있는 칸을 전부 돌며 그 칸 이름표를 단 무럭무럭을 한 장씩 찍는다.
-  // 카드가 아니라 칸을 기준으로 도니까 목적어·어미는 물론 앞으로 늘어날 칸까지
-  // 데이터를 고치지 않고 따라온다. 겹슬롯 복제가 끝난 뒤라 subj2·verb2도 제 몫을 받는다.
-  if (hasPassive(player, 'beanstalk')) {
-    for (const key of order) {
-      const pool = words[key]
-      if (!pool) continue
-      const card = growCardFor(key)
-      if (!pool.some((x) => x.id === card.id)) words[key] = [...pool, card]
-    }
-  }
+  if (hasPassive(player, 'twinVerb')) words.verb2 = (words.verb ?? []).map(secondaryVerb)
   return {
     template: buildTemplate(order),
     words,
-    combos: EARLY_COMBOS,
+    combos: [...EARLY_COMBOS, ...(LOCALE_EARLY_COMBOS[locale] ?? [])],
     conflicts: EARLY_CONFLICTS,
     dissonances: EARLY_DISSONANCES,
-    multCap: MULT_CAP,
   }
 }

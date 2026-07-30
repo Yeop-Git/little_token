@@ -1,16 +1,17 @@
 import { comboLeads, compile, withOverdrawEffects } from '@core/compiler'
 import { bossTurnPressureMultiplier } from '@core/combatRules'
-import { DECK_LIMITS, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
+import { DECK_LIMITS, applyItemReward, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
+import { ECHO_REPEAT_SCALE, LUCK_CLOAK_RATE, TWIN_VERB_SCALE } from '@core/passives'
 import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
 import { wordValueLines } from '@core/wordText'
 import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
-import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
+import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, bossEliteRarityForDay, eliteRarityForEncounter, enemyDefForEncounter, enemyRarityWeightsForDay } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
 import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardRarityWeights } from '@data/rewards'
-import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, rollExclaimMultipliers } from '@data/items'
+import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, EXCLAIM_SLOTS, ITEM_BLESS_POOL, itemStatBudget, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
   activeEnemyPart,
@@ -18,6 +19,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  enemyAttackForecast,
   enemyTurn,
   makeEnemy,
   playerGuardLimit,
@@ -36,7 +38,7 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
 }
-const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, enemyAttackDown: 0, drawCards: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra });
+const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, enemyAttackDown: 0, drawCards: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
@@ -46,7 +48,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const counts = { common: 0, rare: 0, epic: 0, legendary: 0 }
   for (const item of Object.values(ALL_ITEMS)) {
     counts[item.rarity]++
-    const baseBudget = item.base.hp / 2 + item.base.atk + item.base.guard + item.base.heal + item.base.luck
+    const baseBudget = itemStatBudget(item.base)
     const expectedBaseBudget = item.rarity === 'common' ? 1 : item.rarity === 'rare' ? 2 : 0
     assert(baseBudget === expectedBaseBudget, `${item.name} keeps its ${expectedBaseBudget}-point base stat budget`)
     assert((item.rarity === 'epic' || item.rarity === 'legendary') === !!item.passive, `${item.name} passive matches rarity tier`)
@@ -58,7 +60,31 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
     assert(multipliers.reduce((sum, value) => sum + value - 1, 0) === expectedBonus[rarity as keyof typeof expectedBonus], `${rarity} exclaim rarity bonus stays fixed`)
   }
   assert(rollExclaimMultipliers('rare', () => 0).join(',') !== rollExclaimMultipliers('rare', () => 0.99).join(','), 'rare exclaim bonus can appear in different slots')
+  assert(EXCLAIM_SLOTS.flatMap((slot) => slot.words).filter((choice) => choice.mods.atk).every((choice) => choice.mods.atk === 0.5), 'every regular attack exclaim follows the half-point item rule')
+  assert(ITEM_BLESS_POOL.every((bless) => itemStatBudget({ [bless.stat]: bless.n }) === 1), 'every lucky exclaim grants exactly one item-budget point')
+  assert(ECHO_REPEAT_SCALE === 0.5 && TWIN_VERB_SCALE === 0.5 && LUCK_CLOAK_RATE === 0.35, 'rule-item numeric contracts stay at echo 50%, twin verb 50%, and luck 35%')
   assert(Math.abs(counts.common - counts.rare) <= 1 && Math.abs(counts.epic - counts.legendary) <= 1, 'item rarities remain evenly distributed')
+  const expectedPassiveTiers = {
+    retry: 'epic', heavyShoe: 'epic', doubt: 'epic', bbq: 'epic', beanstalk: 'epic',
+    echo: 'legendary', twinVerb: 'legendary', luckCloak: 'legendary', punct: 'legendary', twinSubj: 'legendary', matchFire: 'legendary',
+  } as const
+  for (const item of Object.values(ALL_ITEMS).filter((entry) => entry.passive)) {
+    assert(item.rarity === expectedPassiveTiers[item.passive!], `${item.name} passive power matches its rarity tier`)
+  }
+}
+{
+  const player = startingPlayer()
+  const item = { id: 'duplicate-contract', name: '중복 검사', rarity: 'common' as const, art: '', line: '', stats: { atk: 0.5 } }
+  applyItemReward(player, item)
+  applyItemReward(player, item)
+  assert(player.items.filter((owned) => owned.id === item.id).length === 1 && player.stats.atk === 5.5, 'item acquisition boundary rejects duplicate stats and entries')
+}
+{
+  const player = startingPlayer()
+  player.items.push(...Object.values(ALL_ITEMS).map((item) => ({
+    id: item.id, name: item.name, rarity: item.rarity, art: item.art, line: '', stats: {}, passive: item.passive,
+  })))
+  assert(genRewards(player, 10, 10, 'item', () => 0).length === 0, 'owned items never return as repeat stat purchases')
 }
 {
   const legacy = { player: { ...startingPlayer(), stats: { hp: 20, atk: 5, guard: 5, heal: 5, luck: 3 } }, day: 4, endless: false, endingSeen: false } as Omit<RunState, 'balanceVersion'>
@@ -76,6 +102,8 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
     balanceVersion: 0,
     endless: false,
     endingSeen: false,
+    pendingEndingGrade: null,
+    pendingEndingEarned: null,
     reward: null,
   }
   migrateCombatBalance(legacy)
@@ -144,6 +172,32 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const s = state([makeEnemy(foe('guard-remains'))]); s.guard = 7; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.absorbed === 4 && s.guard === 3 && s.counterMultiplier === 1.5, 'guard remains after absorbing a smaller hit'); applyPreparation(s, attack(), 1); assert(s.guard === 3 && s.counterMultiplier === 1.5, 'non-guard preparation preserves remaining guard') }
 { const s = state([makeEnemy(foe('guard-stacks'))]); s.guard = 3; const r = applyPreparation(s, attack({ guard: 5 }), 1); assert(r.guardGain === 5 && s.guard === 8, 'new guard stacks with remaining guard') }
 {
+  const s = state([makeEnemy(foe('magic-piercer', { pierceGuard: true }))])
+  const prep = applyPreparation(s, attack({ kind: 'guard', base: 0, magicShield: 1 }), 1)
+  const strike = enemyTurn(s, () => 0, 'second')[0]
+  assert(prep.magicShieldGain === 1 && strike.magicShieldBroken && strike.dealt === 0 && s.playerMagicShield === 0, 'player magic shield blocks one guard-piercing enemy attack')
+}
+{
+  const s = state([makeEnemy(foe('stored-resolve', { hp: 100 }))])
+  s.guard = 20
+  const r = applyIntent(s, attack({ guardAttackMultiplier: .75 }), 1, 0)
+  assert(r.hits[0].dmg === 25 && s.guard === 20, 'stored resolve adds current guard damage without consuming guard')
+}
+{
+  const s = state([makeEnemy(foe('overheal', { hp: 100 }))])
+  s.playerMax = 100
+  s.playerHp = 95
+  const r = applyIntent(s, attack({ kind: 'heal', base: 0, heal: 10, overhealDamageMultiplier: 1 }), 1, 0)
+  assert(s.playerHp === 100 && r.convertedDamage === 5 && r.hits[0].dmg === 5, 'only healing beyond max HP converts to damage')
+}
+{
+  const s = state([makeEnemy(foe('lifesteal', { hp: 100 }))])
+  s.playerMax = 100
+  s.playerHp = 50
+  const r = applyIntent(s, attack({ lifeStealRate: .5 }), 1, 0)
+  assert(s.playerHp === 55 && r.lifeStolen === 5, 'lifesteal heals from actual HP damage dealt')
+}
+{
   const s = state([makeEnemy(foe('guard-cap'))])
   s.guard = 28
   const r = applyPreparation(s, attack({ guard: 10 }), 1)
@@ -152,8 +206,20 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 {
   const s = state([makeEnemy(foe('weakened'))])
   applyPreparation(s, attack({ enemyAttackDown: 3 }), 1)
+  s.guard = 2
+  const preview = enemyAttackForecast(s, s.enemies[0])
+  assert(preview.raw.join(',') === '1,3' && preview.dealt.join(',') === '0,1' && preview.hpAfter.join(',') === '29,30', 'enemy forecast includes attack reduction, guard, and post-hit hp')
   const strikes = enemyTurn(s, () => 0, 'second')
-  assert(strikes[0]?.dealt === 1 && s.enemyAttackReduction === 0, 'enemy attack reduction applies once and is consumed')
+  assert(strikes[0]?.dealt === 0 && strikes[0]?.absorbed === 1 && s.enemyAttackReduction === 0, 'enemy attack reduction applies once and is consumed')
+}
+{
+  const s = state([makeEnemy(foe('forecast-pierce', { pierceGuard: true }))])
+  s.guard = 20
+  const preview = enemyAttackForecast(s, s.enemies[0])
+  assert(preview.piercedGuard && preview.dealt.join(',') === '4,6' && preview.hpAfter.join(',') === '24,26', 'enemy forecast exposes guard piercing instead of subtracting stored guard')
+  s.playerMagicShield = 1
+  const shielded = enemyAttackForecast(s, s.enemies[0])
+  assert(shielded.magicShieldBlocked && shielded.dealt.join(',') === '0,0' && shielded.hpAfter.join(',') === '30,30', 'enemy forecast applies magic shield before guard piercing')
 }
 {
   // 상한에 막혀 비축분이 0이어도 그 턴을 방어에 썼으므로 반격은 걸려 있어야 한다.
@@ -203,7 +269,8 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const strike = enemyTurn(s, () => 0, 'second')[0]
   assert(strike.dealt === 7, 'long-fight pressure raises the elder spider damage limit instead of being swallowed by it')
 }
-assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '1,2,3', 'mantis data keeps distinct normal, telegraph, and strong pattern stages')
+assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '2,3', 'mantis data repeats a distinct telegraph then strong attack cycle')
+assert(ENEMIES.mantis.attackPattern?.[0].damageScale === 0 && ENEMIES.mantis.attackPattern[1].shatterGuard, 'mantis data telegraphs before every guard-shattering strike')
 {
   const modifiers = [...EARLY_WORDS.adv, ...REWARD_WORDS.filter((word) => word.slot === 'adv')]
   const orphaned = modifiers.filter((word) => comboLeads(word, makeEarlyTables().combos).length === 0)
@@ -222,14 +289,15 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   const queen = makeEnemy(ENEMIES.queenBee)
   const s = state([queen]); summonAtTurnStart(s)
   const focused = applyIntent(s, attack({ base: 30, emotions: ['anger'] }), 1, 0)
-  assert(focused.summonsDispersed === 1 && focused.summonFocusedBacklash && focused.summonBacklashDamage === 2, 'anger single-target worker defeat doubles queen backlash')
+  assert(focused.summonsDispersed === 1 && focused.summonFocusedBacklash && focused.summonBacklashDamage === 4, 'anger single-target worker defeat doubles queen backlash')
   const wide = applyIntent(s, attack({ base: 60, targetCount: 2, emotions: ['anger'] }), 1, 0)
-  assert(wide.summonsDispersed === 2 && !wide.summonFocusedBacklash && wide.summonBacklashDamage === 2, 'wide anger attack keeps normal backlash while progressing faster toward groggy')
+  assert(wide.summonsDispersed === 2 && !wide.summonFocusedBacklash && wide.summonBacklashDamage === 4, 'wide anger attack keeps normal backlash while progressing faster toward groggy')
   assert(QUEEN_ESCORT_IMMUNITY_LABEL === '호위 중 : 본체 무적' && ENEMIES.queenBee.note.includes(QUEEN_ESCORT_IMMUNITY_LABEL), 'queen escort immunity uses the required visible copy')
 }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); const r = applyIntent(s, attack({ base: 17 }), 1, 0); assert(r.summonDamage === 17 && r.summonsDispersed === 0 && queen.summonHpRight[queen.summonHpRight.length - 1] === 13 && summonCount(queen) === 4, 'partial damage remains on the front worker and keeps its health bar visible') }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 4 && r.summonDamage === 120 && r.summonBacklashDamage === 4 && r.hits.length === 0 && queen.hp === hp - 4 && r.summonGroggyTriggered && queen.summonsDefeated === 0, 'exactly 120 piercing damage clears all four workers without duplicating the spent damage onto the body'); assert(queen.nextAttackTurn === 2 && queen.groggyUntilTurn === 1 && queen.summonRespawnTurn === 3 && queen.groggyDamageMult === 1.5, 'four workers open one recovery turn before the next complete wave') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 2 && r.summonDamage === 60 && r.summonBacklashDamage === 4 && r.hits.length === 1 && r.hits[0].summonShieldBlocked && queen.hp === hp - 4 && !r.summonGroggyTriggered && queen.summonsDefeated === 2, 'single-target pierce reaches exactly two workers and the surviving escort blocks its remaining damage'); assert(queen.nextAttackTurn === 1 && queen.groggyUntilTurn === 0 && queen.summonRespawnTurn === 1, 'a partial piercing clear does not open queen recovery') }
 { const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); assert(t.words.verb.some((word) => word.id === 'queenBeeTactic' && word.targetCount === 2), 'queen encounter lends a two-target tactic even when the deck has no range answer') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); const tactic = tables.words.verb.find((word) => word.id === 'queenBeeTactic')!; const subject = tables.words.subj[0]; const modifier = tables.words.adv[0]; const intent = compile({ subj: subject, adv: modifier, verb: tactic }, tables, { atk: 1, guard: 1, heal: 1, luck: 0 }); const r = applyIntent(s, intent, 1, 0); assert(r.summonsDispersed === 2, 'queen encounter tactic defeats two workers even for a low-attack build') }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
 {
   const queen = makeEnemy(ENEMIES.queenBee)
@@ -237,12 +305,12 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(summonCount(queen) === 4, 'queen opens with a complete four-worker wave')
   const hp = queen.hp
   let r = applyIntent(s, attack({ base: 30, targetCount: 1 }), 1, 0)
-  assert(r.summonsDispersed === 1 && r.summonBacklashDamage === 1 && queen.hp === hp - 1, 'each defeated worker deals direct backlash through body immunity')
+  assert(r.summonsDispersed === 1 && r.summonBacklashDamage === 2 && queen.hp === hp - 2, 'each defeated worker deals direct backlash through body immunity')
   assert(r.hits.length === 0 && summonCount(queen) === 3, 'damage spent on a worker is not duplicated onto the immune queen body')
   s.turn = 2; summonAtTurnStart(s)
   assert(summonCount(queen) === 3, 'a partially defeated worker wave does not refill')
   r = applyIntent(s, attack({ base: 60, targetCount: 1, pierceGuard: true }), 1, 0)
-  assert(r.summonsDispersed === 2 && summonCount(queen) === 1 && r.hits.length === 0 && queen.hp === hp - 3, 'pierce carries through reachable workers but does not duplicate spent damage onto the body')
+  assert(r.summonsDispersed === 2 && summonCount(queen) === 1 && r.hits.length === 0 && queen.hp === hp - 6, 'pierce carries through reachable workers but does not duplicate spent damage onto the body')
 }
 {
   const queen = makeEnemy(ENEMIES.queenBee)
@@ -269,8 +337,8 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1
   const hp = queen.hp
   const r = applyIntent(s, attack({ base: 150, targetCount: 2, pierceGuard: true }), 1, 0)
-  assert(r.summonsDispersed === 4 && r.summonBacklashDamage === 12 && r.summonGroggyTriggered, 'two-target pierce clears the complete worker wave and opens groggy')
-  assert(r.summonDamage === 120 && r.hits[0].dmg === 45 && queen.hp === hp - 57, 'worker chain spends 120 damage, then carries only the remaining 30 into the groggy body')
+  assert(r.summonsDispersed === 4 && r.summonBacklashDamage === 24 && r.summonGroggyTriggered, 'two-target pierce clears the complete worker wave and opens groggy')
+  assert(r.summonDamage === 120 && r.hits[0].dmg === 44 && queen.hp === hp - 68, 'worker chain spends 120 damage, then carries the remaining strike into the groggy body up to its current bar boundary')
   assert(queen.nextAttackTurn === 2 && queen.groggyUntilTurn === 1, 'worker-wave groggy skips the imminent queen attack for one turn')
   s.turn = 2; summonAtTurnStart(s)
   assert(summonCount(queen) === 0 && enemyTurn(s, () => 0, 'second').length === 0, 'queen spends the whole next turn recovering without summoning or attacking')
@@ -353,6 +421,16 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(r.hits[0].weak && r.hits[0].dmg === spider.hpPerBar * 4 && r.hits[0].barsBroken === 4 && spider.dead, 'weakness plus a named combo displays and applies all four penetrated parts')
 }
 {
+  const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
+  spider.guard = 0
+  spider.magicShield = 0
+  const s = state([spider])
+  let transfer = applyOverkillTransfer(s, 0, spider.maxHp * 2, { emotions: ['anger'], comboMatched: true })
+  assert(transfer.dealt === spider.hpPerBar && !transfer.killed && activeEnemyPart(spider)?.def.id === 'leg-anger', 'overkill transfer without the active weakness stops at the current spider part')
+  transfer = applyOverkillTransfer(s, 0, spider.maxHp * 2, { emotions: ['anger'], comboMatched: true })
+  assert(transfer.killed && spider.dead, 'overkill transfer crosses remaining spider parts only with the active weakness and a named combo')
+}
+{
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 99)
   spider.guard = 0
   spider.magicShield = 0
@@ -414,6 +492,41 @@ for (let day = 1; day <= 8; day++) {
   if (!stage.isBoss) stage.encounter.forEach((id) => stagedRegularEnemies.add(id))
 }
 assert(regularEnemyIds.every((id) => stagedRegularEnemies.has(id)), 'all six regular enemies appear by day 8')
+assert([1, 5, 10].every((floor) => eliteRarityForEncounter(floor, 0, 0) === null), 'first story cycle keeps floors one to ten and bosses non-elite')
+assert([11, 12, 13, 14].every((floor) => eliteRarityForEncounter(floor, 0, 0) === 'rare'), 'first story cycle introduces only rare elites on floors eleven to fourteen')
+assert(enemyRarityWeightsForDay(16).common > enemyRarityWeightsForDay(16).rare && enemyRarityWeightsForDay(16).epic === 0, 'early endless remains mostly common with a small rare share')
+assert(enemyRarityWeightsForDay(60).epic > enemyRarityWeightsForDay(60).rare, 'mid endless gradually shifts its center from rare to epic')
+assert(enemyRarityWeightsForDay(105).legendary >= 0.6 && enemyRarityWeightsForDay(105).legendary > enemyRarityWeightsForDay(105).epic, 'floor 105 curve makes legendary the majority rarity')
+assert(enemyRarityWeightsForDay(104).legendary < enemyRarityWeightsForDay(105).legendary, 'legendary share rises continuously into the floor 105 threshold')
+{
+  let legendary = 0
+  let total = 0
+  for (let day = 106; day <= 119; day++) {
+    const stage = stageFor(day)
+    stage.encounter.forEach((_, index) => {
+      if (eliteRarityForEncounter(stage.floor, stage.endlessCycle, index, stage.encounter.length) === 'legendary') legendary++
+      total++
+    })
+  }
+  assert(legendary / total > 0.5, 'regular encounters after floor 105 are actually majority legendary, not only weighted that way on paper')
+}
+assert(bossEliteRarityForDay('mantis', 5) === null && bossEliteRarityForDay('mantis', 20) === 'rare', 'story boss stays base while the first repeated mantis can become rare')
+for (const bossId of ['mantis', 'queenBee', 'elderSpider']) {
+  const order = [20, 35, 50, 65, 80, 95, 110].map((day) => {
+    const rarity = bossEliteRarityForDay(bossId, day)
+    return rarity === null ? 0 : rarity === 'rare' ? 1 : rarity === 'epic' ? 2 : 3
+  })
+  assert(order.every((value, index) => index === 0 || value >= order[index - 1]), `${bossId} elite boss rarity never falls on later cycles`)
+  assert(order[order.length - 1] === 3, `${bossId} is legendary after floor 105`)
+}
+{
+  const warded = enemyDefForEncounter('pillbug', 11, 0, 0)
+  const leeching = enemyDefForEncounter('mosquito', 12, 0, 0)
+  const raging = enemyDefForEncounter('termite', 13, 0, 0)
+  assert(warded.elite?.trait === 'warded' && (warded.magicShield ?? 0) === 2, 'rare warded elite adds one magic-shield layer')
+  assert(leeching.elite?.trait === 'leeching' && (leeching.attackPattern?.[0].lifeStealRate ?? 0) > 0, 'rare leeching elite gains a disclosed lifesteal action')
+  assert(raging.elite?.trait === 'raging' && raging.attackPattern?.length === 2 && (raging.attackPattern[1].damageScale ?? 0) > 1, 'rare raging elite alternates probe and heavy charge')
+}
 assert(floorInCycle(15) === 15 && floorInCycle(16) === 1 && endlessCycleFor(16) === 1, 'endless cycle boundary')
 assert(stageFor(20).encounter.join(',') === 'mantis', 'endless floor 5 repeats first boss')
 assert(stageFor(25).encounter.join(',') === 'queenBee', 'endless floor 10 repeats second boss')
@@ -462,7 +575,7 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
       assert(!genRewards(player, 10, day, phase).some((option) => option.rarity === 'legendary'), `early floor ${floorInCycle(day)} blocks legendary ${phase} rewards`)
     }
   }
-  for (const day of [4, 9, 14]) {
+  for (const day of [3, 4, 5, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 29]) {
     const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
     const reward = genRewards(player, 5, day, 'verb')
     assert(reward.some((option) => option.word && tacticalIds.has(option.word.id)), `boss-eve day ${day} offers a matching tactical verb`)
@@ -482,7 +595,7 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
 }
 
 const word = (id: string, emotion: Word['emotion']): Word => ({ id, text: id, slot: id === 'v' ? 'verb' : id, tags: [], emotion, note: '', kind: id === 'v' ? 'attack' : undefined, power: id === 'v' ? 10 : undefined })
-const result = compile({ subj: word('subj', 'joy'), adv: word('adv', 'joy'), verb: word('v', 'joy') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })
+const result = compile({ subj: word('subj', 'joy'), adv: word('adv', 'joy'), verb: word('v', 'joy') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [] })
 assert(result.emotionResonance === 1.3, 'emotion resonance')
 const stackedResonanceResult = compile(
   {
@@ -505,26 +618,27 @@ const stackedResonanceResult = compile(
     words: {},
     combos: [],
     conflicts: [],
-    multCap: 9,
   },
 )
 assert(stackedResonanceResult.emotionResonance === 1.6, 'emotion resonance keeps stacking past three cards')
 assert(stackedResonanceResult.breakdown.mults.some((part) => part.source === 'emotion' && part.value === 1.6 && part.hint === '같은 감정 5장'), 'stacked emotion resonance stays visible in the tally')
-const neutralResult = compile({ subj: word('subj', 'neutral'), adv: word('adv', 'neutral'), verb: word('v', 'neutral') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [], multCap: 9 })
+const neutralResult = compile({ subj: word('subj', 'neutral'), adv: word('adv', 'neutral'), verb: word('v', 'neutral') }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }, { key: 'adv', label: '', role: 'modifier' }, { key: 'verb', label: '', role: 'verb' }] }, words: {}, combos: [], conflicts: [] })
 assert(neutralResult.emotionResonance === 1, 'neutral cards do not resonate')
 const legacyWord = { ...word('legacy', 'neutral'), emotion: undefined } as unknown as Word
 assert(!wordValueLines(legacyWord).some((line) => line.cls.startsWith('emotion')), 'card values keep emotion in the icon badge')
-assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [], multCap: 9 }).emotionResonance === 1, 'legacy emotion does not resonate')
+assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label: '', role: 'subject' }] }, words: {}, combos: [], conflicts: [] }).emotionResonance === 1, 'legacy emotion does not resonate')
 assert(EARLY_WORDS.subj.every((subject) => subject.emotion !== 'neutral'), 'starting subjects carry emotions')
 
 const resonanceCards = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
-assert(resonanceCards.length === 60, `resonance card total (${resonanceCards.length})`)
+assert(resonanceCards.length === 68, `resonance card total (${resonanceCards.length})`)
 for (const slot of ['subj', 'adv', 'verb']) {
   const slotCards = resonanceCards.filter((card) => card.slot === slot)
-  assert(slotCards.length === 20, `${slot} card total (${slotCards.length})`)
+  const expectedSlotCards = slot === 'verb' ? 28 : 20
+  const expectedEmotionCards = slot === 'verb' ? 7 : 5
+  assert(slotCards.length === expectedSlotCards, `${slot} card total (${slotCards.length})`)
   for (const emotion of ['joy', 'anger', 'sorrow', 'pleasure'] as const) {
     const count = slotCards.filter((card) => card.emotion === emotion).length
-    assert(count === 5, `${slot} ${emotion} balance (${count})`)
+    assert(count === expectedEmotionCards, `${slot} ${emotion} balance (${count})`)
   }
   assert(slotCards.every((card) => card.emotion !== 'neutral'), `${slot} has no forced neutral card`)
 }
@@ -542,10 +656,10 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
 {
   const mantis = makeEnemy(ENEMIES.mantis, 1, 1, 2)
   const s = state([mantis])
-  mantis.attackPatternIndex = 1
+  mantis.attackPatternIndex = 0
   let sentence = enemySentenceFor(s, mantis)!
   assert(sentence.tokens.some((token) => token.text.includes('치켜든다')) && sentence.meta.includes('이번 행동 피해 없음'), 'mantis preparation sentence announces the harmless wind-up')
-  mantis.attackPatternIndex = 2
+  mantis.attackPatternIndex = 1
   sentence = enemySentenceFor(s, mantis)!
   assert(sentence.tone === 'danger' && sentence.meta.some((line) => line.startsWith('필요 방어 ')), 'mantis heavy sentence exposes the exact guard answer')
   mantis.groggyUntilTurn = s.turn

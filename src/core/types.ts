@@ -74,6 +74,14 @@ export interface WordEffects {
   overdrawHitCount?: number
   /** 막아 낸 피해에 곱할 즉시 반격 계수. */
   counterMultiplier?: number
+  /** 다음 적 공격 한 번을 통째로 막는 플레이어 매직실드. 한 겹만 유지한다. */
+  magicShield?: number
+  /** 현재 방어도의 일부를 소모 없이 공격 피해로 사용한다. */
+  guardAttackMultiplier?: number
+  /** 최대 체력을 넘긴 회복량의 일부를 공격 피해로 바꾼다. */
+  overhealDamageMultiplier?: number
+  /** 실제로 입힌 체력 피해의 일부를 회복한다. */
+  lifeStealRate?: number
   /** 이 문장을 완성할 때 지불하는 총 잉크를 줄인다. 카드 자체 비용 표기와 별도로 공개한다. */
   inkDiscount?: number
   /** 정산 뒤 다음 문장으로 넘기는 잉크를 추가한다(이월 상한 2 적용). */
@@ -82,6 +90,8 @@ export interface WordEffects {
   enemyAttackDown?: number
   /** Adds cards to the opening hand of the next sentence. */
   drawCards?: number
+  /** 여왕벌 전용 공략처럼 피해량과 무관하게 앞쪽 소환물을 확정 퇴치하는 수. */
+  summonExecuteCount?: number
 }
 
 // 문장이 기대는 플레이어 스탯 — 현재 일반 런에서는 동사의 깡수치가 여기서 나온다.
@@ -184,8 +194,13 @@ export interface Intent {
   castScale: number
   overdrawHitCount: number
   counterMultiplier: number
+  magicShield: number
+  guardAttackMultiplier: number
+  overhealDamageMultiplier: number
+  lifeStealRate: number
   enemyAttackDown: number
   drawCards: number
+  summonExecuteCount: number
   emotions: Emotion[]
   emotionResonance: number
   tags: string[]
@@ -222,8 +237,8 @@ export interface IntentPart {
 export interface CompileMods {
   /** 백설공주의 구두 — 피해 동사가 있으면 깡수치에 한 번 가산. */
   verbFlat?: number
-  /** 성냥팔이 소녀의 망토 — 모든 동사가 운 스탯만큼 깡수치를 더 받는다. */
-  verbLuck?: boolean
+  /** 성냥팔이 소녀의 망토 — 모든 동사가 운 스탯의 이 비율만큼 깡수치를 더 받는다. */
+  verbLuck?: number
   /** 빨간망토의 성냥 — 배율 역할 칸마다 보너스를 더 얹는다. */
   bonusEach?: number
   /** 아기돼지 바베큐 — 이번 전투 처치 수에서 나온 배율(1이면 없음). */
@@ -238,7 +253,6 @@ export interface Tables {
   combos: Combo[]
   conflicts: Conflict[]
   dissonances?: Dissonance[]
-  multCap: number
 }
 
 // ── 적 ──
@@ -253,6 +267,14 @@ export interface EnemyDef {
   initiative: 'first' | 'second' // 문장 완성 후 플레이어보다 먼저/나중에 행동
   sprite: string // Sprites.ts 키
   note: string
+  /** 같은 모델을 카드 등급 셰이더와 강화 규칙으로 변주한 정예 개체. */
+  elite?: {
+    rarity: Exclude<Rarity, 'common'>
+    trait: 'warded' | 'leeching' | 'raging' | 'boss'
+    label: string
+  }
+  /** 전장 상태 아이콘에서 이 개체 전용 대응 안내를 찾는 키. */
+  tacticalGuideId?: string
   /** 피해를 먼저 흡수하는 일반 방어막. 관통 공격은 소모시키지 않고 지나간다. */
   guard?: number
   /** 한 타격을 통째로 지우는 매직실드 횟수. */

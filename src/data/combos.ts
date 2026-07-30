@@ -2,4 +2,3 @@
 export { COMBOS, CONFLICTS, DISSONANCES } from './generated/sentenceData'
 
 // SPEC 5장. sweep으로 확정한 값. 임의로 올리지 말 것.
-export const MULT_CAP = 2.5

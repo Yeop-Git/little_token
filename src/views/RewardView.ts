@@ -4,7 +4,13 @@
  */
 
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
-import { REWARD_REFRESH_COST, rewardPrice, type RewardOption } from '@data/rewards'
+import {
+  EARLY_BUILD_REWARD_DAY,
+  REWARD_PRICE,
+  REWARD_REFRESH_COST,
+  rewardPrice,
+  type RewardOption,
+} from '@data/rewards'
 import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
 import { PASSIVES } from '@core/passives'
@@ -12,11 +18,16 @@ import { STAT_LABEL, type ItemDef, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
 import { reinforceWord } from '@core/run'
-import { EARLY_COMBOS, EARLY_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, makeEarlyTables } from '@data/earlyWords'
 import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { GameAudio } from '@/audio/GameAudio'
 import { SquareBurst } from '@/ui/SquareBurst'
+import { t } from '@/localization'
+import { stageFor } from '@data/stages'
+import { availableCombos } from '@core/deckInsights'
+import { DISPLAY_FLOORS } from '@/config/edition'
+import { discoveredComboIds } from '@core/comboDiscovery'
 
 interface Opts {
   day: number
@@ -48,6 +59,58 @@ function moodOf(w: Word): string {
   if (w.kind === 'attack' || (w.power ?? 0) > 0) return 'attack'
   if (w.effects?.recoil) return 'sacrifice'
   return 'buff'
+}
+
+function text(key: string, korean: string, values: Record<string, string | number> = {}): string {
+  return t(key, korean).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`))
+}
+
+function stageProgressLabel(day: number): string {
+  const stage = stageFor(day)
+  const cycle = stage.endlessCycle > 0
+    ? text('hudEndlessCycle', '엔드리스 {cycle}주기', { cycle: stage.endlessCycle })
+    : text('hudStoryCycle', '첫 이야기')
+  return `${cycle} · ${text('hudStageLabel', '스테이지')} ${stage.floor}/${DISPLAY_FLOORS}`
+}
+
+function deckSummaryHtml(deck: Record<string, Word[]>): string {
+  const slotEntries = Object.entries(deck).filter(([, words]) => words.length > 0)
+  const words = slotEntries.flatMap(([, list]) => list)
+  const discovered = discoveredComboIds()
+  const combos = availableCombos(deck, makeEarlyTables(deck).combos).filter((combo) => discovered.has(combo.id))
+  return `
+    <div class="rd-deck-head"><span>${text('rewardDeckTitle', '현재 단어장')}</span><b>${words.length}</b></div>
+    <div class="rd-deck-slots">${slotEntries.map(([slot, list]) => `
+      <section><h3>${SLOT_LABEL[slot] ?? slot} <b>${list.length}</b></h3>
+        <div>${list.map((word) => `<span>${word.text}${(word.level ?? 1) > 1 ? ` <em>Lv.${word.level}</em>` : ''}</span>`).join('')}</div>
+      </section>`).join('')}
+    </div>
+    <div class="rd-deck-combos">
+      <h3>${text('rewardDeckCombos', '완성 가능한 관용구')} <b>${combos.length}</b></h3>
+      ${combos.length
+        ? combos.map((combo) => `<span><b>「${combo.name}」</b><em>×${combo.mult.toFixed(2)}</em></span>`).join('')
+        : `<p>${text('rewardDeckNone', '아직 완성 가능한 관용구가 없다.')}</p>`}
+    </div>`
+}
+
+function roleLabel(opt: RewardOption): string {
+  if (opt.kind === 'item') {
+    return opt.item?.passive
+      ? text('rewardRoleRule', '문장 규칙')
+      : text('rewardRoleStats', '스탯 성장')
+  }
+  const mood = moodOf(opt.word!)
+  if (mood === 'attack') return text('rewardRoleAttack', '공격')
+  if (mood === 'guard') return text('rewardRoleGuard', '방어')
+  if (mood === 'heal') return text('rewardRoleHeal', '회복')
+  if (mood === 'gamble') return text('rewardRoleVariable', '변동')
+  return text('rewardRoleTactic', '전술')
+}
+
+function acquireLabel(opt: RewardOption): string {
+  if (opt.reinforce) return text('rewardAcquireReinforce', '반복강화 +1')
+  if (opt.kind === 'item') return text('rewardAcquireItem', '새 아이템')
+  return text('rewardAcquireWord', '새 단어')
 }
 
 // 상단 종류 라벨 — 단어는 문장 순서 번호를 함께 표기한다("1번 주어").
@@ -143,7 +206,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(word.emotion), 'wd-emotion')}<div class="wd-name">${word.text}</div></div>
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${word.level ?? 1}` : ' · 새 단어'}</div>
     <div class="wd-values">${values.map((value) => `<div class="v ${value.cls}">${value.text}</div>`).join('')}</div>
-    ${comboHintHtml(word, { combos: EARLY_COMBOS, words: deck ?? EARLY_WORDS })}
+    ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}
     ${opt.reinforce ? reinforceDeltas(word) : ''}
     ${influenceNote(word)}`
 }
@@ -164,14 +227,21 @@ function bgHtml(opt: RewardOption): string {
 function rewardPickHtml(p: RewardOption, i: number): string {
   const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
   const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
-  const badge = p.reinforce ? '▲ RANK UP' : p.kind === 'item' ? '● ITEM' : '✦ NEW'
   const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
   const nameLength = [...p.name.replace(/\s/g, '')].length
   const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
   const price = rewardPrice(p)
+  const role = roleLabel(p)
+  const acquire = acquireLabel(p)
+  const currency = text('rewardCurrencyInspiration', '런 재화 · 영감')
+  const cardLabel = text(
+    'rewardCardAria',
+    '{name}, 희귀도 {rarity}, 역할 {role}, 획득 {acquire}, 비용 {currency} {price}',
+    { name: p.name, rarity: RARITY_LABEL[p.rarity], role, acquire, currency, price },
+  )
   const ownedLabel = p.reinforce ? '강화 완료!' : p.kind === 'item' ? '내 소품으로 결정!' : '내 단어장에 기록!'
   return `
-    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}">
+    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="group" aria-label="${cardLabel}">
       ${bgHtml(p)}
       <span class="rp-tint" aria-hidden="true"></span>
       <span class="rp-veil" aria-hidden="true"></span>
@@ -181,9 +251,13 @@ function rewardPickHtml(p: RewardOption, i: number): string {
         <span class="rp-type">${typeLabel(p)}</span>
         <span class="rp-tags">
           ${emotionBadge(p)}
-          <span class="rp-rarity rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</span>
-          <span class="rp-badge">${badge}</span>
         </span>
+      </div>
+      <div class="rp-facts" aria-hidden="true">
+        <span><small>${text('rewardFactRarity', '희귀도')}</small><b class="rarity-${p.rarity}">${RARITY_LABEL[p.rarity]}</b></span>
+        <span><small>${text('rewardFactRole', '역할')}</small><b>${role}</b></span>
+        <span><small>${text('rewardFactAcquire', '획득')}</small><b>${acquire}</b></span>
+        <span><small>${text('rewardFactCost', '비용')}</small><b>${currency} ${price}</b></span>
       </div>
       <div class="rp-foot">
         <div class="rp-name">${p.name}</div>
@@ -191,7 +265,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
         <div class="rp-effect">${mainEffect(p)}</div>
         <div class="rp-actions">
           <button class="rp-detail" type="button">자세히보기</button>
-          <button class="rp-take" type="button"><b class="rp-price">◈ ${price}</b> 기록하기 →</button>
+          <button class="rp-take" type="button" aria-label="${currency} ${price}, 기록하기"><b class="rp-price">${currency} ${price}</b> 기록하기 →</button>
         </div>
       </div>
     </div>`
@@ -214,22 +288,27 @@ export class RewardView {
               <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
             </div>
             <header class="reward-head">
-              <div class="k">${opts.day}스테이지 클리어</div>
+              <div class="k">${stageProgressLabel(opts.day)} 클리어</div>
               <div class="t hand">${PHASE_TITLE[opts.phase]}</div>
               <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
               </div>
-              <div class="reward-wallet" aria-label="보유 영감 ${opts.inspiration}, 이번 클리어 획득 ${opts.earned}">
+              <div class="reward-wallet" aria-label="런 재화 영감 ${opts.inspiration} 보유, 이번 클리어 획득 ${opts.earned}">
                 <span class="inspiration-mark" aria-hidden="true">◈</span>
-                <span class="reward-wallet-balance"><small>보유 영감</small><b>${opts.inspiration}</b></span>
+                <span class="reward-wallet-balance"><small>런 재화 · 보유 영감</small><b>${opts.inspiration}</b></span>
                 <span class="reward-wallet-earned">이번 클리어 <b>+${opts.earned}</b></span>
               </div>
+              ${opts.day === EARLY_BUILD_REWARD_DAY && opts.phase !== 'verb' ? `
+                <div class="reward-build-preview">
+                  ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 빌드 서술어 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}
+                </div>` : ''}
             </header>
             <div class="reward-system-message" role="status" aria-live="assertive" hidden></div>
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
             </div>
             <div class="reward-controls">
+              <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
               <button class="reward-refresh" type="button"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />다른 발상 떠올리기 <b>◈ ${REWARD_REFRESH_COST}</b></button>
               <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
             </div>
@@ -260,6 +339,17 @@ export class RewardView {
       event.stopPropagation()
       this.refresh()
     })
+    this.root.querySelector<HTMLButtonElement>('.reward-deck')?.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.showDeck()
+    })
+  }
+
+  private showDeck() {
+    const dock = this.root.querySelector<HTMLElement>('#rdetail')!
+    dock.className = 'info-dock glass reward-dock deck-overview'
+    dock.innerHTML = deckSummaryHtml(this.opts.deck ?? EARLY_WORDS)
+    this.root.querySelectorAll('.reward-pick').forEach((pick) => pick.classList.remove('detailing'))
   }
 
   private showDetail(opt: RewardOption, el: HTMLElement) {
@@ -399,6 +489,8 @@ export class RewardView {
     if (skip) skip.disabled = true
     const refresh = this.root.querySelector<HTMLButtonElement>('.reward-refresh')
     if (refresh) refresh.disabled = true
+    const deck = this.root.querySelector<HTMLButtonElement>('.reward-deck')
+    if (deck) deck.disabled = true
   }
 
   destroy() {}

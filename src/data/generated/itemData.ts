@@ -26,7 +26,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "pencil",
     "base": {
       "hp": 0,
-      "atk": 1,
+      "atk": 0.5,
       "guard": 0,
       "heal": 0,
       "luck": 0
@@ -110,7 +110,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "bugSpray",
     "base": {
       "hp": 0,
-      "atk": 2,
+      "atk": 1,
       "guard": 0,
       "heal": 0,
       "luck": 0
@@ -124,7 +124,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "brush",
     "base": {
       "hp": 0,
-      "atk": 1,
+      "atk": 0.5,
       "guard": 0,
       "heal": 0,
       "luck": 1
@@ -166,7 +166,7 @@ export const STAT_ITEMS: Record<string, ItemDef> = {
     "art": "inkwell",
     "base": {
       "hp": 0,
-      "atk": 1,
+      "atk": 0.5,
       "guard": 0,
       "heal": 1,
       "luck": 0
@@ -221,7 +221,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "echoChime": {
     "id": "echoChime",
     "name": "누댕의 메아리",
-    "rarity": "epic",
+    "rarity": "legendary",
     "art": "chime",
     "base": {
       "hp": 0,
@@ -236,7 +236,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "tastyVerb": {
     "id": "tastyVerb",
     "name": "두 겹의 문장과자",
-    "rarity": "epic",
+    "rarity": "legendary",
     "art": "snack",
     "base": {
       "hp": 0,
@@ -266,7 +266,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "matchCloak": {
     "id": "matchCloak",
     "name": "성냥팔이의 붉은 망토",
-    "rarity": "epic",
+    "rarity": "legendary",
     "art": "cloak",
     "base": {
       "hp": 0,
@@ -311,7 +311,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "goldenApple": {
     "id": "goldenApple",
     "name": "신데렐라의 황금사과",
-    "rarity": "legendary",
+    "rarity": "epic",
     "art": "apple",
     "base": {
       "hp": 0,
@@ -356,7 +356,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "pigBbq": {
     "id": "pigBbq",
     "name": "아기돼지의 숯불화로",
-    "rarity": "legendary",
+    "rarity": "epic",
     "art": "bbq",
     "base": {
       "hp": 0,
@@ -371,7 +371,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
   "beanSprout": {
     "id": "beanSprout",
     "name": "잭의 하늘나물",
-    "rarity": "legendary",
+    "rarity": "epic",
     "art": "beanstalk",
     "base": {
       "hp": 0,

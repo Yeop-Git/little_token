@@ -8,7 +8,7 @@ function page(key: string, title: string, hint: string, lead: string, bullets: s
 }
 
 const en = [
-  page('flow','Battle flow','What happens each turn','Choose a Subject, Modifier, then Verb. The completed sentence becomes your action.',['Preparation effects such as Guard resolve first.','First-strike enemies act before your main action; second-strike enemies act afterward.','Unused card draws improve the reward grade after victory.']),
+  page('flow','Battle flow','What happens each turn','Choose a Subject, Modifier, then Verb. The completed sentence becomes your action.',['Preparation effects such as Guard resolve first.','First-strike enemies act before your main action; second-strike enemies act afterward.','Reward grade depends on clear speed; each unused free draw adds 1 Inspiration without changing rarity.']),
   page('card','Reading cards','Everything is on the card','The front shows emotion at the upper left, Ink cost at the upper right, sentence text, and the current effect.',['Rarity and upgrade level appear in card details; borders and foil hint at rarity on the front.','Subjects and modifiers add to one multiplier pool.','Verbs turn a stat and scaling value into Attack, Guard, or Healing.']),
   page('damage','How values resolve','Base value × multiplier','The verb creates a base value. Additive bonuses form one pool; combos, resonance, luck, variance, and critical success then multiply it.',['There is no multiplier cap.','Critical success multiplies the whole sentence.','The breakdown always matches the value applied in battle.']),
   page('context','Emotion and context','Resonance · combos · weakness','Context changes what a word can do and how valuable it becomes.',['Matching emotions create resonance.','A named combo activates when its required tag set is present.','Match visible enemy weaknesses; segmented bosses require both a weakness and combo to pierce the next part.']),
@@ -17,7 +17,7 @@ const en = [
 ]
 
 const ja = [
-  page('flow','戦闘の流れ','1ターンに起こること','主語 → 修飾語 → 動詞の順に選び、完成した文がそのまま行動になる。',['防御などの準備効果を先に適用する。','先攻の敵は本行動の前、後攻の敵は後に動く。','温存したドローは勝利後の報酬等級を上げる。']),
+  page('flow','戦闘の流れ','1ターンに起こること','主語 → 修飾語 → 動詞の順に選び、完成した文がそのまま行動になる。',['防御などの準備効果を先に適用する。','先攻の敵は本行動の前、後攻の敵は後に動く。','報酬等級は勝利速度で決まり、未使用の無料ドローは等級を変えずにひらめき+1になる。']),
   page('card','カードの読み方','必要な情報はカードにある','左上に感情、右上にインク消費量、中央に言葉、下に現在の効果を表示する。',['等級と強化Lv.はカード詳細で確認でき、表面では枠と箔が等級を示す。','主語と修飾語は一つの倍率プールに加算する。','動詞は能力値と係数から攻撃・防御・回復を作る。']),
   page('damage','数値の決まり方','基礎値 × 倍率','動詞が基礎値を作る。加算ボーナスをまとめ、観用句・共鳴・運・分散・大成功を乗算する。',['倍率に上限はない。','大成功は文全体を強化する。','内訳の合計は実際の戦闘結果と一致する。']),
   page('context','感情と文脈','共鳴 · 観用句 · 弱点','前後の文脈によって言葉の役割と価値が変わる。',['同じ感情を集めると共鳴する。','必要なタグがそろうと名前付きの観用句が発動する。','部位ボスを貫通するには弱点と観用句を同時に満たす。']),
@@ -26,7 +26,7 @@ const ja = [
 ]
 
 const ru = [
-  page('flow','Ход боя','Что происходит за ход','Выберите подлежащее, модификатор и глагол. Готовая фраза становится действием.',['Подготовка, например Защита, срабатывает первой.','Враги первого хода действуют до вас, остальные — после.','Сохранённые доборы повышают уровень награды.']),
+  page('flow','Ход боя','Что происходит за ход','Выберите подлежащее, модификатор и глагол. Готовая фраза становится действием.',['Подготовка, например Защита, срабатывает первой.','Враги первого хода действуют до вас, остальные — после.','Уровень награды зависит от скорости; каждый неиспользованный бесплатный добор даёт +1 Вдохновение, не меняя редкость.']),
   page('card','Как читать карты','Всё указано на карте','Слева вверху показана эмоция, справа — стоимость чернил, в центре — слово, а снизу — текущий эффект.',['Редкость и уровень усиления указаны в подробностях; на лицевой стороне редкость передают рамка и фольга.','Подлежащие и модификаторы пополняют один пул множителя.','Глаголы создают Атаку, Защиту или Лечение из параметра и коэффициента.']),
   page('damage','Расчёт значений','База × множитель','Глагол создаёт базу. Бонусы складываются в пул, затем сочетания, резонанс, удача, разброс и критический успех перемножаются.',['Предела множителя нет.','Критический успех усиливает всю фразу.','Разбор совпадает с реальным результатом боя.']),
   page('context','Эмоции и контекст','Резонанс · сочетания · слабости','Контекст меняет роль и ценность каждого слова.',['Одинаковые эмоции создают резонанс.','Именованное сочетание требует определённого набора тегов.','Для пробития части босса нужны и слабость, и сочетание.']),
@@ -35,7 +35,7 @@ const ru = [
 ]
 
 const zhHans = [
-  page('flow','战斗流程','一回合中发生的事','依次选择主语、修饰语与动词，完成的句子就是本回合行动。',['防御等准备效果优先生效。','先攻敌人在主行动前行动，后攻敌人在之后行动。','保留的抽卡次数会提高奖励等级。']),
+  page('flow','战斗流程','一回合中发生的事','依次选择主语、修饰语与动词，完成的句子就是本回合行动。',['防御等准备效果优先生效。','先攻敌人在主行动前行动，后攻敌人在之后行动。','奖励等级取决于通关速度；每次未使用的免费抽卡会额外获得1点灵感，但不改变稀有度。']),
   page('card','卡牌阅读方法','信息都写在卡牌上','左上显示情绪，右上显示墨水费用，中间是词语，下方是当前效果。',['稀有度与强化等级可在卡牌详情中查看；正面的边框与闪面也会提示稀有度。','主语与修饰语加算到同一个倍率池。','动词以属性与系数生成攻击、防御或恢复。']),
   page('damage','数值结算顺序','基础值 × 倍率','动词生成基础值。加算奖励汇入倍率池，再乘上组合、共鸣、幸运、浮动与大成功。',['倍率没有上限。','大成功会强化整个句子。','结算明细始终与实际战斗结果一致。']),
   page('context','情绪与语境','共鸣 · 组合 · 弱点','前后语境会改变词语的作用与价值。',['相同情绪会产生共鸣。','凑齐所需标签会触发具名组合。','贯通Boss下一部位时，必须同时命中弱点与组合。']),
