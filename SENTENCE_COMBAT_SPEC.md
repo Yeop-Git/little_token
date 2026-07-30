@@ -158,7 +158,7 @@ const EARLY_TEMPLATE = ['subj', 'adv', 'verb']     // 일반 런
 | role | 하는 일 |
 |---|---|
 | `subject` | bonus 풀 · `targetMode` · `aoe` |
-| `modifier` | bonus 풀 · 룰렛 기준 스탯(`stat`) 지정 |
+| `modifier` | 전술 `effects` · 대상 수 · 선공 등 행동 규칙 |
 | `verb` | 깡수치 · `kind`(공격/방어/회복) |
 | `object` | 깡수치 *(현재 런 미사용)* |
 | `ending` | bonus 풀 · `timing` · `variance` *(현재 런 미사용)* |
@@ -171,10 +171,10 @@ interface Word {
   text: string
   slot: SlotKey
   tags: string[]          // 관용구 멀티셋 매칭 + 모순 판정
-  stat?: StatName         // 동사: 깡수치의 출처 / 수식: 룰렛을 미는 스탯
+  stat?: StatName         // 동사: 깡수치의 출처
   statMult?: number       // 동사 전용. 깡수치 = stats[stat] × statMult
-  bonus?: number          // subject/modifier/ending: 가산 배수 풀 기여
-  crit?: number           // 대성공 확률(0..1)
+  bonus?: number          // subject/ending: 가산 배수 풀 기여
+  crit?: number           // 규칙 카드의 대성공 확률(0..1)
   variance?: { p, hi, lo }
   kind?: IntentKind       // verb 전용 — attack/guard/heal/debuff
   targetMode?: TargetMode // subject 전용
@@ -188,7 +188,9 @@ interface Word {
 }
 ```
 
-> `power` · `effects` · `fail`은 타입에 남아 있으나 일반 런 데이터에서 쓰지 않는다(4장 참조).
+> `effects`는 수식어 전술과 특수 동사의 정본이다. 일반 수식어는 `bonus`·`crit`·`stat`을
+> 쓰지 않으며, 선공·관통·다중 대상·연타·준비 방어/회복·반격·잉크·손패 규칙 중
+> 최소 하나를 가진다. `power` · `fail`은 타입에 남아 있으나 일반 런 데이터에서 쓰지 않는다.
 
 ### 5.2-1 등급 예산 ★
 
@@ -196,8 +198,9 @@ interface Word {
 `EARLY_WORDS`·`REWARD_WORDS` 전체를 이 계약으로 검사한다.
 
 ```
-배율 칸(주어·수식·어미)   기대배율 = (1 + bonus) × 도박기댓값 × (1 + 0.5 × crit)
+배율 칸(주어·어미)        기대배율 = (1 + bonus) × 도박기댓값 × (1 + 0.5 × crit)
                           노멀 1.20 · 희귀 1.60 · 영웅 2.10  (허용 오차 ±0.05)
+수식어 칸                 배율 없음 · 공개 전술 최소 1개 · 명시 비용 1~3
 동사 칸                   계수 = 노멀 ×1 · 희귀 ×1.5 · 영웅 ×2, 전체 적중이면 ×0.7
 노멀 정원                 초기 덱 subj 1 · adv 3 · verb 3
 표기                      note는 실제 수치를 전부 포함한다(numericNoteParts 검사)

@@ -19,6 +19,7 @@ import rewardClear from './ui/reward_clear.webp'
 import rewardRefresh from './ui/reward_refresh.svg'
 import inkBottle from './ui/ink_bottle.webp'
 import inkBarFrame from './ui/ink_bar_frame.webp'
+import inkCostBadge from './ui/ink_cost_badge.webp'
 import player001 from './sprites/player_001.webp'
 import playerModel from './models/player.glb?url'
 import tokenModel from './models/token.glb?url'
@@ -223,6 +224,7 @@ export const REWARD_ART = {
 export const INK_UI = {
   bottle: inkBottle,
   barFrame: inkBarFrame,
+  costBadge: inkCostBadge,
 } as const
 
 // 토큰(안내역) 표정 일러스트 — 오프닝 다이얼로그 초상과 화면 장식.

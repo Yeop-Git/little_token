@@ -6,7 +6,7 @@
  * 하나씩 선택 가능하게 보장한다.
  */
 
-import type { Rarity, Word } from '@core/types'
+import type { Emotion, Rarity, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
 import type { RewardPhase } from '@core/run'
 import { GRADE_MAX, startGrade } from '@core/grade'
@@ -173,6 +173,22 @@ function wordOptions(player: PlayerState, slots: string[]): RewardOption[] {
   return [...fresh, ...reinforce]
 }
 
+const REWARD_EMOTIONS = ['joy', 'anger', 'sorrow', 'pleasure'] as const satisfies readonly Emotion[]
+
+/** 주력 감정은 이어 주고 가장 부족한 감정은 선택지로 열어, 어느 길도 보상 RNG가 닫지 않게 한다. */
+function deckEmotionProfile(player: PlayerState): { preferred: Emotion | null; support: Emotion } {
+  const counts = new Map<Emotion, number>(REWARD_EMOTIONS.map((emotion) => [emotion, 0]))
+  for (const word of Object.values(player.deck).flat()) {
+    if (word.emotion === 'neutral') continue
+    counts.set(word.emotion, (counts.get(word.emotion) ?? 0) + 1)
+  }
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  return {
+    preferred: ranked[0] && ranked[0][1] > (ranked[1]?.[1] ?? 0) ? ranked[0][0] : null,
+    support: [...ranked].reverse()[0][0],
+  }
+}
+
 const toItemOption = (item: ItemDef): RewardOption => ({
   kind: 'item',
   rarity: item.rarity,
@@ -194,6 +210,7 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   const all = wordOptions(player, slots)
   const used = new Set<string>()
   const picks: RewardOption[] = []
+  const emotionProfile = deckEmotionProfile(player)
 
   // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)
@@ -201,11 +218,19 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     const option = pickOne(all, grade, day, used, rng, bossRarity)
     if (option) picks.push(option)
   }
+  if (picks.length < 3 && !picks.some((entry) => entry.word?.emotion === emotionProfile.support)) {
+    const option = pickOne(all.filter((entry) => entry.word?.emotion === emotionProfile.support), grade, day, used, rng)
+    if (option) picks.push(option)
+  }
   // 첫 단계는 세 장이 한 문법에 몰리지 않도록 주어와 수식어를 한 장씩 보장한다.
   if (phase === 'subject') {
     for (const slot of slots) {
       if (picks.some((entry) => entry.word?.slot === slot)) continue
-      const option = pickOne(all.filter((entry) => entry.word?.slot === slot), grade, day, used, rng)
+      const slotPool = all.filter((entry) => entry.word?.slot === slot)
+      const alignedPool = emotionProfile.preferred && !picks.some((entry) => entry.word?.emotion === emotionProfile.preferred)
+        ? slotPool.filter((entry) => entry.word?.emotion === emotionProfile.preferred)
+        : []
+      const option = pickOne(alignedPool.length ? alignedPool : slotPool, grade, day, used, rng)
       if (option) picks.push(option)
     }
   }
@@ -216,8 +241,14 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
     if (option) picks.push(option)
   }
+  if (emotionProfile.preferred && picks.length < 3 && !picks.some((entry) => entry.word?.emotion === emotionProfile.preferred)) {
+    const option = pickOne(all.filter((entry) => entry.word?.emotion === emotionProfile.preferred), grade, day, used, rng)
+    if (option) picks.push(option)
+  }
   while (picks.length < 3) {
-    const option = pickOne(all, grade, day, used, rng)
+    const shownEmotions = new Set(picks.map((entry) => entry.word?.emotion).filter(Boolean))
+    const diverse = all.filter((entry) => entry.word && !shownEmotions.has(entry.word.emotion))
+    const option = pickOne(diverse.length ? diverse : all, grade, day, used, rng)
     if (!option) break
     picks.push(option)
   }

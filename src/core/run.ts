@@ -164,6 +164,7 @@ function cloneWord(w: Word): Word {
 // 아무것도 세지지 않는다(도박 주어들이 그랬다 — 화면 문구가 그대로인 이유이기도 했다).
 const REINFORCE_STEP = {
   power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25,
+  castScale: 0.05,
   varianceHi: 0.15, growHp: 1,
 }
 export function reinforceWord(w: Word): void {
@@ -179,6 +180,9 @@ export function reinforceWord(w: Word): void {
   if (w.effects?.heal) w.effects.heal += REINFORCE_STEP.heal
   if (w.effects?.counterMultiplier) {
     w.effects.counterMultiplier = Math.round((w.effects.counterMultiplier + REINFORCE_STEP.counter) * 100) / 100
+  }
+  if (w.effects?.castScale != null) {
+    w.effects.castScale = Math.min(1, Math.round((w.effects.castScale + REINFORCE_STEP.castScale) * 100) / 100)
   }
   if (w.crit != null) w.crit = Math.min(0.6, Math.round((w.crit + REINFORCE_STEP.crit) * 100) / 100)
 }

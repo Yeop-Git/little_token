@@ -16,10 +16,20 @@ import {
   resolveMultiplier,
   sentenceTokens,
   statBiasOf,
+  withOverdrawEffects,
   type ResolvedMult,
 } from '@core/compiler'
 import { wordNoteText, wordValueLines } from '@core/wordText'
-import { inkOverdraw, selectionInkCost, SENTENCE_INK, wordInkCost } from '@core/ink'
+import {
+  carryInkAfterSpend,
+  inkExceedsLimit,
+  inkOverdraw,
+  selectionInkCost,
+  selectionCarryInk,
+  SENTENCE_OVERDRAW_LIMIT,
+  sentenceInkAvailable,
+  wordInkCost,
+} from '@core/ink'
 import { eul } from '@core/josa'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
@@ -60,7 +70,7 @@ import {
   type EnemyInst,
 } from '@/sim/reference'
 import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
-import { REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
+import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
@@ -319,6 +329,9 @@ export class BattleView {
   private bg: FieldBackground = { next: '', prev: null }
   private sel: Selection = {}
   private slotIndex = 0
+  private carriedInk = 0
+  private inkPreviewSpent: number | null = null
+  private autoCompleteTimer = 0
   private target = 0
   private busy = false
   private over = false
@@ -469,6 +482,7 @@ export class BattleView {
   destroy() {
     this.destroyed = true
     this.timers.forEach((t) => clearTimeout(t))
+    clearTimeout(this.autoCompleteTimer)
     clearTimeout(this.dockTimer)
     document.removeEventListener('pointerdown', this.onPointerDown, true)
     document.removeEventListener('pointerup', this.onPointerUp, true)
@@ -745,6 +759,11 @@ export class BattleView {
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
     this.q('#home-btn').addEventListener('click', () => this.onHome?.(this.combatResources()))
     this.q('#battle-help-button').addEventListener('click', () => this.setHelpOpen(!this.helpOpen))
+    this.q('#steps').addEventListener('click', (event) => {
+      const button = (event.target as Element | null)?.closest<HTMLButtonElement>('.step[data-i]')
+      if (!button) return
+      this.rewindToSlot(Number(button.dataset.i))
+    })
     document.addEventListener('pointerdown', this.onHelpOutside)
     window.addEventListener('keydown', this.onHelpKeydown)
 
@@ -754,6 +773,8 @@ export class BattleView {
       onConfirm: (word) => {
         if (!this.busy && !this.over) this.pick(word.id)
       },
+      onHover: (word) => this.previewInkSpend(word),
+      onHoverEnd: () => this.clearInkPreview(),
       onPreview: (word) => {
         this.keepDock()
         this.renderDetail(word)
@@ -1904,7 +1925,7 @@ export class BattleView {
         const emotion = emotionOrNeutral(w.emotion)
         return `<span class="chain-word emotion-${emotion}${attach}" data-i="${i}">
           <b class="cw-text">${toks[i]}</b>
-          <span class="cw-cost" title="잉크 비용">${wordInkCost(w)}</span>
+          <span class="cw-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" title="잉크 비용">${wordInkCost(w)}</span>
           ${note ? `<em class="cw-note ${note.cls}">${note.text}</em>` : ''}
         </span>`
       })
@@ -1934,8 +1955,27 @@ export class BattleView {
   private renderInk(): void {
     const meter = this.q<HTMLElement>('#ink-meter')
     const spent = selectionInkCost(this.sel)
-    const over = inkOverdraw(spent)
-    updateInkMeter(meter, { spent, max: SENTENCE_INK, overdraw: over })
+    const available = this.currentInkAvailable()
+    const over = inkOverdraw(spent, available)
+    updateInkMeter(meter, { spent, max: available, overdraw: over, previewSpent: this.inkPreviewSpent })
+  }
+
+  private currentInkAvailable(): number {
+    return sentenceInkAvailable(this.carriedInk)
+  }
+
+  private previewInkSpend(word: Word): void {
+    if (this.busy || this.over) return
+    const key = this.order()[this.slotIndex]
+    if (!key) return
+    this.inkPreviewSpent = selectionInkCost({ ...this.sel, [key]: word })
+    this.renderInk()
+  }
+
+  private clearInkPreview(): void {
+    if (this.inkPreviewSpent == null) return
+    this.inkPreviewSpent = null
+    this.renderInk()
   }
 
   // 체인 아래 "지금 배율" — 카드를 고르는 즉시 숫자가 삐리릭 돌다가 팅! 하고 확정된다.
@@ -2052,9 +2092,9 @@ export class BattleView {
         const done = g.indices.every((i) => this.sel[this.t.template.slots[i].key])
         const cls = active ? 'active' : done ? 'done' : ''
         const no = g.indices.map((i) => i + 1).join('·')
-        // 한 번 고른 칸은 되돌리지 못한다 — 문장은 쓴 순서대로 흘러간다.
-        // 스텝은 "지금 어디까지 왔나"를 읽는 표시일 뿐이라 누를 수 없다.
-        return `<button class="step ${cls}" data-i="${g.indices[0]}" disabled><b>${no}</b> ${g.label}</button>`
+        const canRewind = done && !this.over && !this.busy
+        const rewindLabel = canRewind ? `${g.label} 선택으로 되돌리기` : `${g.label} 단계`
+        return `<button class="step ${cls}${canRewind ? ' rewindable' : ''}" data-i="${g.indices[0]}" aria-label="${rewindLabel}" title="${rewindLabel}" ${canRewind ? '' : 'disabled'}><b>${no}</b> ${g.label}</button>`
       })
       .join('<span class="sep">·</span>')
 
@@ -2080,7 +2120,7 @@ export class BattleView {
       key,
       words,
       this.sel[key],
-      (word) => conflictReason(word, this.slotIndex, this.sel, this.t),
+      (word) => this.unavailableReason(word),
       needsQueenAnswer ? (word) => word.kind === 'attack' && (!!word.effects?.pierceGuard || word.targetCount === 'all' || (word.targetCount ?? 1) >= 2) : undefined,
     )
     this.castPendingSpiderWeb(key)
@@ -2250,9 +2290,10 @@ export class BattleView {
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
     const intent = compile(sel, this.t, this.combatStats(), this.mods())
     const m = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
-    const guard = Math.round(intent.guard * m)
-    const heal = Math.round(intent.heal * m)
-    const dmg = Math.round(effectiveBase(intent) * m)
+    const castPower = intent.castCount * intent.castScale
+    const guard = Math.round(intent.guard * m * castPower)
+    const heal = Math.round(intent.heal * m * castPower)
+    const dmg = Math.round(effectiveBase(intent) * m * intent.hitCount * castPower)
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
     return { dmg, heal, guard, self: intent.recoil, multiplier: m }
   }
@@ -2710,10 +2751,12 @@ export class BattleView {
   private pick(id: string) {
     // CardHand 외부의 개발 입력이나 지연된 confirm도 정산 잠금 뒤에는 선택을 바꾸지 못한다.
     if (this.busy || this.over) return
+    this.inkPreviewSpent = null
     const key = this.order()[this.slotIndex]
     const debugKey = `${key}:${id}`
     const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
     if (!w) return
+    if (this.unavailableReason(w)) return
     this.debugSpawnedWords.delete(debugKey)
     GameAudio.play('paper')
     // 이 한 칸을 고르는 데 얼마나 걸렸는지 — 정책은 거리감으로, 취향 기록은 성격으로 읽는다.
@@ -2745,21 +2788,78 @@ export class BattleView {
         }),
         action: intent.kind === 'guard' ? 'guard' : intent.kind === 'heal' ? 'heal' : 'attack',
         combo: intent.combos.length > 0,
-        overdraw: inkOverdraw(selectionInkCost(this.sel)) > 0,
+        // 잉크 여유는 이월분에 따라 문장마다 다르다 — 고정 상한이 아니라 지금 값을 쓴다.
+        overdraw: inkOverdraw(selectionInkCost(this.sel), this.currentInkAvailable()) > 0,
       })
-      void this.autoComplete()
+      this.scheduleAutoComplete()
     } else {
       this.token?.noteSelectionStart()
     }
+  }
+
+  private unavailableReason(word: Word): string | null {
+    const reason = conflictReason(word, this.slotIndex, this.sel, this.t)
+    if (reason) return reason
+    const key = this.order()[this.slotIndex]
+    const projected = { ...this.sel, [key]: word }
+    const projectedCost = selectionInkCost(projected)
+    if (inkExceedsLimit(projectedCost, this.currentInkAvailable())) return '현재 잉크 한도 초과'
+    const remainingFloor = this.minimumRemainingInkCost(this.slotIndex, projected)
+    return projectedCost + remainingFloor > this.currentInkAvailable() + SENTENCE_OVERDRAW_LIMIT
+      ? '남은 문장을 완성할 잉크 부족'
+      : null
+  }
+
+  private minimumRemainingInkCost(afterIndex: number, selection: Selection): number {
+    let floor = 0
+    for (let i = afterIndex + 1; i < this.order().length; i++) {
+      const key = this.order()[i]
+      const costs = (this.t.words[key] ?? this.player.deck[key] ?? [])
+        .filter((candidate) => !conflictReason(candidate, i, selection, this.t))
+        .map((candidate) => Math.max(0, wordInkCost(candidate) - (candidate.effects?.inkDiscount ?? 0)))
+      if (!costs.length) return Number.POSITIVE_INFINITY
+      floor += Math.min(...costs)
+    }
+    return floor
+  }
+
+  private scheduleAutoComplete(): void {
+    window.clearTimeout(this.autoCompleteTimer)
+    this.autoCompleteTimer = window.setTimeout(() => {
+      this.autoCompleteTimer = 0
+      void this.autoComplete()
+    }, 520)
+  }
+
+  private rewindToSlot(index: number): void {
+    if (this.over || this.busy || !Number.isFinite(index)) return
+    this.inkPreviewSpent = null
+    const order = this.order()
+    if (index < 0 || index >= order.length || !this.sel[order[index]]) return
+    window.clearTimeout(this.autoCompleteTimer)
+    this.autoCompleteTimer = 0
+    this.q('.word-zone').classList.remove('is-resolving')
+    const next: Selection = {}
+    for (let i = 0; i < index; i++) {
+      const key = order[i]
+      if (this.sel[key]) next[key] = this.sel[key]
+    }
+    this.sel = next
+    this.slotIndex = index
+    this.setPhase(`${this.t.template.slots[this.slotIndex].label} 선택`)
+    this.renderChain()
+    this.renderWords()
+    this.renderDetail(null)
   }
 
   /** 한 번의 카드 선택에서는 가장 급한 상황 하나만 말한다. */
   private coachAfterPick() {
     if (this.isBoss || this.over) return
     const spent = selectionInkCost(this.sel)
-    const overdraw = inkOverdraw(spent)
+    const available = this.currentInkAvailable()
+    const overdraw = inkOverdraw(spent, available)
     if (overdraw > 0 && this.showCombatCoach('ink-overdraw')) return
-    if (SENTENCE_INK - spent <= 3 && this.showCombatCoach('ink-low')) return
+    if (available - spent <= 3 && this.showCombatCoach('ink-low')) return
 
     const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
     if (intent.emotionResonance > 1 && this.showCombatCoach('resonance')) return
@@ -2793,7 +2893,8 @@ export class BattleView {
     // 피해·실드·회복 어느 문장이든 같은 배율 정산을 보여 준다.
     // 순수 효과형 카드도 실제 적용값과 일치하도록 아래에서 깡수치를 보충한다.
     const kind: Tally['kind'] = dealsDamage ? 'dmg' : intent.guard > 0 ? 'guard' : 'heal'
-    const supportBase = kind === 'guard' ? intent.guard : kind === 'heal' ? intent.heal : 0
+    const repeatPower = intent.castCount * intent.castScale * (dealsDamage ? intent.hitCount : 1)
+    const supportBase = (kind === 'guard' ? intent.guard : kind === 'heal' ? intent.heal : 0) * repeatPower
     if (!dealsDamage && supportBase <= 0) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind }
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
@@ -2809,7 +2910,7 @@ export class BattleView {
       .filter((p) => (p.lane ?? 'damage') === lane)
       .map((p) => ({
         label: p.hint ? `${p.label} (${p.hint})` : p.label,
-        value: p.value,
+        value: p.value * repeatPower,
         cls: kind,
       }))
     // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
@@ -2836,7 +2937,11 @@ export class BattleView {
 
     const base = flats.reduce((n, f) => n + f.value, 0)
     const mult = mults.reduce((m, x) => m * x.value, 1)
-    return { flats, mults, base, mult, total: Math.round(base * mult), kind }
+    const repeats = dealsDamage ? intent.hitCount * intent.castCount : 1
+    const total = dealsDamage && repeats > 1
+      ? Math.round((base / repeats) * mult) * repeats
+      : Math.round(base * mult)
+    return { flats, mults, base, mult, total, kind }
   }
 
   // 깡 점수가 하나씩 쌓이고 → 배율이 하나씩 꽂히고 → 총합이 쾅. 발라트로식 콤보 쾌감.
@@ -3090,17 +3195,18 @@ export class BattleView {
 
     const order = this.order()
     // 스탯은 동사의 깡수치로 이미 들어와 있다(공격×1 · 방어×1 · 회복×1) — 여기서 또 더하지 않는다.
-    const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+    let intent = compile(this.sel, this.t, this.combatStats(), this.mods())
     const inkCost = selectionInkCost(this.sel)
-    const overdraw = inkOverdraw(inkCost)
+    const availableInk = this.currentInkAvailable()
+    const overdraw = inkOverdraw(inkCost, availableInk)
     if (overdraw > 0) {
       this.lastSentence = intent.sentence
       this.lastHurtBy = { kind: 'self', sentence: intent.sentence }
       this.setPhase('잉크 초과')
-      applyInkOverdraw(this.state, inkCost)
+      applyInkOverdraw(this.state, inkCost, availableInk)
       this.token?.feel('overdraw')
       this.popPlayer(`잉크 초과 · 체력 -${overdraw}`, 'dmg big')
-      this.log(`잉크 ${inkCost}/${SENTENCE_INK} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
+      this.log(`잉크 ${inkCost}/${availableInk} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
       this.renderActors()
       await sleep(420)
       this.clearNormalTokenWarning()
@@ -3109,6 +3215,8 @@ export class BattleView {
         return
       }
     }
+    intent = withOverdrawEffects(intent, overdraw)
+    this.carriedInk = carryInkAfterSpend(inkCost, availableInk, selectionCarryInk(this.sel))
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
@@ -3119,7 +3227,7 @@ export class BattleView {
       this.doubtRolls(intent),
     )
     const mult = resolved.mult
-    const dmg = Math.round(effectiveBase(intent) * mult)
+    const dmg = Math.round(effectiveBase(intent) * mult * intent.hitCount * intent.castCount * intent.castScale)
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
@@ -3332,6 +3440,7 @@ export class BattleView {
     this.endSlowmo()
     this.sel = {}
     this.clearNormalTokenWarning()
+    this.cardHand.grantNextOpeningHand(intent.drawCards)
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++

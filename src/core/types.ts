@@ -22,7 +22,7 @@ export interface SlotDef {
 // 슬롯 역할 — 수치를 어느 풀에 넣을지 결정.
 export type SlotRole =
   | 'subject' // 주어: bonus 풀 + targetMode
-  | 'modifier' // 수식/부사: bonus 풀 + effects
+  | 'modifier' // 수식/부사: 전술 effects
   | 'object' // 목적어: base 위력
   | 'verb' // 동사: base 위력 + kind
   | 'ending' // 어미: bonus 풀 + timing + variance
@@ -66,11 +66,25 @@ export interface WordEffects {
   pierceGuard?: boolean
   /** 같은 최전방 적에게 가하는 개별 타격 횟수. */
   hitCount?: number
+  /** 동사 행동을 반복 발동하는 횟수. 공격이면 실제 타격 수도 늘어난다. */
+  castCount?: number
+  /** 반복 발동 한 번마다 적용할 깡수치 비율. 미지정은 1이다. */
+  castScale?: number
+  /** Adds attack hits only when the sentence actually pays health for Ink overdraw. */
+  overdrawHitCount?: number
   /** 막아 낸 피해에 곱할 즉시 반격 계수. */
   counterMultiplier?: number
+  /** 이 문장을 완성할 때 지불하는 총 잉크를 줄인다. 카드 자체 비용 표기와 별도로 공개한다. */
+  inkDiscount?: number
+  /** 정산 뒤 다음 문장으로 넘기는 잉크를 추가한다(이월 상한 2 적용). */
+  carryInk?: number
+  /** Reduces the damage of the next enemy attack. */
+  enemyAttackDown?: number
+  /** Adds cards to the opening hand of the next sentence. */
+  drawCards?: number
 }
 
-// 문장이 기대는 플레이어 스탯 — 동사의 깡수치와 수식 룰렛 보정이 여기서 나온다.
+// 문장이 기대는 플레이어 스탯 — 현재 일반 런에서는 동사의 깡수치가 여기서 나온다.
 export type StatName = 'atk' | 'guard' | 'heal' | 'luck'
 export interface StatBlock {
   atk: number
@@ -86,12 +100,12 @@ export interface Word {
   tags: string[]
   power?: number // object/verb: 가산 위력(스탯 비례가 아닌 고정 위력)
   // 스탯 비례 — 동사의 깡수치는 "공격×1 · 방어×1 · 회복×1"처럼 스탯에서 나온다.
-  // 수식에서는 룰렛(대성공/실패) 확률을 밀어 주는 기준 스탯을 가리킨다.
+  // 확장 규칙에서는 룰렛 기준 스탯으로도 쓸 수 있지만, 일반 수식어에는 넣지 않는다.
   stat?: StatName
   statMult?: number // 동사 전용 계수. 깡수치 = stat × statMult
-  bonus?: number // subject/modifier/ending: 배수 풀 기여(가산)
-  crit?: number // 대성공 확률(0..1) — 수식 룰렛
-  fail?: number // 실패 확률(0..1) — 수식 룰렛
+  bonus?: number // subject/ending: 배수 풀 기여(가산)
+  crit?: number // 대성공 확률(0..1) — 일반 수식어에는 넣지 않는다
+  fail?: number // 실패 확률(0..1) — 폐지 데이터
   /** 무럭무럭 — 최대 체력을 이만큼 영구히 올린다. 배율을 받지 않는 고정 수치. */
   growHp?: number
   variance?: Variance
@@ -105,6 +119,7 @@ export interface Word {
   aoe?: AoeMode // subject/verb가 지정 가능
   targetCount?: TargetCount
   emotion: Emotion
+  inkCost?: number
   note: string // UI 한 줄 설명(효과 요약)
   rarity?: Rarity // 보상 티어 표기용(맥락카드 등급제는 폐지 — gradeBonus 없음)
   art?: string // 맥락카드 풀 일러스트 키(assets SKILL_ART: 1xxx 주어·2xxx 수식·3xxx 목적)
@@ -165,15 +180,20 @@ export interface Intent {
   evade: number
   pierceGuard: boolean
   hitCount: number
+  castCount: number
+  castScale: number
+  overdrawHitCount: number
   counterMultiplier: number
+  enemyAttackDown: number
+  drawCards: number
   emotions: Emotion[]
   emotionResonance: number
   tags: string[]
   combos: string[] // 발동 관용구 이름
   coherence: number // 부조화 패널티 곱(1이면 어긋남 없음)
   penalties: string[] // 발동한 부조화 이유
-  critP: number // 대성공 확률 합(수식 룰렛) — 스탯 보정 전 기본값
-  failP: number // 실패 확률 합(수식 룰렛) — 스탯 보정 전 기본값
+  critP: number // 대성공 확률 합 — 스탯 보정 전 기본값
+  failP: number // 폐지된 실패 확률 합 — 스탯 보정 전 기본값
   statKey: StatName | null // 룰렛을 밀어 줄 스탯(수식이 지정). 없으면 맥락(kind)으로 결정
   /** 무럭무럭 총합 — 이 문장으로 자라는 최대 체력. 배율을 받지 않는다. */
   growHp: number

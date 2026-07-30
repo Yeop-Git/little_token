@@ -27,7 +27,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
-import { selectionInkCost, SENTENCE_INK } from '@core/ink'
+import { selectionInkCost, SENTENCE_BASE_INK, SENTENCE_CARRY_LIMIT, SENTENCE_MAX_INK, SENTENCE_OVERDRAW_LIMIT } from '@core/ink'
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -209,7 +209,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
-      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_INK}</b> · 문장마다 잉크 ${SENTENCE_INK}을 새로 채운다. 합계가 넘더라도 완성할 수 있지만 초과분만큼 체력을 지불한다.</p>
+      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · 기본 ${SENTENCE_BASE_INK}, 남은 잉크 이월 최대 ${SENTENCE_CARRY_LIMIT}, 체력 초과 집필 최대 ${SENTENCE_OVERDRAW_LIMIT}로 한 문장은 최대 ${SENTENCE_MAX_INK}까지 쓴다.</p>
 
       <h3 class="g-h3">한 턴의 순서</h3>
       <ol class="g-flow">
@@ -225,7 +225,7 @@ export class CombatGuideView {
             <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 선택지가 넓은 동사 칸만 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
             <li>한 스테이지에서 추가로 뽑을 수 있는 횟수는 <b>${CARD_HAND_CONFIG.drawsPerStage}회</b>, 손패는 최대 <b>${CARD_HAND_CONFIG.maxHand}장</b>까지 늘어난다.</li>
             <li>쓰지 않고 아낀 뽑기는 승리할 때 <b>보상등급 +1</b>씩으로 돌아온다 — 참는 것도 하나의 수다.</li>
-            <li>카드를 클릭하면 그 칸이 곧바로 확정된다. 되돌릴 수 없으니 앞 칸이 뒤 칸을 어떻게 바꾸는지 먼저 본다.</li>
+            <li>카드를 클릭하면 그 칸이 곧바로 확정된다. 아래 단계 버튼을 누르면 그 칸으로 돌아가 뒤 선택을 다시 고를 수 있다.</li>
           </ul>
         </section>
         <section class="g-panel">
@@ -254,10 +254,11 @@ export class CombatGuideView {
     ]
 
     const notes: [string, string][] = [
-      ['배율 ×1.20', '주어·수식이 배율 풀에 보태는 몫. 여러 장이면 <b>더해서</b> 한 번에 곱한다.'],
+      ['배율 ×1.20', '주어가 문장에 보태는 배율. 주어의 안정성·고점에 따라 비용이 달라진다.'],
       ['공격 ×1', '동사가 스탯에서 뽑아내는 깡수치. 공격 스탯이 5면 5가 된다.'],
       ['75% 확률로 배율 ×1.80', '도박 카드. 확률로 높은 배율과 낮은 배율 중 하나가 정해진다.'],
-      ['대성공 10%', '대성공 룰렛 확률을 올린다. 대성공이면 문장 전체가 ' + mult(ROULETTE.crit) + '가 된다.'],
+      ['2회 동사 발동 (각 65%)', '동사의 행동을 두 번 발동한다. 각 발동을 낮춰 총 위력이 두 배가 되지는 않는다.'],
+      ['다음 첫 손패 +1', '다음 문장의 첫 슬롯에서 카드를 한 장 더 보고 고른다.'],
       ['공격 ×0.9 · 2명(100%·70%)', '여러 적을 때리는 카드. 뒷줄일수록 피해가 줄어든다.'],
     ]
 
@@ -345,9 +346,9 @@ export class CombatGuideView {
       <div class="g-split">
         <section class="g-panel">
           <h3 class="g-h3">대성공 확률</h3>
-          <p>수식 카드가 가진 확률에 <b>기준 스탯 1당 ${pct(CRIT_STAT_K)}</b>가 더해진다. 기준 스탯은 수식이
-            지정하며(힘껏 → ${STAT_NAME.atk}, 다정히 → ${STAT_NAME.guard}) 없으면 문장의 종류를 따른다.
-            아무리 올려도 <b>${pct(CRIT_CAP)}</b>에서 수렴한다.</p>
+          <p>문장의 행동 스탯 1당 <b>${pct(CRIT_STAT_K)}</b>가 더해진다. 공격은 ${STAT_NAME.atk},
+            방어는 ${STAT_NAME.guard}, 회복은 ${STAT_NAME.heal}을 따르며 규칙 카드가 확률을 더할 수 있다.
+            수식어는 확률 대신 공개 전술을 담당하고, 확률은 <b>${pct(CRIT_CAP)}</b>에서 수렴한다.</p>
           <p class="g-note g-tight">지금 예시: ${intent.critP ? pct(intent.critP) : '0%'} + ${statBias} × ${pct(CRIT_STAT_K)} = <b>${pct(odds.critP)}</b></p>
         </section>
         <section class="g-panel">

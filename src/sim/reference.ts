@@ -106,6 +106,8 @@ export interface BattleState {
   playerMax: number
   guard: number
   counterMultiplier: number
+  /** Flat reduction consumed by the next enemy attack. */
+  enemyAttackReduction?: number
   /** 개발 치트: 적 행동은 진행하되 플레이어 피해와 방어 소모는 막는다. */
   damageImmune?: boolean
   turn: number
@@ -114,8 +116,8 @@ export interface BattleState {
 }
 
 /** Ink overdraw bypasses guard and directly spends health once per completed sentence. */
-export function applyInkOverdraw(state: BattleState, inkCost: number): number {
-  const damage = inkOverdraw(inkCost)
+export function applyInkOverdraw(state: BattleState, inkCost: number, availableInk?: number): number {
+  const damage = inkOverdraw(inkCost, availableInk)
   state.playerHp = Math.max(0, state.playerHp - damage)
   return damage
 }
@@ -334,6 +336,7 @@ export interface PreparationResult {
   /** 상한 적용 뒤 실제로 늘어난 방어막. */
   guardGain: number
   counterMultiplier: number
+  enemyAttackReduction: number
 }
 
 export interface OverkillTransferResult {
@@ -345,7 +348,8 @@ export interface OverkillTransferResult {
 }
 
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
-  const guardAttempted = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult))
+  const castPower = intent.castCount * intent.castScale
+  const guardAttempted = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult * castPower))
   const guardGain = Math.min(guardAttempted, Math.max(0, playerGuardLimit(state.playerMax) - state.guard))
   // 남은 방어막은 피해로 흡수한 만큼만 줄고, 새 방어는 그 위에 누적한다.
   // 방어가 없는 문장을 준비했다는 이유만으로 기존 방어막을 지우지 않는다.
@@ -353,7 +357,13 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
   // 반격은 방어막이 실제로 늘었는지가 아니라 방어 문장을 세웠는지로 걸린다.
   // 상한에 걸려 비축분이 0이어도 그 턴을 방어에 쓴 사실은 같으므로 반격은 살린다.
   if (guardAttempted > 0) state.counterMultiplier = intent.counterMultiplier
-  return { guardAttempted, guardGain, counterMultiplier: state.counterMultiplier }
+  state.enemyAttackReduction = Math.max(state.enemyAttackReduction ?? 0, intent.enemyAttackDown)
+  return {
+    guardAttempted,
+    guardGain,
+    counterMultiplier: state.counterMultiplier,
+    enemyAttackReduction: state.enemyAttackReduction,
+  }
 }
 
 interface AttackPlan {
@@ -379,6 +389,7 @@ export function bossMultiBarDamageRequirement(enemy: Pick<EnemyInst, 'def' | 'he
 function activePartWeak(enemy: EnemyInst, emotions: readonly Emotion[], tags: readonly string[]): boolean {
   const weakness = activeEnemyPart(enemy)?.def.weakness
   if (!weakness) return false
+  if (tags.includes('adapt')) return true
   return weakness.kind === 'emotion'
     ? emotions.includes(weakness.value as Emotion)
     : tags.includes(weakness.value)
@@ -690,13 +701,13 @@ function disperseTargetSummons(
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
   const dealsDamage = isDamageIntent(intent)
-  const dmg = Math.round(effectiveBase(intent) * mult)
-  const healAmt = Math.round(intent.heal * mult)
+  const dmg = Math.round(effectiveBase(intent) * mult * intent.castScale)
+  const healAmt = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
   const plan: AttackPlan = {
     dmg,
     target,
     targetCount: intent.targetCount,
-    hitCount: intent.hitCount,
+    hitCount: intent.hitCount * intent.castCount,
     pierceGuard: intent.pierceGuard,
     emotions: intent.emotions,
     tags: intent.tags,
@@ -791,7 +802,11 @@ export interface EnemyStrike {
 }
 
 /** 다음 적 공격의 0~2 난수 한 칸을 실제 피해로 바꾼다. 화면 예상값과 실행이 함께 쓴다. */
-export function enemyAttackDamageForRoll(state: Pick<BattleState, 'turn' | 'playerMax'>, enemy: EnemyInst, roll: number): number {
+export function enemyAttackDamageForRoll(
+  state: Pick<BattleState, 'turn' | 'playerMax'> & Partial<Pick<BattleState, 'enemyAttackReduction'>>,
+  enemy: EnemyInst,
+  roll: number,
+): number {
   const attackStep = nextEnemyAttackStep(enemy)
   if (attackStep?.damageScale === 0) return 0
   const attackStage = bossAttackStage(enemy)
@@ -806,7 +821,8 @@ export function enemyAttackDamageForRoll(state: Pick<BattleState, 'turn' | 'play
   // 거미줄은 방어 위를 타고 넘는 대신 한 번에 최대 체력의 1/5까지만 조인다.
   const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
   const pressureBase = enemy.def.webPattern ? Math.min(uncappedRaw, webShowCap) : uncappedRaw
-  return Math.round(pressureBase * bossTurnPressureMultiplier(enemy, state.turn))
+  const damage = Math.round(pressureBase * bossTurnPressureMultiplier(enemy, state.turn))
+  return Math.max(0, damage - (state.enemyAttackReduction ?? 0))
 }
 
 export function enemyAttackDamageRange(state: Pick<BattleState, 'turn' | 'playerMax'>, enemy: EnemyInst): [number, number] {
@@ -833,6 +849,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
   const summonsReleased = summonPattern?.releaseAt != null && escorts >= summonPattern.releaseAt ? escorts : 0
   const raw = enemyAttackDamageForRoll(state, enemy, Math.floor(rng() * 3))
+  state.enemyAttackReduction = 0
   // 모여든 호위가 한꺼번에 돌격하면 방패 위로 넘어 들어온다. 넷이 모이기 전에
   // 넓은 문장으로 흩어 놓는 것이 유일한 대응이고, 방어로 버티기는 답이 아니다.
   const piercedGuard = !!enemy.def.pierceGuard

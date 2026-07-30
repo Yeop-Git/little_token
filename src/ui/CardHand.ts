@@ -1,7 +1,7 @@
 import { SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
-import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
+import { wordCardDisplayNote, wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
@@ -119,6 +119,7 @@ interface CardHandOptions {
   deckButton: HTMLButtonElement
   onConfirm: (word: Word) => void
   onHover?: (word: Word) => void
+  onHoverEnd?: () => void
   onPreview: (word: Word) => void
   onPreviewEnd: () => void
 }
@@ -137,6 +138,7 @@ export class CardHand {
   private readonly sealedWordIds = new Set<string>()
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
+  private nextOpeningHandBonus = 0
   private processing = false
   private inputEnabled = true
   private serial = 0
@@ -160,6 +162,7 @@ export class CardHand {
     const button = this.cardButton(event.target)
     if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return
     button.classList.remove('pressing')
+    this.opts.onHoverEnd?.()
     const state = this.currentState()
     const selected = state?.hand.find((item) => item.instanceId === this.selectedId)
     if (selected) this.opts.onPreview(selected.word)
@@ -179,6 +182,11 @@ export class CardHand {
     const state = this.currentState()
     if (button && state) this.handleCardKey(event, button, state.hand)
   }
+  private readonly onHandFocusIn = (event: FocusEvent) => {
+    const button = this.cardButton(event.target)
+    const card = button ? this.cardFor(button) : undefined
+    if (card) this.opts.onPreview(card.word)
+  }
 
   constructor(private readonly opts: CardHandOptions) {
     this.stage = this.opts.handRoot.closest<HTMLElement>('.stage') ?? this.opts.handRoot.parentElement!
@@ -188,6 +196,7 @@ export class CardHand {
     this.opts.handRoot.addEventListener('pointerout', this.onHandPointerOut)
     this.opts.handRoot.addEventListener('click', this.onHandClick)
     this.opts.handRoot.addEventListener('pointerdown', this.onHandPointerDown)
+    this.opts.handRoot.addEventListener('focusin', this.onHandFocusIn)
     this.opts.handRoot.addEventListener('pointerup', this.onHandPointerUp)
     this.opts.handRoot.addEventListener('pointercancel', this.onHandPointerUp)
     this.opts.handRoot.addEventListener('keydown', this.onHandKeyDown)
@@ -280,7 +289,8 @@ export class CardHand {
       const handTarget = slotKey === 'verb' || slotKey === 'verb2'
         ? CARD_HAND_CONFIG.verbInitialHand
         : CARD_HAND_CONFIG.initialHand
-      const initialCount = Math.min(handTarget, words.length)
+      const initialCount = Math.min(handTarget + this.nextOpeningHandBonus, words.length)
+      this.nextOpeningHandBonus = 0
       const shuffled = ensureCardInInitialDraw(
         this.shuffle(words),
         initialCount,
@@ -335,6 +345,7 @@ export class CardHand {
     this.opts.handRoot.removeEventListener('pointerup', this.onHandPointerUp)
     this.opts.handRoot.removeEventListener('pointercancel', this.onHandPointerUp)
     this.opts.handRoot.removeEventListener('keydown', this.onHandKeyDown)
+    this.opts.handRoot.removeEventListener('focusin', this.onHandFocusIn)
     this.releaseRenderedCards()
     this.cardPool.clear()
   }
@@ -356,6 +367,10 @@ export class CardHand {
   /** 이번 전투에서 아직 쓰지 않은 뽑기 횟수 — 승리 시 영감으로 환산된다. */
   get savedDraws(): number {
     return Math.max(0, this.drawsLeft)
+  }
+
+  grantNextOpeningHand(count: number) {
+    this.nextOpeningHandBonus += Math.max(0, Math.floor(count))
   }
 
   /** 개발 치트 전용 — 뽑기 횟수를 쓰지 않고 현재 슬롯 손패에 카드 한 장을 넣는다. */
@@ -535,11 +550,17 @@ export class CardHand {
       button.style.setProperty('--card-z', String(line.zIndex))
       button.style.setProperty('--selected-lift', `${CARD_HAND_CONFIG.selectedLift}px`)
       button.style.setProperty('--selected-scale', String(CARD_HAND_CONFIG.selectedScale))
-      const note = button.querySelector<HTMLElement>('.card-note')
-      if (note) note.textContent = unavailable ?? wordNoteText(card.word)
+      const note = button.querySelector<HTMLElement>('.card-note-text')
+      if (note) note.textContent = unavailable ?? wordCardDisplayNote(card.word)
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
       if (emotionBadge) {
         emotionBadge.outerHTML = emotionIconBadge(emotionKey, 'card-emotion')
+      }
+      const costBadge = button.querySelector<HTMLElement>('.card-cost')
+      if (costBadge) {
+        const inkCost = wordInkCost(card.word)
+        costBadge.textContent = String(inkCost)
+        costBadge.setAttribute('aria-label', `잉크 ${inkCost}`)
       }
       const footer = button.querySelector<HTMLElement>('.card-front > small')
       if (footer) footer.textContent = sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD'
@@ -731,7 +752,13 @@ export class CardHand {
     event.preventDefault()
     const index = hand.findIndex((item) => item.instanceId === button.dataset.instanceId)
     const direction = event.key === 'ArrowLeft' ? -1 : 1
-    const next = (index + direction + hand.length) % hand.length
-    this.opts.handRoot.querySelector<HTMLElement>(`[data-instance-id="${hand[next].instanceId}"]`)?.focus()
+    for (let offset = 1; offset <= hand.length; offset++) {
+      const next = (index + direction * offset + hand.length) % hand.length
+      const candidate = this.opts.handRoot.querySelector<HTMLButtonElement>(`[data-instance-id="${hand[next].instanceId}"]`)
+      if (candidate && !candidate.disabled) {
+        candidate.focus()
+        break
+      }
+    }
   }
 }

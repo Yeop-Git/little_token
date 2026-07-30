@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { RUN_SAVE_SCHEMA_VERSION, gainInspiration, newRun, spendInspiration } from '@core/run'
 import { deserializeRun, serializeRun } from '@core/save'
-import { inkOverdraw, selectionInkCost, SENTENCE_INK, wordInkCost } from '@core/ink'
+import { inkExceedsLimit, inkOverdraw, selectionInkCost, SENTENCE_BASE_INK, wordInkCost } from '@core/ink'
 import { EARLY_WORDS } from '@data/earlyWords'
 import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 
@@ -37,14 +37,16 @@ const starterSentence = {
   adv: EARLY_WORDS.adv[0],
   verb: EARLY_WORDS.verb[0],
 }
-assert(selectionInkCost(starterSentence) <= SENTENCE_INK, 'a starter sentence must fit in ten ink')
-assert(wordInkCost({ ...EARLY_WORDS.subj[0], rarity: 'legendary' }) > wordInkCost(EARLY_WORDS.subj[0]), 'higher rarity must cost more ink')
-assert(wordInkCost({ ...EARLY_WORDS.subj[0], bonus: 1 }) > wordInkCost(EARLY_WORDS.subj[0]), 'stronger rules must cost more within the same rarity')
-assert.equal(inkOverdraw(10), 0, 'spending exactly ten ink must be safe')
-assert.equal(inkOverdraw(11), 1, 'the first ink above ten must cost one health')
-assert.equal(inkOverdraw(13), 3, 'ink overdraw must equal health damage')
+assert(selectionInkCost(starterSentence) <= SENTENCE_BASE_INK, 'a starter sentence must fit in base ink')
+assert.equal(wordInkCost({ ...EARLY_WORDS.subj[0], bonus: 1 }), wordInkCost(EARLY_WORDS.subj[0]), 'explicit card cost must not rise after reinforcement')
+const implicitSubject = { ...EARLY_WORDS.subj[0], inkCost: undefined }
+assert(wordInkCost({ ...implicitSubject, bonus: 1 }) > wordInkCost(implicitSubject), 'implicit fallback cost follows expected strength')
+assert.equal(inkOverdraw(6, 6), 0, 'base six ink must be safe')
+assert.equal(inkOverdraw(7, 6), 1, 'the first ink above the available pool costs one health')
+assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even beyond the selectable limit')
+assert.equal(inkExceedsLimit(9, 6), true, 'more than two overdraw is not selectable')
 const inkState = { playerHp: 9, playerMax: 9, guard: 4, counterMultiplier: 0, turn: 1, enemies: [], pending: null } satisfies BattleState
-assert.equal(applyInkOverdraw(inkState, 13), 3, 'overdraw must report its exact damage')
+assert.equal(applyInkOverdraw(inkState, 9, 6), 3, 'overdraw must report its exact damage')
 assert.equal(inkState.playerHp, 6, 'overdraw must spend health')
 assert.equal(inkState.guard, 4, 'overdraw must bypass guard')
 
