@@ -47,9 +47,11 @@ export function wordInkCost(word: Word): number {
     cost += Math.ceil(Math.max(0, word.effects?.guardAttackMultiplier ?? 0) * 2)
     cost += Math.ceil(Math.max(0, word.effects?.overhealDamageMultiplier ?? 0))
     cost += Math.ceil(Math.max(0, word.effects?.lifeStealRate ?? 0) * 2)
-    cost += Math.ceil(Math.max(0, word.effects?.enemyAttackDown ?? 0) / 3)
+    cost += Math.abs(word.effects?.attackRank ?? 0)
+    cost += Math.abs(word.effects?.guardRank ?? 0)
+    cost += Math.abs(word.effects?.enemyAttackRank ?? 0)
     cost += Math.max(0, word.effects?.carryInk ?? 0)
-    cost += Math.max(0, word.effects?.drawCards ?? 0)
+    cost += Math.max(0, word.effects?.bonusDraws ?? 0)
     return Math.max(1, Math.min(5, cost))
   }
 

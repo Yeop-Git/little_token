@@ -73,7 +73,10 @@ function nearestPool(pools: Map<Rarity, RewardOption[]>, want: Rarity): RewardOp
 export const GUARANTEED_LEGENDARY_ITEM_FLOOR = 10
 export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
 export const EARLY_BUILD_REWARD_DAY = 2
-export const EARLY_BUILD_CARD_IDS = ['counterOne', 'overflowingHeart', 'drinkInk'] as const
+/** 2층에서 수식어로 먼저 고르는 방어·회복·순환 전술의 방향. */
+export const EARLY_BUILD_MODIFIER_IDS = ['deulsseogimyeo', 'pogeunhage', 'gyeongkwaehage'] as const
+/** 같은 보상의 동사 단계에서 각 전술을 실제 승리 엔진으로 완성한다. */
+export const EARLY_BUILD_CARD_IDS = ['storedResolve', 'overflowingHeart', 'drinkInk'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -215,6 +218,17 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   const used = new Set<string>()
   const picks: RewardOption[] = []
   const emotionProfile = deckEmotionProfile(player)
+
+  // 공격만 고르는 습관이 굳기 전에, 수식어 자체가 문장의 전술을 바꾼다는 것을
+  // 세 갈래로 직접 보여 준다. 방어도 피해·초과 회복 피해·손패 순환은 어느 쪽도
+  // 실패나 자해가 없고, 공격하지 않는 선택에도 독립된 성장 방향을 준다.
+  if (phase === 'subject' && day === EARLY_BUILD_REWARD_DAY) {
+    for (const id of EARLY_BUILD_MODIFIER_IDS) {
+      const option = pickOne(all.filter((entry) => entry.word?.id === id), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
+    if (picks.length === 3) return shuffle(picks, rng)
+  }
 
   // 첫 보스 전에 방어 전환·초과 회복·흡혈 중 하나를 직접 고르게 한다. 핵심 빌드가
   // 무작위 보상에 묻히면 스탯만 올리고 그 스탯을 쓸 문장을 끝내 못 얻을 수 있다.

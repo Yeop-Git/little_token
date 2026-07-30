@@ -5,9 +5,11 @@
 import {
   BOSS_ATTACK_MULTIPLIER,
   bossTurnPressureMultiplier,
+  clampStatRank,
   PART_WEAKNESS_MULT,
   playerGuardLimit,
   TARGET_FALLOFF,
+  statRankScale,
   WEAKNESS_MULT,
   type BossAttackStage,
 } from '@core/combatRules'
@@ -35,6 +37,8 @@ export interface EnemyInst {
   /** 한 막의 체력. 총 체력은 이 값 × healthBars다. */
   hpPerBar: number
   atkMult: number
+  /** 전투 중 공격 랭크. 적마다 따로 유지한다. */
+  attackRank: number
   dead: boolean
   initiativePhase: 'first' | 'second'
   nextAttackTurn: number
@@ -77,7 +81,7 @@ export function bossAttackStage(enemy: Pick<EnemyInst, 'def' | 'hp' | 'maxHp'>):
 
 /** RNG 최고치까지 막아야 그로기가 열리므로 플레이어에게 항상 같은 목표값을 보여 준다. */
 export function enemyGuardBreakRequirement(
-  enemy: Pick<EnemyInst, 'def' | 'atkMult' | 'hp' | 'maxHp'>,
+  enemy: Pick<EnemyInst, 'def' | 'atkMult' | 'attackRank' | 'hp' | 'maxHp'>,
   turn = 1,
 ): number {
   const step = enemy.def.attackPattern?.find((candidate) => candidate.shatterGuard)
@@ -85,7 +89,7 @@ export function enemyGuardBreakRequirement(
   const stageMult = BOSS_ATTACK_MULTIPLIER[bossAttackStage(enemy)]
   const pressureMult = bossTurnPressureMultiplier(enemy, turn)
   return Math.max(1, Math.round(
-    (enemy.def.atk + step.bonusAtk + 2) * enemy.atkMult * stageMult * pressureMult * (step.damageScale ?? 1),
+    (enemy.def.atk + step.bonusAtk + 2) * statRankScale(enemy.attackRank) * enemy.atkMult * stageMult * pressureMult * (step.damageScale ?? 1),
   ))
 }
 
@@ -107,10 +111,10 @@ export interface BattleState {
   playerMax: number
   guard: number
   counterMultiplier: number
+  playerAttackRank?: number
+  playerGuardRank?: number
   /** 한 겹이 다음 적 공격 한 번을 관통 여부와 무관하게 지운다. */
   playerMagicShield?: number
-  /** Flat reduction consumed by the next enemy attack. */
-  enemyAttackReduction?: number
   /** 개발 치트: 적 행동은 진행하되 플레이어 피해와 방어 소모는 막는다. */
   damageImmune?: boolean
   turn: number
@@ -142,6 +146,7 @@ export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1
     healthBars: bars,
     hpPerBar,
     atkMult,
+    attackRank: 0,
     dead: false,
     initiativePhase: def.initiative,
     nextAttackTurn: 1,
@@ -342,7 +347,9 @@ export interface PreparationResult {
   guardGain: number
   counterMultiplier: number
   magicShieldGain: number
-  enemyAttackReduction: number
+  attackRankGain: number
+  guardRankGain: number
+  enemyAttackRankChange: number
 }
 
 export interface OverkillTransferResult {
@@ -372,13 +379,22 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
   const magicShieldBefore = Math.max(0, state.playerMagicShield ?? 0)
   state.playerMagicShield = intent.magicShield > 0 ? 1 : magicShieldBefore
   const magicShieldGain = state.playerMagicShield - magicShieldBefore
-  state.enemyAttackReduction = Math.max(state.enemyAttackReduction ?? 0, intent.enemyAttackDown)
+  const attackRankBefore = state.playerAttackRank ?? 0
+  const guardRankBefore = state.playerGuardRank ?? 0
+  state.playerAttackRank = clampStatRank(attackRankBefore + intent.attackRank)
+  state.playerGuardRank = clampStatRank(guardRankBefore + intent.guardRank)
+  const enemy = state.enemies.find((candidate) => !candidate.dead && candidate.engaged)
+    ?? state.enemies.find((candidate) => !candidate.dead)
+  const enemyRankBefore = enemy?.attackRank ?? 0
+  if (enemy) enemy.attackRank = clampStatRank(enemyRankBefore + intent.enemyAttackRank)
   return {
     guardAttempted,
     guardGain,
     counterMultiplier: state.counterMultiplier,
     magicShieldGain,
-    enemyAttackReduction: state.enemyAttackReduction,
+    attackRankGain: state.playerAttackRank - attackRankBefore,
+    guardRankGain: state.playerGuardRank - guardRankBefore,
+    enemyAttackRankChange: (enemy?.attackRank ?? enemyRankBefore) - enemyRankBefore,
   }
 }
 
@@ -734,13 +750,18 @@ function disperseTargetSummons(
 }
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
-  const dealsDamage = isDamageIntent(intent)
+  const dealsDirectDamage = isDamageIntent(intent)
   const guardDamage = Math.round(state.guard * intent.guardAttackMultiplier)
   const baseDamage = Math.round(effectiveBase(intent) * mult * intent.castScale)
   const healAmt = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
   const actualHeal = Math.min(healAmt, Math.max(0, state.playerMax - state.playerHp))
   const convertedDamage = Math.round(Math.max(0, healAmt - actualHeal) * intent.overhealDamageMultiplier)
   const dmg = baseDamage + guardDamage + convertedDamage
+  // 동사 종류가 방어/회복이어도 수식어가 방어도나 초과 회복을 피해로 바꾸면
+  // 실제 공격 계획을 만든다. 화면 미리보기와 덱 평가기는 이미 이 피해를 보여 주므로
+  // 여기서 kind만 보고 건너뛰면 "표시만 공격하는" 거짓 선택지가 된다.
+  const dealsConvertedDamage = guardDamage > 0 || convertedDamage > 0
+  const dealsDamage = dealsDirectDamage || dealsConvertedDamage
   const plan: AttackPlan = {
     dmg,
     target,
@@ -758,14 +779,13 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   }
 
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
-  const convertsHealing = convertedDamage > 0
-  const summonDisperse = dealsDamage || convertsHealing
+  const summonDisperse = dealsDamage
     ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions, intent.summonExecuteCount)
     : { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   // 일벌과 본체는 한 줄의 킬체인이다. 같은 피해를 본체에 한 번 더 복제하지 않고,
   // 일벌 체력을 차례로 소모하고 남은 초과분만 그로기된 본체까지 이어 보낸다.
   const bodyPlan = { ...plan, dmg: summonDisperse.remainingDamage }
-  const attack = (dealsDamage || convertsHealing) && !summonDisperse.killed && bodyPlan.dmg > 0
+  const attack = dealsDamage && !summonDisperse.killed && bodyPlan.dmg > 0
     ? resolveAttack(state, bodyPlan)
     : { hits: [], killed: [], overflow: 0 }
   const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
@@ -853,7 +873,7 @@ export interface EnemyStrike {
 
 /** 다음 적 공격의 0~2 난수 한 칸을 실제 피해로 바꾼다. 화면 예상값과 실행이 함께 쓴다. */
 export function enemyAttackDamageForRoll(
-  state: Pick<BattleState, 'turn' | 'playerMax'> & Partial<Pick<BattleState, 'enemyAttackReduction'>>,
+  state: Pick<BattleState, 'turn' | 'playerMax'>,
   enemy: EnemyInst,
   roll: number,
 ): number {
@@ -864,6 +884,7 @@ export function enemyAttackDamageForRoll(
   const summonAttackBonus = escorts * (enemy.def.summonPattern?.attackBonusPerUnit ?? 0)
   const uncappedRaw = Math.round(
     (enemy.def.atk + (attackStep?.bonusAtk ?? 0) + summonAttackBonus + Math.max(0, Math.min(2, Math.floor(roll))))
+      * statRankScale(enemy.attackRank)
       * enemy.atkMult
       * BOSS_ATTACK_MULTIPLIER[attackStage]
       * (attackStep?.damageScale ?? 1),
@@ -872,11 +893,11 @@ export function enemyAttackDamageForRoll(
   const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
   const pressureBase = enemy.def.webPattern ? Math.min(uncappedRaw, webShowCap) : uncappedRaw
   const damage = Math.round(pressureBase * bossTurnPressureMultiplier(enemy, state.turn))
-  return Math.max(0, damage - (state.enemyAttackReduction ?? 0))
+  return Math.max(0, damage)
 }
 
 export function enemyAttackDamageRange(
-  state: Pick<BattleState, 'turn' | 'playerMax'> & Partial<Pick<BattleState, 'enemyAttackReduction'>>,
+  state: Pick<BattleState, 'turn' | 'playerMax'>,
   enemy: EnemyInst,
 ): [number, number] {
   return [enemyAttackDamageForRoll(state, enemy, 0), enemyAttackDamageForRoll(state, enemy, 2)]
@@ -927,7 +948,7 @@ export interface EnemyAttackForecast {
 /** 다음 실제 공격 턴의 피해, 방어 적용값과 피격 후 체력을 한 번에 예상한다. */
 export function enemyAttackForecast(
   state: Pick<BattleState, 'turn' | 'playerMax' | 'playerHp' | 'guard'>
-    & Partial<Pick<BattleState, 'playerMagicShield' | 'enemyAttackReduction' | 'damageImmune'>>,
+    & Partial<Pick<BattleState, 'playerMagicShield' | 'damageImmune'>>,
   enemy: EnemyInst,
 ): EnemyAttackForecast {
   const attackTurn = Math.max(state.turn, enemy.nextAttackTurn)
@@ -967,7 +988,6 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   const summonAttackBonus = escorts * (summonPattern?.attackBonusPerUnit ?? 0)
   const summonsReleased = summonPattern?.releaseAt != null && escorts >= summonPattern.releaseAt ? escorts : 0
   const raw = enemyAttackDamageForRoll(state, enemy, Math.floor(rng() * 3))
-  state.enemyAttackReduction = 0
   // 모여든 호위가 한꺼번에 돌격하면 방패 위로 넘어 들어온다. 화면 예상과 같은
   // 순수 판정을 먼저 읽고, 이 실행부에서만 체력과 방어 상태를 실제로 바꾼다.
   const defense = enemyAttackDefense(state, enemy, raw)

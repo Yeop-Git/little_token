@@ -1,5 +1,5 @@
 import { comboLeads, compile, withOverdrawEffects } from '@core/compiler'
-import { bossTurnPressureMultiplier } from '@core/combatRules'
+import { bossTurnPressureMultiplier, rankedStat } from '@core/combatRules'
 import { DECK_LIMITS, applyItemReward, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
 import { ECHO_REPEAT_SCALE, LUCK_CLOAK_RATE, TWIN_VERB_SCALE } from '@core/passives'
 import { defaultPlayer } from '@core/player'
@@ -38,7 +38,7 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
 }
-const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, enemyAttackDown: 0, drawCards: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
+const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, attackRank: 0, guardRank: 0, enemyAttackRank: 0, bonusDraws: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
@@ -191,6 +191,23 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(s.playerHp === 100 && r.convertedDamage === 5 && r.hits[0].dmg === 5, 'only healing beyond max HP converts to damage')
 }
 {
+  const modifier = REWARD_WORDS.find((word) => word.id === 'deulsseogimyeo')!
+  const tables = makeEarlyTables({ subj: [EARLY_WORDS.subj[0]], adv: [modifier], verb: [EARLY_WORDS.verb.find((word) => word.kind === 'guard')!] })
+  const intent = compile({ subj: tables.words.subj[0], adv: modifier, verb: tables.words.verb[0] }, tables, startingPlayer().stats)
+  const s = state([makeEnemy(foe('modifier-guard-engine', { hp: 100 }))])
+  applyPreparation(s, intent, intent.multiplier)
+  const r = applyIntent(s, intent, intent.multiplier, 0)
+  assert(intent.kind === 'guard' && s.guard > 0 && r.hits[0].dmg > 0, 'guard-conversion modifier lets a guard verb defend and deal damage')
+}
+{
+  const modifier = REWARD_WORDS.find((word) => word.id === 'pogeunhage')!
+  const tables = makeEarlyTables({ subj: [EARLY_WORDS.subj[0]], adv: [modifier], verb: [EARLY_WORDS.verb.find((word) => word.kind === 'heal')!] })
+  const intent = compile({ subj: tables.words.subj[0], adv: modifier, verb: tables.words.verb[0] }, tables, startingPlayer().stats)
+  const s = state([makeEnemy(foe('modifier-heal-engine', { hp: 100 }))])
+  const r = applyIntent(s, intent, intent.multiplier, 0)
+  assert(intent.kind === 'heal' && s.playerHp === s.playerMax && r.convertedDamage! > 0 && r.hits[0].dmg > 0, 'overheal modifier lets a heal verb finish enemies at full health')
+}
+{
   const s = state([makeEnemy(foe('lifesteal', { hp: 100 }))])
   s.playerMax = 100
   s.playerHp = 50
@@ -205,12 +222,18 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 {
   const s = state([makeEnemy(foe('weakened'))])
-  applyPreparation(s, attack({ enemyAttackDown: 3 }), 1)
+  applyPreparation(s, attack({ enemyAttackRank: -1 }), 1)
   s.guard = 2
   const preview = enemyAttackForecast(s, s.enemies[0])
-  assert(preview.raw.join(',') === '1,3' && preview.dealt.join(',') === '0,1' && preview.hpAfter.join(',') === '29,30', 'enemy forecast includes attack reduction, guard, and post-hit hp')
+  assert(preview.raw.join(',') === '3,5' && preview.dealt.join(',') === '1,3' && preview.hpAfter.join(',') === '27,29', 'enemy forecast includes attack rank, guard, and post-hit hp')
   const strikes = enemyTurn(s, () => 0, 'second')
-  assert(strikes[0]?.dealt === 0 && strikes[0]?.absorbed === 1 && s.enemyAttackReduction === 0, 'enemy attack reduction applies once and is consumed')
+  assert(strikes[0]?.dealt === 1 && strikes[0]?.absorbed === 2 && s.enemies[0].attackRank === -1, 'enemy attack rank persists for that enemy')
+}
+{
+  const s = state()
+  applyPreparation(s, attack({ attackRank: 5, guardRank: 1 }), 1)
+  assert(s.playerAttackRank === 3 && s.playerGuardRank === 1, 'player stat ranks cap at +3')
+  assert(rankedStat(10, s.playerAttackRank ?? 0) === 17.5 && rankedStat(10, s.playerGuardRank ?? 0) === 12.5, 'ranked stats use the shared 25-percent stage curve')
 }
 {
   const s = state([makeEnemy(foe('forecast-pierce', { pierceGuard: true }))])

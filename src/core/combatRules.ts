@@ -10,6 +10,22 @@
 /** 다중 대상 공격의 앞줄부터의 피해 비율. 배열 길이를 넘는 대상은 마지막 값을 쓴다. */
 export const TARGET_FALLOFF = [1, 0.7, 0.5] as const
 
+/** 전투 중 공격·방어 변화는 고정 수치가 아니라 이 랭크 범위로만 움직인다. */
+export const STAT_RANK_LIMIT = 3
+
+export function clampStatRank(rank: number): number {
+  return Math.max(-STAT_RANK_LIMIT, Math.min(STAT_RANK_LIMIT, Math.trunc(rank)))
+}
+
+/** 1랭크마다 기준 스탯의 25%씩 변한다. */
+export function statRankScale(rank: number): number {
+  return 1 + clampStatRank(rank) * 0.25
+}
+
+export function rankedStat(value: number, rank: number): number {
+  return Math.round(Math.max(0, value) * statRankScale(rank) * 2) / 2
+}
+
 /** 적 HP바 옆 감정을 문장에 실었을 때의 피해 배율. */
 export const WEAKNESS_MULT = 1.25
 

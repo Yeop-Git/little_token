@@ -87,31 +87,31 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
 
 const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
   en: {
-    magicVeil: 'wrapped myself in a veil of light', storedResolve: 'thrust out the strength I had held',
+    magicVeil: 'wrapped myself in a veil of light', storedResolve: 'blocked and pushed back',
     overflowingHeart: 'passed on the feeling that overflowed', drinkInk: 'drank back the spilled ink',
     stainedTomorrow: "stained tomorrow's line", savedBreath: 'saved my next breath',
     dampenMomentum: 'pressed down their momentum in writing', readAhead: 'read the line ahead',
   },
   ja: {
-    magicVeil: '光の幕をまとった', storedResolve: '耐えた力を突き出した',
+    magicVeil: '光の幕をまとった', storedResolve: '防いで押し返した',
     overflowingHeart: 'あふれた想いを渡した', drinkInk: 'こぼれたインクを飲み戻した',
     stainedTomorrow: '明日の一行を染めた', savedBreath: '次の息をためておいた',
     dampenMomentum: '勢いを押さえて書いた', readAhead: '先の一行を読んだ',
   },
   ru: {
-    magicVeil: 'укрылся завесой света', storedResolve: 'высвободил накопленную стойкость',
+    magicVeil: 'укрылся завесой света', storedResolve: 'защитился и оттеснил',
     overflowingHeart: 'передал переполнившее чувство', drinkInk: 'выпил пролитые чернила обратно',
     stainedTomorrow: 'окрасил завтрашнюю строку', savedBreath: 'сберёг следующий вдох',
     dampenMomentum: 'усмирил их напор на бумаге', readAhead: 'прочитал следующую строку заранее',
   },
   'zh-Hans': {
-    magicVeil: '披上了光幕', storedResolve: '打出了忍耐积蓄的力量',
+    magicVeil: '披上了光幕', storedResolve: '挡住后推了回去',
     overflowingHeart: '递出了满溢的心意', drinkInk: '饮回了洒落的墨水',
     stainedTomorrow: '染上了明日的一行', savedBreath: '存下了下一口气',
     dampenMomentum: '落笔压住了气势', readAhead: '提前读了下一行',
   },
   'zh-Hant': {
-    magicVeil: '披上了光幕', storedResolve: '打出了忍耐積蓄的力量',
+    magicVeil: '披上了光幕', storedResolve: '擋住後推了回去',
     overflowingHeart: '遞出了滿溢的心意', drinkInk: '飲回了灑落的墨水',
     stainedTomorrow: '染上了明日的一行', savedBreath: '存下了下一口氣',
     dampenMomentum: '落筆壓住了氣勢', readAhead: '提前讀了下一行',

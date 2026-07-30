@@ -95,8 +95,10 @@ function modifierTactics(word: Word): string[] {
   if ((effects?.counterMultiplier ?? 0) > 0) tactics.push('counter')
   if ((effects?.inkDiscount ?? 0) > 0) tactics.push('ink-discount')
   if ((effects?.carryInk ?? 0) > 0) tactics.push('carry-ink')
-  if ((effects?.enemyAttackDown ?? 0) > 0) tactics.push('enemy-weaken')
-  if ((effects?.drawCards ?? 0) > 0) tactics.push('opening-draw')
+  if ((effects?.enemyAttackRank ?? 0) < 0) tactics.push('enemy-weaken')
+  if ((effects?.attackRank ?? 0) > 0) tactics.push('attack-rank')
+  if ((effects?.guardRank ?? 0) > 0) tactics.push('guard-rank')
+  if ((effects?.bonusDraws ?? 0) > 0) tactics.push('bonus-draw')
   if (word.aoe === 'all' || word.targetCount === 'all' || (word.targetCount ?? 1) > 1) {
     tactics.push('multi-target')
   }
@@ -110,14 +112,14 @@ function hasEmotionSignature(emotion: CheckedEmotion, modifiers: Word[]): boolea
       && modifiers.some((word) => (word.effects?.castCount ?? 1) > 1)
   }
   if (emotion === 'sorrow') {
-    return modifiers.some((word) => (word.effects?.counterMultiplier ?? 0) > 0 && (word.effects?.enemyAttackDown ?? 0) > 0)
+    return modifiers.some((word) => (word.effects?.counterMultiplier ?? 0) > 0 && (word.effects?.enemyAttackRank ?? 0) < 0)
       && modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
   }
   if (emotion === 'joy') {
     return modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
-      && modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.effects?.drawCards ?? 0) > 0)
+      && modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.effects?.bonusDraws ?? 0) > 0)
   }
-  return modifiers.some((word) => (word.effects?.drawCards ?? 0) > 0 && (word.effects?.inkDiscount ?? 0) > 0)
+  return modifiers.some((word) => (word.effects?.bonusDraws ?? 0) > 0 && (word.effects?.inkDiscount ?? 0) > 0)
     && modifiers.some((word) => word.tags.includes('preempt'))
 }
 

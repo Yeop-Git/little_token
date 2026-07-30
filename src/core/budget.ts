@@ -54,7 +54,7 @@ export const expectedMult = (w: Word): number =>
 export const hasModifierTactic = (w: Word): boolean => {
   const effects = w.effects
   const numericEffect = effects && Object.values(effects).some((value) =>
-    typeof value === 'number' ? value > 0 : value === true,
+    typeof value === 'number' ? value !== 0 : value === true,
   )
   return (w.bonus ?? 0) > 0
     || !!numericEffect
@@ -83,17 +83,33 @@ export const tacticalVerbPower = (w: Word): number => {
     return direct
       + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
       + direct * Math.max(0, w.effects?.lifeStealRate ?? 0)
-      + Math.max(0, w.effects?.enemyAttackDown ?? 0) * .25
+      + Math.abs(w.effects?.attackRank ?? 0)
+      + Math.abs(w.effects?.guardRank ?? 0)
+      + Math.abs(w.effects?.enemyAttackRank ?? 0)
   }
-  if (w.kind === 'guard' && w.effects?.counterMultiplier) {
-    return coefficient + Math.max(0, w.effects.counterMultiplier - 1)
+  if (w.kind === 'guard') {
+    const count = typeof w.targetCount === 'number' ? Math.max(1, w.targetCount) : 1
+    const coverage = Array.from({ length: count }, (_, i) =>
+      TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
+    ).reduce((sum, value) => sum + value, 0)
+    return coefficient
+      + Math.max(0, (w.effects?.counterMultiplier ?? 0) - 1)
+      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
+      + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
+      + Math.max(0, w.effects?.carryInk ?? 0) * .25
+      + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
+      + Math.abs(w.effects?.attackRank ?? 0)
+      + Math.abs(w.effects?.guardRank ?? 0)
+      + Math.abs(w.effects?.enemyAttackRank ?? 0)
   }
   return coefficient
     + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
     + Math.max(0, w.effects?.overhealDamageMultiplier ?? 0) * .25
     + Math.max(0, w.effects?.carryInk ?? 0) * .25
-    + Math.max(0, w.effects?.drawCards ?? 0) * .25
-    + Math.max(0, w.effects?.enemyAttackDown ?? 0) * .25
+    + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
+    + Math.abs(w.effects?.attackRank ?? 0)
+    + Math.abs(w.effects?.guardRank ?? 0)
+    + Math.abs(w.effects?.enemyAttackRank ?? 0)
 }
 
 /** 다중 대상 관통은 방어를 건너뛰는 희소 유틸리티를 총량의 15%로 평가한다. */

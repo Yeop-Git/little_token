@@ -75,6 +75,7 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeForElapsedTurns, gradeTier, startGrade } from '@core/grade'
+import { rankedStat } from '@core/combatRules'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
@@ -458,6 +459,8 @@ export class BattleView {
       guard: Math.max(0, Math.min(playerGuardLimit(maxHp), savedGuard)),
       counterMultiplier: 0,
       playerMagicShield: 0,
+      playerAttackRank: 0,
+      playerGuardRank: 0,
       turn: 1,
       enemies,
       pending: null,
@@ -858,7 +861,8 @@ export class BattleView {
 
   private stageProgressHtml(): string {
     if (this.isBoss) return ''
-    const { floor, endlessCycle } = this.stageInfo
+    const { day, floor, endlessCycle } = this.stageInfo
+    const isEndless = endlessCycle > 0
     const bossFloors = Object.keys(BOSS_BY_FLOOR).map(Number).filter((value) => value <= DISPLAY_FLOORS).sort((a, b) => a - b)
     const nextBossFloor = bossFloors.find((bossFloor) => bossFloor >= floor) ?? DISPLAY_FLOORS
     const bossName = ENEMIES[BOSS_BY_FLOOR[nextBossFloor]]?.name ?? t('hudBoss', '보스')
@@ -866,27 +870,41 @@ export class BattleView {
     const next = remaining === 0
       ? hudTip('hudBossNow', '{boss} 보스전', { boss: bossName })
       : hudTip('hudNextBoss', '{boss}까지 {count}스테이지', { boss: bossName, count: remaining })
-    const cycle = endlessCycle > 0
+    const cycle = isEndless
       ? hudTip('hudEndlessCycle', '엔드리스 {cycle}주기', { cycle: endlessCycle })
       : t('hudStoryCycle', '첫 번째 이야기')
-    const aria = hudTip('hudStageAria', '{cycle}. {floor}/{total}스테이지. {next}', {
-      cycle,
-      floor,
-      total: DISPLAY_FLOORS,
-      next,
-    })
+    const aria = isEndless
+      ? hudTip('hudEndlessStageAria', '엔드리스 {cycle}주기. 주기 {floor}/{total}스테이지. 누적 {day}스테이지. {next}', {
+        cycle: endlessCycle,
+        floor,
+        total: DISPLAY_FLOORS,
+        day,
+        next,
+      })
+      : hudTip('hudStageAria', '{cycle}. {floor}/{total}스테이지. {next}', {
+        cycle,
+        floor,
+        total: DISPLAY_FLOORS,
+        next,
+      })
+    const summary = isEndless
+      ? hudTip('hudEndlessStage', '엔드리스 · {day}스테이지', { day })
+      : `${t('hudStageLabel', '스테이지')} ${floor}<em>/${DISPLAY_FLOORS}</em>`
+    const detailLead = isEndless
+      ? hudTip('hudEndlessCycleProgress', '{cycle}주기 진행 · {floor}/{total}', { cycle: endlessCycle, floor, total: DISPLAY_FLOORS })
+      : cycle
     const progress = Math.min(100, Math.max(0, (floor / DISPLAY_FLOORS) * 100))
     const bossMarks = bossFloors
       .map((bossFloor) => `<i class="stage-progress-boss${floor >= bossFloor ? ' passed' : ''}" style="--boss-at:${(bossFloor / DISPLAY_FLOORS) * 100}%" aria-hidden="true"></i>`)
       .join('')
     const bossList = bossFloors
-      .map((bossFloor) => `<span><b>${bossFloor}</b>${ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')}</span>`)
+      .map((bossFloor) => `<span><b>${isEndless ? endlessCycle * DISPLAY_FLOORS + bossFloor : bossFloor}</b>${ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')}</span>`)
       .join('')
     return `
-      <section class="stage-progress glass" role="img" tabindex="0" aria-label="${aria}">
-        <span class="stage-progress-summary"><i aria-hidden="true">✦</i><b>${t('hudStageLabel', '스테이지')} ${floor}<em>/${DISPLAY_FLOORS}</em></b></span>
+      <section class="stage-progress glass${isEndless ? ' is-endless' : ''}" role="img" tabindex="0" aria-label="${aria}">
+        <span class="stage-progress-summary"><i aria-hidden="true">${isEndless ? '∞' : '✦'}</i><b>${summary}</b></span>
         <span class="stage-progress-detail" aria-hidden="true">
-          <span class="stage-progress-copy"><small>${cycle}</small><b>${next}</b></span>
+          <span class="stage-progress-copy"><small>${detailLead}</small><b>${next}</b></span>
           <span class="stage-progress-track">
             <i class="stage-progress-fill" style="width:${progress}%"></i>
             ${bossMarks}
@@ -1915,11 +1933,13 @@ export class BattleView {
     const host = this.q('#detail')
     let stats: string
     if (id === 'player') {
-      const p = this.player.stats
+      const p = this.combatStats()
+      const attackRank = this.state.playerAttackRank ?? 0
+      const guardRank = this.state.playerGuardRank ?? 0
       stats = [
         ['체력', `${Math.max(0, this.state.playerHp)} / ${this.state.playerMax}`],
-        ['공격', String(p.atk)],
-        ['방어', String(p.guard)],
+        ['공격', `${p.atk}${attackRank ? ` (${attackRank > 0 ? '↑' : '↓'}${Math.abs(attackRank)})` : ''}`],
+        ['방어', `${p.guard}${guardRank ? ` (${guardRank > 0 ? '↑' : '↓'}${Math.abs(guardRank)})` : ''}`],
         ['회복', String(p.heal)],
         ['운', String(p.luck)],
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
@@ -1938,7 +1958,7 @@ export class BattleView {
       stats = enemy
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
-            ['공격', attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`],
+            ['공격', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
             ...(attackStep ? [['다음 기술', attackStep.name]] : []),
             ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
@@ -2206,44 +2226,52 @@ export class BattleView {
       const actionReady = effectiveBase(intent) > 0
         || intent.guard > 0
         || intent.heal > 0
-        || intent.enemyAttackDown > 0
+        || (intent.guardAttackMultiplier > 0 && this.state.guard > 0)
+        || intent.attackRank !== 0
+        || intent.guardRank !== 0
+        || intent.enemyAttackRank !== 0
         || intent.magicShield > 0
       if (!actionReady) {
         sentenceValue = bossText('forecastProgress', { current: chosenCount, total: this.order().length })
       } else {
         const normalMult = resolveMultiplier(intent, this.multCtx(intent), .99).mult
-      const healPreview = Math.round(intent.heal * normalMult * intent.castScale * intent.castCount)
-      const overhealDamage = Math.round(
-        Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
-          * intent.overhealDamageMultiplier,
-      )
-      const resourceDamage = Math.round(this.state.guard * intent.guardAttackMultiplier) + overhealDamage
-      const damageValue = Math.round(
-        (effectiveBase(intent) * normalMult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount,
-      )
-      const value = isDamageIntent(intent)
-        ? damageValue
-        : intent.guard > 0
-          ? Math.round(intent.guard * normalMult * intent.castScale * intent.castCount)
-          : Math.round(intent.heal * normalMult * intent.castScale * intent.castCount)
-      const kindKey = intent.kind === 'attack'
-        ? 'forecastAttack'
-        : intent.kind === 'guard'
-          ? 'forecastGuard'
-          : intent.kind === 'heal'
-            ? 'forecastHeal'
-            : 'forecastDebuff'
-      const targetCount = intent.targetCount === 'all'
-        ? aliveIdx(this.state).length
-        : Math.min(intent.targetCount, aliveIdx(this.state).length)
-      sentenceValue = bossText('forecastContextValue', { value })
-      const enemyTargets = bossText('forecastTargets', { count: Math.max(1, targetCount) })
-      const targetText = intent.targetMode === 'self'
-        ? bossText('forecastSelf')
-        : intent.targetMode === 'both'
-          ? `${enemyTargets} + ${bossText('forecastSelf')}`
-          : enemyTargets
+        const guardPreview = Math.round(intent.guard * normalMult * intent.castScale * intent.castCount)
+        const healPreview = Math.round(intent.heal * normalMult * intent.castScale * intent.castCount)
+        const overhealDamage = Math.round(
+          Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
+            * intent.overhealDamageMultiplier,
+        )
+        const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+        const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+        const damageValue = Math.round(
+          (effectiveBase(intent) * normalMult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount,
+        )
+        const value = isDamageIntent(intent)
+          ? damageValue
+          : intent.guard > 0
+            ? guardPreview
+            : healPreview
+        const kindKey = intent.kind === 'attack'
+          ? 'forecastAttack'
+          : intent.kind === 'guard'
+            ? 'forecastGuard'
+            : intent.kind === 'heal'
+              ? 'forecastHeal'
+              : 'forecastDebuff'
+        const targetCount = intent.targetCount === 'all'
+          ? aliveIdx(this.state).length
+          : Math.min(intent.targetCount, aliveIdx(this.state).length)
+        sentenceValue = bossText('forecastContextValue', { value })
+        const enemyTargets = bossText('forecastTargets', { count: Math.max(1, targetCount) })
+        const targetText = intent.targetMode === 'self'
+          ? bossText('forecastSelf')
+          : intent.targetMode === 'both'
+            ? `${enemyTargets} + ${bossText('forecastSelf')}`
+            : enemyTargets
         sentenceMeta = `${bossText(kindKey)} · ${targetText}`
+        if (!isDamageIntent(intent) && damageValue > 0) {
+          sentenceMeta += ` · ${bossText('forecastAttack')} ${damageValue}`
+        }
       }
     } else if (this.lastResolvedTally) {
       const tally = this.lastResolvedTally
@@ -2394,7 +2422,7 @@ export class BattleView {
     const sealed = this.cardHand.isSealed(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
-    const intent = compile(trial, this.t, this.combatStats(), this.mods())
+    const intent = compile(trial, this.t, this.combatStats(trial), this.mods())
     const warn = intent.penalties.length
       ? `<div class="wd-warn">⚠ ${intent.penalties[0]} · 위력 ×${intent.coherence.toFixed(2)}</div>`
       : ''
@@ -2416,15 +2444,21 @@ export class BattleView {
       ${sealed ? `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>` : ''}`
   }
 
-  private multCtx(intent: Intent) {
-    const stats = this.combatStats()
+  private multCtx(intent: Intent, selection: Selection = this.sel) {
+    const stats = this.combatStats(selection)
     return { luck: stats.luck, statBias: statBiasOf(intent, stats) }
   }
 
-  /** The boost changes only outgoing attack-stat cards, never saved stats or heal/guard values. */
-  private combatStats() {
-    if (this.debugAttackMultiplier === 1) return this.player.stats
-    return { ...this.player.stats, atk: this.player.stats.atk * this.debugAttackMultiplier }
+  /** 전투 랭크는 저장 스탯을 바꾸지 않고 이 전투의 컴파일 입력에만 반영한다. */
+  private combatStats(selection: Selection = this.sel) {
+    const selected = Object.values(selection)
+    const pendingAttackRank = selected.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), 0)
+    const pendingGuardRank = selected.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), 0)
+    return {
+      ...this.player.stats,
+      atk: rankedStat(this.player.stats.atk * this.debugAttackMultiplier, (this.state.playerAttackRank ?? 0) + pendingAttackRank),
+      guard: rankedStat(this.player.stats.guard, (this.state.playerGuardRank ?? 0) + pendingGuardRank),
+    }
   }
 
   /** 보유 패시브 → 컴파일러 수정자. 바베큐는 이번 전투 처치 수를 먹는다. */
@@ -2451,14 +2485,15 @@ export class BattleView {
   // 공/방/회 모두 하나의 배율을 공유한다(execute와 동일 규칙, 룰렛만 미확정).
   // 스탯은 이미 동사의 깡수치로 들어가 있으니 여기서 또 더하지 않는다.
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
-    const intent = compile(sel, this.t, this.combatStats(), this.mods())
-    const m = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
+    const intent = compile(sel, this.t, this.combatStats(sel), this.mods())
+    const m = resolveMultiplier(intent, this.multCtx(intent, sel), 0.5).mult
     const castPower = intent.castCount * intent.castScale
     const guard = Math.round(intent.guard * m * castPower)
     const heal = Math.round(intent.heal * m * castPower)
     const missingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
     const overhealDamage = Math.round(Math.max(0, heal - missingHp) * intent.overhealDamageMultiplier)
-    const resourceDamage = Math.round(this.state.guard * intent.guardAttackMultiplier) + overhealDamage
+    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guard)
+    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     const dmg = Math.round((effectiveBase(intent) * m * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
     return { dmg, heal, guard, self: intent.recoil, multiplier: m }
@@ -2511,7 +2546,11 @@ export class BattleView {
         (m) => {
           const value = m.key === 'hp'
             ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}${this.state.guard ? ` ◈${this.state.guard}` : ''}${this.state.playerMagicShield ? ' ✦1' : ''}`
-            : String(this.player.stats[m.key])
+            : m.key === 'atk'
+              ? `${this.combatStats().atk}${this.state.playerAttackRank ? ` ${this.state.playerAttackRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerAttackRank)}` : ''}`
+              : m.key === 'guard'
+                ? `${this.combatStats().guard}${this.state.playerGuardRank ? ` ${this.state.playerGuardRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerGuardRank)}` : ''}`
+                : String(this.player.stats[m.key])
           return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
@@ -3433,7 +3472,9 @@ export class BattleView {
     const mult = resolved.mult
     const healPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
     const overhealDamage = Math.round(Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
-    const resourceDamage = Math.round(this.state.guard * intent.guardAttackMultiplier) + overhealDamage
+    const guardPreview = Math.round(intent.guard * mult * intent.castScale * intent.castCount)
+    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     const dmg = Math.round((effectiveBase(intent) * mult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
@@ -3487,6 +3528,7 @@ export class BattleView {
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
+    if (prep.attackRankGain || prep.guardRankGain || prep.enemyAttackRankChange) this.renderStats()
     if (prep.guardGain > 0) {
       GameAudio.play('shield')
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
@@ -3664,7 +3706,7 @@ export class BattleView {
     this.endSlowmo()
     this.sel = {}
     this.clearNormalTokenWarning()
-    this.cardHand.grantNextOpeningHand(intent.drawCards)
+    this.cardHand.grantDraws(intent.bonusDraws)
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++

@@ -86,10 +86,14 @@ export interface WordEffects {
   inkDiscount?: number
   /** 정산 뒤 다음 문장으로 넘기는 잉크를 추가한다(이월 상한 2 적용). */
   carryInk?: number
-  /** Reduces the damage of the next enemy attack. */
-  enemyAttackDown?: number
-  /** Adds cards to the opening hand of the next sentence. */
-  drawCards?: number
+  /** 전투 중 플레이어 공격 랭크 변화. */
+  attackRank?: number
+  /** 전투 중 플레이어 방어 랭크 변화. */
+  guardRank?: number
+  /** 현재 적의 공격 랭크 변화. 디버프는 음수다. */
+  enemyAttackRank?: number
+  /** 이번 전투에서 덱 버튼으로 무료 카드를 뽑을 수 있는 횟수를 더한다. */
+  bonusDraws?: number
   /** 여왕벌 전용 공략처럼 피해량과 무관하게 앞쪽 소환물을 확정 퇴치하는 수. */
   summonExecuteCount?: number
 }
@@ -198,8 +202,10 @@ export interface Intent {
   guardAttackMultiplier: number
   overhealDamageMultiplier: number
   lifeStealRate: number
-  enemyAttackDown: number
-  drawCards: number
+  attackRank: number
+  guardRank: number
+  enemyAttackRank: number
+  bonusDraws: number
   summonExecuteCount: number
   emotions: Emotion[]
   emotionResonance: number

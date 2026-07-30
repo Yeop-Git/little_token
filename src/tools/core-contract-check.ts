@@ -15,7 +15,7 @@ import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 import { availableCombos } from '@core/deckInsights'
 import { floorsForEdition, isEditionFinalFloor, strictResourceError } from '@/config/edition'
 import { clearRewardValue, gradeFloor, gradeForElapsedTurns, startGrade } from '@core/grade'
-import { EARLY_BUILD_CARD_IDS, EARLY_BUILD_REWARD_DAY, genRewards } from '@data/rewards'
+import { EARLY_BUILD_CARD_IDS, EARLY_BUILD_MODIFIER_IDS, EARLY_BUILD_REWARD_DAY, genRewards } from '@data/rewards'
 
 const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(3, elapsed))
 assert.deepEqual(speedGrades, [5, 5, 5, 4, 4, 4, 3], 'reward grade falls once per three completed sentences until the luck floor')
@@ -95,6 +95,12 @@ assert.deepEqual(
   new Set(earlyBuildOffers.map((option) => option.word?.id)),
   new Set(EARLY_BUILD_CARD_IDS),
   'the second-floor verb reward must offer all three early build engines',
+)
+const earlyModifierOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'subject', () => 0.5)
+assert.deepEqual(
+  new Set(earlyModifierOffers.map((option) => option.word?.id)),
+  new Set(EARLY_BUILD_MODIFIER_IDS),
+  'the second-floor modifier reward must expose guard, heal, and flow tactics side by side',
 )
 const inkState = { playerHp: 9, playerMax: 9, guard: 4, counterMultiplier: 0, turn: 1, enemies: [], pending: null } satisfies BattleState
 assert.equal(applyInkOverdraw(inkState, 9, 6), 3, 'overdraw must report its exact damage')

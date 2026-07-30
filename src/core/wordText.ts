@@ -18,22 +18,37 @@ const L = {
 }[currentLocale]
 
 const EXTRA_EFFECT_LABEL = {
-  ko: { enemyAttackDown: '다음 적 공격', drawCards: '다음 첫 손패' },
-  en: { enemyAttackDown: 'Next enemy attack', drawCards: 'Next opening hand' },
-  ja: { enemyAttackDown: '次の敵攻撃', drawCards: '次の初期手札' },
-  ru: { enemyAttackDown: 'Следующая атака врага', drawCards: 'Следующая начальная рука' },
-  'zh-Hans': { enemyAttackDown: '下次敌方攻击', drawCards: '下句起始手牌' },
-  'zh-Hant': { enemyAttackDown: '下次敵方攻擊', drawCards: '下句起始手牌' },
+  ko: { attackRank: '공격', guardRank: '방어', enemyAttackRank: '적 공격', rank: '랭크', bonusDraws: '다시 뽑기' },
+  en: { attackRank: 'Attack', guardRank: 'Guard', enemyAttackRank: 'Enemy Attack', rank: 'rank', bonusDraws: 'Redraw' },
+  ja: { attackRank: '攻撃', guardRank: '防御', enemyAttackRank: '敵の攻撃', rank: 'ランク', bonusDraws: '引き直し' },
+  ru: { attackRank: 'Атака', guardRank: 'Защита', enemyAttackRank: 'Атака врага', rank: 'ранг', bonusDraws: 'Добор' },
+  'zh-Hans': { attackRank: '攻击', guardRank: '防御', enemyAttackRank: '敌方攻击', rank: '级', bonusDraws: '重抽' },
+  'zh-Hant': { attackRank: '攻擊', guardRank: '防禦', enemyAttackRank: '敵方攻擊', rank: '級', bonusDraws: '重抽' },
+}[currentLocale]
+
+const DRAW_COUNT_UNIT = {
+  ko: '회', en: '', ja: '回', ru: '', 'zh-Hans': '次', 'zh-Hant': '次',
 }[currentLocale]
 
 const BUILD_EFFECT_LABEL = {
-  ko: { magicShield: '매직실드 1겹', guardAttack: '현재 방어도 피해', overhealAttack: '초과 회복 피해', lifeSteal: '흡혈' },
+  ko: { magicShield: '매직실드 1겹', guardAttack: '방어도', overhealAttack: '초과 회복량', lifeSteal: '흡혈' },
   en: { magicShield: 'Magic Shield 1 layer', guardAttack: 'Current Guard damage', overhealAttack: 'Overheal damage', lifeSteal: 'Lifesteal' },
   ja: { magicShield: 'マジックシールド1層', guardAttack: '現在の防御ダメージ', overhealAttack: '超過回復ダメージ', lifeSteal: '吸収' },
   ru: { magicShield: 'Магический щит: 1 слой', guardAttack: 'Урон от текущей защиты', overhealAttack: 'Урон от избытка лечения', lifeSteal: 'Вампиризм' },
   'zh-Hans': { magicShield: '魔法盾1层', guardAttack: '当前防御伤害', overhealAttack: '过量治疗伤害', lifeSteal: '吸血' },
   'zh-Hant': { magicShield: '魔法盾1層', guardAttack: '目前防禦傷害', overhealAttack: '過量治療傷害', lifeSteal: '吸血' },
 }[currentLocale]
+
+const resourceDamageText = (label: string, rate: number): string => currentLocale === 'ko'
+  ? `${label} ${Math.round(rate * 100)}% 피해`
+  : `${label} ${Math.round(rate * 100)}%`
+
+const rankText = (label: string, rank: number): string => {
+  const arrow = rank > 0 ? '↑' : '↓'
+  const value = Math.abs(rank)
+  if (currentLocale === 'en' || currentLocale === 'ru') return `${label} ${EXTRA_EFFECT_LABEL.rank} ${rank > 0 ? '+' : '−'}${value}`
+  return `${label} ${value}${EXTRA_EFFECT_LABEL.rank}${arrow}`
+}
 
 const OVERDRAW_HIT_LABEL = {
   ko: '잉크 초과 시 공격',
@@ -119,13 +134,15 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.effects?.overdrawHitCount) out.push({ text: `${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`, cls: 'dmg' })
   if (w.effects?.counterMultiplier) out.push({ text: `${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
   if (w.effects?.magicShield) out.push({ text: BUILD_EFFECT_LABEL.magicShield, cls: 'guard' })
-  if (w.effects?.guardAttackMultiplier) out.push({ text: `${BUILD_EFFECT_LABEL.guardAttack} ${Math.round(w.effects.guardAttackMultiplier * 100)}%`, cls: 'dmg' })
-  if (w.effects?.overhealDamageMultiplier) out.push({ text: `${BUILD_EFFECT_LABEL.overhealAttack} ${Math.round(w.effects.overhealDamageMultiplier * 100)}%`, cls: 'dmg' })
+  if (w.effects?.guardAttackMultiplier) out.push({ text: resourceDamageText(BUILD_EFFECT_LABEL.guardAttack, w.effects.guardAttackMultiplier), cls: 'dmg' })
+  if (w.effects?.overhealDamageMultiplier) out.push({ text: resourceDamageText(BUILD_EFFECT_LABEL.overhealAttack, w.effects.overhealDamageMultiplier), cls: 'dmg' })
   if (w.effects?.lifeStealRate) out.push({ text: `${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`, cls: 'heal' })
   if (w.effects?.inkDiscount) out.push({ text: `${L.inkDiscount} −${w.effects.inkDiscount}`, cls: 'buff' })
   if (w.effects?.carryInk) out.push({ text: `${L.carryInk} +${w.effects.carryInk}`, cls: 'buff' })
-  if (w.effects?.enemyAttackDown) out.push({ text: `${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`, cls: 'buff' })
-  if (w.effects?.drawCards) out.push({ text: `${EXTRA_EFFECT_LABEL.drawCards} +${w.effects.drawCards}`, cls: 'buff' })
+  if (w.effects?.attackRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.attackRank, w.effects.attackRank), cls: 'buff' })
+  if (w.effects?.guardRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.guardRank, w.effects.guardRank), cls: 'guard' })
+  if (w.effects?.enemyAttackRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.enemyAttackRank, w.effects.enemyAttackRank), cls: 'buff' })
+  if (w.effects?.bonusDraws) out.push({ text: `${EXTRA_EFFECT_LABEL.bonusDraws} +${w.effects.bonusDraws}${DRAW_COUNT_UNIT}`, cls: 'buff' })
   if (!out.length) out.push({ text: wordNoteText(w), cls: 'flat' })
   return out
 }
@@ -190,13 +207,15 @@ function noteParts(w: Word): string[] {
   if (w.effects?.overdrawHitCount) out.push(`${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`)
   if (w.effects?.counterMultiplier) out.push(`${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`)
   if (w.effects?.magicShield) out.push(BUILD_EFFECT_LABEL.magicShield)
-  if (w.effects?.guardAttackMultiplier) out.push(`${BUILD_EFFECT_LABEL.guardAttack} ${Math.round(w.effects.guardAttackMultiplier * 100)}%`)
-  if (w.effects?.overhealDamageMultiplier) out.push(`${BUILD_EFFECT_LABEL.overhealAttack} ${Math.round(w.effects.overhealDamageMultiplier * 100)}%`)
+  if (w.effects?.guardAttackMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.guardAttack, w.effects.guardAttackMultiplier))
+  if (w.effects?.overhealDamageMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.overhealAttack, w.effects.overhealDamageMultiplier))
   if (w.effects?.lifeStealRate) out.push(`${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`)
   if (w.effects?.inkDiscount) out.push(`${L.inkDiscount} −${w.effects.inkDiscount}`)
   if (w.effects?.carryInk) out.push(`${L.carryInk} +${w.effects.carryInk}`)
-  if (w.effects?.enemyAttackDown) out.push(`${EXTRA_EFFECT_LABEL.enemyAttackDown} −${w.effects.enemyAttackDown}`)
-  if (w.effects?.drawCards) out.push(`${EXTRA_EFFECT_LABEL.drawCards} +${w.effects.drawCards}`)
+  if (w.effects?.attackRank) out.push(rankText(EXTRA_EFFECT_LABEL.attackRank, w.effects.attackRank))
+  if (w.effects?.guardRank) out.push(rankText(EXTRA_EFFECT_LABEL.guardRank, w.effects.guardRank))
+  if (w.effects?.enemyAttackRank) out.push(rankText(EXTRA_EFFECT_LABEL.enemyAttackRank, w.effects.enemyAttackRank))
+  if (w.effects?.bonusDraws) out.push(`${EXTRA_EFFECT_LABEL.bonusDraws} +${w.effects.bonusDraws}${DRAW_COUNT_UNIT}`)
   if (w.tags.includes(PREEMPT_TAG)) out.push(L.preempt)
   if (w.tags.includes('adapt')) out.push(L.adapt)
   if (w.aoe === 'all') out.push(w.slot === 'adv' && currentLocale === 'ko' ? '전체 적중' : w.slot === 'adv' ? L.allHit : L.all)

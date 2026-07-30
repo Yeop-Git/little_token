@@ -16,6 +16,7 @@ import { conflictReason } from '@core/validator'
 import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { clearRewardValue, decayGrade, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
+import { rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
 import type { Intent, Rarity, Selection, Word } from '@core/types'
 import type { PlayerState, PlayerStats } from '@core/player'
 import { applyItemReward, registerWord, startingPlayer } from '@core/run'
@@ -32,6 +33,7 @@ import { enemyDefForEncounter } from '@data/enemies'
 import { STORY_FLOORS, stageFor } from '@data/stages'
 import {
   EARLY_BUILD_REWARD_DAY,
+  EARLY_BUILD_MODIFIER_IDS,
   REWARD_PRICE,
   genRewards,
   rewardPrice,
@@ -71,6 +73,17 @@ const rngSeeded = (seed: number) => () => {
 const HAND_SIZE = 3
 const VERB_HAND_SIZE = 4
 const MAX_TURNS_PER_STAGE = 80
+
+const rankedCombatStats = (player: PlayerState, state: BattleState, selection?: Selection): PlayerStats => {
+  const words = Object.values(selection ?? {})
+  const attackRank = words.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), state.playerAttackRank ?? 0)
+  const guardRank = words.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), state.playerGuardRank ?? 0)
+  return {
+    ...player.stats,
+    atk: rankedStat(player.stats.atk, attackRank),
+    guard: rankedStat(player.stats.guard, guardRank),
+  }
+}
 
 interface Candidate {
   sel: Selection
@@ -194,8 +207,9 @@ function deckScore(player: PlayerState, focus: BuildFocus, locale: LocaleCode): 
       + attack.med * 0.85 + attack.max * 0.15 + player.stats.guard * 0.95 + player.stats.atk + player.stats.hp * 0.4,
     heal: heal.med * 1.05 + heal.max * 0.3 + attack.med * 0.65 + attack.max * 0.1
       + player.stats.heal * 1.05 + player.stats.atk * 0.65 + player.stats.hp * 0.4,
-    combo: (comboTriggers / Math.max(1, sentenceCount)) * 1000
-      + combo.med * 0.3 + combo.max * 0.1 + attack.med * 0.1 + player.stats.luck * 0.5,
+    combo: (comboTriggers / Math.max(1, sentenceCount)) * 650
+      + combo.med * 0.3 + combo.max * 0.1 + attack.med * 0.4 + attack.max * 0.1
+      + player.stats.atk * 0.5 + player.stats.hp * 0.25 + player.stats.luck * 0.35,
   }
   return scores[focus]
 }
@@ -212,9 +226,9 @@ const EXCLAIM_WEIGHT: Record<RewardSkill, Record<StatKey, number>> = {
 const FOCUS_EXCLAIM_WEIGHT: Record<Exclude<BuildFocus, 'balanced'>, Record<StatKey, number>> = {
   attack: { atk: 2.2, hp: 0.6, guard: 0.5, heal: 0.5, luck: 1.2 },
   // 세 보스 모두 방어 무력화 수단이 있으므로 반격을 마무리할 최소 공격도 함께 산다.
-  guard: { atk: 2.0, hp: 1.0, guard: 1.8, heal: 0.8, luck: 0.7 },
+  guard: { atk: 0.8, hp: 1.4, guard: 2.0, heal: 0.8, luck: 0.9 },
   heal: { atk: 1.6, hp: 1.0, guard: 0.7, heal: 1.9, luck: 0.8 },
-  combo: { atk: 1.0, hp: 0.8, guard: 0.8, heal: 0.8, luck: 1.7 },
+  combo: { atk: 1.3, hp: 1.2, guard: 1.0, heal: 1.0, luck: 1.4 },
 }
 
 function exclaimStats(rarity: Rarity, grade: number, skill: RewardSkill, focus: BuildFocus, rng: () => number): Partial<PlayerStats> {
@@ -281,6 +295,12 @@ function applyOption(player: PlayerState, opt: RewardOption, grade: number, skil
 /** 한 층 클리어 보상 3단계를 실제 genRewards로 뽑아 고른다. */
 function takeRewards(player: PlayerState, grade: number, unusedDraws: number, day: number, skill: RewardSkill, focus: BuildFocus, locale: LocaleCode, rng: () => number, wallet: { inspiration: number }): void {
   wallet.inspiration += clearRewardValue(grade, unusedDraws)
+  const plannedModifierId = day === EARLY_BUILD_REWARD_DAY
+    ? focus === 'guard' ? EARLY_BUILD_MODIFIER_IDS[0]
+      : focus === 'heal' ? EARLY_BUILD_MODIFIER_IDS[1]
+        : focus === 'combo' || focus === 'attack' ? EARLY_BUILD_MODIFIER_IDS[2]
+          : null
+    : null
   const plannedEngineId = day === EARLY_BUILD_REWARD_DAY
     ? focus === 'guard' ? 'storedResolve' : focus === 'heal' ? 'overflowingHeart' : focus === 'attack' ? 'drinkInk' : null
     : null
@@ -325,7 +345,9 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
       }
       const plannedOption = phase === 'verb'
         ? options.find((option) => option.word?.id === plannedEngineId)
-        : null
+        : phase === 'subject'
+          ? options.find((option) => option.word?.id === plannedModifierId)
+          : null
       if (plannedOption) chosen = plannedOption
       // ok는 최선을 늘 알아보지는 못한다 — 10%는 아무거나 고른다.
       if (skill === 'ok' && rng() < 0.1) chosen = options[Math.floor(rng() * options.length)]
@@ -367,18 +389,17 @@ function drawHands(
   rng: () => number,
   sealed: Set<string>,
   preferWide: boolean,
-  openingHandBonus = 0,
 ): { hands: Word[][]; piles: Word[][]; tables: ReturnType<typeof makeEarlyTables> } {
   const t = tablesForEncounter(makeEarlyTables(player.deck, player, locale), enemyId)
   const order = t.template.slots.map((s) => s.key)
   const piles: Word[][] = []
-  const hands = order.map((key, slotIndex) => {
+  const hands = order.map((key) => {
     let pool = [...((t.words[key] ?? []) as Word[])]
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
       ;[pool[i], pool[j]] = [pool[j], pool[i]]
     }
-    const size = (key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE) + (slotIndex === 0 ? openingHandBonus : 0)
+    const size = key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE
     if (key.startsWith('verb')) pool = ensureVerbRoles(pool, size)
     if (preferWide && key.startsWith('verb')) {
       pool = ensurePreferredInHand(pool, size, (word) =>
@@ -398,6 +419,7 @@ function drawHands(
 
 function enumerate(
   player: PlayerState,
+  state: BattleState,
   tables: ReturnType<typeof makeEarlyTables>,
   hands: Word[][],
   sealed: Set<string>,
@@ -412,7 +434,8 @@ function enumerate(
       const inkCost = selectionInkCost(sel)
       if (inkExceedsLimit(inkCost, availableInk)) return
       const overdraw = inkOverdraw(inkCost, availableInk)
-      const intent = withOverdrawEffects(compile(sel, tables, player.stats, mods), overdraw)
+      const stats = rankedCombatStats(player, state, sel)
+      const intent = withOverdrawEffects(compile(sel, tables, stats, mods), overdraw)
       const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
       out.push({
         sel,
@@ -458,15 +481,19 @@ function railValue(c: Candidate, state: BattleState): number {
 
 function candidateDamage(c: Candidate, state: BattleState): number {
   const missingHp = Math.max(0, state.playerMax - state.playerHp)
+  const projectedGuard = Math.min(state.playerMax, state.guard + c.guard)
   return c.dmg
-    + Math.round(state.guard * c.intent.guardAttackMultiplier)
+    + Math.round(projectedGuard * c.intent.guardAttackMultiplier)
     + Math.round(Math.max(0, c.heal - missingHp) * c.intent.overhealDamageMultiplier)
 }
 
 function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): number {
   const attack = railValue(c, state)
-  const utility = c.intent.enemyAttackDown * 2.5
-    + c.intent.drawCards * 2
+  const front = state.enemies[frontIdx(state)]
+  const utility = (front && front.attackRank > -STAT_RANK_LIMIT ? Math.max(0, -c.intent.enemyAttackRank) * 9 : 0)
+    + ((state.playerAttackRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.attackRank) * 7 : 0)
+    + ((state.playerGuardRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.guardRank) * 7 : 0)
+    + c.intent.bonusDraws * 2
     + c.intent.counterMultiplier * 2
     + c.intent.magicShield * state.playerMax * .3
     + attack * c.intent.lifeStealRate * .5
@@ -477,8 +504,8 @@ function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): nu
     attack: attack * 1.45 + c.guard * 0.25 + c.heal * 0.3 + utility * 0.7,
     guard: attack * 0.6 + c.guard * 1.45 + c.heal * 0.35 + utility * 1.2,
     heal: attack * 0.6 + c.guard * 0.35 + c.heal * 1.5 + utility,
-    combo: attack * 0.65 + c.guard * 0.55 + c.heal * 0.65 + utility + combo
-      + (c.intent.combos.length ? 24 : 0),
+    combo: attack * 0.85 + c.guard * 0.55 + c.heal * 0.65 + utility + combo
+      + (c.intent.combos.length ? 18 : 0),
   }
   return scores[focus]
 }
@@ -531,7 +558,6 @@ function fightStage(
   let beanstalkGrownThisBattle = false
   let turn = 0
   let carriedInk = 0
-  let openingHandBonus = 0
   let drawsLeft = FREE_DRAWS_PER_STAGE
   const actions = emptyActions()
 
@@ -544,8 +570,7 @@ function fightStage(
 
     const escorts = summonCount(boss)
     const preferWide = !!boss.def.summonPattern && escorts > 0
-    const { hands, piles, tables } = drawHands(player, stage.encounter[0], locale, rng, sealed, preferWide, openingHandBonus)
-    openingHandBonus = 0
+    const { hands, piles, tables } = drawHands(player, stage.encounter[0], locale, rng, sealed, preferWide)
     if (web) {
       const slotKey = spiderSealSlotForTurn(tables.template.slots.map((s) => s.key), turn)
       const idx = tables.template.slots.findIndex((s) => s.key === slotKey)
@@ -579,7 +604,7 @@ function fightStage(
     }
 
     const availableInk = sentenceInkAvailable(carriedInk)
-    const hand = enumerate(player, tables, hands, sealed, killsThisBattle, availableInk)
+    const hand = enumerate(player, state, tables, hands, sealed, killsThisBattle, availableInk)
     if (!hand.length) break
     const attackScore = (candidate: Candidate) => skill === 'average'
       ? candidateValue(candidate, state, focus)
@@ -604,13 +629,15 @@ function fightStage(
     const bestGuardEngine = hand
       .filter((candidate) => candidate.intent.guardAttackMultiplier > 0)
       .sort((a, b) => candidateDamage(b, state) - candidateDamage(a, state))[0]
+    const guardIgnored = !!boss.def.pierceGuard
+      || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
     let pick = bestAttack ?? bestGuard ?? bestHeal
 
     if (skill !== 'greedy' && focus !== 'balanced') {
       const focused = [...hand].sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
       if (focus === 'attack') pick = bestAttack ?? focused
       else if (focus === 'guard' && state.turn <= boss.groggyUntilTurn) pick = bestAttack ?? focused
-      else if (focus === 'guard' && state.guard < state.playerMax * 0.65 && bestGuard) pick = bestGuard
+      else if (focus === 'guard' && !guardIgnored && state.guard < state.playerMax * 0.65 && bestGuard) pick = bestGuard
       else if (focus === 'guard' && bestGuardEngine) pick = bestGuardEngine
       else if (focus === 'guard') {
         const guardOffense = hand
@@ -695,15 +722,16 @@ function fightStage(
     carriedInk = carryInkAfterSpend(pick.inkCost, availableInk, selectionCarryInk(pick.sel))
     if (state.playerHp <= 0) break
 
+    const rankedStats = rankedCombatStats(player, state, pick.sel)
     const intent = withOverdrawEffects(
-      compile(pick.sel, tables, player.stats, modsFor(player, killsThisBattle)),
+      compile(pick.sel, tables, rankedStats, modsFor(player, killsThisBattle)),
       pick.overdraw,
     )
     const firstRouletteRoll = rng()
     const rouletteRoll = hasPassive(player, 'retry') ? Math.min(firstRouletteRoll, rng()) : firstRouletteRoll
     const resolved = resolveMultiplier(
       intent,
-      { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) },
+      { luck: rankedStats.luck, statBias: statBiasOf(intent, rankedStats) },
       rouletteRoll,
       intent.variance ? rng() : null,
       Array.from({ length: intent.doubtCount }, () => rng()),
@@ -775,7 +803,7 @@ function fightStage(
         if (pending.killed.length) engageFront(state)
       }
     }
-    if (state.playerHp > 0 && !allDead(state)) openingHandBonus += intent.drawCards
+    if (state.playerHp > 0 && !allDead(state)) drawsLeft += intent.bonusDraws
     if (state.playerHp <= 0 || allDead(state)) break
     grade = decayGrade(grade, player.stats.luck)
   }
@@ -789,7 +817,7 @@ function fightStage(
     grade,
     turns: turn,
     maxHp: state.playerMax,
-    unusedDraws: drawsLeft,
+    unusedDraws: Math.min(FREE_DRAWS_PER_STAGE, drawsLeft),
     actions,
   }
 }
@@ -1010,8 +1038,9 @@ for (const focus of BUILD_FOCUSES) {
 }
 
 const LOCALE_RUNS = check ? 8 : 12
-console.log(`\nLocale idiom balance (${LOCALE_RUNS} seeded average runs each)`)
-const localeMetrics = SUPPORTED_LOCALES.map((locale) => {
+const skipLocales = process.argv.includes('--skip-locales')
+if (!skipLocales) console.log(`\nLocale idiom balance (${LOCALE_RUNS} seeded average runs each)`)
+const localeMetrics = (skipLocales ? [] : SUPPORTED_LOCALES).map((locale) => {
   const runs = Array.from(
     { length: LOCALE_RUNS },
     (_, i) => playRun((i + 1) * 65537 + 211, 'ok', 'average', 'balanced', false, locale),

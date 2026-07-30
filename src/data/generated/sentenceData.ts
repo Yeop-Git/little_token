@@ -550,10 +550,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2005",
-    "note": "카운터 ×1.00",
-    "lore": "막아 낸 충격을 참았다가 그대로 돌려준다.",
+    "note": "카운터 ×1.00 · 방어 1랭크↑",
+    "lore": "막아 낸 충격을 참았다가 그대로 돌려주며 방어 태세를 다진다.",
     "effects": {
-      "counterMultiplier": 1
+      "counterMultiplier": 1,
+      "guardRank": 1
     }
   },
   {
@@ -565,11 +566,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 2,
-    "bonus": 0.4,
     "rarity": "rare",
     "art": "2006",
-    "note": "배율 ×1.40",
-    "lore": "눈물로 쓴 행동은 공격도 방어도 회복도 크게 번진다."
+    "note": "흡혈 50%",
+    "lore": "빼앗긴 이야기를 눈물 한 방울까지 되찾는다.",
+    "effects": {
+      "lifeStealRate": 0.5
+    }
   },
   {
     "id": "jikyeot",
@@ -633,10 +636,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2008",
-    "note": "카운터 ×1.00",
-    "lore": "못 이기는 척 막아 낸 뒤 그 힘을 되돌려준다.",
+    "note": "카운터 ×1.00 · 적 공격 1랭크↓",
+    "lore": "빈틈을 보인 척 적의 기세를 꺾고, 막은 힘은 되돌려준다.",
     "effects": {
-      "counterMultiplier": 1
+      "counterMultiplier": 1,
+      "enemyAttackRank": -1
     }
   },
   {
@@ -735,13 +739,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
-    "bonus": 0.4,
     "rarity": "rare",
     "art": "2012",
-    "note": "배율 ×1.40 · 카운터 ×1.00",
-    "lore": "포근하게 막고, 막은 힘까지 그대로 돌려준다.",
+    "note": "초과 회복량 125% 피해",
+    "lore": "몸에 다 담지 못한 온기가 벌레까지 힘껏 밀어낸다.",
     "effects": {
-      "counterMultiplier": 1
+      "overhealDamageMultiplier": 1.25
     }
   },
   {
@@ -753,13 +756,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
-    "bonus": 0.3,
     "rarity": "rare",
     "art": "2013",
-    "note": "배율 ×1.30 · 관통",
-    "lore": "반가운 기세가 방어를 넘어 행동을 밀어 넣는다.",
+    "note": "관통 · 흡혈 40%",
+    "lore": "되찾은 이야기가 방어를 넘어 상처까지 메운다.",
     "effects": {
-      "pierceGuard": true
+      "pierceGuard": true,
+      "lifeStealRate": 0.4
     }
   },
   {
@@ -790,8 +793,11 @@ export const REWARD_WORDS: Word[] = [
     "targetCount": 2,
     "rarity": "rare",
     "art": "2015",
-    "note": "2명(100%·70%)",
-    "lore": "거친 기세로 앞의 두 벌레를 함께 뒤흔든다."
+    "note": "2명(100%·70%) · 공격 1랭크↑",
+    "lore": "거친 기세로 앞의 두 벌레를 흔들고 공격 태세를 끌어올린다.",
+    "effects": {
+      "attackRank": 1
+    }
   },
   {
     "id": "sseulsseulhi",
@@ -802,13 +808,13 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 3,
-    "bonus": 0.3,
     "rarity": "rare",
     "art": "2016",
-    "note": "배율 ×1.30 · 카운터 ×1.00",
-    "lore": "빈 자리를 방패 삼아 막은 힘을 크게 되튕긴다.",
+    "note": "카운터 ×1.00 · 다음 문장 잉크 +2",
+    "lore": "빈 자리를 방패 삼아 버티고 다음 줄에 힘을 남긴다.",
     "effects": {
-      "counterMultiplier": 1
+      "counterMultiplier": 1,
+      "carryInk": 2
     }
   },
   {
@@ -820,13 +826,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 2,
-    "bonus": 0.4,
     "rarity": "rare",
     "art": "2017",
-    "note": "배율 ×1.40 · 관통",
-    "lore": "애써 밀어붙인 행동이 방어를 뚫고 닿는다.",
+    "note": "적 공격 1랭크↓",
+    "lore": "거칠어진 이야기를 눌러 적의 공격 태세를 꺾는다.",
     "effects": {
-      "pierceGuard": true
+      "enemyAttackRank": -1
     }
   },
   {
@@ -854,13 +859,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
-    "bonus": 0.2,
     "rarity": "rare",
     "art": "2019",
-    "note": "배율 ×1.20 · 카운터 ×1.00",
-    "lore": "되튀는 박자가 막은 힘을 더 크게 돌려준다.",
+    "note": "방어도 120% 피해",
+    "lore": "되튀는 박자가 쌓인 방어보다 한 걸음 더 세게 밀어낸다.",
     "effects": {
-      "counterMultiplier": 1
+      "guardAttackMultiplier": 1.2
     }
   },
   {
@@ -868,15 +872,18 @@ export const REWARD_WORDS: Word[] = [
     "text": "경쾌하게",
     "slot": "adv",
     "tags": [
-      "lively",
-      "preempt"
+      "lively"
     ],
     "emotion": "pleasure",
     "inkCost": 2,
     "rarity": "rare",
     "art": "2020",
-    "note": "선공 상대보다 먼저 행동",
-    "lore": "가벼운 박자로 상대를 앞질러 움직인다."
+    "note": "문장 비용 −1 · 다시 뽑기 +1회",
+    "lore": "짧고 가벼운 박자가 덱에서 한 장 더 꺼낼 여유를 만든다.",
+    "effects": {
+      "inkDiscount": 1,
+      "bonusDraws": 1
+    }
   }
 ]
 

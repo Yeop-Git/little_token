@@ -12,6 +12,7 @@
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
  */
 import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf } from '@core/compiler'
+import { rankedStat } from '@core/combatRules'
 import { conflictReason } from '@core/validator'
 import type { Intent, Selection, Word } from '@core/types'
 import { startingPlayer, applyItemReward } from '@core/run'
@@ -95,6 +96,7 @@ function candidates(
   maxSealed = 0,
   enemyId?: string,
   preferWide = false,
+  battleState?: BattleState,
 ): Candidate[] {
   const t = tablesForEncounter(makeEarlyTables(player.deck, player), enemyId)
   const order = t.template.slots.map((s) => s.key)
@@ -134,8 +136,14 @@ function candidates(
   const out: Candidate[] = []
   const walk = (i: number, sel: Selection) => {
     if (i === order.length) {
-      const intent = compile(sel, t, player.stats, modsFor(player, 3))
-      const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
+      const selected = Object.values(sel)
+      const stats = {
+        ...player.stats,
+        atk: rankedStat(player.stats.atk, (battleState?.playerAttackRank ?? 0) + selected.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), 0)),
+        guard: rankedStat(player.stats.guard, (battleState?.playerGuardRank ?? 0) + selected.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), 0)),
+      }
+      const intent = compile(sel, t, stats, modsFor(player, 3))
+      const m = resolveMultiplier(intent, { luck: stats.luck, statBias: statBiasOf(intent, stats) }, 0.5).mult
       out.push({
         sel,
         intent,
@@ -189,7 +197,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
     const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
     const sealSlotKey = web ? spiderSealSlotForTurn(t.template.slots.map((slot) => slot.key), turn) : null
     const needsWide = boss.def.id === 'queenBee' && summonCount(boss) > 0
-    const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, boss.def.id, needsWide)
+    const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, boss.def.id, needsWide, state)
     const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => b.dmg - a.dmg)[0]
     const bestGuard = hand
       .filter((c) => c.guard > 0 || c.intent.magicShield > 0)
@@ -227,10 +235,16 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
       else if (willBeHit && threat > state.guard + state.playerHp * 0.4 && bestGuard) pick = bestGuard
     }
     if (!pick) break
-    const intent = compile(pick.sel, t, player.stats, modsFor(player, workersDispersed))
+    const selected = Object.values(pick.sel)
+    const stats = {
+      ...player.stats,
+      atk: rankedStat(player.stats.atk, (state.playerAttackRank ?? 0) + selected.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), 0)),
+      guard: rankedStat(player.stats.guard, (state.playerGuardRank ?? 0) + selected.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), 0)),
+    }
+    const intent = compile(pick.sel, t, stats, modsFor(player, workersDispersed))
     const firstRoll = rng()
     const rouletteRoll = hasPassive(player, 'retry') ? Math.min(firstRoll, rng()) : firstRoll
-    const resolved = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, rouletteRoll, intent.variance ? rng() : null, Array.from({ length: intent.doubtCount }, () => rng()))
+    const resolved = resolveMultiplier(intent, { luck: stats.luck, statBias: statBiasOf(intent, stats) }, rouletteRoll, intent.variance ? rng() : null, Array.from({ length: intent.doubtCount }, () => rng()))
     const mult = resolved.mult
     applyPreparation(state, intent, mult)
     const before = state.playerHp

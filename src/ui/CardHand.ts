@@ -140,7 +140,6 @@ export class CardHand {
   private readonly sealedWordIds = new Set<string>()
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
-  private nextOpeningHandBonus = 0
   private processing = false
   private inputEnabled = true
   private serial = 0
@@ -291,8 +290,7 @@ export class CardHand {
       const handTarget = slotKey === 'verb' || slotKey === 'verb2'
         ? CARD_HAND_CONFIG.verbInitialHand
         : CARD_HAND_CONFIG.initialHand
-      const initialCount = Math.min(handTarget + this.nextOpeningHandBonus, words.length)
-      this.nextOpeningHandBonus = 0
+      const initialCount = Math.min(handTarget, words.length)
       const shuffled = ensureCardInInitialDraw(
         this.shuffle(words),
         initialCount,
@@ -368,11 +366,14 @@ export class CardHand {
 
   /** 쓰지 않은 무료 드로우는 희귀도가 아닌 최종 영감 수치에 더해진다. */
   get savedDraws(): number {
-    return Math.max(0, this.drawsLeft)
+    return Math.min(FREE_DRAWS_PER_STAGE, Math.max(0, this.drawsLeft))
   }
 
-  grantNextOpeningHand(count: number) {
-    this.nextOpeningHandBonus += Math.max(0, Math.floor(count))
+  /** 카드 효과로 이번 전투의 실제 덱 뽑기 횟수를 늘린다. */
+  grantDraws(count: number) {
+    this.drawsLeft += Math.max(0, Math.floor(count))
+    const state = this.currentState()
+    if (state) this.updateDeckButton(state)
   }
 
   /** 개발 치트 전용 — 뽑기 횟수를 쓰지 않고 현재 슬롯 손패에 카드 한 장을 넣는다. */

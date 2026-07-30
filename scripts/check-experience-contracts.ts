@@ -32,6 +32,8 @@ expect('src/views/BattleView.ts', /action-order-item\.player[\s\S]*playerOrder\.
 expect('src/views/BattleView.ts', /action-order-item\.enemy[\s\S]*enemyOrder\.dataset\.tooltip/, 'enemy action-order hover forecast is missing')
 expect('src/views/BattleView.ts', /lastResolvedTally[\s\S]*forecastExact/, 'resolved sentence tally is not kept until the next selection')
 expect('src/views/BattleView.ts', /stage-progress-track[\s\S]*stage-progress-boss/, 'stage hover progress rail is missing')
+expect('src/views/BattleView.ts', /stage-progress glass.*is-endless/, 'endless stage HUD visual identity is missing')
+expect('src/views/BattleView.ts', /hudEndlessStage'[\s\S]*\{day\}/, 'endless stage HUD cumulative identity is missing')
 expect('src/main.ts', /coverStageForNextBattle[\s\S]*revealPreparedStage/, 'reward-to-stage loading curtain is missing')
 expect('src/views/BattleView.ts', /enemyAttackForecast\(this\.state, enemy\)/, 'enemy forecast does not read the shared combat projection')
 expect('src/sim/reference.ts', /enemyAttackDefense[\s\S]*enemyAttackForecast/, 'enemy execution and forecast do not share defense resolution')

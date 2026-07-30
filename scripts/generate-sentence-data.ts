@@ -174,8 +174,13 @@ wordRows.forEach((row, index) => {
     counterMultiplier: optionalNumber(tacticRow.counter_multiplier, 'card_tactics.csv', tacticLine, 'counter_multiplier'),
     inkDiscount: optionalNumber(tacticRow.ink_discount, 'card_tactics.csv', tacticLine, 'ink_discount'),
     carryInk: optionalNumber(tacticRow.carry_ink, 'card_tactics.csv', tacticLine, 'carry_ink'),
-    enemyAttackDown: optionalNumber(tacticRow.enemy_attack_down, 'card_tactics.csv', tacticLine, 'enemy_attack_down'),
-    drawCards: optionalNumber(tacticRow.draw_cards, 'card_tactics.csv', tacticLine, 'draw_cards'),
+    attackRank: optionalNumber(tacticRow.attack_rank, 'card_tactics.csv', tacticLine, 'attack_rank'),
+    guardRank: optionalNumber(tacticRow.guard_rank, 'card_tactics.csv', tacticLine, 'guard_rank'),
+    enemyAttackRank: optionalNumber(tacticRow.enemy_attack_rank, 'card_tactics.csv', tacticLine, 'enemy_attack_rank'),
+    bonusDraws: optionalNumber(tacticRow.bonus_draws, 'card_tactics.csv', tacticLine, 'bonus_draws'),
+    guardAttackMultiplier: optionalNumber(tacticRow.guard_attack_multiplier, 'card_tactics.csv', tacticLine, 'guard_attack_multiplier'),
+    overhealDamageMultiplier: optionalNumber(tacticRow.overheal_damage_multiplier, 'card_tactics.csv', tacticLine, 'overheal_damage_multiplier'),
+    lifeStealRate: optionalNumber(tacticRow.life_steal_rate, 'card_tactics.csv', tacticLine, 'life_steal_rate'),
   })
   const variance = compact({
     p: optionalNumber(row.variance_p, 'words.csv', line, 'variance_p'),
