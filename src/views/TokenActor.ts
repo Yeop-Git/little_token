@@ -227,13 +227,15 @@ export class TokenActor {
 
   /**
    * 사람이 골랐다. 빨리 골랐다면 그 구간의 거리감이 편했다는 뜻이라 정책에 좋은 신호로 간다.
+   * @returns 이 한 칸을 고르는 데 걸린 시간(ms). 재지 못했으면 0.
    */
-  noteSelectionMade() {
-    if (this.selectionStartedAt) {
-      this.episode.decidedQuickly = performance.now() - this.selectionStartedAt < QUICK_DECISION_MS
-    }
+  noteSelectionMade(): number {
+    if (!this.selectionStartedAt) return 0
+    const elapsed = performance.now() - this.selectionStartedAt
+    this.episode.decidedQuickly = elapsed < QUICK_DECISION_MS
     this.selectionStartedAt = 0
     this.situation.hesitation = 0
+    return elapsed
   }
 
   /** 런이 끝났다. 기억에 남기고 성향이 아주 조금 움직인다. */

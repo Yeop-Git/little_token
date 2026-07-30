@@ -32,6 +32,18 @@ const KOREAN = {
   spiderOpeningGeneric: '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!',
   spiderShieldBroken: '마력실드가 깨졌어! 이제 「{weakness}」 감정으로 현재 다리를 노려!!',
   queenOpportunity: '지금이 빈틈이에요!!',
+  // 회상 — 지난 런의 사실만 말한다. 없는 일을 지어내지 않는다.
+  recallDefeatBy: '지난번엔 {day}층에서 {cause}한테 멈췄어. 이번엔 더 멀리 가자!',
+  recallDefeatPlain: '지난번엔 {day}층까지였지. 오늘은 그 너머를 보고 싶어.',
+  recallClear: '지난번엔 {day}층까지 끝까지 썼잖아. 나 그거 계속 생각하고 있었어.',
+  recallFirst: '우리 처음이지? 나는 프롬 곁에 있을게. 어디에 있을지는 내가 알아서 정할게.',
+  // 성향 관찰 — 세어 둔 숫자에서 나오는 말이라 단정해도 된다.
+  styleStriker: '너는 때리는 쪽이 편하구나. 알겠어, 앞은 내가 볼게.',
+  styleKeeper: '너는 먼저 막고 보는구나. 그 신중함이 우리를 여기까지 데려왔어.',
+  styleMender: '너는 자꾸 스스로를 돌보는구나. 좋아, 그게 제일 어려운 건데.',
+  styleEmotion: '너는 「{emotion}」을 자주 고르네. 그 감정이 너한테 잘 맞나 봐.',
+  styleBold: '여백 밖까지 밀어붙이는 거, 무섭지 않아? ...멋있긴 해.',
+  styleCombo: '맥락을 이렇게 자주 맞추는 사람은 처음 봐.',
 } as const
 
 export type BossTokenLineKey = keyof typeof KOREAN
@@ -46,6 +58,8 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
     elderSpiderMiss: 'Anything but the weakness stops at that leg! Aim for the weakness now!!', elderSpiderWebReady: "The webs are fully tightened! We have to hit the weakness this time!!", elderSpiderWebCut: 'That worked, Prompt! The webs are loosening!!',
     spiderNextWeakness: 'That leg is down! This time, {weakness} is the weakness!!', spiderBody: "All the legs are severed! Now for the body — no weakness, so give it everything!!", spiderOpeningWeak: 'The Magic Shield blocks the first hit! Strip it with multiple hits, then target the first leg with {weakness} — the webs pierce Guard too!!', spiderOpeningGeneric: 'The webs pierce Guard! You need to hit the exposed weakness to break through!!', spiderShieldBroken: 'The Magic Shield is broken! Now target this leg with {weakness}!!',
     queenOpportunity: 'Now is our chance!!',
+    recallDefeatBy: 'Last time we stopped at floor {day}, against {cause}. Let us go further today!', recallDefeatPlain: 'Last time we only reached floor {day}. Today I want to see past it.', recallClear: 'Last time you wrote it all the way to floor {day}. I have been thinking about that ever since.', recallFirst: 'This is our first time, right? I will stay near you. Where exactly — leave that to me.',
+    styleStriker: 'You are more comfortable striking. Understood — I will watch the front.', styleKeeper: 'You guard before anything else. That care is what carried us this far.', styleMender: 'You keep tending to yourself. Good — that is the hardest part.', styleEmotion: 'You often choose {emotion}. That feeling must suit you.', styleBold: 'Writing past the margin — does that not scare you? ...It does look brave.', styleCombo: 'I have never met anyone who lands the Context this often.',
   },
   ja: {
     idleConcern: 'どうしよう…！助けて、プロンプト！！', idleHuge: 'プロンプト、あいつ大きすぎるよ…！', idleStand: 'うう…それでも退いちゃだめだ！', idleIncoming: '気をつけて！何か来るよ！',
@@ -55,6 +69,8 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
     elderSpiderMiss: '弱点じゃないとその脚で止まるよ！今の弱点を狙って！！', elderSpiderWebReady: '蜘蛛の糸が締まりきった！今度こそ弱点を狙おう！！', elderSpiderWebCut: '当たったよ、プロンプト！蜘蛛の糸が緩んでる！！',
     spiderNextWeakness: '脚を落とした！今度は「{weakness}」の感情が弱点だ！！', spiderBody: '脚を全部切った！次は本体だ――弱点はない、全力で押し切ろう！！', spiderOpeningWeak: '最初の攻撃はマジックシールドが防ぐよ！連撃で剥がしてから「{weakness}」の感情で最初の脚を狙って――蜘蛛の糸は防御も貫通する！！', spiderOpeningGeneric: '蜘蛛の糸は防御を貫通する！今見えている弱点を狙わないと突破できないよ！！', spiderShieldBroken: 'マジックシールドが壊れた！今度は「{weakness}」の感情で今の脚を狙って！！',
     queenOpportunity: '今がチャンスだよ！！',
+    recallDefeatBy: 'この前は{day}階で、{cause}に止められたね。今日はもっと先へ行こう！', recallDefeatPlain: 'この前は{day}階までだった。今日はその先が見たい。', recallClear: 'この前は{day}階まで最後まで書き切ったよね。ずっとそのことを考えてた。', recallFirst: '初めてだよね？ わたしはそばにいる。どこにいるかは自分で決めるけど。',
+    styleStriker: '君は叩くほうが性に合ってるね。わかった、前はわたしが見る。', styleKeeper: '君はまず守るんだね。その慎重さがここまで連れてきた。', styleMender: '君はいつも自分を手当てする。いいよ、それが一番難しいのに。', styleEmotion: '君は「{emotion}」をよく選ぶね。その感情が合ってるのかも。', styleBold: '余白の外まで書くの、怖くない？ ……かっこいいけど。', styleCombo: 'こんなに何度も文脈を噛み合わせる人、初めて見た。',
   },
   ru: {
     idleConcern: 'Что же делать…?! Помоги, Промпт!!', idleHuge: 'Промпт, эта штука огромная…!', idleStand: 'Ух… Но отступать нельзя!', idleIncoming: 'Осторожно! Что-то приближается!',
@@ -64,6 +80,8 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
     elderSpiderMiss: 'Без попадания в слабость удар остановится на этой ноге! Целься в слабость!!', elderSpiderWebReady: 'Паутина затянулась до конца! Теперь обязательно попади в слабость!!', elderSpiderWebCut: 'Получилось, Промпт! Паутина ослабевает!!',
     spiderNextWeakness: 'Нога отсечена! Теперь слабость — {weakness}!!', spiderBody: 'Все ноги отсечены! Теперь тело — слабостей нет, бей изо всех сил!!', spiderOpeningWeak: 'Первый удар остановит Магический щит! Сбей его серией ударов, затем целься в первую ногу эмоцией «{weakness}» — паутина пробивает Защиту!!', spiderOpeningGeneric: 'Паутина пробивает Защиту! Чтобы прорваться, бей по открытой слабости!!', spiderShieldBroken: 'Магический щит сломан! Теперь целься в эту ногу эмоцией «{weakness}»!!',
     queenOpportunity: 'Сейчас наш шанс!!',
+    recallDefeatBy: 'В прошлый раз мы остановились на этаже {day}, перед {cause}. Сегодня пойдём дальше!', recallDefeatPlain: 'В прошлый раз мы дошли только до этажа {day}. Сегодня хочу увидеть, что дальше.', recallClear: 'В прошлый раз ты дописал всё до этажа {day}. Я с тех пор об этом думаю.', recallFirst: 'Это наш первый раз, да? Я буду рядом. А где именно — решу сама.',
+    styleStriker: 'Тебе привычнее бить. Понятно — я присмотрю за фронтом.', styleKeeper: 'Ты сначала защищаешься. Эта осторожность и довела нас сюда.', styleMender: 'Ты постоянно заботишься о себе. Хорошо — это и есть самое трудное.', styleEmotion: 'Ты часто выбираешь {emotion}. Похоже, это чувство тебе подходит.', styleBold: 'Писать за поля — тебе не страшно? ...Но выглядит смело.', styleCombo: 'Я ещё не встречала того, кто так часто попадает в Контекст.',
   },
   'zh-Hans': {
     idleConcern: '怎么办……！帮帮我，提示词！！', idleHuge: '提示词，那家伙也太大了……！', idleStand: '呜……但我们不能后退！', idleIncoming: '小心！有什么要来了！',
@@ -73,6 +91,8 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
     elderSpiderMiss: '没击中弱点就会停在那条腿！快瞄准当前弱点！！', elderSpiderWebReady: '蛛网已经完全收紧了！这次一定要击中弱点！！', elderSpiderWebCut: '打中了，提示词！蛛网正在松开！！',
     spiderNextWeakness: '那条腿断了！这次「{weakness}」情感是弱点！！', spiderBody: '所有腿都斩断了！接下来是本体——没有弱点，全力进攻吧！！', spiderOpeningWeak: '第一次攻击会被魔法盾挡住！先用连击剥掉盾，再用「{weakness}」情感攻击第一条腿——蛛网还能贯穿防御！！', spiderOpeningGeneric: '蛛网会贯穿防御！必须击中当前暴露的弱点才能突破！！', spiderShieldBroken: '魔法盾破了！现在用「{weakness}」情感攻击当前这条腿！！',
     queenOpportunity: '现在就是机会！！',
+    recallDefeatBy: '上次我们停在第{day}层，被{cause}挡住了。这次走得更远吧！', recallDefeatPlain: '上次只走到第{day}层。今天我想看看更远的地方。', recallClear: '上次你一路写到了第{day}层。我一直在想那件事。', recallFirst: '我们是第一次吧？我会待在你身边。至于待在哪儿，让我自己决定。',
+    styleStriker: '你更习惯出手打。明白了，前面交给我看着。', styleKeeper: '你总是先防守。正是这份谨慎把我们带到这里。', styleMender: '你总在照顾自己。很好——那才是最难的。', styleEmotion: '你经常选「{emotion}」。这份感情大概很适合你。', styleBold: '写到页边之外，你不怕吗？……不过确实帅气。', styleCombo: '我还没见过这么频繁凑齐语境的人。',
   },
   'zh-Hant': {
     idleConcern: '怎麼辦……！幫幫我，提示詞！！', idleHuge: '提示詞，那傢伙也太大了……！', idleStand: '嗚……但我們不能後退！', idleIncoming: '小心！有什麼要來了！',
@@ -82,6 +102,8 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
     elderSpiderMiss: '沒擊中弱點就會停在那條腿！快瞄準目前弱點！！', elderSpiderWebReady: '蛛網已經完全收緊了！這次一定要擊中弱點！！', elderSpiderWebCut: '打中了，提示詞！蛛網正在鬆開！！',
     spiderNextWeakness: '那條腿斷了！這次「{weakness}」情感是弱點！！', spiderBody: '所有腿都斬斷了！接下來是本體——沒有弱點，全力進攻吧！！', spiderOpeningWeak: '第一次攻擊會被魔法盾擋住！先用連擊剝掉盾，再用「{weakness}」情感攻擊第一條腿——蛛網還能貫穿防禦！！', spiderOpeningGeneric: '蛛網會貫穿防禦！必須擊中目前暴露的弱點才能突破！！', spiderShieldBroken: '魔法盾破了！現在用「{weakness}」情感攻擊目前這條腿！！',
     queenOpportunity: '現在就是機會！！',
+    recallDefeatBy: '上次我們停在第{day}層，被{cause}擋住了。這次走得更遠吧！', recallDefeatPlain: '上次只走到第{day}層。今天我想看看更遠的地方。', recallClear: '上次你一路寫到了第{day}層。我一直在想那件事。', recallFirst: '我們是第一次吧？我會待在你身邊。至於待在哪兒，讓我自己決定。',
+    styleStriker: '你更習慣出手打。明白了，前面交給我看著。', styleKeeper: '你總是先防守。正是這份謹慎把我們帶到這裡。', styleMender: '你總在照顧自己。很好——那才是最難的。', styleEmotion: '你經常選「{emotion}」。這份感情大概很適合你。', styleBold: '寫到頁邊之外，你不怕嗎？……不過確實帥氣。', styleCombo: '我還沒見過這麼頻繁湊齊語境的人。',
   },
 }
 

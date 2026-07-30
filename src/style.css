@@ -9313,3 +9313,144 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 @media (prefers-reduced-motion: reduce) {
   .result-token { animation: none; }
 }
+
+/* ── 유대 기록 ─────────────────────────────────────────────────────────────
+   토큰이 알게 된 것을 한 장의 종이로 편다. 도감과 같은 오버레이 골격을 쓰되,
+   내용은 수치표가 아니라 일기의 한 면으로 읽히게 잉크와 종이 결을 입힌다. */
+.bond-panel { width: 1060px; max-height: min(92vh, 820px); overflow: hidden; }
+.bond-layout {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  /* 행을 minmax(0, 1fr)로 못 박는다. auto로 두면 행이 내용만큼 늘어나 컨테이너
+     높이를 넘어서고, 넘친 만큼은 아래 overflow-y가 아니라 창의 clip에 잘려 나간다.
+     실제로 「함께한 이야기」 아래 절반이 그렇게 사라졌다. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: 22px;
+  min-height: 0;
+  max-height: calc(min(92vh, 820px) - 96px);
+}
+
+/* 왼쪽 기둥 — 토큰의 얼굴과 유대가 차오르는 세로 게이지. */
+.bond-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 16px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 226, 160, .07), rgba(255, 255, 255, .03));
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 118, .18);
+}
+.bond-face {
+  width: 116px;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 236, 176, .3), transparent 68%);
+  filter: drop-shadow(0 0 18px rgba(255, 214, 128, .42));
+}
+.bond-face img { width: 100%; height: 100%; object-fit: contain; }
+.bond-gauge { display: flex; align-items: flex-end; gap: 10px; }
+.bond-gauge-track {
+  position: relative;
+  width: 15px;
+  height: 74px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(20, 15, 24, .5);
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 118, .28);
+}
+/* 아래에서 차오르는 촛불빛. 유대는 줄지 않으므로 내려가는 연출은 두지 않는다. */
+.bond-gauge-track i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold-deep));
+  box-shadow: 0 0 12px rgba(255, 200, 110, .7);
+  transition: height .5s cubic-bezier(.2, 1, .3, 1);
+}
+.bond-gauge b { color: var(--gold-hi); font-size: 34px; font-weight: 900; line-height: .9; }
+.bond-gauge b small { font-size: 15px; opacity: .7; }
+.bond-gauge span { color: var(--ink-faint); font-size: 13px; padding-bottom: 4px; }
+.bond-portrait-note { margin: 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; text-align: center; }
+
+/* 오른쪽 — 종이 세 장. */
+.bond-sheets { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding-right: 6px; }
+/* 왼쪽 기둥은 스스로 스크롤하지 않고 위에 붙어 있는다 — 얼굴과 게이지는 늘 보여야 한다. */
+.bond-portrait { align-self: start; }
+.bond-sheet {
+  padding: 16px 18px 18px;
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 25px, rgba(255, 232, 190, .045) 26px),
+    rgba(255, 255, 255, .035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+}
+.bond-sheet h3 { margin: 0 0 6px; color: var(--gold-hi); font-size: 17px; letter-spacing: .06em; }
+.bond-sheet-note { margin: 0 0 14px; color: var(--ink-faint); font-size: 12px; line-height: 1.55; }
+.bond-empty { margin: 0; color: var(--ink-faint); font-size: 13px; }
+
+/* 성격 눈금 — 값 옆에 말로 된 판정을 같이 적어 숫자만 남지 않게 한다. */
+.bond-meter + .bond-meter { margin-top: 11px; }
+.bond-meter-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 5px; }
+.bond-meter-head b { color: #f4e6cd; font-size: 14px; }
+.bond-meter-head span { color: var(--ink-faint); font-size: 12px; }
+.bond-meter-track { height: 9px; border-radius: 999px; background: rgba(20, 15, 24, .46); overflow: hidden; }
+.bond-meter-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 207, 118, .55), var(--gold-hi));
+  transition: width .5s cubic-bezier(.2, 1, .3, 1);
+}
+
+/* 토큰이 내린 결론 — 이 창에서 가장 크게 읽혀야 하는 한 줄. */
+.bond-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 214, 130, .09);
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 118, .26);
+}
+.bond-verdict small { color: var(--gold); font-size: 11px; letter-spacing: .1em; }
+.bond-verdict b { color: #fff3dc; font-size: 22px; }
+.bond-verdict span { color: var(--ink-faint); font-size: 12.5px; }
+/* 아직 표본이 적으면 단정하지 않는다는 걸 색으로도 알린다. */
+.bond-verdict.tentative { background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+.bond-verdict.tentative b { color: #e4d8c2; }
+
+.bond-actions { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+.bond-action { display: grid; grid-template-columns: 44px minmax(0, 1fr) 34px; align-items: center; gap: 10px; }
+.bond-action b { color: #efe0c6; font-size: 13px; }
+.bond-action span { color: var(--ink-faint); font-size: 12px; text-align: right; }
+.bond-action-track { height: 8px; border-radius: 999px; background: rgba(20, 15, 24, .46); overflow: hidden; }
+.bond-action-track i { display: block; height: 100%; border-radius: 999px; transition: width .5s cubic-bezier(.2, 1, .3, 1); }
+/* 갈래마다 전투 HUD와 같은 색을 쓴다 — 여기서 새 색을 만들면 같은 개념이 두 색이 된다. */
+.bond-action.atk .bond-action-track i { background: linear-gradient(90deg, rgba(255, 138, 106, .5), #ff8a6a); }
+.bond-action.def .bond-action-track i { background: linear-gradient(90deg, rgba(117, 204, 255, .5), #75ccff); }
+.bond-action.heal .bond-action-track i { background: linear-gradient(90deg, rgba(124, 255, 157, .45), #7cff9d); }
+
+.bond-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 0; }
+.bond-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 5px; border-bottom: 1px dashed rgba(255, 255, 255, .09); }
+.bond-facts dt { color: var(--ink-faint); font-size: 12.5px; }
+.bond-facts dd { margin: 0; color: #f2e4ca; font-size: 13.5px; font-weight: 700; }
+
+/* 함께한 이야기 — 일기 목차처럼 번호 · 층 · 결말 한 줄. */
+.bond-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bond-run { display: grid; grid-template-columns: 34px 52px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, .035); }
+.bond-run-no { color: var(--ink-faint); font-size: 12px; letter-spacing: .06em; }
+.bond-run b { color: #f4e6cd; font-size: 14px; }
+.bond-run em { color: var(--ink-faint); font-size: 12.5px; font-style: normal; }
+.bond-run.clear { box-shadow: inset 2px 0 0 rgba(150, 240, 180, .65); }
+.bond-run.clear em { color: #a9e6c0; }
+.bond-run.defeat { box-shadow: inset 2px 0 0 rgba(255, 138, 106, .5); }
+.bond-run.empty { grid-template-columns: 1fr; color: var(--ink-faint); font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bond-gauge-track i, .bond-meter-track i, .bond-action-track i { transition: none; }
+}

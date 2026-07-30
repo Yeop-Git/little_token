@@ -24,6 +24,7 @@ import {
   tokenFeatures,
   type TokenContext,
 } from '@core/tokenPolicy'
+import { TOKEN_STYLE_KEY, TOKEN_STYLE_VERSION, TokenPlaystyle } from '@core/tokenPlaystyle'
 
 /** 검사용 저장소 한 장. 브라우저의 localStorage 자리를 그대로 메운다. */
 class MemoryStorage implements MindStorage {
@@ -294,6 +295,74 @@ const neutral: TokenContext = {
   )
 }
 
+// ── 취향 관찰: 세어 둔 것만 말한다 ──────────────────────────────────────────
+
+{
+  const style = new TokenPlaystyle(new MemoryStorage())
+  const blank = style.read()
+  assert.equal(blank.sentences, 0, '아무것도 안 봤으면 센 문장도 0이다')
+  assert.equal(blank.favoriteEmotion, null, '고른 적 없는 감정을 즐겨 쓴다고 하지 않는다')
+  assert.equal(blank.tentative, true, '표본이 없으면 사람을 규정하지 않는다')
+
+  // 공격 문장만 쭉 쓰면 때리는 사람으로 읽혀야 한다.
+  for (let i = 0; i < 14; i++) {
+    style.noteSentence({
+      words: [{ id: 'na', emotion: 'anger' }, { id: 'himkkeot', emotion: 'anger' }],
+      action: 'attack', combo: i % 4 === 0, overdraw: false,
+    })
+  }
+  const striker = style.read()
+  assert.equal(striker.archetype, 'striker', '공격만 쓰면 때리는 사람이다')
+  assert.equal(striker.tentative, false, '충분히 봤으면 단정한다')
+  assert.equal(striker.favoriteEmotion, 'anger', '가장 자주 고른 감정을 집어낸다')
+  assert.equal(striker.sentences, 14, '문장 수는 실제로 센 값이다')
+  assert(striker.comboRate > 0 && striker.comboRate < 1, '관용구 성사율은 비율이다')
+  assert.equal(striker.boldness, 0, '여백 밖으로 안 나갔으면 무모함은 0이다')
+  assert.equal(striker.favoriteWord, 'na', '가장 많이 쓴 단어를 집어낸다')
+
+  // 방어로 갈아타면 결론도 따라 움직인다 — 사람은 바뀔 수 있다.
+  for (let i = 0; i < 40; i++) {
+    style.noteSentence({ words: [{ id: 'makat', emotion: 'joy' }], action: 'guard', combo: false, overdraw: true })
+  }
+  const keeper = style.read()
+  assert.equal(keeper.archetype, 'keeper', '방어가 우세해지면 막는 사람으로 바뀐다')
+  assert(keeper.boldness > 0, '여백 밖 집필이 무모함으로 잡힌다')
+
+  style.noteDecision(1200)
+  style.noteDecision(9000)
+  const paced = style.read()
+  assert(paced.averageDecisionMs > 1200 && paced.averageDecisionMs < 9000, '평균 결정 시간은 두 값 사이에 있다')
+  assert.equal(paced.decisiveness, 0.5, '망설임 없이 고른 비율을 센다')
+  style.noteDecision(-5)
+  assert.equal(style.read().decisiveness, 0.5, '말이 안 되는 시간은 세지 않는다')
+}
+
+{
+  // 취향도 저장을 건너 살아남고, 손상·구버전은 조용히 버린다.
+  const storage = new MemoryStorage()
+  const style = new TokenPlaystyle(storage)
+  style.noteSentence({ words: [{ id: 'na', emotion: 'joy' }], action: 'heal', combo: false, overdraw: false })
+  assert.equal(new TokenPlaystyle(storage).read().sentences, 1, '취향은 저장을 건너 살아남는다')
+
+  const broken = new MemoryStorage()
+  broken.setItem(TOKEN_STYLE_KEY, '{망가진')
+  assert.equal(new TokenPlaystyle(broken).read().sentences, 0, '손상된 취향 저장은 버린다')
+
+  const stale = new MemoryStorage()
+  stale.setItem(TOKEN_STYLE_KEY, JSON.stringify({ version: TOKEN_STYLE_VERSION + 1, sentences: 99 }))
+  assert.equal(new TokenPlaystyle(stale).read().sentences, 0, '구버전 취향 저장은 되살리지 않는다')
+
+  const insane = new MemoryStorage()
+  insane.setItem(TOKEN_STYLE_KEY, JSON.stringify({
+    version: TOKEN_STYLE_VERSION, sentences: -3, combos: 'x',
+    actions: { attack: -1, guard: 2, heal: null }, emotions: { joy: 'nope', anger: 4 },
+  }))
+  const sane = new TokenPlaystyle(insane).read()
+  assert(sane.sentences >= 0, '음수 문장 수는 0으로 되돌린다')
+  assert(sane.actions.attack >= 0 && sane.actions.heal >= 0, '망가진 갈래 수는 0으로 되돌린다')
+  assert.equal(sane.favoriteEmotion, 'anger', '숫자가 아닌 감정 수치는 버리고 성한 것만 센다')
+}
+
 // ── 기록 초기화: 토큰의 기억도 함께 지워진다 ──────────────────────────────
 
 {
@@ -301,6 +370,7 @@ const neutral: TokenContext = {
   // 새로 늘어난 키가 조용히 살아남아, 전부 지웠다는 사람을 토큰이 계속 기억한다.
   assert(TOKEN_MIND_KEY.startsWith(STORAGE_PREFIX), '토큰의 기억 키는 초기화 접두사를 쓴다')
   assert(TOKEN_POLICY_KEY.startsWith(STORAGE_PREFIX), '토큰의 정책 키는 초기화 접두사를 쓴다')
+  assert(TOKEN_STYLE_KEY.startsWith(STORAGE_PREFIX), '토큰의 취향 기록 키는 초기화 접두사를 쓴다')
 }
 
-console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한 · 초기화 접두사')
+console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한 · 취향 관찰 · 초기화 접두사')

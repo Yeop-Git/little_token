@@ -99,6 +99,8 @@ import {
   type BattleAnimation,
 } from '@views/BattleCharacterModel'
 import { TokenActor } from '@views/TokenActor'
+import { sharedTokenPlaystyle } from '@core/tokenPlaystyle'
+import { sharedTokenMind } from '@core/tokenMind'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -379,6 +381,8 @@ export class BattleView {
   private token: TokenActor | null = null
   /** 현재 층. 토큰이 런의 끝을 기억할 때 "몇 층까지 갔는지"로 남긴다. */
   private readonly day: number
+  /** 런 오프닝 한마디는 한 번만. 적이 다시 도착해도 되풀이하지 않는다. */
+  private tokenOpeningSaid = false
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
   private pendingSpiderSeal: { enemyIdx: number; maxSealed: number; slotKey: string } | null = null
 
@@ -602,13 +606,23 @@ export class BattleView {
     if (this.spiderCastReady) return
     this.spiderCastReady = true
     this.cardHand.setInputEnabled(true)
+    // 런의 첫 층에서만, 그리고 **조작권이 열린 뒤에** 한마디. 인트로 컷신 위에 띄우면
+    // 아무도 못 읽고 사라진다.
+    const opening = !this.isBoss && this.day === 1 && !this.tokenOpeningSaid ? this.tokenOpeningLine() : null
+    if (opening) {
+      this.tokenOpeningSaid = true
+      this.timers.push(window.setTimeout(() => this.showTokenSpeech(opening), 480))
+    }
     if (!this.isBoss) {
+      // 인사가 먼저, 가르침은 그 뒤다. 같은 말풍선을 나눠 쓰므로 오프닝이 있으면
+      // 그게 다 떠 있다 사라진 다음에 코치를 부른다 — 안 그러면 1회성 교육 대사가
+      // 뜨자마자 덮여 영영 사라진다.
       this.timers.push(window.setTimeout(() => {
         const front = this.state.enemies[frontIdx(this.state)]
         if (!this.showCombatCoach('subject') && front?.initiativePhase === 'first') {
           this.showCombatCoach('enemy-first')
         }
-      }, 480))
+      }, opening ? 4400 : 480))
     }
     const pending = this.pendingSpiderSeal
     if (!pending) return
@@ -654,6 +668,7 @@ export class BattleView {
             <div class="hud-status-bar">
               <div class="hud-actions glass" aria-label="시스템 메뉴">
                 <button id="settings-btn" type="button" aria-label="설정" data-tooltip="${hudTip('hudSettingsTip', '설정\n그래픽, 소리, 언어와 플레이 기록을 조정한다.')}">${icon('settings')}</button>
+                <button id="bond-btn" type="button" aria-label="토큰과의 유대" data-tooltip="${hudTip('hudBondTip', '토큰과의 유대\n함께한 기록과 토큰이 너에 대해 알게 된 것을 본다.')}">${icon('bond')}</button>
                 <button id="codex-btn" type="button" aria-label="그림일기 도감" data-tooltip="${hudTip('hudCodexTip', '그림일기 도감\n단어, 카드, 만난 벌레와 획득한 아이템을 살펴본다.')}">${icon('collection')}</button>
                 <button id="home-btn" type="button" aria-label="홈으로" data-tooltip="${hudTip('hudHomeTip', '홈\n전투를 나가 타이틀 화면으로 돌아간다.')}">${icon('home')}</button>
               </div>
@@ -725,6 +740,7 @@ export class BattleView {
     // 손패의 쌓임 맥락에 갇혀 무엇으로든 가려진다. 자리는 매 프레임 다시 잰다.
     this.tooltips = new TooltipLayer(this.q<HTMLElement>('.scene.battle'))
 
+    this.q('#bond-btn').addEventListener('click', () => this.openBondRecord())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
     this.q('#home-btn').addEventListener('click', () => this.onHome?.(this.combatResources()))
@@ -763,6 +779,33 @@ export class BattleView {
       if (initialPatternHint) this.scheduleBossTokenHint(initialPatternHint, 900)
       else this.scheduleBossTokenSpeech(1800)
     }
+  }
+
+  /**
+   * 런을 여는 토큰의 한마디. 지난 런의 기억이 우선이고, 없으면 이 사람의 플레이에서
+   * 알게 된 것을 말한다. 둘 다 **세어 둔 사실**에서만 나오므로 없는 말을 지어내지 않는다.
+   */
+  private tokenOpeningLine(): TokenLine | null {
+    const memory = this.token?.recall()
+    if (memory) {
+      if (memory.outcome === 'clear') return bossTokenLine('recallClear', 'relief', { day: String(memory.day) })
+      return memory.cause
+        ? bossTokenLine('recallDefeatBy', 'calm', { day: String(memory.day), cause: memory.cause })
+        : bossTokenLine('recallDefeatPlain', 'calm', { day: String(memory.day) })
+    }
+
+    const style = sharedTokenPlaystyle().read()
+    // 아직 몇 판 못 봤으면 사람을 규정하지 않는다. 처음이라고 말할 뿐이다.
+    if (style.tentative) return style.sentences === 0 ? bossTokenLine('recallFirst', 'calm') : null
+    if (style.boldness >= 0.25) return bossTokenLine('styleBold', 'calm')
+    if (style.comboRate >= 0.5) return bossTokenLine('styleCombo', 'relief')
+    if (style.archetype === 'striker') return bossTokenLine('styleStriker', 'calm')
+    if (style.archetype === 'keeper') return bossTokenLine('styleKeeper', 'calm')
+    if (style.archetype === 'mender') return bossTokenLine('styleMender', 'calm')
+    if (style.favoriteEmotion && style.favoriteEmotionShare >= 0.4) {
+      return bossTokenLine('styleEmotion', 'calm', { emotion: EMOTION_LABEL[style.favoriteEmotion] })
+    }
+    return null
   }
 
   private setHelpOpen(open: boolean, restoreFocus = false) {
@@ -2299,6 +2342,123 @@ export class BattleView {
   }
 
   // ── 도감 — 현재 단어장과 카드·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
+  /**
+   * 유대 기록 — 토큰이 이번까지 알게 된 것을 한 장의 종이로 편다.
+   *
+   * 여기 뜨는 숫자는 전부 **실제로 세어 둔 것**이다. 유대는 함께한 순간의 합이고,
+   * 성향은 런이 끝날 때마다 조금씩 움직인 값이며, 취향은 완성한 문장을 그대로 센 것이다.
+   * 지어낸 수치를 예쁘게 보여 주지 않는다 — 그러면 이 창은 장식이 된다.
+   */
+  private openBondRecord() {
+    const host = this.q('#overlay')
+    const mind = this.token?.mindState ?? sharedTokenMind()
+    const style = sharedTokenPlaystyle().read()
+    const snapshot = mind.snapshot()
+    const bondPercent = Math.round(mind.bond * 100)
+    const face = mind.bond >= 0.6 ? TOKEN_FACES.crown : mind.bond >= 0.25 ? TOKEN_FACES.smile : TOKEN_FACES.neutral
+
+    /** 0~1 값을 잉크가 스며든 눈금으로. 숫자는 곁에 그대로 적어 근거를 감추지 않는다. */
+    const meter = (label: string, value: number, note: string) => `
+      <div class="bond-meter">
+        <div class="bond-meter-head"><b>${label}</b><span>${note}</span></div>
+        <div class="bond-meter-track"><i style="width:${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%"></i></div>
+      </div>`
+
+    const traitNote = (value: number) =>
+      value >= 0.62 ? '뚜렷하다' : value <= 0.38 ? '옅다' : '보통'
+
+    const ARCHETYPE_TEXT: Record<string, [string, string]> = {
+      striker: ['때리는 사람', '문장의 끝을 공격으로 맺는 쪽을 좋아한다.'],
+      keeper: ['막는 사람', '맞기 전에 먼저 손을 쓴다.'],
+      mender: ['돌보는 사람', '스스로를 추스르는 문장을 자주 쓴다.'],
+      balanced: ['고르게 쓰는 사람', '한쪽으로 치우치지 않는다.'],
+    }
+    const [archetypeName, archetypeNote] = ARCHETYPE_TEXT[style.archetype]
+
+    const actionTotal = style.actions.attack + style.actions.guard + style.actions.heal
+    const actionRow = (label: string, count: number, tone: string) => `
+      <div class="bond-action ${tone}">
+        <b>${label}</b>
+        <div class="bond-action-track"><i style="width:${actionTotal ? ((count / actionTotal) * 100).toFixed(1) : 0}%"></i></div>
+        <span>${count}</span>
+      </div>`
+
+    // 함께한 기록 — 최근이 위로 온다. 아직 한 판도 안 끝냈으면 그렇게 적는다.
+    const runsBody = snapshot.runs.length
+      ? snapshot.runs.map((run, index) => `
+          <li class="bond-run ${run.outcome}">
+            <span class="bond-run-no">${String(snapshot.runsTogether - index).padStart(2, '0')}</span>
+            <b>${run.day}층</b>
+            <em>${run.outcome === 'clear' ? '끝까지 썼다' : run.cause ? `${run.cause}에게 멈췄다` : '멈췄다'}</em>
+          </li>`).join('')
+      : '<li class="bond-run empty">아직 함께 끝낸 이야기가 없다.</li>'
+
+    // 취향은 문장을 충분히 본 다음에만 단정한다.
+    const styleBody = style.sentences === 0
+      ? '<p class="bond-empty">아직 지켜본 문장이 없다. 몇 줄 써 보면 토큰이 알아차린다.</p>'
+      : `
+        <div class="bond-verdict${style.tentative ? ' tentative' : ''}">
+          <small>${style.tentative ? '아직 지켜보는 중' : '토큰이 내린 결론'}</small>
+          <b>${archetypeName}</b>
+          <span>${archetypeNote}</span>
+        </div>
+        <div class="bond-actions" aria-label="문장 갈래">
+          ${actionRow('공격', style.actions.attack, 'atk')}
+          ${actionRow('방어', style.actions.guard, 'def')}
+          ${actionRow('회복', style.actions.heal, 'heal')}
+        </div>
+        <dl class="bond-facts">
+          <div><dt>쓴 문장</dt><dd>${style.sentences}줄</dd></div>
+          <div><dt>즐겨 쓰는 감정</dt><dd>${style.favoriteEmotion ? `${EMOTION_LABEL[style.favoriteEmotion]} · ${Math.round(style.favoriteEmotionShare * 100)}%` : '아직 없다'}</dd></div>
+          <div><dt>관용구 성사</dt><dd>${Math.round(style.comboRate * 100)}%</dd></div>
+          <div><dt>여백 밖 집필</dt><dd>${Math.round(style.boldness * 100)}%</dd></div>
+          <div><dt>고르는 속도</dt><dd>${style.averageDecisionMs > 0 ? `${(style.averageDecisionMs / 1000).toFixed(1)}초` : '아직 모른다'}</dd></div>
+          <div><dt>망설임 없이</dt><dd>${Math.round(style.decisiveness * 100)}%</dd></div>
+        </dl>`
+
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <section class="ov-panel glass bond-panel" aria-label="토큰과의 유대">
+        <div class="ov-head">
+          <div class="ov-title">${icon('bond')} 토큰과의 유대 <span class="codex-current-count">함께한 이야기 ${snapshot.runsTogether}</span></div>
+          <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
+        </div>
+        <div class="bond-layout">
+          <aside class="bond-portrait">
+            <div class="bond-face"><img src="${face}" alt="토큰"></div>
+            <div class="bond-gauge" role="img" aria-label="유대 ${bondPercent}%">
+              <div class="bond-gauge-track"><i style="height:${bondPercent}%"></i></div>
+              <b>${bondPercent}<small>%</small></b>
+              <span>유대</span>
+            </div>
+            <p class="bond-portrait-note">조언을 끝까지 들려주거나 위기를 함께 넘길 때마다 자란다. 줄어들지는 않는다.</p>
+          </aside>
+          <div class="bond-sheets">
+            <section class="bond-sheet">
+              <h3>토큰의 성격</h3>
+              <p class="bond-sheet-note">이야기가 끝날 때마다 아주 조금씩 움직인다. 무너진 런은 조심스럽게, 살아남은 런은 대담하게 만든다.</p>
+              ${meter('호기심', snapshot.traits.curiosity, traitNote(snapshot.traits.curiosity))}
+              ${meter('조심성', snapshot.traits.caution, traitNote(snapshot.traits.caution))}
+              ${meter('장난기', snapshot.traits.playfulness, traitNote(snapshot.traits.playfulness))}
+            </section>
+            <section class="bond-sheet">
+              <h3>너에 대해 알게 된 것</h3>
+              ${styleBody}
+            </section>
+            <section class="bond-sheet bond-sheet-runs">
+              <h3>함께한 이야기</h3>
+              <ul class="bond-runs">${runsBody}</ul>
+            </section>
+          </div>
+        </div>
+      </section>`
+    host.classList.add('open')
+    const close = () => this.closeOverlay()
+    host.querySelector('#ov-x')!.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+    GameAudio.play('paper')
+  }
+
   private openCodex() {
     const host = this.q('#overlay')
     const slots = this.t.template.slots
@@ -2530,8 +2690,9 @@ export class BattleView {
     if (!w) return
     this.debugSpawnedWords.delete(debugKey)
     GameAudio.play('paper')
-    // 이 한 칸을 고르는 데 얼마나 걸렸는지가 토큰이 배우는 신호다.
-    this.token?.noteSelectionMade()
+    // 이 한 칸을 고르는 데 얼마나 걸렸는지 — 정책은 거리감으로, 취향 기록은 성격으로 읽는다.
+    const decisionMs = this.token?.noteSelectionMade() ?? 0
+    if (decisionMs > 0) sharedTokenPlaystyle().noteDecision(decisionMs)
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
     const order = this.order()
@@ -2549,6 +2710,17 @@ export class BattleView {
       GameAudio.playSentenceComplete(intent.emotions)
       // 맥락이 맞물린 문장은 토큰도 신이 난다.
       if (intent.combos.length > 0) this.token?.feel('comboFired')
+      // 토큰이 이 사람의 취향을 지켜본다 — 어떤 감정을 고르고, 때리는지 막는지.
+      // debuff는 아직 데이터가 없으므로 공격으로 묶는다.
+      sharedTokenPlaystyle().noteSentence({
+        words: this.order().flatMap((key) => {
+          const word = this.sel[key]
+          return word ? [{ id: word.id, emotion: word.emotion }] : []
+        }),
+        action: intent.kind === 'guard' ? 'guard' : intent.kind === 'heal' ? 'heal' : 'attack',
+        combo: intent.combos.length > 0,
+        overdraw: inkOverdraw(selectionInkCost(this.sel)) > 0,
+      })
       void this.autoComplete()
     } else {
       this.token?.noteSelectionStart()

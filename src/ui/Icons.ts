@@ -24,6 +24,10 @@ export const icon = (key: string): string => {
         <path d="M8 10h13a5 5 0 015 5v25a4 4 0 00-4-4H8z" fill="currentColor" fill-opacity="0.14"/>
         <path d="M40 10H27a5 5 0 00-5 5v25a4 4 0 014-4h14z" fill="currentColor" fill-opacity="0.14"/>
         <path d="M22 15v25"/></svg>`
+    case 'bond': // 유대 — 서로를 향해 기운 두 개의 빛
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M24 39s-13-7.6-13-16.4A7.6 7.6 0 0124 18a7.6 7.6 0 0113 4.6C37 31.4 24 39 24 39z" fill="currentColor" fill-opacity="0.16"/>
+        <path d="M24 12.5l1.7 3.6 3.9.5-2.9 2.7.8 3.9-3.5-2-3.5 2 .8-3.9-2.9-2.7 3.9-.5z" fill="currentColor" fill-opacity="0.3"/></svg>`
     case 'collection': // 카드 도감
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
         <path d="M9 9h25a5 5 0 015 5v25H14a5 5 0 01-5-5z" fill="currentColor" fill-opacity="0.14"/>
