@@ -80,6 +80,28 @@ body {
   color: var(--ink);
 }
 
+/* 보상 뒤 전투 리소스를 준비하는 동안 종이 한 장이 무대를 덮는다. 새 전장이
+   완전히 그려진 뒤에만 걷혀, 모델·배경 로딩 프레임이 직접 드러나지 않는다. */
+.stage.stage-transition-active::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: 20000;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(54, 43, 64, .42), rgba(8, 6, 12, .96) 72%),
+    linear-gradient(135deg, #211824, #09070d);
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, .72);
+  transition: opacity .32s ease-in, filter .52s ease-out;
+  filter: blur(2px);
+}
+.stage.stage-transition-active.is-stage-covered::after {
+  opacity: 1;
+  pointer-events: auto;
+  filter: blur(0);
+}
+
 /* 개별 화면이 별도 포커스 연출을 갖지 않아도 키보드 위치가 사라지지 않는 공용 안전망. */
 .stage :where(button, input, select, [role='button'], [tabindex]):focus-visible {
   outline: 3px solid #fff2b8;
@@ -1273,26 +1295,107 @@ button {
   pointer-events: none;
 }
 .stage-progress {
-  position: absolute;
-  top: 0;
-  left: calc(50% + 320px);
-  display: flex;
-  width: auto;
-  min-height: 0;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  position: relative;
+  flex: none;
+  display: grid;
+  width: 170px;
+  min-height: 42px;
+  align-content: center;
+  padding: 8px 16px;
   border: 1px solid rgba(255, 220, 157, .5);
-  border-radius: 999px;
+  border-radius: 18px;
   color: #fff1d2;
   background: rgba(24, 17, 29, .82);
   box-shadow: inset 0 0 0 2px rgba(255, 247, 218, .05), 0 8px 24px rgba(0, 0, 0, .42);
-  transform: translateX(-50%);
   pointer-events: auto;
+  overflow: hidden;
+  transition: width .22s ease, min-height .22s ease, padding .22s ease, background .22s ease, box-shadow .22s ease;
 }
-.stage-progress > span { color: #ffd989; font-size: 12px; }
-.stage-progress > b { font-size: 17px; letter-spacing: 0; white-space: nowrap; }
-.stage-progress > b i { margin-left: 3px; color: var(--ink-dim); font-size: 11px; font-style: normal; }
+.stage-progress:hover,
+.stage-progress:focus-visible {
+  width: 470px;
+  min-height: 104px;
+  padding: 10px 18px 12px;
+  background: rgba(24, 17, 29, .94);
+  box-shadow: inset 0 0 0 2px rgba(255, 247, 218, .08), 0 12px 32px rgba(0, 0, 0, .52), 0 0 18px rgba(255, 203, 111, .14);
+}
+.stage-progress-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.stage-progress-summary > i { color: #ffd989; font-size: 12px; font-style: normal; }
+.stage-progress-summary > b { font-size: 17px; letter-spacing: 0; }
+.stage-progress-summary > b em { margin-left: 3px; color: var(--ink-dim); font-size: 11px; font-style: normal; }
+.stage-progress-detail {
+  display: grid;
+  grid-template-rows: 0fr 0fr 0fr;
+  gap: 0;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: grid-template-rows .22s ease, gap .22s ease, opacity .14s ease, transform .22s ease;
+}
+.stage-progress:hover .stage-progress-detail,
+.stage-progress:focus-visible .stage-progress-detail {
+  grid-template-rows: 1fr 8px 1fr;
+  gap: 7px;
+  opacity: 1;
+  transform: none;
+}
+.stage-progress-copy {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.stage-progress-copy small { color: var(--ink-dim); font-size: 11px; font-weight: 800; }
+.stage-progress-copy b { color: var(--gold-hi); font-size: 12px; }
+.stage-progress-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 246, 220, .14);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .65);
+  overflow: visible;
+}
+.stage-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f4b65a, #ffe89c);
+  box-shadow: 0 0 10px rgba(255, 201, 100, .6);
+}
+.stage-progress-boss {
+  position: absolute;
+  top: 50%;
+  left: var(--boss-at);
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffcf76;
+  border-radius: 50%;
+  background: #2a1c2c;
+  box-shadow: 0 0 8px rgba(255, 190, 82, .46);
+  transform: translate(-50%, -50%);
+}
+.stage-progress-boss.passed { background: #ffe79a; }
+.stage-progress-boss-list {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.stage-progress-boss-list span { display: inline-flex; align-items: center; gap: 4px; }
+.stage-progress-boss-list b { color: var(--gold-hi); font-size: 11px; }
 .hud-left-stack {
   justify-self: start;
   align-self: start;
@@ -1534,7 +1637,8 @@ html[data-postprocessing='off'] .tip-bubble {
   position: relative;
   /* 무대 밖으로 6px 밀어 두면 그 아래 로그 줄의 그림자가 곧장 잘린다. */
   right: 0;
-  width: 372px;
+  width: auto;
+  min-width: 372px;
   min-height: 74px;
   display: flex;
   flex-direction: column;
@@ -1654,17 +1758,6 @@ html[data-postprocessing='off'] .tip-bubble {
   border-radius: 20px;
   background: linear-gradient(135deg, rgba(22, 52, 67, .92), rgba(24, 28, 51, .9));
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wglow, #8fe8ff) 44%, transparent), 0 8px 24px rgba(0, 0, 0, .42), 0 0 23px color-mix(in srgb, var(--wglow, #8fe8ff) 14%, transparent);
-}
-.hud-left-status .grade-badge::before {
-  content: 'STAGE CLEAR';
-  position: absolute;
-  right: -7px;
-  top: 5px;
-  color: color-mix(in srgb, var(--wglow, #8fe8ff) 24%, transparent);
-  font-size: 8px;
-  font-weight: 1000;
-  letter-spacing: .14em;
-  transform: rotate(8deg);
 }
 .clear-reward-mark {
   position: relative;
@@ -7380,6 +7473,40 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
     inset 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 40%, transparent);
 }
 .rp-foil { border-radius: 20px; }
+.rp-word-meta {
+  position: absolute;
+  inset: 12px 12px auto;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.rp-word-meta .rp-emotion {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+  padding: 4px;
+  background: rgba(8, 6, 14, .78);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color, #d8c6a4) 78%, transparent), 0 0 14px color-mix(in srgb, var(--emotion-color, #d8c6a4) 42%, transparent), 0 4px 10px rgba(0,0,0,.5);
+}
+.rp-ink-cost {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  color: #fff9d9;
+  background-image: var(--ink-cost-badge-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 5px 5px rgba(5, 4, 16, .9)) drop-shadow(0 0 13px rgba(103, 218, 255, .72));
+  font-size: 23px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 2px 2px #171246, 1px 0 #171246, -1px 0 #171246, 0 -1px #171246, 0 0 7px rgba(255,255,255,.8);
+}
+.reward-pick.is-word .rp-unavailable { top: 76px; }
 .rp-top {
   position: relative;
   z-index: 2;
@@ -7498,6 +7625,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   min-height: 40px;
   margin-top: 3px;
   font-size: 15px;
@@ -7508,6 +7636,16 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   overflow-wrap: anywhere;
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
+.rp-effect .card-action-inline {
+  gap: 5px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: rgba(7, 5, 12, .72);
+}
+.rp-effect .card-action-inline svg,
+.rp-effect .card-action-inline .baked-stat-icon { width: 20px; height: 20px; }
+.rp-effect .card-action-inline b { font-size: 14px; }
+.rp-effect-copy { min-width: 0; }
 .rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .rp-detail {
   padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 900; color: #fff;

@@ -688,7 +688,6 @@ export class BattleView {
         <div class="field-sun" aria-hidden="true"></div>
         <div class="storybook-grade" aria-hidden="true"></div>
         <div class="hud-top">
-          ${this.stageProgressHtml()}
           <div class="hud-left-stack">
             <div class="hud-left-status" aria-label="전투 상태">
               <div class="inspiration-wallet glass" role="img" tabindex="0" aria-label="보유 영감 ${this.inspiration}" data-tooltip="${hudTip('hudInspirationTip', `보유 영감 ${this.inspiration}\n전투에서 모아 보상 카드를 구입하거나 보상 목록을 새로 고칠 때 사용한다.`, { value: this.inspiration })}">
@@ -709,6 +708,7 @@ export class BattleView {
           </div>
           <div class="hud-status">
             <div class="hud-status-bar">
+              ${this.stageProgressHtml()}
               <div class="hud-actions glass" aria-label="시스템 메뉴">
                 <button id="settings-btn" type="button" aria-label="설정" data-tooltip="${hudTip('hudSettingsTip', '설정\n그래픽, 소리, 언어와 플레이 기록을 조정한다.')}">${icon('settings')}</button>
                 <button id="bond-btn" type="button" aria-label="토큰과의 유대" data-tooltip="${hudTip('hudBondTip', '토큰과의 유대\n함께한 기록과 토큰이 너에 대해 알게 된 것을 본다.')}">${icon('bond')}</button>
@@ -875,10 +875,24 @@ export class BattleView {
       total: DISPLAY_FLOORS,
       next,
     })
+    const progress = Math.min(100, Math.max(0, (floor / DISPLAY_FLOORS) * 100))
+    const bossMarks = bossFloors
+      .map((bossFloor) => `<i class="stage-progress-boss${floor >= bossFloor ? ' passed' : ''}" style="--boss-at:${(bossFloor / DISPLAY_FLOORS) * 100}%" aria-hidden="true"></i>`)
+      .join('')
+    const bossList = bossFloors
+      .map((bossFloor) => `<span><b>${bossFloor}</b>${ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')}</span>`)
+      .join('')
     return `
-      <section class="stage-progress glass" role="img" tabindex="0" aria-label="${aria}" data-tooltip="${aria.split('. ').join('\n')}">
-        <span aria-hidden="true">✦</span>
-        <b>${t('hudStageLabel', '스테이지')} ${floor}<i>/${DISPLAY_FLOORS}</i></b>
+      <section class="stage-progress glass" role="img" tabindex="0" aria-label="${aria}">
+        <span class="stage-progress-summary"><i aria-hidden="true">✦</i><b>${t('hudStageLabel', '스테이지')} ${floor}<em>/${DISPLAY_FLOORS}</em></b></span>
+        <span class="stage-progress-detail" aria-hidden="true">
+          <span class="stage-progress-copy"><small>${cycle}</small><b>${next}</b></span>
+          <span class="stage-progress-track">
+            <i class="stage-progress-fill" style="width:${progress}%"></i>
+            ${bossMarks}
+          </span>
+          <span class="stage-progress-boss-list">${bossList}</span>
+        </span>
       </section>`
   }
 

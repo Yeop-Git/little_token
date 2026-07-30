@@ -367,7 +367,8 @@ export class ItemExclaimView {
             footer: slot.label,
             overlay: bonuses,
             artUrl: ITEM_ART[this.opts.item.art],
-            hideEmotion: true,
+            // 제련 감탄사는 전투 단어가 아니므로 잉크를 소비하지 않는다.
+            hideMeta: true,
           })}
         </button>`
       })

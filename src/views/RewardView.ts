@@ -11,9 +11,9 @@ import {
   rewardPrice,
   type RewardOption,
 } from '@data/rewards'
-import { BACKGROUNDS, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
+import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { wordActionInline } from '@/ui/WordCardFace'
+import { wordActionInline, wordCardDisplayNote } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
@@ -29,6 +29,7 @@ import { stageFor } from '@data/stages'
 import { availableCombos } from '@core/deckInsights'
 import { DISPLAY_FLOORS } from '@/config/edition'
 import { discoveredComboIds } from '@core/comboDiscovery'
+import { wordInkCost } from '@core/ink'
 
 interface Opts {
   day: number
@@ -135,7 +136,22 @@ function mainEffect(opt: RewardOption): string {
     return '제련 문장으로 스탯을 더할 수 있다'
   }
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
-  return wordNoteText(opt.word!)
+  const word = opt.word!
+  const action = wordActionInline(word)
+  const note = action ? wordCardDisplayNote(word) : wordNoteText(word)
+  return action
+    ? `${action}<span class="rp-effect-copy">${note}</span>`
+    : note
+}
+
+function rewardWordMeta(opt: RewardOption): string {
+  if (opt.kind !== 'word' || !opt.word) return ''
+  const emotion = emotionOrNeutral(opt.word.emotion)
+  const ink = wordInkCost(opt.word)
+  return `<div class="rp-word-meta">
+    ${emotionIconBadge(emotion, 'rp-emotion')}
+    <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
+  </div>`
 }
 
 function influenceNote(w: Word): string {
@@ -214,7 +230,7 @@ function bgHtml(opt: RewardOption): string {
 function rewardPickHtml(p: RewardOption, i: number): string {
   const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
   const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
-  const rewardKind = p.reinforce ? 'is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-new'
+  const rewardKind = p.reinforce ? 'is-word is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-word is-new'
   const nameLength = [...p.name.replace(/\s/g, '')].length
   const nameSize = nameLength >= 8 ? 'has-long-name' : nameLength >= 6 ? 'has-medium-name' : ''
   const price = rewardPrice(p)
@@ -234,6 +250,7 @@ function rewardPickHtml(p: RewardOption, i: number): string {
       <span class="rp-veil" aria-hidden="true"></span>
       <span class="rp-foil" aria-hidden="true"></span>
       <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
+      ${rewardWordMeta(p)}
       <span class="rp-unavailable" aria-hidden="true">
         <b>${text('rewardUnavailable', '구매 불가')}</b>
         <small>${text('rewardInsufficient', '영감 부족')}</small>

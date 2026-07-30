@@ -52,6 +52,8 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
+const STAGE_TRANSITION_COVER_MS = 320
+const STAGE_TRANSITION_REVEAL_MS = 520
 /** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
 const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
@@ -422,6 +424,26 @@ function reset() {
   stage.innerHTML = ''
 }
 
+const waitForFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const waitForMs = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+/** 보상 종이를 덮은 뒤 무거운 전투 리소스를 준비해 로딩 프레임을 감춘다. */
+async function coverStageForNextBattle(): Promise<void> {
+  stage.classList.add('stage-transition-active')
+  await waitForFrame()
+  stage.classList.add('is-stage-covered')
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) await waitForMs(STAGE_TRANSITION_COVER_MS)
+}
+
+/** 새 전장이 완전히 마운트된 다음에만 덮개를 걷는다. */
+function revealPreparedStage(): void {
+  if (!stage.classList.contains('stage-transition-active')) return
+  void waitForFrame().then(() => {
+    stage.classList.remove('is-stage-covered')
+    window.setTimeout(() => stage.classList.remove('stage-transition-active'), STAGE_TRANSITION_REVEAL_MS)
+  })
+}
+
 function startNewRunBattle() {
   // 새 런의 첫 장면은 이전 튜토리얼 열람 기록과 무관하게 항상 다시 보여 준다.
   void goBattle(true, markTutorialSeen)
@@ -589,6 +611,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     onIntroComplete,
   })
   mountMeta(intro ? 'intro' : 'battle')
+  revealPreparedStage()
 }
 
 /** 타이틀 첫 화면을 막지 않고 다음 전투 런타임과 실제 편성 리소스를 뒤에서 준비한다. */
@@ -683,7 +706,7 @@ function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) 
   finishReward()
 }
 
-function finishReward() {
+async function finishReward() {
   run.reward = null
   if (IS_DEMO && isEditionFinalFloor(run.day)) {
     clearRun()
@@ -692,6 +715,7 @@ function finishReward() {
   }
   run.day++
   saveRun(run)
+  await coverStageForNextBattle()
   goBattleWithBossIntro()
 }
 
