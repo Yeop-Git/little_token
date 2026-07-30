@@ -274,7 +274,7 @@ export class TokenActor {
   }
 
   /**
-   * 지금 관측에서 각 결이 뽑힐 확률. 유대 창의 「곁의 거리」가 이걸 그대로 편다 —
+   * 지금 관측에서 각 결이 뽑힐 확률. 유대 창의 「거리감」가 이걸 그대로 편다 —
    * 학습이 눈에 보이지 않으면 배우고 있다는 말은 믿을 근거가 없는 주장일 뿐이다.
    */
   distanceReading(): Array<{ action: PolicyAction; probability: number }> {

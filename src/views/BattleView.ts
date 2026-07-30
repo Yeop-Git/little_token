@@ -2459,7 +2459,7 @@ export class BattleView {
               ${styleBody}
             </section>
             <section class="bond-sheet">
-              <h3>곁의 거리</h3>
+              <h3>거리감</h3>
               <p class="bond-sheet-note">토큰이 지금 상황에서 어떻게 있을지 고르는 비율이다. 네가 다칠 때 곁에 있었는지, 고르는 동안 손패를 가렸는지를 보고 조금씩 옮겨 간다.</p>
               ${reading.length
                 ? `<div class="bond-reading">${reading

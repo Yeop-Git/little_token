@@ -9460,7 +9460,7 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .bond-tier b { color: var(--gold-hi); font-size: 15px; }
 .bond-tier span { color: var(--ink-faint); font-size: 11.5px; line-height: 1.5; }
 
-/* 곁의 거리 — 학습된 결 비율. 성격 눈금과 같은 문법을 쓰되 색만 달리해 구분한다. */
+/* 거리감 — 학습된 결 비율. 성격 눈금과 같은 문법을 쓰되 색만 달리해 구분한다. */
 .bond-reading { display: flex; flex-direction: column; gap: 7px; }
 .bond-read { display: grid; grid-template-columns: 108px minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
 .bond-read b { color: #efe0c6; font-size: 12.5px; font-weight: 700; }
