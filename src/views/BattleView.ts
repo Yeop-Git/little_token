@@ -3198,7 +3198,10 @@ export class BattleView {
     else if (sweep) await this.slowmoWindup()
 
     // 실제 본행동 발동 + 꽂힘 연출
+    const hpBeforeIntent = this.state.playerHp
     const res = applyIntent(this.state, intent, mult, this.target)
+    // 만피에서 회복 문장을 써도 실제로 오른 건 없다 — 그럴 땐 토큰도 기뻐하지 않는다.
+    if (this.state.playerHp > hpBeforeIntent) this.token?.feel('healed')
     const missedSpiderWeakness = dealsDamage && res.hits.some((hit) =>
       !hit.weak && this.state.enemies[hit.target]?.def.id === 'elderSpider',
     )

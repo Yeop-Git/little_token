@@ -39,6 +39,8 @@ const MOOD_EVENTS = {
 } as const
 
 export type MoodEvent = keyof typeof MOOD_EVENTS
+/** 정의만 해 두고 아무도 안 부르는 사건이 생기지 않게 검사가 이 목록을 훑는다. */
+export const MOOD_EVENT_KEYS = Object.keys(MOOD_EVENTS) as MoodEvent[]
 
 /** 유대를 올리는 사건. 줄어드는 항목은 없다 — 그게 유대의 정의다. */
 const BOND_EVENTS = {
@@ -51,6 +53,26 @@ const BOND_EVENTS = {
 } as const
 
 export type BondEvent = keyof typeof BOND_EVENTS
+export const BOND_EVENT_KEYS = Object.keys(BOND_EVENTS) as BondEvent[]
+
+/** 이 비율 이하로 떨어진 턴을 위태로웠다고 본다. */
+export const STOOD_BY_HP_RATIO = 0.35
+/** 이 안에 있었으면 곁을 지킨 것으로 본다(무대 px). 맴돌기 궤도 반경보다 넉넉하다. */
+export const STOOD_BY_DISTANCE = 300
+
+/**
+ * 위태로운 턴을 곁에서 함께 넘겼는가. 세 조건을 모두 만족해야 한다 —
+ * 프롬이 실제로 위태로웠고, 토큰이 곁에 있었고, 살아서 다음 턴을 맞았다.
+ * 하나라도 빠지면 "함께 넘겼다"가 아니다.
+ *
+ * 뷰가 아니라 여기 있는 이유: 판정이 DOM에 걸려 있으면 검사할 수가 없고,
+ * 검사할 수 없는 판정은 조용히 틀린 채로 남는다.
+ */
+export function stoodByThroughDanger(turn: { hpRatio: number; distanceToPlayer: number }): boolean {
+  // 체력 0은 쓰러진 것이지 넘긴 게 아니다.
+  if (!(turn.hpRatio > 0) || turn.hpRatio > STOOD_BY_HP_RATIO) return false
+  return turn.distanceToPlayer <= STOOD_BY_DISTANCE
+}
 
 /**
  * 타고난 성향. 셋 다 0~1이고 기본은 한가운데다.

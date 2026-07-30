@@ -644,6 +644,9 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
 }
 
 function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
+  // 전리품을 고른 순간 토큰의 기분이 오른다. 기분은 런 안에서만 사는 값이라
+  // 화면이 바뀌어도 같은 마음 한 벌(sharedTokenMind)이 그대로 들고 다음 전투로 간다.
+  if (pick) sharedTokenMind().feel('rewardTaken')
   const picks = [...(run.reward?.picks ?? [])]
   const seed = run.reward?.seed ?? Math.floor(Math.random() * 0x7fffffff)
   const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }

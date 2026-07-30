@@ -7,8 +7,14 @@
  */
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { STORAGE_PREFIX } from '@core/save'
 import {
+  BOND_EVENT_KEYS,
+  MOOD_EVENT_KEYS,
+  STOOD_BY_DISTANCE,
+  STOOD_BY_HP_RATIO,
+  stoodByThroughDanger,
   TOKEN_MIND_KEY,
   TOKEN_MIND_VERSION,
   TokenMind,
@@ -363,6 +369,46 @@ const neutral: TokenContext = {
   assert.equal(sane.favoriteEmotion, 'anger', '숫자가 아닌 감정 수치는 버리고 성한 것만 센다')
 }
 
+// ── 곁을 지켰다는 판정 ──────────────────────────────────────────────────────
+
+{
+  const near = STOOD_BY_DISTANCE - 1
+  const far = STOOD_BY_DISTANCE + 1
+  const danger = STOOD_BY_HP_RATIO - 0.05
+  const safe = STOOD_BY_HP_RATIO + 0.2
+
+  assert.equal(stoodByThroughDanger({ hpRatio: danger, distanceToPlayer: near }), true,
+    '위태로운 턴을 곁에서 넘겼으면 함께 넘긴 것이다')
+  assert.equal(stoodByThroughDanger({ hpRatio: danger, distanceToPlayer: far }), false,
+    '멀리 있었으면 곁을 지킨 게 아니다')
+  assert.equal(stoodByThroughDanger({ hpRatio: safe, distanceToPlayer: near }), false,
+    '위태롭지 않았으면 함께 넘길 위기도 없었다')
+  assert.equal(stoodByThroughDanger({ hpRatio: 0, distanceToPlayer: near }), false,
+    '체력 0은 쓰러진 것이지 넘긴 게 아니다')
+  // 경계값에서 판정이 뒤집히지 않아야 한다 — 이하/이내가 모두 포함이다.
+  assert.equal(stoodByThroughDanger({ hpRatio: STOOD_BY_HP_RATIO, distanceToPlayer: STOOD_BY_DISTANCE }), true,
+    '경계값은 포함이다')
+}
+
+// ── 죽은 사건이 없어야 한다 ────────────────────────────────────────────────
+
+{
+  // 사건을 표에 적어 두고 부르는 곳을 안 만들면 조용히 죽은 코드가 된다. 실제로
+  // stoodBy·rewardTaken·healed 셋이 그렇게 한동안 놀고 있었다. 이 검사가 그걸 막는다.
+  const sources = ['src/views/BattleView.ts', 'src/views/TokenActor.ts', 'src/main.ts']
+    .map((file) => readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8'))
+    .join('\n')
+
+  for (const event of MOOD_EVENT_KEYS) {
+    assert(sources.includes(`'${event}'`), `기분 사건 ${event}을(를) 부르는 곳이 없다`)
+  }
+  for (const event of BOND_EVENT_KEYS) {
+    // runFinished는 endRun 안에서 스스로 부른다 — 바깥에 호출부가 없는 게 정상이다.
+    if (event === 'runFinished') continue
+    assert(sources.includes(`'${event}'`), `유대 사건 ${event}을(를) 부르는 곳이 없다`)
+  }
+}
+
 // ── 기록 초기화: 토큰의 기억도 함께 지워진다 ──────────────────────────────
 
 {
@@ -373,4 +419,4 @@ const neutral: TokenContext = {
   assert(TOKEN_STYLE_KEY.startsWith(STORAGE_PREFIX), '토큰의 취향 기록 키는 초기화 접두사를 쓴다')
 }
 
-console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한 · 취향 관찰 · 초기화 접두사')
+console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한 · 취향 관찰 · 곁을 지킨 판정 · 죽은 사건 없음 · 초기화 접두사')

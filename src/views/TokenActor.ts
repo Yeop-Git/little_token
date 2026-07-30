@@ -15,7 +15,7 @@
 
 import { CHARACTER_VISUALS } from '@data/characters'
 import type { TokenLine } from '@/localization/bossToken'
-import { sharedTokenMind, TokenMind, type BondEvent, type MoodEvent } from '@core/tokenMind'
+import { sharedTokenMind, stoodByThroughDanger, TokenMind, type BondEvent, type MoodEvent } from '@core/tokenMind'
 import { TokenPolicy, type PolicyAction, type TokenContext } from '@core/tokenPolicy'
 import {
   destroyCharacterModels,
@@ -121,6 +121,8 @@ export class TokenActor {
   private situation = { hpRatio: 1, enemyCount: 1, turnProgress: 0, hesitation: 0 }
   /** 사람이 손패 앞에 선 시각. 0이면 지금 고르는 중이 아니다. */
   private selectionStartedAt = 0
+  /** 이번 전투에서 위기를 함께 넘긴 것을 이미 세었는가. */
+  private stoodByCounted = false
 
   private playerEl: HTMLElement | null = null
   private frame = 0
@@ -134,8 +136,6 @@ export class TokenActor {
    * @param host 무대 좌표를 그대로 쓰는 컨테이너(.stage-area). 이 요소가 z-index 3이라
    *   토큰은 배우보다 앞, HUD·손패보다 뒤에 자동으로 놓인다 — UI 뒤로 지나가는 규칙이
    *   여기 한 줄에 담긴다.
-   */
-  /**
    * @param mind 기분·유대·성향. 토큰이 어떻게 날지의 절반은 여기서 나온다.
    * @param policy 자율 결을 고르는 정책. 사전 성향 위에 이 사람의 플레이에서 배운 만큼을 얹는다.
    */
@@ -214,10 +214,30 @@ export class TokenActor {
     this.mind.bindCloser(event)
   }
 
-  /** 턴이 넘어갔다. 기분이 평정으로 조금 돌아온다. */
+  /**
+   * 턴이 넘어갔다. 기분이 평정으로 조금 돌아오고, 위태로운 턴을 곁에서 함께 넘겼다면
+   * 유대가 자란다.
+   *
+   * 판정 자체는 `stoodByThroughDanger`(tokenMind)가 갖는다 — DOM에 묶어 두면 검사할
+   * 수 없고, 검사할 수 없는 판정은 조용히 틀린 채로 남는다. 여기서는 한 전투에 한 번만
+   * 세어 위기가 길어질수록 유대가 불어나는 일만 막는다.
+   */
   passTurn() {
+    if (
+      !this.stoodByCounted &&
+      stoodByThroughDanger({ hpRatio: this.situation.hpRatio, distanceToPlayer: this.distanceToPlayer() })
+    ) {
+      this.stoodByCounted = true
+      this.mind.bindCloser('stoodBy')
+    }
     this.mind.passTurn()
     this.applyMood()
+  }
+
+  /** 무대 좌표에서 프롬까지의 거리. 곁에 있었는지 판단하는 유일한 기준이다. */
+  private distanceToPlayer(): number {
+    const anchor = this.playerAnchor()
+    return Math.hypot(anchor.x - this.pos.x, anchor.y - this.pos.y)
   }
 
   /** 사람이 손패 앞에 섰다. 여기서부터 망설임을 잰다. */
