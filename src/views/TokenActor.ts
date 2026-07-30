@@ -15,6 +15,8 @@
 
 import { CHARACTER_VISUALS } from '@data/characters'
 import type { TokenLine } from '@/localization/bossToken'
+import { sharedTokenMind, TokenMind, type BondEvent, type MoodEvent } from '@core/tokenMind'
+import { TokenPolicy, type PolicyAction, type TokenContext } from '@core/tokenPolicy'
 import {
   destroyCharacterModels,
   mountCharacterModel,
@@ -60,14 +62,6 @@ const DURATION: Record<'orbit' | 'wander' | 'inspect' | 'peer', [number, number]
   peer: [2000, 3200],
 }
 
-/** 자율 결의 추첨 가중치. 맴돌기가 기본이고 나머지는 가끔 끼어드는 변덕이다. */
-const AUTONOMY: Array<['orbit' | 'wander' | 'inspect' | 'peer', number]> = [
-  ['orbit', 52],
-  ['wander', 18],
-  ['inspect', 20],
-  ['peer', 10],
-]
-
 /**
  * 들여다볼 만한 게임 안 사물. 있는 것만 골라 쓴다 — 일반전엔 보스 HUD가 없고
  * 보스전엔 대기 적 레일이 없다.
@@ -81,6 +75,16 @@ const INSPECT_TARGETS = [
   '.hud-left-status',
   '.boss-health-hud',
 ]
+
+/** 이 안에 골랐으면 망설이지 않은 것으로 친다. */
+const QUICK_DECISION_MS = 2500
+/** 망설임 관측이 1에 닿는 시간. 이보다 오래 보고 있으면 확실히 고민 중이다. */
+const HESITATION_FULL_MS = 6000
+/** 손패 위 이 높이보다 아래에 있으면 카드를 덮은 것으로 본다(무대 y). */
+const HAND_TOP_Y = 760
+
+/** 정책이 고르는 결. attend·alert는 바깥이 부르므로 학습 대상이 아니다. */
+const POLICY_BEHAVIOURS: readonly TokenBehavior[] = ['orbit', 'wander', 'inspect', 'peer']
 
 const TAU = Math.PI * 2
 const rand = (min: number, max: number) => min + Math.random() * (max - min)
@@ -111,6 +115,13 @@ export class TokenActor {
   private scale = FLIGHT.orbit.scale
   private yaw = 0
 
+  /** 지금 이 구간에 벌어진 일. 결이 끝날 때 정책이 이걸 보고 배운다. */
+  private episode = { tookDamage: false, distanceWhenHurt: 0, occludedHand: false, decidedQuickly: false }
+  /** 무대에서 벌어지는 일을 뷰가 여기에 부어 준다. 정책의 관측이 된다. */
+  private situation = { hpRatio: 1, enemyCount: 1, turnProgress: 0, hesitation: 0 }
+  /** 사람이 손패 앞에 선 시각. 0이면 지금 고르는 중이 아니다. */
+  private selectionStartedAt = 0
+
   private playerEl: HTMLElement | null = null
   private frame = 0
   private lastFrameAt = 0
@@ -124,7 +135,15 @@ export class TokenActor {
    *   토큰은 배우보다 앞, HUD·손패보다 뒤에 자동으로 놓인다 — UI 뒤로 지나가는 규칙이
    *   여기 한 줄에 담긴다.
    */
-  constructor(private readonly host: HTMLElement) {
+  /**
+   * @param mind 기분·유대·성향. 토큰이 어떻게 날지의 절반은 여기서 나온다.
+   * @param policy 자율 결을 고르는 정책. 사전 성향 위에 이 사람의 플레이에서 배운 만큼을 얹는다.
+   */
+  constructor(
+    private readonly host: HTMLElement,
+    private readonly mind: TokenMind = sharedTokenMind(),
+    private readonly policy: TokenPolicy = new TokenPolicy(),
+  ) {
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const visual = CHARACTER_VISUALS.token
     const modelStatus = visual.model3d ? 'preparing-3d' : 'fallback-2d'
@@ -147,6 +166,7 @@ export class TokenActor {
     // 장난을 넣는다면 여기서 .token-body에만 포인터를 열고, 잡힌 동안 비행 컨트롤러를
     // 멈춘 뒤 놓는 순간의 커서 속도를 this.vel에 실어 주면 그대로 튕겨 날아간다.
     mountCharacterModel(this.body, visual)
+    this.applyMood()
     this.enter('orbit')
     this.pos.x = this.target.x
     this.pos.y = this.target.y
@@ -154,9 +174,80 @@ export class TokenActor {
     this.start()
   }
 
+  /**
+   * 기분을 DOM에 적어 CSS가 발광으로 받게 한다. 수치를 그대로 흘리지 않고 세 단계로
+   * 뭉개는 이유는, 미세한 변화가 화면에서 깜빡임으로만 읽히기 때문이다.
+   */
+  private applyMood() {
+    const mood = this.mind.mood
+    this.el.dataset.mood = mood > 0.35 ? 'high' : mood < -0.35 ? 'low' : 'even'
+  }
+
   /** 맴돌 대상. 프롬이 다시 그려지면 새 요소로 갈아 끼운다. */
   attachTo(playerEl: HTMLElement | null) {
     this.playerEl = playerEl
+  }
+
+  /** 무대의 형편. 정책의 관측이 되므로 뷰가 상태를 다시 그릴 때마다 부어 준다. */
+  observeBattle(next: { hpRatio: number; enemyCount: number; turnProgress: number }) {
+    this.situation.hpRatio = clamp(next.hpRatio, 0, 1)
+    this.situation.enemyCount = Math.max(0, next.enemyCount)
+    this.situation.turnProgress = clamp(next.turnProgress, 0, 1)
+  }
+
+  /**
+   * 사건 하나가 기분을 흔든다. 맞은 순간에는 그때의 거리도 함께 적어 둔다 —
+   * "곁에 없었다"는 정책이 배우는 가장 비싼 신호다.
+   */
+  feel(event: MoodEvent) {
+    this.mind.feel(event)
+    if (event === 'playerHurt' || event === 'playerNearDeath') {
+      this.episode.tookDamage = true
+      const anchor = this.playerAnchor()
+      this.episode.distanceWhenHurt = Math.hypot(anchor.x - this.pos.x, anchor.y - this.pos.y)
+    }
+    this.applyMood()
+  }
+
+  /** 유대는 사건이 아니라 함께한 시간이다. 뷰가 그 순간을 알려 준다. */
+  bindCloser(event: BondEvent) {
+    this.mind.bindCloser(event)
+  }
+
+  /** 턴이 넘어갔다. 기분이 평정으로 조금 돌아온다. */
+  passTurn() {
+    this.mind.passTurn()
+    this.applyMood()
+  }
+
+  /** 사람이 손패 앞에 섰다. 여기서부터 망설임을 잰다. */
+  noteSelectionStart() {
+    this.selectionStartedAt = performance.now()
+  }
+
+  /**
+   * 사람이 골랐다. 빨리 골랐다면 그 구간의 거리감이 편했다는 뜻이라 정책에 좋은 신호로 간다.
+   */
+  noteSelectionMade() {
+    if (this.selectionStartedAt) {
+      this.episode.decidedQuickly = performance.now() - this.selectionStartedAt < QUICK_DECISION_MS
+    }
+    this.selectionStartedAt = 0
+    this.situation.hesitation = 0
+  }
+
+  /** 런이 끝났다. 기억에 남기고 성향이 아주 조금 움직인다. */
+  endRun(memory: { day: number; outcome: 'clear' | 'defeat'; cause?: string }) {
+    this.mind.endRun(memory)
+  }
+
+  /** 지난 런 하나를 떠올린다. 회상 대사의 사실 출처다. */
+  recall() {
+    return this.mind.recall()
+  }
+
+  get mindState() {
+    return this.mind
   }
 
   /**
@@ -181,10 +272,11 @@ export class TokenActor {
     // 용건이 생기면 변덕을 접고 프롬에게 온다. 경고는 바짝 붙고(alert), 팁은 앞에 선다(attend).
     this.enter(hold ? 'alert' : 'attend')
     if (hold) return
-    this.speechHideTimer = window.setTimeout(
-      () => this.clearSpeech(),
-      line.tone === 'relief' ? 4200 : 3600,
-    )
+    this.speechHideTimer = window.setTimeout(() => {
+      // 끝까지 떠 있었던 말만 "들려준 것"으로 친다. 다음 대사가 덮은 말은 세지 않는다.
+      this.mind.bindCloser('adviceHeard')
+      this.clearSpeech()
+    }, line.tone === 'relief' ? 4200 : 3600)
   }
 
   /** 말풍선을 걷고 자유 비행으로 돌려보낸다. */
@@ -232,6 +324,11 @@ export class TokenActor {
 
   private step(delta: number, now: number) {
     this.elapsed += delta
+    if (this.selectionStartedAt) {
+      this.situation.hesitation = clamp((now - this.selectionStartedAt) / HESITATION_FULL_MS, 0, 1)
+      // 고르는 사람 앞에서 카드를 덮고 있었다는 사실은 한 번이라도 있었으면 남긴다.
+      if (this.pos.y > HAND_TOP_Y) this.episode.occludedHand = true
+    }
     if (!this.holdingSpeech && this.behaviorUntil && now >= this.behaviorUntil) this.enter(this.pickNext())
     this.aim(delta)
     this.steer(delta)
@@ -249,8 +346,10 @@ export class TokenActor {
         // 궤도면 자체가 아주 느리게 오르내린다. 고정 타원만 돌면 높이가 한 줄로 굳어
         // 프롬 머리 위에 매달아 둔 장식처럼 보인다.
         const drift = Math.sin(this.elapsed * 0.37) * 84
-        this.target.x = anchor.x + Math.cos(this.orbitAngle) * 175
-        this.target.y = anchor.y + Math.sin(this.orbitAngle) * 104 - 18 + drift
+        // 걱정될수록 궤도가 좁아진다. 말로 하지 않고 거리로 말하는 부분이다.
+        const closeness = this.mind.isWorried ? 0.58 : 1 - Math.max(0, -this.mind.mood) * 0.3
+        this.target.x = anchor.x + Math.cos(this.orbitAngle) * 175 * closeness
+        this.target.y = anchor.y + (Math.sin(this.orbitAngle) * 104 - 18 + drift) * closeness
         break
       }
       case 'wander': {
@@ -301,7 +400,9 @@ export class TokenActor {
     const dx = this.target.x - this.pos.x
     const dy = this.target.y - this.pos.y
     const distance = Math.hypot(dx, dy) || 1
-    const speed = flight.speed * Math.min(1, distance / flight.slow)
+    // 들뜨면 빨라지고 가라앉으면 처진다. 같은 결이라도 기분에 따라 다른 몸짓이 된다.
+    const spirit = 1 + this.mind.mood * 0.28
+    const speed = flight.speed * spirit * Math.min(1, distance / flight.slow)
     const desiredX = (dx / distance) * speed
     const desiredY = (dy / distance) * speed
 
@@ -373,19 +474,39 @@ export class TokenActor {
     if (behavior === 'orbit') this.orbitAngle = rand(0, TAU)
   }
 
+  /**
+   * 방금 끝난 구간을 정책에 돌려주고 다음 결을 받는다.
+   * 같은 결이 연달아 나오면 아무 일도 일어나지 않은 것처럼 보이므로 직전 결은 제외한다.
+   */
   private pickNext(): TokenBehavior {
-    // 움직임을 줄여 달라고 한 사람에게 무대를 가로지르는 결을 보여 주지 않는다.
-    const pool = this.reducedMotion ? AUTONOMY.filter(([kind]) => kind === 'orbit' || kind === 'inspect') : AUTONOMY
-    // 같은 결을 연달아 뽑으면 방금 끝난 동작이 이어 붙어 아무 일도 안 일어난 것처럼 보인다.
-    const usable = pool.filter(([kind]) => kind !== this.behavior)
-    const table = usable.length ? usable : pool
-    const total = table.reduce((sum, [, weight]) => sum + weight, 0)
-    let roll = Math.random() * total
-    for (const [kind, weight] of table) {
-      roll -= weight
-      if (roll <= 0) return kind
+    this.policy.learn(this.episode)
+    this.episode = { tookDamage: false, distanceWhenHurt: 0, occludedHand: false, decidedQuickly: false }
+
+    const previous = POLICY_BEHAVIOURS.includes(this.behavior as PolicyAction)
+      ? (this.behavior as PolicyAction)
+      : undefined
+    const next = this.policy.choose(this.observe(), previous)
+    // 움직임을 줄여 달라고 한 사람에게 무대를 가로지르는 결은 보여 주지 않는다.
+    // 정책보다 이쪽이 위다 — 접근성은 학습이 뒤집을 수 있는 선호가 아니다.
+    if (this.reducedMotion && (next === 'wander' || next === 'peer')) return 'orbit'
+    return next
+  }
+
+  /** 지금 무대의 형편을 정책이 읽는 모양으로 옮긴다. */
+  private observe(): TokenContext {
+    const traits = this.mind.traits
+    return {
+      hpRatio: this.situation.hpRatio,
+      recentlyHurt: this.mind.isWorried,
+      enemyCount: this.situation.enemyCount,
+      turnProgress: this.situation.turnProgress,
+      mood: this.mind.mood,
+      bond: this.mind.bond,
+      curiosity: traits.curiosity,
+      caution: traits.caution,
+      playfulness: traits.playfulness,
+      hesitation: this.situation.hesitation,
     }
-    return 'orbit'
   }
 
   /** 무대 좌표로 환산한 프롬의 머리 언저리. 프롬이 없으면 무대 왼쪽 위를 기본으로 쓴다. */

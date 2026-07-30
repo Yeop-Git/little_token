@@ -22,6 +22,7 @@ import { genRewards, REWARD_REFRESH_COST, rewardOfferRng, rewardPrice, type Rewa
 import { applyItemReward, gainInspiration, newRun, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
+import { sharedTokenMind } from '@core/tokenMind'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
 import { ALL_REWARD_WORDS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
@@ -452,6 +453,8 @@ function goTitle(withIntro: unknown = false) {
       if (fresh) clearRun()
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
+      // 새로 시작하는 런은 토큰의 기분도 평정에서 다시 시작한다. 유대·성향·기억은 남는다.
+      if (!saved) sharedTokenMind().beginRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
       else if (run.reward?.day === run.day) {
@@ -774,6 +777,13 @@ function goItem(
  */
 function goResult(outcome: RunOutcome, cause?: DefeatCause | null, onContinue?: () => void) {
   battleRequest++
+  // 런이 끝나는 유일한 길목. 토큰은 여기서만 이번 런을 기억에 넣고 성향이 조금 움직인다 —
+  // 승패가 함께 지나는 곳이라 한쪽만 세는 일이 생기지 않는다.
+  sharedTokenMind().endRun({
+    day: run.day,
+    outcome: outcome === 'won' ? 'clear' : 'defeat',
+    cause: cause?.kind === 'enemy' ? cause.name : undefined,
+  })
   reset()
   stage.setAttribute('data-theme', 'day')
   current = new RunResultView(stage, {
@@ -785,6 +795,7 @@ function goResult(outcome: RunOutcome, cause?: DefeatCause | null, onContinue?: 
     endless: run.endless,
     onNewRun: () => {
       run = newRun()
+      sharedTokenMind().beginRun()
       saveRun(run)
       startNewRunBattle()
     },

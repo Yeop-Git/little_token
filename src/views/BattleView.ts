@@ -377,6 +377,8 @@ export class BattleView {
   private bossSentenceSignature = ''
   /** 프롬 곁을 자유롭게 나는 토큰. 일반전·보스전이 같은 한 몸을 쓴다. */
   private token: TokenActor | null = null
+  /** 현재 층. 토큰이 런의 끝을 기억할 때 "몇 층까지 갔는지"로 남긴다. */
+  private readonly day: number
   /** 장로거미는 턴마다 슬롯을 순환 지정하고, 그 슬롯이 열릴 때 카드 한 장을 봉인한다. */
   private pendingSpiderSeal: { enemyIdx: number; maxSealed: number; slotKey: string } | null = null
 
@@ -421,7 +423,8 @@ export class BattleView {
     this.encounterHp = enemies.reduce((n, e) => n + (e.maxHp ?? e.hp), 0)
     // 배경은 판마다 갈린다(1스테이지 고정 · 보스별 지정 · 나머지는 직전 것 빼고 무작위).
     // 이 한 줄이 조명과 무대 배치까지 함께 정한다.
-    this.bg = pickFieldBackground(opts.day ?? 1, this.isBoss, opts.encounter[0])
+    this.day = opts.day ?? 1
+    this.bg = pickFieldBackground(this.day, this.isBoss, opts.encounter[0])
     // 여왕벌의 첫 일벌은 배경·연출 기준값을 확정한 뒤, 첫 행동 순서를 잡기 전에 소환한다.
     summonAtTurnStart(this.state)
     engageInitialFront(this.state)
@@ -871,6 +874,12 @@ export class BattleView {
     const stage = this.root.querySelector<HTMLElement>('.stage-area')
     if (stage && !this.token) this.token = new TokenActor(stage)
     this.token?.attachTo(you)
+    this.token?.observeBattle({
+      hpRatio: this.state.playerMax > 0 ? this.state.playerHp / this.state.playerMax : 1,
+      enemyCount: this.state.enemies.filter((e) => e.hp > 0).length,
+      // 한 전투가 대략 열 턴 안팎이라 그걸 1로 본다. 길어지면 그냥 1에서 머문다.
+      turnProgress: Math.min(1, this.state.turn / 10),
+    })
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
       if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
@@ -2521,6 +2530,8 @@ export class BattleView {
     if (!w) return
     this.debugSpawnedWords.delete(debugKey)
     GameAudio.play('paper')
+    // 이 한 칸을 고르는 데 얼마나 걸렸는지가 토큰이 배우는 신호다.
+    this.token?.noteSelectionMade()
     this.sel = { ...this.sel, [key]: w }
     this.sel = pruneConflicts(this.sel, this.slotIndex, this.t)
     const order = this.order()
@@ -2536,7 +2547,11 @@ export class BattleView {
     if (this.complete()) {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       GameAudio.playSentenceComplete(intent.emotions)
+      // 맥락이 맞물린 문장은 토큰도 신이 난다.
+      if (intent.combos.length > 0) this.token?.feel('comboFired')
       void this.autoComplete()
+    } else {
+      this.token?.noteSelectionStart()
     }
   }
 
@@ -2885,6 +2900,7 @@ export class BattleView {
       this.lastHurtBy = { kind: 'self', sentence: intent.sentence }
       this.setPhase('잉크 초과')
       applyInkOverdraw(this.state, inkCost)
+      this.token?.feel('overdraw')
       this.popPlayer(`잉크 초과 · 체력 -${overdraw}`, 'dmg big')
       this.log(`잉크 ${inkCost}/${SENTENCE_INK} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
       this.renderActors()
@@ -3055,6 +3071,7 @@ export class BattleView {
 
     // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
     this.killsThisBattle += kills
+    for (let i = 0; i < kills; i++) this.token?.feel('enemyKilled')
 
     // 한 턴에 두 마리 이상 쓸어담으면 획득 예정 영감이 띵·띵·띵 오른다. 전멸 마무리면 +1.
     const gradeGain = overkillGain(kills, allDead(this.state))
@@ -3117,6 +3134,9 @@ export class BattleView {
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++
+    this.token?.passTurn()
+    // 새 턴의 첫 슬롯이 열렸다 — 여기서부터 사람이 얼마나 망설이는지 잰다.
+    this.token?.noteSelectionStart()
     const turnSummons = summonAtTurnStart(this.state)
     this.renderActors()
     if (turnSummons.length > 0) await this.playTurnSummons(turnSummons)
@@ -3139,6 +3159,9 @@ export class BattleView {
     this.releaseTally()
     this.over = true
     this.setPhase('패배')
+    this.token?.feel('runLost')
+    // 런의 끝을 기억에 남기는 건 main의 goResult 한 곳이다 — 승패가 함께 지나는 유일한
+    // 길목이라, 여기서도 적으면 패배만 두 번 세어진다.
     this.log('일기장이 너무 상했다…')
     this.renderActors()
     const defeatDuration = playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'defeat')
@@ -3730,6 +3753,8 @@ export class BattleView {
     const def = this.state.enemies[idx]?.def
     if (!def) return
     this.lastHurtBy = { kind: 'enemy', enemyId: def.id, name: def.name, sprite: def.sprite, note: def.note }
+    // 토큰이 가장 크게 흔들리는 사건. 남은 체력이 얼마 없으면 더 크게 흔들린다.
+    this.token?.feel(this.state.playerHp <= this.state.playerMax * 0.3 ? 'playerNearDeath' : 'playerHurt')
   }
 
   /** 슬로우·딤·확대가 한 점을 보게 초점을 맞춘다. */
@@ -3998,6 +4023,8 @@ export class BattleView {
     }
     await sleep(pause)
     await this.gradeFinale()
+    this.token?.feel(this.isBoss ? 'bossDown' : 'runCleared')
+    if (this.isBoss) this.token?.bindCloser('bossDown')
     await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)

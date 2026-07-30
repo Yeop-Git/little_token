@@ -2359,6 +2359,17 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 가로지르는 중에는 잔상처럼 꼬리를 남기고, 들여다보는 중에는 빛을 키워 시선을 끈다. */
 .token-actor[data-behavior='wander'] .token-body { filter: drop-shadow(0 0 22px rgba(255, 230, 140, .68)); }
 .token-actor[data-behavior='peer'] .token-body { filter: drop-shadow(0 0 26px rgba(255, 236, 160, .72)); }
+/* 기분은 빛의 세기로 샌다 — 들뜨면 환해지고 가라앉으면 사그라든다. 말풍선이 없는
+   구간에도 토큰이 지금 어떤지 읽히게 하는 유일한 단서다. data-tone(대사 중)이
+   들어오면 그쪽이 이긴다: 경고보다 앞설 기분은 없다. */
+.token-actor[data-mood='high']:not([data-tone]) .token-body {
+  filter: drop-shadow(0 0 20px rgba(255, 240, 168, .82));
+}
+.token-actor[data-mood='low']:not([data-tone]) .token-body {
+  filter: drop-shadow(0 0 9px rgba(198, 196, 214, .38));
+}
+.token-actor[data-mood='low'] .token-panic-lines i { opacity: .5; height: 13px; }
+.token-actor[data-mood='high'] .token-panic-lines i { background: #fff3b0; }
 .token-speech {
   position: absolute;
   display: flex;
