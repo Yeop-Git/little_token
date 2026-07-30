@@ -7,6 +7,7 @@
  */
 
 import assert from 'node:assert/strict'
+import { STORAGE_PREFIX } from '@core/save'
 import {
   TOKEN_MIND_KEY,
   TOKEN_MIND_VERSION,
@@ -293,4 +294,13 @@ const neutral: TokenContext = {
   )
 }
 
-console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한')
+// ── 기록 초기화: 토큰의 기억도 함께 지워진다 ──────────────────────────────
+
+{
+  // 기록 초기화는 키를 하나씩 지우지 않고 접두사로 쓸어 낸다. 하나씩 지우는 방식이면
+  // 새로 늘어난 키가 조용히 살아남아, 전부 지웠다는 사람을 토큰이 계속 기억한다.
+  assert(TOKEN_MIND_KEY.startsWith(STORAGE_PREFIX), '토큰의 기억 키는 초기화 접두사를 쓴다')
+  assert(TOKEN_POLICY_KEY.startsWith(STORAGE_PREFIX), '토큰의 정책 키는 초기화 접두사를 쓴다')
+}
+
+console.log('토큰 자아 계약 통과 — 기분·유대·성향의 시간 축 · 저장 왕복과 구버전 거부 · 사전 성향 · 보상 부호 · 학습 상한 · 초기화 접두사')

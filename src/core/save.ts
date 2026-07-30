@@ -11,6 +11,14 @@ import { ALL_ITEMS } from '@data/items'
 import type { Emotion, Word } from './types'
 import type { PlayerStats } from './player'
 
+/**
+ * 이 게임이 브라우저에 남기는 모든 진행도의 접두사. 기록 초기화는 키를 하나씩
+ * 지우는 게 아니라 이 접두사를 통째로 쓸어 낸다 — 하나씩 지우면 새로 늘어난 키가
+ * 조용히 살아남는다(실제로 토큰의 기억과 학습된 정책이 그렇게 빠질 뻔했다).
+ * **새 진행도 키는 반드시 이 접두사를 쓴다.**
+ */
+export const STORAGE_PREFIX = 'little-token.'
+
 const SAVE_KEY = 'little-token.run.v1'
 const CORRUPT_SAVE_KEY = 'little-token.run.corrupt.v1'
 // v1은 오프닝이 실제로 뜨기 전에 완료로 기록되어, 로딩 중 이탈하거나 기존
@@ -290,6 +298,21 @@ function clearTutorialHistory(): void {
   }
 }
 
+/** `little-token.` 접두사를 가진 저장을 전부 지운다. 기록 초기화의 실제 몸통이다. */
+function clearPrefixedStorage(): void {
+  try {
+    const doomed: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(STORAGE_PREFIX)) doomed.push(key)
+    }
+    // 훑는 도중에 지우면 인덱스가 밀려 건너뛰는 키가 생긴다. 다 모으고 나서 지운다.
+    doomed.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    // 저장소를 못 쓰는 환경에서는 지울 기록도 없다.
+  }
+}
+
 export function clearRun(): void {
   try {
     localStorage.removeItem(SAVE_KEY)
@@ -299,7 +322,12 @@ export function clearRun(): void {
 }
 
 /** 환경 설정은 유지하고 런과 튜토리얼 완료 여부 등 플레이 기록을 모두 지운다. */
+/**
+ * 기록 초기화 — 이 게임이 남긴 진행도를 전부 지운다. 토큰의 기억·유대·성향과 학습된
+ * 정책도 여기 포함된다. 접두사로 쓸어 내므로 앞으로 키가 늘어도 자동으로 따라온다.
+ */
 export function clearAllRecords(): void {
   clearRun()
   clearTutorialHistory()
+  clearPrefixedStorage()
 }
