@@ -55,6 +55,30 @@ const BOND_EVENTS = {
 export type BondEvent = keyof typeof BOND_EVENTS
 export const BOND_EVENT_KEYS = Object.keys(BOND_EVENTS) as BondEvent[]
 
+/**
+ * 유대의 단계. 수치는 창에 그대로 뜨지만, 사람이 체감하는 건 "언제 달라졌는가"다.
+ * 그래서 문턱을 두고 넘는 순간에만 한마디 하고, 그 뒤로 행동이 실제로 바뀐다.
+ */
+export type BondTier = 'new' | 'familiar' | 'close' | 'inseparable'
+
+/** 문턱은 오름차순이다. `bondTierAt`이 이 순서를 전제로 뒤에서부터 훑는다. */
+export const BOND_TIERS: ReadonlyArray<{ id: BondTier; at: number }> = [
+  { id: 'new', at: 0 },
+  { id: 'familiar', at: 0.25 },
+  { id: 'close', at: 0.5 },
+  { id: 'inseparable', at: 0.75 },
+]
+
+export function bondTierAt(bond: number): BondTier {
+  for (let i = BOND_TIERS.length - 1; i >= 0; i--) if (bond >= BOND_TIERS[i].at) return BOND_TIERS[i].id
+  return 'new'
+}
+
+/** 단계가 오를수록 회상이 길어지고 곁에 더 오래 머문다. 창에 적는 설명과 같은 출처다. */
+export function bondTierRank(tier: BondTier): number {
+  return BOND_TIERS.findIndex((entry) => entry.id === tier)
+}
+
 /** 이 비율 이하로 떨어진 턴을 위태로웠다고 본다. */
 export const STOOD_BY_HP_RATIO = 0.35
 /** 이 안에 있었으면 곁을 지킨 것으로 본다(무대 px). 맴돌기 궤도 반경보다 넉넉하다. */
@@ -101,6 +125,8 @@ export interface TokenMindSnapshot {
   runs: TokenRunMemory[]
   /** 함께 끝낸 런 수. 회상과 유대 곡선의 분모다. */
   runsTogether: number
+  /** 지금까지 도달한 최고 단계. 같은 문턱을 두 번 축하하지 않으려고 남긴다. */
+  tier: BondTier
 }
 
 /** 저장소 계약. 브라우저에서는 localStorage, 검사에서는 Map 한 장이면 된다. */
@@ -134,6 +160,9 @@ export class TokenMind {
   private traitValues: TokenTraits = defaultTraits()
   private memories: TokenRunMemory[] = []
   private runsTogether = 0
+  private tierReached: BondTier = 'new'
+  /** 아직 축하하지 않은 단계 상승. 뷰가 한 번 가져가면 비워진다. */
+  private pendingTier: BondTier | null = null
   /** 이번 런에서 최근에 일어난 일. 정책의 관측과 회상 대사가 함께 읽는다. */
   private recentHurtTurns = 0
   private recentWinTurns = 0
@@ -177,7 +206,28 @@ export class TokenMind {
     const next = clamp01(this.bondValue + BOND_EVENTS[event])
     if (next === this.bondValue) return
     this.bondValue = next
+    // 문턱을 넘었으면 표시만 해 둔다. 말하는 건 뷰의 몫이고, 여기서는 두 번 넘지
+    // 않았다는 것만 보장한다.
+    const tier = bondTierAt(next)
+    if (bondTierRank(tier) > bondTierRank(this.tierReached)) {
+      this.tierReached = tier
+      this.pendingTier = tier
+    }
     this.save()
+  }
+
+  get tier(): BondTier {
+    return bondTierAt(this.bondValue)
+  }
+
+  /**
+   * 방금 오른 단계를 한 번만 꺼내 간다. 두 번째 호출은 null이다 —
+   * 축하는 넘는 순간에만 의미가 있고, 되풀이하면 알림이 된다.
+   */
+  takeTierUpgrade(): BondTier | null {
+    const pending = this.pendingTier
+    this.pendingTier = null
+    return pending
   }
 
   /** 턴이 넘어갈 때마다 기분이 평정으로 조금 돌아오고, 최근 사건 표시가 바랜다. */
@@ -241,6 +291,7 @@ export class TokenMind {
       traits: { ...this.traitValues },
       runs: this.memories.map((m) => ({ ...m })),
       runsTogether: this.runsTogether,
+      tier: this.tierReached,
     }
   }
 
@@ -259,6 +310,14 @@ export class TokenMind {
     if (data.version !== TOKEN_MIND_VERSION) return
     this.bondValue = readNumber(data.bond, 0, 0, 1)
     this.runsTogether = readNumber(data.runsTogether, 0, 0, Number.MAX_SAFE_INTEGER)
+    // 저장된 단계가 없거나 이상하면 지금 유대에서 다시 구한다 — 없던 축하를 소급해
+    // 터뜨리지 않으려면 여기서 맞춰 두는 편이 안전하다.
+    const savedTier = BOND_TIERS.some((entry) => entry.id === data.tier)
+      ? (data.tier as BondTier)
+      : bondTierAt(this.bondValue)
+    this.tierReached = bondTierRank(savedTier) >= bondTierRank(bondTierAt(this.bondValue))
+      ? savedTier
+      : bondTierAt(this.bondValue)
     const traits: Partial<TokenTraits> = data.traits ?? {}
     this.traitValues = {
       curiosity: readNumber(traits.curiosity, 0.5, 0, 1),

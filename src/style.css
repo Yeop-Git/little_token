@@ -9454,3 +9454,23 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 @media (prefers-reduced-motion: reduce) {
   .bond-gauge-track i, .bond-meter-track i, .bond-action-track i { transition: none; }
 }
+
+/* 유대 단계 — 게이지 밑에 이름 한 줄. 수치보다 이쪽이 먼저 읽혀야 한다. */
+.bond-tier { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.bond-tier b { color: var(--gold-hi); font-size: 15px; }
+.bond-tier span { color: var(--ink-faint); font-size: 11.5px; line-height: 1.5; }
+
+/* 곁의 거리 — 학습된 결 비율. 성격 눈금과 같은 문법을 쓰되 색만 달리해 구분한다. */
+.bond-reading { display: flex; flex-direction: column; gap: 7px; }
+.bond-read { display: grid; grid-template-columns: 108px minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
+.bond-read b { color: #efe0c6; font-size: 12.5px; font-weight: 700; }
+.bond-read span { color: var(--ink-faint); font-size: 12px; text-align: right; }
+.bond-read-track { height: 8px; border-radius: 999px; background: rgba(20, 15, 24, .46); overflow: hidden; }
+.bond-read-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(196, 176, 255, .45), #c4b0ff);
+  transition: width .5s cubic-bezier(.2, 1, .3, 1);
+}
+@media (prefers-reduced-motion: reduce) { .bond-read-track i { transition: none; } }

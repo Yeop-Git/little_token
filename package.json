@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "scripts": {
@@ -25,8 +25,9 @@
     "balance:check": "npm run data:generate && tsx src/tools/run-sim.ts --runs=8 --check",
     "boss:sim": "npm run data:generate && tsx src/tools/boss-sim.ts",
     "run:sim": "npm run data:generate && tsx src/tools/run-sim.ts",
-    "test": "npm run type-check && npm run sweep && npm run check && npm run locale:check && npm run effects:check && npm run core:check && npm run mind:check && npm run boss:sim && npm run balance:check",
-    "mind:check": "npm run data:generate && tsx src/tools/token-mind-check.ts"
+    "test": "npm run type-check && npm run sweep && npm run check && npm run locale:check && npm run effects:check && npm run core:check && npm run mind:check && npm run policy:sim && npm run boss:sim && npm run balance:check",
+    "mind:check": "npm run data:generate && tsx src/tools/token-mind-check.ts",
+    "policy:sim": "npm run data:generate && tsx src/tools/token-policy-sim.ts"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",

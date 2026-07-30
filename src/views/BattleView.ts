@@ -2355,6 +2355,18 @@ export class BattleView {
     const style = sharedTokenPlaystyle().read()
     const snapshot = mind.snapshot()
     const bondPercent = Math.round(mind.bond * 100)
+    const TIER_TEXT: Record<string, [string, string]> = {
+      new: ['막 만난 사이', '아직 서로를 알아 가는 중이다.'],
+      familiar: ['익숙해진 사이', '지난 이야기를 떠올려 말하기 시작한다.'],
+      close: ['가까운 사이', '곁에 더 오래 머물고, 네 쪽을 자주 돌아본다.'],
+      inseparable: ['떨어질 수 없는 사이', '어디로 가든 따라온다.'],
+    }
+    const [tierName, tierNote] = TIER_TEXT[mind.tier]
+    // 학습 결과를 그대로 편다. 배우고 있다는 말은 보여 줄 수 없으면 주장일 뿐이다.
+    const READING_TEXT: Record<string, string> = {
+      orbit: '곁을 지킨다', wander: '무대를 가로지른다', inspect: '무언가를 들여다본다', peer: '네 쪽을 바라본다',
+    }
+    const reading = this.token?.distanceReading() ?? []
     const face = mind.bond >= 0.6 ? TOKEN_FACES.crown : mind.bond >= 0.25 ? TOKEN_FACES.smile : TOKEN_FACES.neutral
 
     /** 0~1 값을 잉크가 스며든 눈금으로. 숫자는 곁에 그대로 적어 근거를 감추지 않는다. */
@@ -2431,6 +2443,7 @@ export class BattleView {
               <b>${bondPercent}<small>%</small></b>
               <span>유대</span>
             </div>
+            <div class="bond-tier"><b>${tierName}</b><span>${tierNote}</span></div>
             <p class="bond-portrait-note">조언을 끝까지 들려주거나 위기를 함께 넘길 때마다 자란다. 줄어들지는 않는다.</p>
           </aside>
           <div class="bond-sheets">
@@ -2444,6 +2457,19 @@ export class BattleView {
             <section class="bond-sheet">
               <h3>너에 대해 알게 된 것</h3>
               ${styleBody}
+            </section>
+            <section class="bond-sheet">
+              <h3>곁의 거리</h3>
+              <p class="bond-sheet-note">토큰이 지금 상황에서 어떻게 있을지 고르는 비율이다. 네가 다칠 때 곁에 있었는지, 고르는 동안 손패를 가렸는지를 보고 조금씩 옮겨 간다.</p>
+              ${reading.length
+                ? `<div class="bond-reading">${reading
+                    .map(({ action, probability }) => `
+                      <div class="bond-read">
+                        <b>${READING_TEXT[action]}</b>
+                        <div class="bond-read-track"><i style="width:${(probability * 100).toFixed(1)}%"></i></div>
+                        <span>${Math.round(probability * 100)}%</span>
+                      </div>`).join('')}</div>`
+                : '<p class="bond-empty">전투 중에만 잴 수 있다.</p>'}
             </section>
             <section class="bond-sheet bond-sheet-runs">
               <h3>함께한 이야기</h3>
@@ -3310,6 +3336,12 @@ export class BattleView {
     this.playerPreempting = false
     this.state.turn++
     this.token?.passTurn()
+    // 유대 문턱을 넘었으면 그 순간에만 한마디. 넘는 순간을 놓치면 축하할 자리가 없다.
+    const upgraded = this.token?.takeTierUpgrade()
+    if (upgraded && upgraded !== 'new' && !this.token?.isHolding) {
+      const key = upgraded === 'familiar' ? 'bondFamiliar' : upgraded === 'close' ? 'bondClose' : 'bondInseparable'
+      this.timers.push(window.setTimeout(() => this.showTokenSpeech(bossTokenLine(key, 'relief')), 900))
+    }
     // 새 턴의 첫 슬롯이 열렸다 — 여기서부터 사람이 얼마나 망설이는지 잰다.
     this.token?.noteSelectionStart()
     const turnSummons = summonAtTurnStart(this.state)

@@ -16,7 +16,7 @@
 import { CHARACTER_VISUALS } from '@data/characters'
 import type { TokenLine } from '@/localization/bossToken'
 import { sharedTokenMind, stoodByThroughDanger, TokenMind, type BondEvent, type MoodEvent } from '@core/tokenMind'
-import { TokenPolicy, type PolicyAction, type TokenContext } from '@core/tokenPolicy'
+import { POLICY_ACTIONS, TokenPolicy, type PolicyAction, type TokenContext } from '@core/tokenPolicy'
 import {
   destroyCharacterModels,
   mountCharacterModel,
@@ -268,6 +268,20 @@ export class TokenActor {
     return this.mind.recall()
   }
 
+  /** 방금 오른 유대 단계를 한 번만 꺼내 간다. 뷰가 이걸로 축하 한마디를 낸다. */
+  takeTierUpgrade() {
+    return this.mind.takeTierUpgrade()
+  }
+
+  /**
+   * 지금 관측에서 각 결이 뽑힐 확률. 유대 창의 「곁의 거리」가 이걸 그대로 편다 —
+   * 학습이 눈에 보이지 않으면 배우고 있다는 말은 믿을 근거가 없는 주장일 뿐이다.
+   */
+  distanceReading(): Array<{ action: PolicyAction; probability: number }> {
+    const distribution = this.policy.distribution(this.observe())
+    return POLICY_ACTIONS.map((action, i) => ({ action, probability: distribution[i] }))
+  }
+
   get mindState() {
     return this.mind
   }
@@ -369,7 +383,9 @@ export class TokenActor {
         // 프롬 머리 위에 매달아 둔 장식처럼 보인다.
         const drift = Math.sin(this.elapsed * 0.37) * 84
         // 걱정될수록 궤도가 좁아진다. 말로 하지 않고 거리로 말하는 부분이다.
-        const closeness = this.mind.isWorried ? 0.58 : 1 - Math.max(0, -this.mind.mood) * 0.3
+        // 조심스러운 성격도 같은 방향으로 당긴다 — 겁이 많으면 평소에도 가까이 돈다.
+        const timid = (this.mind.traits.caution - 0.5) * 0.34
+        const closeness = (this.mind.isWorried ? 0.58 : 1 - Math.max(0, -this.mind.mood) * 0.3) - timid
         this.target.x = anchor.x + Math.cos(this.orbitAngle) * 175 * closeness
         this.target.y = anchor.y + (Math.sin(this.orbitAngle) * 104 - 18 + drift) * closeness
         break
@@ -423,7 +439,10 @@ export class TokenActor {
     const dy = this.target.y - this.pos.y
     const distance = Math.hypot(dx, dy) || 1
     // 들뜨면 빨라지고 가라앉으면 처진다. 같은 결이라도 기분에 따라 다른 몸짓이 된다.
-    const spirit = 1 + this.mind.mood * 0.28
+    // 여기에 성격이 한 겹 더 실린다 — 장난기는 밀고 조심성은 당긴다. 성향이 어떤 결을
+    // 고르는지만 바꾸면 성격은 통계로만 남는다. 같은 맴돌기라도 달라 보여야 성격이다.
+    const temper = (this.mind.traits.playfulness - this.mind.traits.caution) * 0.22
+    const spirit = 1 + this.mind.mood * 0.28 + temper
     const speed = flight.speed * spirit * Math.min(1, distance / flight.slow)
     const desiredX = (dx / distance) * speed
     const desiredY = (dy / distance) * speed

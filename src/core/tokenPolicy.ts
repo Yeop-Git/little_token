@@ -13,8 +13,9 @@
  * 무사했는가 / 사람이 망설임 없이 골랐는가.
  *
  * 이 보상은 **설계된 heuristic이지 정답이 아니다.** 사람이 실제로 무엇을 원했는지는
- * 알 수 없고, 위 네 신호는 그 대리물이다. 그래서 학습분을 따로 묶어 상한을 두었다
- * (아래 `DELTA_LIMIT`) — 잘못 배워도 손으로 잡은 결의 감각을 완전히 덮지는 못한다.
+ * 알 수 없고, 위 네 신호는 그 대리물이다. 그래서 학습분을 따로 묶어 두 겹으로 상한을
+ * 걸었다 — 가중치 한 칸의 `DELTA_LIMIT`, 그리고 한 결에 실리는 총량의
+ * `LEARNED_LOGIT_LIMIT`. 잘못 배워도 손으로 잡은 결의 감각을 덮지는 못한다.
  */
 
 /** 저장 형식·차원이 바뀌면 올린다. 구버전 정책은 거부하고 사전 성향에서 다시 시작한다. */
@@ -72,8 +73,22 @@ export interface TokenPolicyWeights {
   baseline: number
 }
 
-/** 학습분이 움직일 수 있는 한계. 손으로 잡은 결의 감각을 지키는 안전대다. */
+/** 학습분 한 칸이 움직일 수 있는 한계. */
 const DELTA_LIMIT = 1.2
+/**
+ * 학습분이 **한 결의 확률에 실을 수 있는 총량**의 상한(로짓). 가중치 한 칸씩 묶어 두는
+ * 것만으로는 부족하다 — 열두 칸이 같은 방향으로 조금씩 쌓이면 합이 얼마든 커져서,
+ * 신호가 일관된 판을 오래 돌리면 소프트맥스가 포화되고 토큰이 한 가지만 하게 된다.
+ * (실제로 `token-policy-sim`이 엔트로피 0.07/1.39로 무너지는 걸 잡아냈다.)
+ *
+ * 여기서 막는 건 성능이 아니라 **성격**이다. 아무리 배워도 요정은 요정이어야 한다.
+ * 이 값이면 평상시 가장 흔한 결이 학습만으로 52% → 70% 언저리까지 움직인다 —
+ * 사람이 알아챌 만큼은 배우되, 한 가지만 하는 위성이 되지는 않는 폭이다.
+ *
+ * 주의: 이건 **학습이 얹는 몫**의 상한이지 최종 확률의 상한이 아니다. 프롬이 다쳤을 때
+ * 맴돌기가 90%까지 가는 건 교사 정책이 그렇게 정한 것이고, 그게 옳다.
+ */
+const LEARNED_LOGIT_LIMIT = 0.4
 const LEARNING_RATE = 0.035
 /** 기준선이 최근 보상을 따라가는 속도. 느려야 초반 몇 번에 휘둘리지 않는다. */
 const BASELINE_RATE = 0.05
@@ -281,9 +296,14 @@ export class TokenPolicy {
 
   private logits(x: number[]): number[] {
     return POLICY_ACTIONS.map((_, a) => {
-      let sum = 0
-      for (let i = 0; i < TOKEN_FEATURE_COUNT; i++) sum += (PRIOR[a][i] + this.delta[a][i]) * x[i]
-      return sum
+      let prior = 0
+      let learned = 0
+      for (let i = 0; i < TOKEN_FEATURE_COUNT; i++) {
+        prior += PRIOR[a][i] * x[i]
+        learned += this.delta[a][i] * x[i]
+      }
+      // 배운 몫만 따로 묶는다. 교사 정책은 그대로 두고 학습이 얹을 수 있는 높이만 제한한다.
+      return prior + clamp(learned, -LEARNED_LOGIT_LIMIT, LEARNED_LOGIT_LIMIT)
     })
   }
 
