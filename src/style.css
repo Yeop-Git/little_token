@@ -2347,6 +2347,9 @@ html[data-postprocessing='off'] .tip-bubble {
   transform-origin: 50% 50%;
   filter: drop-shadow(0 0 14px rgba(255, 222, 112, .5));
 }
+/* 깊이 흐림 — 멀어질수록 초점이 빠진다. 발광(drop-shadow)은 아래 상태 규칙들이
+   쥐고 있으므로 여기서만 blur를 걸어 두 filter가 서로를 덮어쓰지 않게 한다. */
+.token-actor .model-shell { filter: blur(var(--token-depth-blur, 0)); }
 .token-actor .model-shell {
   position: absolute;
   inset: 0;

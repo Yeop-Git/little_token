@@ -620,6 +620,10 @@ export class BattleView {
     if (this.spiderCastReady) return
     this.spiderCastReady = true
     this.cardHand.setInputEnabled(true)
+    // 조작권이 열린 지금부터 토큰이 날개를 편다. 그 전(튜토리얼 컷신·적 등장)에는
+    // 프롬 곁에 조용히 붙어 있는다 — 컷신에는 이미 커다란 토큰 초상이 떠 있어서,
+    // 무대에서까지 휘젓고 다니면 어디를 봐야 할지 알 수 없다.
+    this.token?.wake()
     // 런의 첫 층에서만, 그리고 **조작권이 열린 뒤에** 한마디. 인트로 컷신 위에 띄우면
     // 아무도 못 읽고 사라진다.
     const opening = !this.isBoss && this.day === 1 && !this.tokenOpeningSaid ? this.tokenOpeningLine() : null

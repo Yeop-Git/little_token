@@ -42,16 +42,18 @@ const BOX = 320
 const BOUNDS = { minX: 130, maxX: 1790, minY: 96, maxY: 838 }
 
 /** 결마다 다른 비행 성질. 속도·가속·감속 반경이 곧 그 결의 인상이다. */
-const FLIGHT: Record<TokenBehavior, { speed: number; accel: number; slow: number; scale: number }> = {
+const FLIGHT: Record<TokenBehavior, { speed: number; accel: number; slow: number; scale: number; depth: number }> = {
   // 맴돌기는 느리고 둥글다. 기본값이라 여기가 시끄러우면 화면 전체가 시끄러워진다.
   // 가속만은 넉넉히 준다 — 가로지르기에서 돌아올 때 제동이 약하면 800px씩 흘러가 버린다.
-  orbit: { speed: 300, accel: 2000, slow: 130, scale: 0.6 },
+  orbit: { speed: 300, accel: 2000, slow: 130, scale: 0.6, depth: 0 },
   // 가로지르기만 유일하게 빠르다. "슈우웅"은 속도가 아니라 **다른 결과의 대비**에서 나온다.
-  wander: { speed: 980, accel: 3000, slow: 240, scale: 0.52 },
-  inspect: { speed: 420, accel: 1700, slow: 96, scale: 0.72 },
-  peer: { speed: 620, accel: 2000, slow: 110, scale: 1 },
-  attend: { speed: 760, accel: 2400, slow: 100, scale: 0.94 },
-  alert: { speed: 360, accel: 2200, slow: 60, scale: 0.8 },
+  // 뒤로 물러나며 가로지르므로 무대 안쪽으로 들어가는 것처럼 보인다.
+  wander: { speed: 980, accel: 3000, slow: 240, scale: 0.52, depth: -0.7 },
+  inspect: { speed: 420, accel: 1700, slow: 96, scale: 0.72, depth: -0.25 },
+  // 화면 너머를 보러 올 때가 가장 가깝다. 유리에 얼굴을 붙이는 거리다.
+  peer: { speed: 620, accel: 2000, slow: 110, scale: 1, depth: 1 },
+  attend: { speed: 760, accel: 2400, slow: 100, scale: 0.94, depth: 0.55 },
+  alert: { speed: 360, accel: 2200, slow: 60, scale: 0.8, depth: 0.3 },
 }
 
 /** 자율 결의 지속 시간(ms) 범위. attend·alert는 바깥이 놓아줄 때까지라 여기 없다. */
@@ -82,6 +84,32 @@ const QUICK_DECISION_MS = 2500
 const HESITATION_FULL_MS = 6000
 /** 손패 위 이 높이보다 아래에 있으면 카드를 덮은 것으로 본다(무대 y). */
 const HAND_TOP_Y = 760
+
+/**
+ * 날개를 펴는 데 걸리는 시간(ms). 조작권이 열린 순간부터 잰다.
+ *
+ * 전투가 열리자마자 무대 끝까지 튀어 나가면 요정이 아니라 튄 공처럼 보인다. 처음에는
+ * 프롬 곁만 맴돌다가 서서히 반경을 넓혀야 "이제 좀 익숙해졌구나"로 읽힌다.
+ */
+const WARMUP_MS = 14000
+/** 막 깨어났을 때 프롬에게서 벗어날 수 있는 최대 거리(무대 px). */
+const WARMUP_RADIUS_MIN = 260
+/** 다 풀렸을 때의 반경. 무대 대각선보다 넉넉해 사실상 제한이 없다. */
+const WARMUP_RADIUS_MAX = 2200
+/** 이만큼 풀리기 전에는 무대를 가로지르거나 화면 너머를 보러 나가지 않는다. */
+const WARMUP_ROAM_GATE = 0.45
+
+/**
+ * 깊이 — 화면 앞뒤. -1이 가장 멀고 +1이 가장 가깝다.
+ *
+ * 결마다 축척을 고정값으로 주던 것을 축 하나로 바꾼 것이다. 고정값이면 "지금 다가오는
+ * 중"이 안 보이고 크기만 툭 바뀐다. 깊이를 따로 두고 천천히 좇게 하면 같은 이동이
+ * 앞으로 나오는 몸짓이 된다.
+ */
+const DEPTH_SCALE = 0.34
+/** 멀어질수록 흐려지고 옅어진다. 크기만으로는 거리가 잘 안 읽힌다. */
+const DEPTH_BLUR_PX = 1.6
+const DEPTH_FADE = 0.22
 
 /** 정책이 고르는 결. attend·alert는 바깥이 부르므로 학습 대상이 아니다. */
 const POLICY_BEHAVIOURS: readonly TokenBehavior[] = ['orbit', 'wander', 'inspect', 'peer']
@@ -114,6 +142,16 @@ export class TokenActor {
   private roll = 0
   private scale = FLIGHT.orbit.scale
   private yaw = 0
+  /** 화면 앞뒤. -1(멀다) ~ +1(가깝다). 목표를 천천히 좇아 이동이 몸짓으로 읽히게 한다. */
+  private depth = 0
+  /**
+   * 날개가 얼마나 풀렸는가 0~1. 조작권이 열린 뒤부터 차오르고, 새 전투마다 0으로 돌아간다.
+   * 0이면 프롬 곁만, 1이면 무대 전체.
+   */
+  private warmup = 0
+  private wokeAt = 0
+  /** 묶여 있는가. 튜토리얼처럼 요정이 돌아다니면 안 되는 구간에서 켠다. */
+  private leashed = true
 
   /** 지금 이 구간에 벌어진 일. 결이 끝날 때 정책이 이걸 보고 배운다. */
   private episode = { tookDamage: false, distanceWhenHurt: 0, occludedHand: false, decidedQuickly: false }
@@ -186,6 +224,20 @@ export class TokenActor {
   /** 맴돌 대상. 프롬이 다시 그려지면 새 요소로 갈아 끼운다. */
   attachTo(playerEl: HTMLElement | null) {
     this.playerEl = playerEl
+  }
+
+  /**
+   * 날개를 편다. 조작권이 열리는 순간 뷰가 부른다.
+   *
+   * 이때부터 워밍업이 차오르기 시작하며, 그 전까지는 프롬 곁에 조용히 붙어 있는다.
+   * 튜토리얼 컷신 위에서 요정이 무대를 휘젓고 다니면 지금 봐야 할 게 어느 쪽인지
+   * 알 수 없게 된다 — 컷신에는 이미 커다란 토큰 초상이 떠 있다.
+   */
+  wake() {
+    if (!this.leashed) return
+    this.leashed = false
+    this.wokeAt = performance.now()
+    this.enter('orbit')
   }
 
   /** 무대의 형편. 정책의 관측이 되므로 뷰가 상태를 다시 그릴 때마다 부어 준다. */
@@ -365,7 +417,13 @@ export class TokenActor {
       // 고르는 사람 앞에서 카드를 덮고 있었다는 사실은 한 번이라도 있었으면 남긴다.
       if (this.pos.y > HAND_TOP_Y) this.episode.occludedHand = true
     }
-    if (!this.holdingSpeech && this.behaviorUntil && now >= this.behaviorUntil) this.enter(this.pickNext())
+    // 묶여 있는 동안은 워밍업이 0에 머물고 결도 바뀌지 않는다 — 프롬 곁 맴돌기만.
+    this.warmup = this.leashed || !this.wokeAt
+      ? 0
+      : clamp((now - this.wokeAt) / WARMUP_MS, 0, 1)
+    if (!this.leashed && !this.holdingSpeech && this.behaviorUntil && now >= this.behaviorUntil) {
+      this.enter(this.pickNext())
+    }
     this.aim(delta)
     this.steer(delta)
     this.paint()
@@ -428,8 +486,24 @@ export class TokenActor {
         break
       }
     }
+    // 날개가 덜 풀렸으면 목표점을 프롬 주위로 끌어당긴다. 결이 무엇이든 처음에는
+    // 곁을 벗어나지 못하고, 시간이 지나며 같은 결이 점점 멀리까지 나간다.
+    this.reelIn(anchor)
     this.target.x = clamp(this.target.x, BOUNDS.minX, BOUNDS.maxX)
     this.target.y = clamp(this.target.y, BOUNDS.minY, BOUNDS.maxY)
+  }
+
+  /** 목표점이 지금 허용된 반경 밖이면 프롬 쪽으로 끌어당긴다. */
+  private reelIn(anchor: Vec) {
+    const allowed = WARMUP_RADIUS_MIN + (WARMUP_RADIUS_MAX - WARMUP_RADIUS_MIN) * this.warmup
+    if (allowed >= WARMUP_RADIUS_MAX) return
+    const dx = this.target.x - anchor.x
+    const dy = this.target.y - anchor.y
+    const distance = Math.hypot(dx, dy)
+    if (distance <= allowed) return
+    const k = allowed / distance
+    this.target.x = anchor.x + dx * k
+    this.target.y = anchor.y + dy * k
   }
 
   /** 목표를 향해 감속 접근(arrive)한다. 관성이 있어야 방향을 틀 때 곡선이 남는다. */
@@ -458,7 +532,16 @@ export class TokenActor {
     // 뱅킹 — 횡속도만큼 기운다. 이게 없으면 아무리 빨라도 미끄러지는 스티커로 보인다.
     const bank = clamp(this.vel.x / 900, -1, 1) * 26
     this.roll += (bank - this.roll) * Math.min(1, delta * 6)
-    this.scale += (flight.scale - this.scale) * Math.min(1, delta * 4)
+
+    // 깊이 — 결이 정한 목표를 천천히 좇는다. 여기에 아주 느린 숨을 얹어 멈춰 있을
+    // 때도 앞뒤로 미세하게 흔들리게 한다. 완전히 고정된 깊이는 종이 인형처럼 보인다.
+    const breath = this.reducedMotion ? 0 : Math.sin(this.elapsed * 0.53) * 0.09
+    const wantDepth = clamp(flight.depth + breath, -1, 1)
+    this.depth += (wantDepth - this.depth) * Math.min(1, delta * 2.4)
+    // 축척은 결의 기본값 × 깊이. 곱으로 묶어야 "가까운 들여다보기"와 "먼 들여다보기"가
+    // 같은 결의 두 순간으로 읽힌다.
+    const wantScale = flight.scale * (1 + this.depth * DEPTH_SCALE)
+    this.scale += (wantScale - this.scale) * Math.min(1, delta * 4)
 
     // 몸통 방향. 들여다보는 두 결에서는 대상을 정면으로 마주하고, 그 밖에는 진행 방향을 본다.
     const facing =
@@ -478,6 +561,11 @@ export class TokenActor {
       : Math.sin(this.elapsed * 2.3) * 5 + Math.sin(this.elapsed * 1.1) * 3
     this.el.style.transform = `translate3d(${(this.pos.x - BOX / 2).toFixed(1)}px, ${(this.pos.y - BOX / 2 + bob).toFixed(1)}px, 0)`
     this.body.style.transform = `scale(${this.scale.toFixed(3)}) rotate(${this.roll.toFixed(2)}deg)`
+    // 멀어질수록 흐려지고 옅어진다. 크기만 줄이면 "작은 요정"이지 "먼 요정"이 아니다.
+    // 발광은 CSS(data-behavior/data-mood)가 쥐고 있으므로 여기서는 흐림만 변수로 넘긴다.
+    const far = Math.max(0, -this.depth)
+    this.el.style.setProperty('--token-depth-blur', `${(far * DEPTH_BLUR_PX).toFixed(2)}px`)
+    this.el.style.opacity = (1 - far * DEPTH_FADE).toFixed(3)
     // 오른쪽 끝에서는 말풍선을 왼쪽으로 넘긴다 — 안 그러면 무대 밖으로 밀려 잘린다.
     this.bubble.dataset.side = this.pos.x > 1180 ? 'left' : 'right'
   }
@@ -530,6 +618,11 @@ export class TokenActor {
     // 움직임을 줄여 달라고 한 사람에게 무대를 가로지르는 결은 보여 주지 않는다.
     // 정책보다 이쪽이 위다 — 접근성은 학습이 뒤집을 수 있는 선호가 아니다.
     if (this.reducedMotion && (next === 'wander' || next === 'peer')) return 'orbit'
+    // 아직 날개가 덜 풀렸으면 멀리 나가는 결은 미룬다. 반경 제한만으로도 목표점은
+    // 가까워지지만, 결 자체를 미뤄야 "처음엔 곁에만 있다가 점점 넓힌다"로 읽힌다.
+    if (this.warmup < WARMUP_ROAM_GATE && (next === 'wander' || next === 'peer')) {
+      return this.warmup < WARMUP_ROAM_GATE * 0.5 ? 'orbit' : 'inspect'
+    }
     return next
   }
 
