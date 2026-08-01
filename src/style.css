@@ -1843,18 +1843,16 @@ html[data-postprocessing='off'] .tip-bubble {
   z-index: 58;
   width: 360px;
   margin: 0;
-  padding: 14px 18px 16px;
+  padding: 4px 6px 6px;
   transform: none;
-  border: 1px solid rgba(255, 221, 165, .55);
-  border-radius: 18px 7px 17px 7px;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 242, 212, .065),
-    inset 0 1px 0 rgba(255, 236, 196, .16),
-    0 10px 28px rgba(0, 0, 0, .58),
-    0 0 22px rgba(255, 168, 84, .1);
+  /* 프롬 이름표도 전장과 같은 규칙 — 판 없이 이름줄과 밑줄만 남긴다. */
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
-.scene.battle[data-boss='true'] .boss-player-health-hud .row { margin-bottom: 9px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { padding: 2px 10px 3px; font-size: 14px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .row { margin-bottom: 6px; }
+.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 17px; }
 .scene.battle[data-boss='true'] .boss-player-health-hud .nm { font-size: 19px; }
 .scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 15px; }
 .scene.battle[data-boss='true'] .boss-player-health-hud .hpbar { height: 17px; }
@@ -1959,7 +1957,29 @@ html[data-postprocessing='off'] .tip-bubble {
   font-size: 14px;
   font-weight: 900;
 }
-.boss-health-hud .hpbar { height: 20px; border-radius: 10px 5px 10px 5px; }
+/* 보스 체력바는 판이 있는 지금 모양을 그대로 지킨다. 일반 이름표가 판 없는
+   잉크선으로 바뀌면서 공용 `.hpbar`가 얇아졌으므로, 보스 쪽은 여기서 되돌린다. */
+.boss-health-hud .hpbar {
+  height: 20px;
+  border-radius: 10px 5px 10px 5px;
+  background: rgba(9, 5, 11, .74);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, .72),
+    inset 0 0 0 1px rgba(255, 221, 165, .46);
+}
+.boss-health-hud .hpbar > .fill { border-radius: 8px 3px 8px 3px; }
+.boss-health-hud .hpbar > .fill::after { top: 3px; left: 6px; right: 6px; height: 4px; border-radius: 4px; }
+.boss-health-hud .hpbar > .shield { border-radius: 0 5px 10px 0; }
+/* 밀랍 눈금 — 긴 보스 바는 길이만으로 남은 양이 어림으로만 읽힌다. 칸을 세게 한다. */
+.boss-health-hud .hpbar::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: 4;
+  border-radius: 8px 3px 8px 3px;
+  background: repeating-linear-gradient(90deg, transparent 0 43px, rgba(0, 0, 0, .3) 43px 44px);
+  pointer-events: none;
+}
 .boss-badge-row {
   position: absolute;
   top: calc(100% + 7px);
@@ -1979,14 +1999,14 @@ html[data-postprocessing='off'] .tip-bubble {
   pointer-events: auto;
 }
 .boss-health-hud .boss-intel .enemy-intel-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px 4px 9px 4px;
-  background: linear-gradient(145deg, rgba(66, 35, 39, .96), rgba(24, 13, 24, .95));
+  width: 36px;
+  height: 36px;
+  border-radius: 4px 10px 4px 10px;
+  background: linear-gradient(150deg, rgba(66, 42, 32, .96), rgba(26, 16, 18, .95));
 }
 .boss-health-hud .boss-intel .enemy-intel-icon svg,
-.boss-health-hud .boss-intel .enemy-intel-icon .baked-stat-icon { width: 20px; height: 20px; }
-.boss-health-hud .boss-intel .enemy-intel-icon > b { font-size: 15px; }
+.boss-health-hud .boss-intel .enemy-intel-icon .baked-stat-icon { width: 24px; height: 24px; }
+.boss-health-hud .boss-intel .enemy-intel-icon > b { font-size: 18px; }
 
 /* 보스가 쓰는 다음 문장 — 규칙 툴팁이 아니라 플레이어가 매 턴 읽는 주된 의도판이다. */
 .boss-sentence-board {
@@ -2830,13 +2850,21 @@ html[data-postprocessing='off'] .tip-bubble {
   display: block;
   width: 136px;
   margin: 0;
-  padding: 5px 7px 7px;
-  border: 1px solid rgba(255, 220, 142, .58);
-  border-radius: 9px 4px 9px 4px;
-  background: linear-gradient(145deg, rgba(54, 35, 28, .9), rgba(20, 14, 19, .92));
-  box-shadow: inset 0 0 0 2px rgba(255, 245, 211, .05), 0 5px 12px rgba(18, 9, 8, .5);
+  /* 일벌도 판 없이 — 전장에 검은 판이 하나라도 남으면 그것만 튄다. */
+  padding: 0 3px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   transform: translateX(-50%);
 }
+.queen-worker-tag {
+  text-shadow:
+    0 0 3px #000, 0 1px 3px rgba(0, 0, 0, .95),
+    1px 1px 0 rgba(0, 0, 0, .85), -1px 1px 0 rgba(0, 0, 0, .85),
+    1px -1px 0 rgba(0, 0, 0, .85), -1px -1px 0 rgba(0, 0, 0, .85);
+}
+.queen-worker-tag > b { text-shadow: none; }
 .queen-worker-tag {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -2862,8 +2890,12 @@ html[data-postprocessing='off'] .tip-bubble {
   position: relative;
   display: block;
   width: 100%;
-  height: 8px;
-  border-radius: 4px;
+  height: 9px;
+  border-radius: 5px 2px 4px 2px;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(28, 16, 12, .9),
+    inset 0 0 0 2.5px rgba(255, 226, 178, .45),
+    0 2px 6px rgba(0, 0, 0, .6);
 }
 .queen-worker-hp > .fill {
   width: 100%;
@@ -3292,44 +3324,46 @@ html[data-postprocessing='off'] .tip-bubble {
 #actors.rail-rush .hpbar > .fill { transition: width 0.16s cubic-bezier(0.22, 1, 0.36, 1); }
 
 /* 이름표 + 귀여운 HP 바 */
-/* 이름표는 전장 위 특징 뱃지(enemy-intel-icon)와 같은 언어로 그린다 —
-   각진 모서리 + 1px 금테 + 안쪽 얇은 링. 밋밋한 검은 판이 아니라 촛농으로
-   봉인한 명패처럼 보이게 하고, 이름과 수치는 절대 배경에 묻히지 않게 한다. */
+/* 이름표에 판(어두운 배경 레이어)을 두지 않는다. 남는 것은 이름 한 줄과 그
+   밑줄인 체력바뿐 — 캐릭터 위에 얹힌 상자가 사라지면서 전장이 그림으로 읽힌다.
+   판이 없으니 대비는 글자가 스스로 지어야 한다: 검은 테를 여러 겹 두른다. */
 .nameplate {
   position: absolute;
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 12px;
-  width: 218px;
-  padding: 8px 13px 10px;
-  border: 1px solid rgba(255, 221, 165, .55);
-  border-radius: 15px 6px 14px 6px;
-  background:
-    linear-gradient(150deg, rgba(56, 34, 40, .965), rgba(20, 13, 23, .955)),
-    repeating-linear-gradient(52deg, transparent 0 9px, rgba(255, 220, 158, .035) 9px 11px);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 242, 212, .065),
-    inset 0 1px 0 rgba(255, 236, 196, .16),
-    0 7px 18px rgba(0, 0, 0, .6),
-    0 0 20px rgba(255, 168, 84, .1);
+  margin-bottom: 15px;
+  width: 214px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   z-index: 5;
   /* 이름/체력 HUD는 표시 전용이다. 선택 판정은 캐릭터 본체(model-shell)만 받는다. */
   pointer-events: none;
 }
-/* 왼쪽 위로 흘러내린 촛농 한 방울 — 판이 종이가 아니라 봉인이라는 표시다. */
-.nameplate::before {
+/* 잉크 마구리 — 판이 없어지면 적 다섯이 늘어섰을 때 옆 적의 밑줄과 이어져
+   한 줄로 읽힌다. 양 끝에 못을 박아 "여기서 끊긴다"를 만든다. */
+.nameplate::before,
+.nameplate::after {
   content: '';
   position: absolute;
-  left: 11px;
-  top: -4px;
-  width: 13px;
-  height: 9px;
-  border-radius: 0 0 7px 7px;
-  background: linear-gradient(180deg, rgba(255, 216, 150, .9), rgba(226, 158, 72, .75));
-  box-shadow: 0 2px 6px rgba(255, 170, 70, .35);
+  bottom: -4px;
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: rgba(255, 232, 194, .85);
+  box-shadow: 0 0 8px rgba(0, 0, 0, .85);
+}
+.nameplate::before { left: -6px; }
+.nameplate::after { right: -6px; }
+/* 마구리에 약점 감정색을 물려 옆 적과 색으로도 갈린다 */
+.actor.foe .nameplate[class*='emotion-']::before,
+.actor.foe .nameplate[class*='emotion-']::after {
+  background: color-mix(in srgb, var(--emotion-color) 58%, #ffe8c2);
 }
 .actor.foe .nameplate {
   transform: translateX(-50%);
@@ -3338,20 +3372,15 @@ html[data-postprocessing='off'] .tip-bubble {
   cursor: help;
   outline: none;
 }
-/* 약점 감정색은 판을 물들이되 농도를 낮춘다 — 색이 사라지면 어느 감정이 약점인지
-   못 읽고, 너무 진하면 금테와 이름이 함께 묻힌다. */
+/* 판이 없으니 약점 감정색은 이름 글자 자체에 섞는다 — 색이 사라지면 어느 감정이
+   약점인지 못 읽는다. 검은 외곽선은 그대로라 어떤 색이 와도 가독성은 유지된다. */
 .actor.foe .nameplate[class*='emotion-'] {
-  border-color: color-mix(in srgb, var(--emotion-color) 60%, rgba(255, 221, 165, .55));
-  background:
-    linear-gradient(150deg,
-      color-mix(in srgb, var(--emotion-color) 28%, rgba(40, 24, 30, .96)),
-      color-mix(in srgb, var(--emotion-color) 11%, rgba(19, 12, 22, .955))),
-    repeating-linear-gradient(52deg, transparent 0 9px, rgba(255, 220, 158, .035) 9px 11px);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 242, 212, .065),
-    inset 0 1px 0 rgba(255, 236, 196, .16),
-    0 7px 18px rgba(0, 0, 0, .6),
-    0 0 20px color-mix(in srgb, var(--emotion-color) 30%, transparent);
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+.actor.foe .nameplate[class*='emotion-'] .nm {
+  color: color-mix(in srgb, var(--emotion-color) 38%, #fff3dc);
 }
 .actor.foe .nameplate:focus-visible {
   filter: brightness(1.16);
@@ -3362,27 +3391,35 @@ html[data-postprocessing='off'] .tip-bubble {
   filter: none;
 }
 .actor.foe .nameplate.gone { opacity: 0; pointer-events: none; }
+/* 이름과 수치가 한 줄에 좌우로 서고, 그 아래 밑줄이 곧 체력바다. */
 .nameplate .row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 7px;
+  align-items: baseline;
+  margin-bottom: 4px;
+  padding: 0 3px;
 }
 .nameplate .nm {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 900;
-  color: #ffe7bb;
-  letter-spacing: .02em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 10px rgba(255, 176, 88, .28);
+  color: #fff3dc;
+  letter-spacing: .01em;
+  text-shadow:
+    0 0 4px #000, 0 0 4px #000, 0 2px 4px rgba(0, 0, 0, .95),
+    1.5px 1.5px 0 rgba(0, 0, 0, .85), -1.5px 1.5px 0 rgba(0, 0, 0, .85),
+    1.5px -1.5px 0 rgba(0, 0, 0, .85), -1.5px -1.5px 0 rgba(0, 0, 0, .85);
 }
-/* 수치는 금박 칩 위 검은 잉크다 — 판이 감정색으로 물들어도 대비가 무너지지 않는다. */
 .nameplate .hpn {
-  padding: 1px 8px 2px;
-  border-radius: 999px 999px 4px 999px;
-  color: #34210e;
-  background: linear-gradient(140deg, #ffdfa4, #efb262);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .45);
-  font: 900 12px/1.45 Georgia, serif;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #ffdba6;
+  font: 900 15px/1 Georgia, serif;
+  text-shadow:
+    0 0 4px #000, 0 2px 3px rgba(0, 0, 0, .95),
+    1px 1px 0 rgba(0, 0, 0, .85), -1px 1px 0 rgba(0, 0, 0, .85),
+    1px -1px 0 rgba(0, 0, 0, .85), -1px -1px 0 rgba(0, 0, 0, .85);
 }
 .enemy-traits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; min-height: 17px; }
 .enemy-intel {
@@ -3398,30 +3435,33 @@ html[data-postprocessing='off'] .tip-bubble {
   pointer-events: auto;
 }
 /* 일반 적의 상태 뱃지는 이름/체력 태그를 읽은 시선이 그대로 내려오도록
-   태그 바로 아래에 붙인다. 보스는 상단 전용 HUD 아래 배치를 계속 사용한다. */
+   태그 바로 아래에 붙인다. 보스는 상단 전용 HUD 아래 배치를 계속 사용한다.
+   이름줄이 판 없는 얇은 잉크선이 되면서 정보 무게가 이 줄로 옮겨 왔다 —
+   자리를 한 칸 내리고 크기도 키운다. */
 .scene.battle:not([data-boss='true']) .actor.foe .enemy-intel {
-  bottom: calc(100% - 34px);
+  bottom: calc(100% - 50px);
 }
 .enemy-intel[hidden] { display: none; }
+.enemy-intel { gap: 6px; }
 .enemy-intel-icon {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 221, 165, .5);
-  border-radius: 11px 5px 10px 5px;
+  border: 1px solid rgba(255, 232, 194, .8);
+  border-radius: 5px 12px 5px 12px;
   color: #ffe4ad;
-  background: linear-gradient(145deg, rgba(52, 32, 38, .96), rgba(19, 12, 22, .94));
+  background: linear-gradient(150deg, rgba(58, 38, 28, .96), rgba(24, 15, 16, .95));
   box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .06), 0 4px 11px rgba(0, 0, 0, .56);
   cursor: help;
   outline: none;
   transition: transform .14s ease, filter .14s ease;
 }
 .enemy-intel-icon svg,
-.enemy-intel-icon .baked-stat-icon { width: 23px; height: 23px; }
-.enemy-intel-icon > b { font: 900 17px/1 Georgia, serif; }
+.enemy-intel-icon .baked-stat-icon { width: 28px; height: 28px; }
+.enemy-intel-icon > b { font: 900 21px/1 Georgia, serif; }
 .enemy-intel-icon .emotion-face { width: 26px; height: 26px; object-fit: contain; }
 .enemy-intel-icon .emotion-symbol { font-size: 20px; }
 .enemy-intel-icon.magic > b,
@@ -3445,9 +3485,9 @@ html[data-postprocessing='off'] .tip-bubble {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 30px;
+  height: 38px;
   margin-right: 4px;
-  padding: 0 11px 0 8px;
+  padding: 0 14px 0 11px;
   border: 1px solid rgba(245, 216, 142, .74);
   border-radius: 999px 999px 4px 999px;
   color: #f7dfa4;
@@ -3468,11 +3508,11 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .enemy-tip-note:hover,
 .enemy-tip-note:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
-.enemy-tip-note svg { width: 18px; height: 18px; }
-.enemy-tip-note > b { font: 900 13px/1 Georgia, serif; letter-spacing: .1em; }
-.boss-health-hud .boss-intel .enemy-tip-note { height: 26px; padding: 0 9px 0 7px; }
-.boss-health-hud .boss-intel .enemy-tip-note svg { width: 16px; height: 16px; }
-.boss-health-hud .boss-intel .enemy-tip-note > b { font-size: 11px; }
+.enemy-tip-note svg { width: 22px; height: 22px; }
+.enemy-tip-note > b { font: 900 15px/1 Georgia, serif; letter-spacing: .1em; }
+.boss-health-hud .boss-intel .enemy-tip-note { height: 33px; padding: 0 12px 0 9px; }
+.boss-health-hud .boss-intel .enemy-tip-note svg { width: 19px; height: 19px; }
+.boss-health-hud .boss-intel .enemy-tip-note > b { font-size: 13px; }
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
 .actor.foe > .model-shell { cursor: default; }
@@ -3720,38 +3760,25 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 뒷줄은 힌트까지 띄우면 소란하니 최전방만 */
 .actor.foe.back .guard-hint { display: none; }
 /* 통통하고 귀여운 캡슐 HP 바 */
+/* 손으로 그은 밑줄 — 얇고, 양 끝 모서리가 조금씩 어긋나고, 잉크 테두리가 있다.
+   판이 사라진 자리를 채우는 건 이 선 하나뿐이라 안쪽 잉크 테두리로 형태를 세운다. */
 .hpbar {
   position: relative;
-  height: 16px;
-  border-radius: 9px 4px 9px 4px;
-  background: rgba(9, 5, 11, .74);
+  height: 14px;
+  border-radius: 7px 2px 6px 3px;
+  background: rgba(16, 10, 16, .82);
   overflow: hidden;
   box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, .72),
-    inset 0 0 0 1px rgba(255, 221, 165, .46);
+    inset 0 0 0 2px rgba(28, 16, 12, .9),
+    inset 0 0 0 3px rgba(255, 226, 178, .45),
+    0 3px 9px rgba(0, 0, 0, .62);
 }
 .hpbar > .fill {
   position: absolute;
   inset: 0;
   right: auto;
-  border-radius: 8px 3px 8px 3px;
+  border-radius: 6px 1px 5px 2px;
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-/* 밀랍 눈금 — 막대만으로는 "얼마나 남았나"가 어림으로만 읽힌다. 칸을 세게 한다.
-   이름표 안과 보스 HUD의 바에만 건다(일벌 같은 작은 막대는 눈금이 소음이 된다). */
-.nameplate .hpbar::after,
-.boss-health-hud .hpbar::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  z-index: 4;
-  border-radius: 7px 3px 7px 3px;
-  background: repeating-linear-gradient(90deg, transparent 0 15px, rgba(0, 0, 0, .32) 15px 16px);
-  pointer-events: none;
-}
-/* 보스 바는 길다 — 같은 간격으로 두면 눈금이 아니라 울타리가 된다. */
-.boss-health-hud .hpbar::after {
-  background: repeating-linear-gradient(90deg, transparent 0 43px, rgba(0, 0, 0, .3) 43px 44px);
 }
 
 /* 매직실드 — 천상의 보호막처럼 캐릭터를 감싸는 황금막과 체력바 위 결정층을
@@ -3766,7 +3793,7 @@ html[data-postprocessing='off'] .tip-bubble {
   gap: 2px;
   padding-right: 7px;
   overflow: hidden;
-  border-radius: 8px 3px 8px 3px;
+  border-radius: 6px 1px 5px 2px;
   color: #fff9cc;
   background:
     linear-gradient(122deg, transparent 0 13%, rgba(255,255,255,.72) 14% 17%, transparent 18% 42%, rgba(255,248,174,.58) 43% 48%, transparent 49%),
@@ -3812,12 +3839,12 @@ html[data-postprocessing='off'] .tip-bubble {
 .hpbar > .fill::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 6px;
-  right: 6px;
-  height: 4px;
+  top: 2px;
+  left: 5px;
+  right: 5px;
+  height: 3px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.32);
 }
 .hpbar.you > .fill {
   background: linear-gradient(180deg, #d3f5a4, #7cc457);
@@ -3832,7 +3859,7 @@ html[data-postprocessing='off'] .tip-bubble {
   left: 0;
   width: 0;
   /* 왼쪽은 체력과 맞닿으므로 각지게, 오른쪽만 바의 끝 모서리를 그대로 따라간다 */
-  border-radius: 0 4px 9px 0;
+  border-radius: 0 2px 6px 0;
   background: linear-gradient(180deg, var(--shield-hp-hi), var(--shield-hp));
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.4),
