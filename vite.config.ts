@@ -1,10 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { resolve } from 'path'
 
 // GitHub Pages는 저장소 이름 하위 경로로 서빙된다(github.io/TestGame001/).
 // 액션 배포 시 이 base가 있어야 에셋 경로가 깨지지 않는다.
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const envRoot = resolve(__dirname, '.')
+  const isDemo = loadEnv(mode, envRoot, '').VITE_APP_EDITION === 'demo'
+  return {
   root: 'src',
+  envDir: envRoot,
   base: process.env.GITHUB_PAGES ? '/TestGame001/' : '/',
   build: {
     outDir: '../dist',
@@ -16,12 +20,17 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
   },
   resolve: {
-    alias: {
-      '@': resolve(__dirname, './src'),
-      '@core': resolve(__dirname, './src/core'),
-      '@data': resolve(__dirname, './src/data'),
-      '@views': resolve(__dirname, './src/views'),
-    },
+    alias: [
+      {
+        find: '@/assets/late',
+        replacement: resolve(__dirname, isDemo ? './src/assets/late.demo.ts' : './src/assets/late.ts'),
+      },
+      { find: '@', replacement: resolve(__dirname, './src') },
+      { find: '@core', replacement: resolve(__dirname, './src/core') },
+      { find: '@data', replacement: resolve(__dirname, './src/data') },
+      { find: '@views', replacement: resolve(__dirname, './src/views') },
+    ],
   },
   server: { port: Number(process.env.PORT) || 3000, host: true },
+  }
 })

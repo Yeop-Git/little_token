@@ -7,7 +7,7 @@
 
 import type { ItemDef, StatKey } from '@data/items'
 import type { ExclaimWord } from '@data/items'
-import { EXCLAIM_SLOTS, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers } from '@data/items'
+import { EXCLAIM_SLOTS, ITEM_BLESS_CHANCE_PER_GRADE, ITEM_BLESS_POOL, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers } from '@data/items'
 import type { OwnedItem } from '@core/player'
 import { BACKGROUNDS, FORGE_HAMMER_ART, ITEM_ART } from '@/assets'
 import { itemArt } from '@/ui/Icons'
@@ -24,17 +24,6 @@ interface Opts {
 }
 
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-
-// 행운 감탄이 붙일 수 있는 추가 스탯 — 체력은 2가 1점 가치라 +2.
-const BLESS_POOL: { stat: StatKey; n: number }[] = [
-  { stat: 'hp', n: 2 },
-  { stat: 'atk', n: 1 },
-  { stat: 'guard', n: 1 },
-  { stat: 'heal', n: 1 },
-  { stat: 'luck', n: 1 },
-]
-// 등급 1당 4% — 등급 10이면 선택지마다 40% 확률로 팅!이 붙는다.
-const BLESS_CHANCE_PER_GRADE = 0.04
 
 // 선택의 손맛이 끊기지 않도록 카드 이동 → 망치 접촉 → 다음 타격을 짧은 한 박자로 묶는다.
 const FORGE_TRANSFER_DURATION_MS = 500
@@ -66,11 +55,11 @@ export class ItemExclaimView {
     this.rarityMultipliers = rollExclaimMultipliers(opts.item.rarity)
     this.choices = rollExclaimChoices()
     // 입장 시 한 번만 굴린다 — 슬롯을 오가도 붙은 자리는 그대로다.
-    const chance = Math.min(0.4, (opts.grade ?? 0) * BLESS_CHANCE_PER_GRADE)
+    const chance = Math.min(0.4, (opts.grade ?? 0) * ITEM_BLESS_CHANCE_PER_GRADE)
     for (const slot of EXCLAIM_SLOTS)
       for (const w of this.choices[slot.key] ?? [])
         if (Math.random() < chance) {
-          this.blessed.set(`${slot.key}:${w.id}`, BLESS_POOL[Math.floor(Math.random() * BLESS_POOL.length)])
+          this.blessed.set(`${slot.key}:${w.id}`, ITEM_BLESS_POOL[Math.floor(Math.random() * ITEM_BLESS_POOL.length)])
         }
     this.mount()
   }
@@ -378,7 +367,8 @@ export class ItemExclaimView {
             footer: slot.label,
             overlay: bonuses,
             artUrl: ITEM_ART[this.opts.item.art],
-            hideEmotion: true,
+            // 제련 감탄사는 전투 단어가 아니므로 잉크를 소비하지 않는다.
+            hideMeta: true,
           })}
         </button>`
       })

@@ -1,4 +1,4 @@
-import { BACKGROUNDS, ITEM_ART, SKILL_ART } from '@/assets'
+import { ITEM_ART, SKILL_ART } from '@/assets'
 import type { Word } from '@core/types'
 import { CHARACTER_VISUALS } from '@data/characters'
 import { preloadCharacterModelResources } from '@views/BattleCharacterModel'
@@ -12,6 +12,7 @@ export function preloadBattleResources(
   deck: Record<string, Word[]>,
   items: { art: string }[] = [],
   encounter: string[] = [],
+  backgrounds: string[] = [],
 ): Promise<void> {
   const cardArt = Object.values(deck)
     .flat()
@@ -36,7 +37,7 @@ export function preloadBattleResources(
   ]
   const characterArt = visuals.map((visual) => visual.portrait2d)
   const urls = [
-    ...new Set([...Object.values(BACKGROUNDS), ...characterArt, ...cardArt, ...bagArt]),
+    ...new Set([...backgrounds, ...characterArt, ...cardArt, ...bagArt]),
   ]
   return Promise.all([
     preloadImages(urls),

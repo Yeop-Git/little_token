@@ -2,14 +2,15 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#141019" />
+    <meta name="little-token-edition" content="%VITE_APP_EDITION%" />
     <title>Little Token - 단어 조립 전투</title>
     <link rel="icon" type="image/webp" href="./assets/branding/little-token-favicon.webp" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <!-- 고정 1920x1080 무대. main.ts가 뷰포트에 맞춰 transform: scale()로 레터박스. -->
+    <!-- 고정 1920x1080 무대. 모바일 안전 영역까지 계산해 transform: scale()로 레터박스. -->
     <div id="viewport">
       <div id="stage" class="stage" data-theme="day"></div>
     </div>

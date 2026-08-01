@@ -23,6 +23,7 @@ import {
   BOSS_ATTACK_MULTIPLIER,
   EMOTION_RESONANCE,
   PART_WEAKNESS_MULT,
+  STAT_RANK_LIMIT,
   TARGET_FALLOFF,
   WEAKNESS_MULT,
 } from '@core/combatRules'
@@ -46,6 +47,8 @@ import { emotionBadgeContent } from '@/ui/EmotionBadge'
 import { wordCardHtml } from '@/ui/WordCardFace'
 import { currentLocale } from '@/localization'
 import { localizedGuidePages } from '@/localization/guide'
+import { IS_DEMO } from '@/config/edition'
+import { discoveredComboIds } from '@core/comboDiscovery'
 
 interface Opts {
   onBack: () => void
@@ -92,14 +95,15 @@ function cardSlot(word: Word | null, caption?: string): string {
 }
 
 export class CombatGuideView {
-  private chapters: Chapter[] = currentLocale === 'ko' ? [
+  private chapters: Chapter[] = (currentLocale === 'ko' ? [
     { key: 'flow', title: '전투의 흐름', hint: '한 턴에 벌어지는 일', body: () => this.pageFlow() },
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
     { key: 'damage', title: '피해가 정해지는 순서', hint: '깡수치 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
     { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
-  ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body }))
+  ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body })))
+    .filter((chapter) => !IS_DEMO || chapter.key !== 'journey')
 
   private active = 0
 
@@ -224,7 +228,7 @@ export class CombatGuideView {
           <ul class="g-bullets">
             <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 선택지가 넓은 동사 칸만 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
             <li>한 스테이지에서 추가로 뽑을 수 있는 횟수는 <b>${CARD_HAND_CONFIG.drawsPerStage}회</b>, 손패는 최대 <b>${CARD_HAND_CONFIG.maxHand}장</b>까지 늘어난다.</li>
-            <li>쓰지 않고 아낀 뽑기는 승리할 때 <b>보상등급 +1</b>씩으로 돌아온다 — 참는 것도 하나의 수다.</li>
+            <li>쓰지 않은 무료 뽑기는 승리할 때 <b>영감 +1</b>씩 더해진다. 보상 희귀도에는 영향을 주지 않는다.</li>
             <li>카드를 클릭하면 그 칸이 곧바로 확정된다. 아래 단계 버튼을 누르면 그 칸으로 돌아가 뒤 선택을 다시 고를 수 있다.</li>
           </ul>
         </section>
@@ -258,7 +262,8 @@ export class CombatGuideView {
       ['공격 ×1', '동사가 스탯에서 뽑아내는 깡수치. 공격 스탯이 5면 5가 된다.'],
       ['75% 확률로 배율 ×1.80', '도박 카드. 확률로 높은 배율과 낮은 배율 중 하나가 정해진다.'],
       ['2회 동사 발동 (각 65%)', '동사의 행동을 두 번 발동한다. 각 발동을 낮춰 총 위력이 두 배가 되지는 않는다.'],
-      ['다음 첫 손패 +1', '다음 문장의 첫 슬롯에서 카드를 한 장 더 보고 고른다.'],
+      ['다시 뽑기 +1회', '덱에서 카드를 한 번 더 뽑을 수 있다.'],
+      ['공격 1랭크↑', `공격·방어 태세는 1랭크마다 25% 변하고 최대 ±${STAT_RANK_LIMIT}랭크까지 쌓인다.`],
       ['공격 ×0.9 · 2명(100%·70%)', '여러 적을 때리는 카드. 뒷줄일수록 피해가 줄어든다.'],
     ]
 
@@ -372,7 +377,9 @@ export class CombatGuideView {
         </li>`
     }).join('')
 
+    const discoveredCombos = discoveredComboIds()
     const comboRow = (combo: Combo) => {
+      if (!discoveredCombos.has(combo.id)) return '<li class="missing"><b>「?」</b><i>—</i><span>모험에서 처음 완성하면 기록된다.</span></li>'
       const cards = combo.need.map((tag) => TAG_SAMPLE.get(tag) ?? tag).join(' + ')
       return `<li><b>「${combo.name}」</b><i>${mult(combo.mult)}</i><span>${cards}</span></li>`
     }
@@ -398,9 +405,9 @@ export class CombatGuideView {
         </section>
       </div>
 
-      <h3 class="g-h3">완벽한 맥락 — 관용구 ${combos.length}종</h3>
-      <p class="g-lead g-tight">카드마다 보이지 않는 태그가 붙어 있고, 한 문장 안에 필요한 태그가 모두 모이면
-        이름 있는 관용구가 터진다. 지금 덱으로 만들 수 있는 조합은 전부 아래에 있다 — 배율은 곱해서 붙는다.</p>
+      <h3 class="g-h3">완벽한 맥락 — 발견 ${combos.filter((combo) => discoveredCombos.has(combo.id)).length} / ${combos.length}</h3>
+      <p class="g-lead g-tight">한 문장 안에서 어울리는 맥락을 처음 완성하면 이름 있는 관용구가 발견된다.
+        발견한 관용구의 배율과 조합만 기록되며, 아직 만나지 못한 답은 가려 둔다.</p>
       <ul class="g-combos">${combos.map(comboRow).join('')}</ul>`
   }
 
@@ -511,7 +518,7 @@ export class CombatGuideView {
           <ul class="g-bullets">
             <li><b>주어·수식 → 아이템 → 동사</b> 순서로 세 번, 각각 세 장 중 하나를 고른다.</li>
             <li>이미 가진 단어를 다시 얻으면 덱에 겹쳐 쌓이지 않고 <b>반복강화</b>로 단계가 오른다.</li>
-            <li>아낀 카드 뽑기 횟수는 <b>보상등급</b>이 되고, 운 스탯은 등급의 바닥을 올린다.</li>
+            <li><b>보상등급</b>은 빠르게 클리어할수록 높고, 운은 시작값과 최저치를 올린다. 남은 무료 뽑기는 획득 영감에 별도로 더한다.</li>
             <li>보스를 잡은 층에서는 등급이 높은 스킬카드가 최소 한 장 보장된다.</li>
           </ul>
         </section>

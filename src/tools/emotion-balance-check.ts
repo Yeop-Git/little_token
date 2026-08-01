@@ -95,8 +95,10 @@ function modifierTactics(word: Word): string[] {
   if ((effects?.counterMultiplier ?? 0) > 0) tactics.push('counter')
   if ((effects?.inkDiscount ?? 0) > 0) tactics.push('ink-discount')
   if ((effects?.carryInk ?? 0) > 0) tactics.push('carry-ink')
-  if ((effects?.enemyAttackDown ?? 0) > 0) tactics.push('enemy-weaken')
-  if ((effects?.drawCards ?? 0) > 0) tactics.push('opening-draw')
+  if ((effects?.enemyAttackRank ?? 0) < 0) tactics.push('enemy-weaken')
+  if ((effects?.attackRank ?? 0) > 0) tactics.push('attack-rank')
+  if ((effects?.guardRank ?? 0) > 0) tactics.push('guard-rank')
+  if ((effects?.bonusDraws ?? 0) > 0) tactics.push('bonus-draw')
   if (word.aoe === 'all' || word.targetCount === 'all' || (word.targetCount ?? 1) > 1) {
     tactics.push('multi-target')
   }
@@ -110,14 +112,14 @@ function hasEmotionSignature(emotion: CheckedEmotion, modifiers: Word[]): boolea
       && modifiers.some((word) => (word.effects?.castCount ?? 1) > 1)
   }
   if (emotion === 'sorrow') {
-    return modifiers.some((word) => (word.effects?.counterMultiplier ?? 0) > 0 && (word.effects?.enemyAttackDown ?? 0) > 0)
+    return modifiers.some((word) => (word.effects?.counterMultiplier ?? 0) > 0 && (word.effects?.enemyAttackRank ?? 0) < 0)
       && modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
   }
   if (emotion === 'joy') {
     return modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
-      && modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.effects?.drawCards ?? 0) > 0)
+      && modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.effects?.bonusDraws ?? 0) > 0)
   }
-  return modifiers.some((word) => (word.effects?.drawCards ?? 0) > 0 && (word.effects?.inkDiscount ?? 0) > 0)
+  return modifiers.some((word) => (word.effects?.bonusDraws ?? 0) > 0 && (word.effects?.inkDiscount ?? 0) > 0)
     && modifiers.some((word) => word.tags.includes('preempt'))
 }
 
@@ -152,6 +154,31 @@ function primaryPower(selection: Selection): { kind: CheckedAction; value: numbe
 
 let failed = false
 const powerSummaries: PowerSummary[] = []
+
+const starterActionCounts: Record<CheckedAction, number> = { attack: 0, guard: 0, heal: 0 }
+let starterAngerSentences = 0
+for (const subj of EARLY_WORDS.subj) {
+  for (const adv of EARLY_WORDS.adv) {
+    for (const verb of EARLY_WORDS.verb) {
+      if (!ACTION_KINDS.includes(verb.kind as CheckedAction)) continue
+      const hasAnger = [subj, adv, verb].some((word) => word.emotion === 'anger')
+      if (!hasAnger) continue
+      starterAngerSentences++
+      starterActionCounts[verb.kind as CheckedAction]++
+    }
+  }
+}
+const starterAngerVerbKinds = new Set(
+  EARLY_WORDS.verb.filter((word) => word.emotion === 'anger').map((word) => word.kind),
+)
+const starterAngerAttackRate = starterActionCounts.attack / Math.max(1, starterAngerSentences)
+console.log(
+  `Starter anger association: ${starterAngerSentences} sentences · attack ${starterActionCounts.attack} (${Math.round(starterAngerAttackRate * 100)}%) · guard ${starterActionCounts.guard} · heal ${starterActionCounts.heal}`,
+)
+if (starterAngerAttackRate > .5 || !starterAngerVerbKinds.has('attack') || !starterAngerVerbKinds.has('guard')) {
+  console.error('  [FAIL] starting anger cards teach a single attack-only action')
+  failed = true
+}
 
 const selfContainedCombos = EARLY_COMBOS.flatMap((combo) =>
   catalog

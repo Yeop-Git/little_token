@@ -10,6 +10,22 @@
 /** 다중 대상 공격의 앞줄부터의 피해 비율. 배열 길이를 넘는 대상은 마지막 값을 쓴다. */
 export const TARGET_FALLOFF = [1, 0.7, 0.5] as const
 
+/** 전투 중 공격·방어 변화는 고정 수치가 아니라 이 랭크 범위로만 움직인다. */
+export const STAT_RANK_LIMIT = 3
+
+export function clampStatRank(rank: number): number {
+  return Math.max(-STAT_RANK_LIMIT, Math.min(STAT_RANK_LIMIT, Math.trunc(rank)))
+}
+
+/** 1랭크마다 기준 스탯의 25%씩 변한다. */
+export function statRankScale(rank: number): number {
+  return 1 + clampStatRank(rank) * 0.25
+}
+
+export function rankedStat(value: number, rank: number): number {
+  return Math.round(Math.max(0, value) * statRankScale(rank) * 2) / 2
+}
+
 /** 적 HP바 옆 감정을 문장에 실었을 때의 피해 배율. */
 export const WEAKNESS_MULT = 1.25
 
@@ -33,10 +49,11 @@ export const BOSS_ATTACK_MULTIPLIER: Record<BossAttackStage, number> = {
   3: 1.5,
 }
 
-/** 보스전이 늘어질 때만 적용되는 상한 없는 장기전 압박. 초반 패턴을 읽을 시간은 준다. */
+/** 보스전이 늘어질 때 적용되는 장기전 압박. 느린 지원 빌드를 지우지 않도록 상한을 둔다. */
 export const BOSS_TURN_PRESSURE = {
   graceTurns: 6,
   perTurn: 0.05,
+  maxMultiplier: 1.5,
 } as const
 
 /** 일반 적은 항상 1이며, 보스만 유예 턴 뒤부터 전투 턴마다 공격이 누적 상승한다. */
@@ -46,7 +63,10 @@ export function bossTurnPressureMultiplier(
 ): number {
   if (!enemy.def.boss) return 1
   const pressuredTurns = Math.max(0, Math.floor(turn) - BOSS_TURN_PRESSURE.graceTurns)
-  return 1 + pressuredTurns * BOSS_TURN_PRESSURE.perTurn
+  return Math.min(
+    BOSS_TURN_PRESSURE.maxMultiplier,
+    1 + pressuredTurns * BOSS_TURN_PRESSURE.perTurn,
+  )
 }
 
 /** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */

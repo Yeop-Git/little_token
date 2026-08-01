@@ -1,6 +1,8 @@
 import { AUDIO } from '@/assets'
 import type { Emotion } from '@core/types'
 import { Howl, Howler } from 'howler'
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 type EffectName =
   | 'sentenceComplete'
@@ -115,6 +117,19 @@ class GameAudioController {
 
   constructor() {
     Howler.volume(this.masterVolume)
+    document.addEventListener('visibilitychange', () => {
+      Howler.mute(document.hidden)
+      if (!document.hidden && this.streamsUnlocked && this.currentBgmName) {
+        const bgm = this.getBgm(this.currentBgmName)
+        if (!bgm.playing()) bgm.play()
+      }
+    })
+    window.addEventListener('pageshow', () => {
+      Howler.mute(false)
+      if (!this.streamsUnlocked || !this.currentBgmName) return
+      const bgm = this.getBgm(this.currentBgmName)
+      if (!bgm.playing()) bgm.play()
+    })
   }
 
   getVolume() {
@@ -141,6 +156,9 @@ class GameAudioController {
       }
       if (this.preparedBgmName === track) this.preparedBgmName = null
     }
+    // Creating an HTML5 Howl before the first gesture exhausts Howler's
+    // unlocked-node pool and cannot result in audible autoplay anyway.
+    if (!this.streamsUnlocked) return
     const bgm = this.getBgm(track)
     if (!bgm.playing()) bgm.play()
   }
@@ -236,6 +254,10 @@ class GameAudioController {
         // Howler가 같은 클릭에서 브라우저 오디오 잠금을 먼저 해제한 뒤 스트림을 만든다.
         this.streamsUnlocked = true
         void Promise.all(this.preloadPreparedStreams())
+        if (this.currentBgmName) {
+          const bgm = this.getBgm(this.currentBgmName)
+          if (!bgm.playing()) bgm.play()
+        }
       }
       const target = event.target
       // 단어 카드를 포함해 실제 클릭이 닿는 모든 입력면에 공용 피드백을 준다.
@@ -335,7 +357,10 @@ class GameAudioController {
       volume: BGM_VOLUME,
       pool: 1,
     })
-    bgm.on('loaderror', () => this.failedLoads.add(bgm))
+    bgm.on('loaderror', (_id, error) => {
+      this.failedLoads.add(bgm)
+      reportResourceFailure('audio load', BGM_TRACK[track], error)
+    })
     this.bgms.set(track, bgm)
     return bgm
   }
@@ -361,7 +386,10 @@ class GameAudioController {
       volume: EFFECT_VOLUME[effect],
       pool: effect === 'cardHover' || effect === 'wordSelect' || effect === 'hover' || effect === 'swordHit' ? 8 : effect === 'pencil' ? 1 : 5,
     })
-    source.on('loaderror', () => this.failedLoads.add(source))
+    source.on('loaderror', (_id, error) => {
+      this.failedLoads.add(source)
+      reportResourceFailure('audio load', AUDIO[effect], error)
+    })
     this.effects.set(effect, source)
     return source
   }
@@ -376,7 +404,7 @@ class GameAudioController {
     if (source.state() === 'loaded') return Promise.resolve()
     const cached = this.loads.get(source)
     if (cached) return cached
-    const pending = new Promise<void>((resolve) => {
+    const pending = new Promise<void>((resolve, reject) => {
       const finish = (failed: boolean) => {
         source.off('load', onLoad)
         source.off('loaderror', onLoadError)
@@ -385,6 +413,11 @@ class GameAudioController {
           // 다시 걸면 이벤트가 오지 않으므로 다음 getEffect/getBgm에서 통째로 교체한다.
           this.failedLoads.add(source)
           this.loads.delete(source)
+          if (STRICT_RESOURCE_LOADING) {
+            const src = (source as unknown as { _src?: string })._src ?? 'unknown audio source'
+            reject(reportResourceFailure('audio load', src))
+            return
+          }
         }
         resolve()
       }

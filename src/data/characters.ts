@@ -289,7 +289,7 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     cameraTargetY: 1.45,
     portrait2d: SPRITES.boss_mantis,
     title: '문장을 재단하는 큰낫',
-    description: '평범한 낫질 뒤 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청여 빈틈을 보이고 다음 공격을 한 턴 거른다.',
+    description: '전투 첫 턴부터 큰낫을 높이 들어 강공격을 예고한다. 막아 내면 크게 휘청여 빈틈을 보이고 다음 공격을 한 턴 거른다.',
   },
   queenBee: {
     id: 'queenBee',

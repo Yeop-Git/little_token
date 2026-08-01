@@ -4,25 +4,18 @@
  * sprite 필드는 assets/index.ts의 SPRITES 키를 참조한다.
  */
 
-import type { EnemyDef } from '@core/types'
+import type { EnemyDef, Rarity } from '@core/types'
 
 export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중 : 본체 무적'
 
 export const ENEMIES: Record<string, EnemyDef> = {
-  inkDevourer: {
-    id: 'inkDevourer', name: '먹물 왕바퀴', boss: true,
-    hp: 26, atk: 7, every: 2, initiative: 'first',
-    sprite: 'enemy_roach', guard: 8, magicShield: 1, weakEmotion: 'pleasure',
-    note: '페이지를 통째로 갉아먹는 우두머리. 일반 방어와 매직실드를 모두 두르고 즐거움에 약하다.',
-  },
   mantis: {
     id: 'mantis', name: '사마귀', boss: true,
-    // 평타 1~2회 → 준비 → 내려베기가 한 사이클(최대 4턴)이다. 사이클을 두 바퀴
-    // 이상 보여 주지 못하면 예고와 그로기가 한 번씩만 스치고 전투가 끝난다.
-    hp: 88, atk: 7, every: 1, initiative: 'first',
+    // 준비 → 내려베기가 2턴 한 사이클이다. 첫 턴부터 파훼법을 보여 주고
+    // 반복강화 고점 덱에도 같은 규칙을 두 번 읽고 대응할 기회를 준다.
+    hp: 116, atk: 7, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
-      { name: '평범한 낫 베기', bonusAtk: 0, animationStage: 1, repeatOnceChance: 0.5 },
       { name: '강공격 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
       {
         name: '큰낫 내려베기',
@@ -35,7 +28,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
         groggyRequiresGuardShatter: true,
       },
     ],
-    note: '평타를 무작위로 1~2회 사용한 뒤 한 턴 동안 큰낫을 들어 강공격을 예고한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 받는 피해가 커지고 예정된 다음 공격을 한 턴 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
+    note: '큰낫을 들어 다음 강공격을 예고한 뒤 내려베는 두 턴 패턴을 반복한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 받는 피해가 커지고 예정된 다음 공격을 한 턴 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
@@ -54,12 +47,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
       maxPerSide: 2,
       refillOnlyWhenEmpty: true,
       pierceWhileEscorted: true,
-      backlashMaxHpRatePerUnit: 0.015,
+      backlashMaxHpRatePerUnit: 0.03,
       focusedBacklash: { emotion: 'anger', multiplier: 2 },
       groggyEvery: 4,
       groggyDamageMult: 1.5,
     },
-    note: `전투 시작에 체력 30인 일벌 네 마리를 한꺼번에 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 문장 피해는 일벌 넷을 차례로 쓰러뜨린 뒤 남은 만큼 본체까지 이어진다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 1.5%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 다음 턴에는 아무 행동도 하지 않는다. 그 다음 턴 시작에 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
+    note: `전투 시작에 체력 30인 일벌 네 마리를 한꺼번에 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 문장 피해는 일벌 넷을 차례로 쓰러뜨린 뒤 남은 만큼 본체까지 이어진다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 3%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 다음 턴에는 아무 행동도 하지 않는다. 그 다음 턴 시작에 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
@@ -69,7 +62,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     // 거미줄은 방패 위를 타고 넘어 몸을 감는다(pierceGuard). 방어로 버티는 길을
     // 막아야 "지금 드러난 약점을 읽어 다리를 끊는다"가 유일한 활로가 된다.
     // 대신 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
-    hp: 58, atk: 12, every: 2, initiative: 'first',
+    hp: 74, atk: 12, every: 2, initiative: 'first',
     sprite: 'boss_elder_spider', guard: 12, magicShield: 1, pierceGuard: true, weakEmotion: null,
     parts: [
       { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
@@ -126,3 +119,154 @@ export const ENEMIES: Record<string, EnemyDef> = {
 
 // 화면 데모 조우: 서로 다른 능력을 바로 비교한다.
 export const DEMO_ENCOUNTER = ['flea', 'roach', 'pillbug', 'mosquito']
+
+type EliteRarity = Exclude<Rarity, 'common'>
+type EliteTrait = NonNullable<EnemyDef['elite']>['trait']
+
+const ELITE_SCALE: Record<EliteRarity, { hp: number; atk: number; shield: number; leech: number }> = {
+  rare: { hp: 1.08, atk: 1.04, shield: 1, leech: 0.25 },
+  epic: { hp: 1.16, atk: 1.08, shield: 2, leech: 0.4 },
+  legendary: { hp: 1.25, atk: 1.12, shield: 3, leech: 0.55 },
+}
+
+/** 로케일 적용 시 내용만 바뀌며, 등급 셰이더와 전투 규칙은 이 텍스트를 참조하지 않는다. */
+export const ELITE_ENEMY_TEXT = {
+  rarity: { rare: '희귀', epic: '영웅', legendary: '전설' } as Record<EliteRarity, string>,
+  trait: {
+    warded: { label: '겹실드', note: '추가 매직실드가 타격을 통째로 지운다.', attacks: ['껍질 튕기기'] },
+    leeching: { label: '흡묵', note: '체력에 준 피해 일부를 잉크처럼 빨아들여 회복한다.', attacks: ['잉크 빨아먹기'] },
+    raging: { label: '격문', note: '약한 견제와 강한 돌진을 번갈아 사용한다.', attacks: ['기세 긁기', '문장 들이받기'] },
+    boss: { label: '정예 보스', note: '고유 패턴을 유지한 채 체력과 공격이 강화된다.', attacks: [] },
+  } as Record<EliteTrait, { label: string; note: string; attacks: string[] }>,
+}
+
+function eliteTraitFor(enemyId: string): EliteTrait {
+  if (enemyId === 'roach' || enemyId === 'pillbug') return 'warded'
+  if (enemyId === 'flea' || enemyId === 'mosquito') return 'leeching'
+  return 'raging'
+}
+
+const BOSS_RARITY_QUANTILE: Record<string, number> = {
+  mantis: 0.78,
+  queenBee: 0.62,
+  elderSpider: 0.38,
+}
+
+/** 같은 보스의 다음 출현은 이전보다 낮은 등급으로 돌아가지 않는다. */
+export function bossEliteRarityForDay(enemyId: string, day: number): EliteRarity | null {
+  if (day <= 15) return null
+  if (day >= 105) return 'legendary'
+  const quantile = BOSS_RARITY_QUANTILE[enemyId] ?? 0.5
+  const weights = enemyRarityWeightsForDay(day)
+  if (quantile < weights.common) return null
+  if (quantile < weights.common + weights.rare) return 'rare'
+  if (quantile < weights.common + weights.rare + weights.epic) return 'epic'
+  return 'legendary'
+}
+
+type EnemyRarityWeights = Record<Rarity, number>
+
+const ENDLESS_RARITY_CURVE: ReadonlyArray<readonly [day: number, weights: EnemyRarityWeights]> = [
+  [16, { common: 0.82, rare: 0.18, epic: 0, legendary: 0 }],
+  [30, { common: 0.62, rare: 0.33, epic: 0.05, legendary: 0 }],
+  [45, { common: 0.42, rare: 0.38, epic: 0.19, legendary: 0.01 }],
+  [60, { common: 0.25, rare: 0.33, epic: 0.36, legendary: 0.06 }],
+  [75, { common: 0.14, rare: 0.23, epic: 0.48, legendary: 0.15 }],
+  [90, { common: 0.07, rare: 0.13, epic: 0.45, legendary: 0.35 }],
+  [105, { common: 0.03, rare: 0.06, epic: 0.31, legendary: 0.6 }],
+  [120, { common: 0.01, rare: 0.03, epic: 0.21, legendary: 0.75 }],
+]
+
+export function enemyRarityWeightsForDay(day: number): EnemyRarityWeights {
+  if (day <= 15) return { common: 1, rare: 0, epic: 0, legendary: 0 }
+  const upperIndex = ENDLESS_RARITY_CURVE.findIndex(([anchor]) => day <= anchor)
+  if (upperIndex <= 0) return { ...ENDLESS_RARITY_CURVE[0][1] }
+  if (upperIndex < 0) return { ...ENDLESS_RARITY_CURVE[ENDLESS_RARITY_CURVE.length - 1][1] }
+  const [lowerDay, lower] = ENDLESS_RARITY_CURVE[upperIndex - 1]
+  const [upperDay, upper] = ENDLESS_RARITY_CURVE[upperIndex]
+  const progress = (day - lowerDay) / (upperDay - lowerDay)
+  return {
+    common: lower.common + (upper.common - lower.common) * progress,
+    rare: lower.rare + (upper.rare - lower.rare) * progress,
+    epic: lower.epic + (upper.epic - lower.epic) * progress,
+    legendary: lower.legendary + (upper.legendary - lower.legendary) * progress,
+  }
+}
+
+/**
+ * 첫 권은 11~14층 선두에 희귀 정예만 소개한다. 이후에는 층별 가중치를 편성 안에서
+ * 층화 추출해 갑작스러운 등급 도약과 재접속 리롤을 막는다. 보스는 고유 재질을 유지한다.
+ */
+export function eliteRarityForEncounter(
+  floor: number,
+  endlessCycle: number,
+  index: number,
+  encounterCount = 8,
+): EliteRarity | null {
+  if (floor === 5 || floor === 10 || floor === 15) return null
+  if (endlessCycle === 0) return floor >= 11 && floor <= 14 && index === 0 ? 'rare' : null
+
+  const day = endlessCycle * 15 + floor
+  const weights = enemyRarityWeightsForDay(day)
+  // 황금비 위상으로 날짜마다 줄의 시작점을 돌리되, 각 인덱스는 동일 간격으로 뽑아
+  // 여덟 마리 편성이 작은 표본 하나에 치우치지 않게 한다.
+  const roll = ((index + 0.5) / Math.max(1, encounterCount) + day * 0.61803398875) % 1
+  if (roll < weights.common) return null
+  if (roll < weights.common + weights.rare) return 'rare'
+  if (roll < weights.common + weights.rare + weights.epic) return 'epic'
+  return 'legendary'
+}
+
+/** 스테이지가 같은 기본 모델을 등급 셰이더와 종족 특성으로 변주할 때 읽는 단일 진입점. */
+export function enemyDefForEncounter(
+  enemyId: string,
+  floor: number,
+  endlessCycle: number,
+  index: number,
+  encounterCount = 8,
+): EnemyDef {
+  const base = ENEMIES[enemyId]
+  if (!base) throw new Error(`등록되지 않은 적: ${enemyId}`)
+  const day = endlessCycle * 15 + floor
+  const rarity = base.boss
+    ? bossEliteRarityForDay(enemyId, day)
+    : eliteRarityForEncounter(floor, endlessCycle, index, encounterCount)
+  if (!rarity) return base
+
+  if (base.boss) {
+    const scale = ELITE_SCALE[rarity]
+    const text = ELITE_ENEMY_TEXT.trait.boss
+    return {
+      ...base,
+      name: `${ELITE_ENEMY_TEXT.rarity[rarity]} ${base.name}`,
+      hp: Math.max(1, Math.round(base.hp * (1 + (scale.hp - 1) * 0.65))),
+      atk: Math.max(1, Math.round(base.atk * (1 + (scale.atk - 1) * 0.75))),
+      note: `${text.note} ${base.note}`,
+      elite: { rarity, trait: 'boss', label: text.label },
+    }
+  }
+
+  const trait = eliteTraitFor(enemyId)
+  const scale = ELITE_SCALE[rarity]
+  const text = ELITE_ENEMY_TEXT.trait[trait]
+  const attackPattern: EnemyDef['attackPattern'] = trait === 'leeching'
+    ? [{ name: text.attacks[0], bonusAtk: 0, lifeStealRate: scale.leech }]
+    : trait === 'raging'
+      ? [
+          { name: text.attacks[0], bonusAtk: 0, damageScale: 0.75 },
+          { name: text.attacks[1], bonusAtk: 0, damageScale: rarity === 'rare' ? 1.25 : rarity === 'epic' ? 1.4 : 1.55 },
+        ]
+      : [{ name: text.attacks[0], bonusAtk: 0 }]
+
+  return {
+    ...base,
+    name: `${ELITE_ENEMY_TEXT.rarity[rarity]} ${base.name}`,
+    hp: Math.max(1, Math.round(base.hp * scale.hp)),
+    atk: Math.max(1, Math.round(base.atk * scale.atk)),
+    magicShield: trait === 'warded' ? (base.magicShield ?? 0) + scale.shield : base.magicShield,
+    attackPattern,
+    note: `${text.note} ${base.note}`,
+    elite: { rarity, trait, label: text.label },
+    tacticalGuideId: `elite-${trait}`,
+  }
+}

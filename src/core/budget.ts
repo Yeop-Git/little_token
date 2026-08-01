@@ -50,13 +50,14 @@ export const gambleExpectation = (w: Word): number =>
 export const expectedMult = (w: Word): number =>
   (1 + (w.bonus ?? 0)) * gambleExpectation(w) * (1 + 0.5 * (w.crit ?? 0))
 
-/** 수식어는 배율 대신 선택의 성격을 바꾸는 공개 전술을 최소 하나 가져야 한다. */
+/** 수식어는 즉시 읽히는 배율 풀 기여나 공개 전술을 최소 하나 가져야 한다. */
 export const hasModifierTactic = (w: Word): boolean => {
   const effects = w.effects
   const numericEffect = effects && Object.values(effects).some((value) =>
-    typeof value === 'number' ? value > 0 : value === true,
+    typeof value === 'number' ? value !== 0 : value === true,
   )
-  return !!numericEffect
+  return (w.bonus ?? 0) > 0
+    || !!numericEffect
     || w.tags.includes('preempt')
     || w.aoe === 'all'
     || w.targetCount === 'all'
@@ -78,12 +79,37 @@ export const tacticalVerbPower = (w: Word): number => {
     const coverage = Array.from({ length: count }, (_, i) =>
       TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
     ).reduce((sum, value) => sum + value, 0)
-    return coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
+    const direct = coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
+    return direct
+      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
+      + direct * Math.max(0, w.effects?.lifeStealRate ?? 0)
+      + Math.abs(w.effects?.attackRank ?? 0)
+      + Math.abs(w.effects?.guardRank ?? 0)
+      + Math.abs(w.effects?.enemyAttackRank ?? 0)
   }
-  if (w.kind === 'guard' && w.effects?.counterMultiplier) {
-    return coefficient + Math.max(0, w.effects.counterMultiplier - 1)
+  if (w.kind === 'guard') {
+    const count = typeof w.targetCount === 'number' ? Math.max(1, w.targetCount) : 1
+    const coverage = Array.from({ length: count }, (_, i) =>
+      TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
+    ).reduce((sum, value) => sum + value, 0)
+    return coefficient
+      + Math.max(0, (w.effects?.counterMultiplier ?? 0) - 1)
+      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
+      + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
+      + Math.max(0, w.effects?.carryInk ?? 0) * .25
+      + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
+      + Math.abs(w.effects?.attackRank ?? 0)
+      + Math.abs(w.effects?.guardRank ?? 0)
+      + Math.abs(w.effects?.enemyAttackRank ?? 0)
   }
   return coefficient
+    + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
+    + Math.max(0, w.effects?.overhealDamageMultiplier ?? 0) * .25
+    + Math.max(0, w.effects?.carryInk ?? 0) * .25
+    + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
+    + Math.abs(w.effects?.attackRank ?? 0)
+    + Math.abs(w.effects?.guardRank ?? 0)
+    + Math.abs(w.effects?.enemyAttackRank ?? 0)
 }
 
 /** 다중 대상 관통은 방어를 건너뛰는 희소 유틸리티를 총량의 15%로 평가한다. */

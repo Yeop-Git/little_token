@@ -21,16 +21,24 @@ export type PassiveId =
   | 'luckCloak' // 성냥팔이의 붉은 망토 — 모든 동사가 운을 깡수치로 받는다
   | 'bbq' // 아기돼지의 숯불화로 — 이번 전투 처치 수만큼 배율 상승
   | 'doubt' // 피노키오의 물음표 — 완성한 문장 끝에 "…근데?"가 붙는다
-  | 'beanstalk' // 잭의 하늘나물 — 모든 칸에 무럭무럭 카드가 섞인다
+  | 'beanstalk' // 잭의 하늘나물 — 각 전투의 첫 문장을 마치면 최대 체력이 자란다
 
 /** 백설공주의 구두가 동사 깡수치에 더하는 값. */
-export const HEAVY_SHOE_FLAT = 7
+export const HEAVY_SHOE_FLAT = 5
+/** 성냥팔이의 망토가 동사 깡수치로 바꾸는 운의 비율. */
+export const LUCK_CLOAK_RATE = 0.35
+/** 메아리는 대성공 문장을 이 비율의 잔향으로 한 번 더 발동한다. */
+export const ECHO_REPEAT_SCALE = 0.5
+/** 겹동사의 두 번째 동사가 더하는 공격·방어·회복 수치 비율. */
+export const TWIN_VERB_SCALE = 0.5
 /** 빨간망토의 성냥이 배율 칸마다 더하는 보너스. */
-export const MATCH_FIRE_BONUS = 0.1
+export const MATCH_FIRE_BONUS = 0.05
 /** 아기돼지 바베큐 — 이번 전투 처치 1마리당 배율. */
 export const BBQ_PER_KILL = 0.05
 /** 피노키오의 미아핑 — "…근데?" 한 번의 배율 상한(1.0 ~ 1+이 값). */
 export const DOUBT_RANGE = 0.3
+/** 잭의 하늘나물 — 각 전투에서 첫 문장을 완성한 뒤 얻는 영구 최대 체력. */
+export const BEANSTALK_GROWTH = 1
 /** 완성한 문장 끝에 항상 붙는 말. 문장에 그대로 들어가므로 로그·체인에 함께 보인다. */
 export const DOUBT_SUFFIX = currentLocale === 'en' ? '…but?' : currentLocale === 'ja' ? '…でも？' : currentLocale === 'ru' ? '…но?' : currentLocale === 'zh-Hans' ? '……但是？' : currentLocale === 'zh-Hant' ? '……但是？' : '…근데?'
 
@@ -45,7 +53,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   echo: {
     id: 'echo',
     name: '메아리',
-    desc: '대성공하면 그 문장이 한 번 더 발동한다',
+    desc: `대성공하면 그 문장이 ${Math.round(ECHO_REPEAT_SCALE * 100)}% 위력으로 한 번 더 발동한다`,
   },
   punct: {
     id: 'punct',
@@ -55,7 +63,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   twinVerb: {
     id: 'twinVerb',
     name: '겹동사',
-    desc: '동사 칸이 둘이 된다 · 공격과 회복을 함께 쓸 수 있다',
+    desc: `동사 칸이 둘이 된다 · 두 번째 동사는 ${Math.round(TWIN_VERB_SCALE * 100)}% 수치로 공격과 회복을 섞는다`,
   },
   retry: {
     id: 'retry',
@@ -80,7 +88,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   luckCloak: {
     id: 'luckCloak',
     name: '운을 두른다',
-    desc: '모든 동사가 운 스탯만큼 깡수치를 더 받는다',
+    desc: `모든 동사가 운 스탯의 ${Math.round(LUCK_CLOAK_RATE * 100)}%만큼 깡수치를 더 받는다`,
   },
   bbq: {
     id: 'bbq',
@@ -95,13 +103,16 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   beanstalk: {
     id: 'beanstalk',
     name: '무럭무럭',
-    // 뒤의 수치는 words.csv의 grow_hp와 같아야 한다(무럭무럭 네 장 모두 같은 값).
-    desc: '모든 칸에 무럭무럭 카드가 유령처럼 섞인다 · 고르면 최대 체력 +2',
+    desc: `각 전투의 첫 문장을 완성하면 최대 체력 +${BEANSTALK_GROWTH}`,
   },
 }
 
 export function hasPassive(player: PlayerState | undefined, id: PassiveId): boolean {
   return !!player?.items.some((it) => it.passive === id)
+}
+
+export function beanstalkGrowthFor(player: PlayerState | undefined, available: boolean): number {
+  return available && hasPassive(player, 'beanstalk') ? BEANSTALK_GROWTH : 0
 }
 
 export function passivesOf(player: PlayerState | undefined): PassiveDef[] {
@@ -117,7 +128,8 @@ export function passivesOf(player: PlayerState | undefined): PassiveDef[] {
 
 /**
  * 보유 패시브가 문장 슬롯을 어떻게 늘리는지.
- * 동사 뒤에 겹동사, 문장 맨 끝에 문장부호가 붙는다 — 우리말 어순 그대로다.
+ * 동사 뒤에 겹동사, 문장 맨 끝에 문장부호가 붙는다. 겹동사의 언어별 접속 표기는
+ * localization/sentenceGrammar.ts가 맡아 슬롯 순서와 표시 문법을 분리한다.
  */
 export function slotOrderFor(base: string[], player: PlayerState | undefined): string[] {
   const order = [...base]
@@ -141,7 +153,7 @@ export function slotOrderFor(base: string[], player: PlayerState | undefined): s
 export function modsFor(player: PlayerState | undefined, kills = 0): CompileMods {
   return {
     verbFlat: hasPassive(player, 'heavyShoe') ? HEAVY_SHOE_FLAT : 0,
-    verbLuck: hasPassive(player, 'luckCloak'),
+    verbLuck: hasPassive(player, 'luckCloak') ? LUCK_CLOAK_RATE : 0,
     bonusEach: hasPassive(player, 'matchFire') ? MATCH_FIRE_BONUS : 0,
     stageMult: hasPassive(player, 'bbq') ? 1 + kills * BBQ_PER_KILL : 1,
     doubt: hasPassive(player, 'doubt'),

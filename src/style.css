@@ -21,7 +21,35 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
+
+.safe-area-probe {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#orientation-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: grid;
+  place-items: center;
+  padding: max(28px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
+  color: #f8ead0;
+  background: #0d0a11;
+  font-family: var(--font);
+  text-align: center;
+}
+#orientation-gate[hidden] { display: none; }
+#orientation-gate div { max-width: 440px; }
+#orientation-gate b,
+#orientation-gate span { display: block; }
+#orientation-gate b { color: #ffcf76; font-size: 24px; }
+#orientation-gate span { margin-top: 9px; font-size: 15px; line-height: 1.55; }
+#orientation-gate div::before { content: '↻'; display: block; margin-bottom: 12px; font-size: 44px; line-height: 1; }
 
 
 :root {
@@ -50,6 +78,46 @@ body {
   font-size: 20px;
   line-height: 1.5;
   color: var(--ink);
+}
+
+/* 보상 뒤 전투 리소스를 준비하는 동안 종이 한 장이 무대를 덮는다. 새 전장이
+   완전히 그려진 뒤에만 걷혀, 모델·배경 로딩 프레임이 직접 드러나지 않는다. */
+.stage.stage-transition-active::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: 20000;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(54, 43, 64, .42), rgba(8, 6, 12, .96) 72%),
+    linear-gradient(135deg, #211824, #09070d);
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, .72);
+  transition: opacity .32s ease-in, filter .52s ease-out;
+  filter: blur(2px);
+}
+.stage.stage-transition-active.is-stage-covered::after {
+  opacity: 1;
+  pointer-events: auto;
+  filter: blur(0);
+}
+
+/* 개별 화면이 별도 포커스 연출을 갖지 않아도 키보드 위치가 사라지지 않는 공용 안전망. */
+.stage :where(button, input, select, [role='button'], [tabindex]):focus-visible {
+  outline: 3px solid #fff2b8;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .stage *,
+  .stage *::before,
+  .stage *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 /* ───────── 팔레트(배경 일러스트 톤에 맞춘 따뜻한 금빛) ───────── */
@@ -1226,6 +1294,160 @@ button {
   align-items: start;
   pointer-events: none;
 }
+.stage-progress {
+  position: relative;
+  flex: none;
+  display: grid;
+  width: 170px;
+  min-height: 42px;
+  align-content: center;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 220, 157, .5);
+  border-radius: 18px;
+  color: #fff1d2;
+  background: rgba(24, 17, 29, .82);
+  box-shadow: inset 0 0 0 2px rgba(255, 247, 218, .05), 0 8px 24px rgba(0, 0, 0, .42);
+  pointer-events: auto;
+  overflow: hidden;
+  transition: width .22s ease, min-height .22s ease, padding .22s ease, background .22s ease, box-shadow .22s ease;
+}
+.stage-progress:hover,
+.stage-progress:focus-visible {
+  width: 470px;
+  min-height: 104px;
+  padding: 10px 18px 12px;
+  background: rgba(24, 17, 29, .94);
+  box-shadow: inset 0 0 0 2px rgba(255, 247, 218, .08), 0 12px 32px rgba(0, 0, 0, .52), 0 0 18px rgba(255, 203, 111, .14);
+}
+.stage-progress-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.stage-progress-summary > i { color: #ffd989; font-size: 12px; font-style: normal; }
+.stage-progress-summary > b { font-size: 17px; letter-spacing: 0; }
+.stage-progress-summary > b em { margin-left: 3px; color: var(--ink-dim); font-size: 11px; font-style: normal; }
+.stage-progress.is-endless {
+  width: 250px;
+  min-height: 50px;
+  padding-inline: 19px;
+  border-color: rgba(125, 226, 255, .62);
+  color: #edfaff;
+  background:
+    linear-gradient(135deg, rgba(25, 23, 52, .94), rgba(25, 45, 61, .9));
+  box-shadow: inset 0 0 0 2px rgba(129, 222, 255, .07), 0 8px 26px rgba(4, 5, 20, .52), 0 0 14px rgba(105, 116, 255, .16);
+}
+.stage-progress.is-endless:hover,
+.stage-progress.is-endless:focus-visible {
+  width: 520px;
+  background:
+    radial-gradient(circle at 20% 0, rgba(133, 90, 255, .2), transparent 54%),
+    linear-gradient(135deg, rgba(24, 20, 56, .98), rgba(19, 52, 68, .97));
+  box-shadow: inset 0 0 0 2px rgba(131, 229, 255, .1), 0 12px 34px rgba(4, 5, 20, .62), 0 0 24px rgba(100, 197, 255, .22);
+}
+.stage-progress.is-endless .stage-progress-summary > i {
+  flex: none;
+  min-width: 24px;
+  color: #9cecff;
+  font-size: 24px;
+  font-weight: 1000;
+  text-shadow: 0 0 10px rgba(102, 221, 255, .8);
+}
+.stage-progress.is-endless .stage-progress-summary > b {
+  color: #f2efff;
+  font-size: 17px;
+  font-weight: 1000;
+  letter-spacing: .035em;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, .9), 0 0 10px rgba(138, 218, 255, .25);
+}
+.stage-progress.is-endless .stage-progress-copy small { color: #a8ddeb; }
+.stage-progress.is-endless .stage-progress-copy b { color: #cbb9ff; }
+.stage-progress.is-endless .stage-progress-fill {
+  background: linear-gradient(90deg, #8b70ff, #69e6ff);
+  box-shadow: 0 0 12px rgba(95, 224, 255, .7);
+}
+.stage-progress.is-endless .stage-progress-boss {
+  border-color: #85e6ff;
+  background: #252044;
+  box-shadow: 0 0 9px rgba(100, 222, 255, .58);
+}
+.stage-progress.is-endless .stage-progress-boss.passed { background: #ae91ff; }
+.stage-progress.is-endless .stage-progress-boss-list b { color: #92eaff; }
+.stage-progress.is-endless .stage-progress-boss-list {
+  gap: 14px;
+  color: #d3e8ee;
+  font-size: 11px;
+}
+.stage-progress.is-endless .stage-progress-boss-list span { gap: 5px; }
+.stage-progress-detail {
+  display: grid;
+  grid-template-rows: 0fr 0fr 0fr;
+  gap: 0;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: grid-template-rows .22s ease, gap .22s ease, opacity .14s ease, transform .22s ease;
+}
+.stage-progress:hover .stage-progress-detail,
+.stage-progress:focus-visible .stage-progress-detail {
+  grid-template-rows: 1fr 8px 1fr;
+  gap: 7px;
+  opacity: 1;
+  transform: none;
+}
+.stage-progress-copy {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.stage-progress-copy small { color: var(--ink-dim); font-size: 11px; font-weight: 800; }
+.stage-progress-copy b { color: var(--gold-hi); font-size: 12px; }
+.stage-progress-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 246, 220, .14);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .65);
+  overflow: visible;
+}
+.stage-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f4b65a, #ffe89c);
+  box-shadow: 0 0 10px rgba(255, 201, 100, .6);
+}
+.stage-progress-boss {
+  position: absolute;
+  top: 50%;
+  left: var(--boss-at);
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffcf76;
+  border-radius: 50%;
+  background: #2a1c2c;
+  box-shadow: 0 0 8px rgba(255, 190, 82, .46);
+  transform: translate(-50%, -50%);
+}
+.stage-progress-boss.passed { background: #ffe79a; }
+.stage-progress-boss-list {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.stage-progress-boss-list span { display: inline-flex; align-items: center; gap: 4px; }
+.stage-progress-boss-list b { color: var(--gold-hi); font-size: 11px; }
 .hud-left-stack {
   justify-self: start;
   align-self: start;
@@ -1238,7 +1460,7 @@ button {
 .action-order {
   width: 196px;
   margin-left: 4px;
-  pointer-events: none;
+  pointer-events: auto;
   filter: drop-shadow(0 9px 16px rgba(0, 0, 0, .5));
 }
 .action-order-head {
@@ -1473,7 +1695,8 @@ html[data-postprocessing='off'] .tip-bubble {
   position: relative;
   /* 무대 밖으로 6px 밀어 두면 그 아래 로그 줄의 그림자가 곧장 잘린다. */
   right: 0;
-  width: 372px;
+  width: auto;
+  min-width: 372px;
   min-height: 74px;
   display: flex;
   flex-direction: column;
@@ -1602,17 +1825,6 @@ html[data-postprocessing='off'] .tip-bubble {
   background: linear-gradient(135deg, rgba(22, 52, 67, .92), rgba(24, 28, 51, .9));
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wglow, #8fe8ff) 44%, transparent), 0 8px 24px rgba(0, 0, 0, .42), 0 0 23px color-mix(in srgb, var(--wglow, #8fe8ff) 14%, transparent);
 }
-.hud-left-status .grade-badge::before {
-  content: 'STAGE CLEAR';
-  position: absolute;
-  right: -7px;
-  top: 5px;
-  color: color-mix(in srgb, var(--wglow, #8fe8ff) 24%, transparent);
-  font-size: 8px;
-  font-weight: 1000;
-  letter-spacing: .14em;
-  transform: rotate(8deg);
-}
 .clear-reward-mark {
   position: relative;
   flex: none;
@@ -1640,6 +1852,24 @@ html[data-postprocessing='off'] .tip-bubble {
   background: rgba(18, 13, 24, .78);
   box-shadow: inset 0 0 0 1px rgba(255, 225, 170, .18), 0 8px 22px rgba(0, 0, 0, .42);
 }
+/* 보스전 중앙 HUD와 한 줄에서 경쟁하지 않는다. 프롬 수치는 좌측 두 번째 줄,
+   행동 순서는 그 아래로 내려 세 정보가 서로 겹치지 않게 한다. */
+.scene.battle[data-boss='true'] .hud-player-stats {
+  position: absolute;
+  top: 58px;
+  left: 4px;
+  gap: 2px;
+  min-height: 46px;
+  padding: 4px 7px;
+}
+.scene.battle[data-boss='true'] .hud-player-stats .hud-player-name { display: none; }
+.scene.battle[data-boss='true'] .hud-player-stats .hud-stat {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 8px;
+}
+.scene.battle[data-boss='true'] .hud-player-stats .hud-stat:first-of-type { min-width: 68px; }
+.scene.battle[data-boss='true'] .action-order { margin-top: 52px; }
 .hud-player-name {
   padding: 0 9px 0 5px;
   border-right: 1px solid rgba(255, 225, 170, .2);
@@ -1832,25 +2062,6 @@ html[data-postprocessing='off'] .tip-bubble {
   width: 300px;
   opacity: .72;
 }
-.scene.battle[data-boss='true'] .boss-player-health-hud {
-  left: 38px;
-  bottom: 28px;
-  z-index: 58;
-  width: 360px;
-  margin: 0;
-  padding: 4px 6px 6px;
-  transform: none;
-  /* 프롬 이름표도 전장과 같은 규칙 — 판 없이 이름줄과 밑줄만 남긴다. */
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-.scene.battle[data-boss='true'] .boss-player-health-hud .row { margin-bottom: 6px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 17px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .nm { font-size: 19px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpn { font-size: 15px; }
-.scene.battle[data-boss='true'] .boss-player-health-hud .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
   /* 모델 원점은 카드 쪽으로 내려가지만 실제 발끝은 카드 위에 남는다. 투명 여백을
      포함한 박스가 아니라 화면에 보이는 실루엣을 기준으로 보스별 위치를 맞춘다. */
@@ -1924,12 +2135,32 @@ html[data-postprocessing='off'] .tip-bubble {
   min-height: 28px;
   margin-bottom: 7px;
 }
+.boss-health-heading .boss-health-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-self: start;
+}
+.boss-health-heading .boss-health-title {
+  justify-self: center;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
 .boss-health-heading .boss-health-mark {
   justify-self: start;
   color: #ffad72;
   font: 900 10px/1 Georgia, serif;
   letter-spacing: .28em;
   opacity: .76;
+}
+.boss-health-heading .boss-health-stage {
+  color: #ffe0a3;
+  font: 900 11px/1 var(--font-body);
+  font-style: normal;
+  letter-spacing: 0;
+  opacity: .82;
 }
 .boss-health-heading .boss-health-mark.escort-rule {
   color: #ffe0a3;
@@ -2006,13 +2237,13 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 보스가 쓰는 다음 문장 — 규칙 툴팁이 아니라 플레이어가 매 턴 읽는 주된 의도판이다. */
 .boss-sentence-board {
   position: absolute;
-  /* 보스 HUD 아래 뱃지 줄(선공·TIP·능력)이 y 112~142에 선다. 문장판을 122px에 두면
-     뱃지의 아래 2/3가 종이 밑으로 깔려 못 읽었다. 뱃지 줄이 끝난 자리부터 시작한다. */
-  top: 152px;
+  /* 보스 HUD 아래 뱃지 줄(선공·TIP·능력)이 한 줄을 온전히 차지한 뒤 문장판을 연다.
+     예전 122px에서는 뱃지의 아래 2/3가 종이 밑으로 깔려 못 읽었다. */
+  top: 158px;
   left: 50%;
   z-index: 88;
-  width: min(920px, 67vw);
-  padding: 11px 22px 13px;
+  width: min(1120px, 78vw);
+  padding: 14px 28px 17px;
   color: #38251d;
   transform: translateX(-50%) rotate(-.15deg);
   clip-path: polygon(0 6%, 2% 0, 6% 3%, 11% 0, 17% 2%, 24% 0, 31% 3%, 39% 0, 47% 2%, 55% 0, 63% 3%, 71% 0, 78% 2%, 85% 0, 92% 3%, 98% 0, 100% 7%, 99% 24%, 100% 43%, 99% 64%, 100% 83%, 98% 100%, 91% 97%, 84% 100%, 76% 97%, 68% 100%, 60% 98%, 52% 100%, 44% 97%, 35% 100%, 27% 98%, 19% 100%, 11% 97%, 3% 100%, 0 94%, 1% 76%, 0 58%, 1% 37%);
@@ -2070,7 +2301,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-manuscript-line > i {
   flex: none;
   color: rgba(82, 50, 36, .38);
-  font: italic 800 18px Georgia, serif;
+  font: italic 800 24px Georgia, serif;
 }
 .boss-sentence-token {
   position: relative;
@@ -2078,20 +2309,15 @@ html[data-postprocessing='off'] .tip-bubble {
   flex-direction: column;
   align-items: center;
   min-width: 0;
-  padding: 1px 6px 3px;
+  padding: 1px 8px 4px;
   border-bottom: 2px solid rgba(78, 47, 34, .28);
-}
-.boss-sentence-token small {
-  color: rgba(91, 60, 45, .62);
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: .16em;
 }
 .boss-sentence-token b {
   overflow: hidden;
   color: #35221b;
-  font-size: clamp(17px, 1.35vw, 23px);
+  font-size: clamp(22px, 1.65vw, 31px);
   font-weight: 900;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2138,7 +2364,6 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .boss-sentence-context .boss-sentence-line { justify-content: flex-start; }
 .boss-sentence-context .boss-sentence-token b { font-size: 13px; }
-.boss-sentence-context .boss-sentence-token small { display: none; }
 .boss-sentence-context .boss-sentence-meta { justify-content: flex-end; margin: 0; }
 .boss-sentence-side-label {
   color: #76513e;
@@ -2666,8 +2891,6 @@ html[data-postprocessing='off'] .tip-bubble {
   .token-speech[data-tone='warn'].is-speaking { animation: token-speech-slam .5s ease both; }
   .token-speech-mark { animation: none; }
 }
-.scene.battle[data-boss='true'] .hud-player-stats .hud-stat[data-stat-key='hp'] { display: none; }
-
 /* 배우 */
 .actor {
   position: absolute;
@@ -3488,6 +3711,12 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-health-hud .boss-intel .enemy-tip-note { height: 33px; padding: 0 12px 0 9px; }
 .boss-health-hud .boss-intel .enemy-tip-note svg { width: 19px; height: 19px; }
 .boss-health-hud .boss-intel .enemy-tip-note > b { font-size: 13px; }
+.enemy-intel-icon.elite-rare { color: #9edcff; border-color: rgba(126, 203, 255, .82); background: rgba(28, 63, 91, .62); }
+.enemy-intel-icon.elite-epic { color: #e3b4ff; border-color: rgba(218, 145, 255, .86); background: rgba(69, 31, 93, .66); box-shadow: inset 0 0 9px rgba(108, 224, 255, .2); }
+.enemy-intel-icon.elite-legendary { color: #fff; border-color: rgba(255, 236, 169, .92); background: linear-gradient(135deg, rgba(54, 188, 255, .65), rgba(189, 82, 255, .68), rgba(255, 183, 65, .68)); box-shadow: inset 0 0 10px rgba(255,255,255,.34), 0 0 12px rgba(165, 114, 255, .38); }
+.actor.foe[data-enemy-rarity='rare'] > .model-shell { filter: drop-shadow(0 0 7px rgba(98, 197, 255, .42)); }
+.actor.foe[data-enemy-rarity='epic'] > .model-shell { filter: drop-shadow(0 0 9px rgba(197, 105, 255, .48)); }
+.actor.foe[data-enemy-rarity='legendary'] > .model-shell { filter: drop-shadow(0 0 12px rgba(145, 214, 255, .62)) drop-shadow(0 0 18px rgba(229, 119, 255, .34)); }
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
 .actor.foe > .model-shell { cursor: default; }
@@ -4660,6 +4889,43 @@ html[data-postprocessing='off'] .tip-bubble {
   color: var(--gold);
   text-shadow: 0 0 14px var(--glow);
 }
+
+.combo-discovery-note {
+  position: fixed;
+  z-index: 1200;
+  top: 17%;
+  left: 50%;
+  width: min(420px, calc(100vw - 48px));
+  padding: 16px 24px 18px;
+  color: #2b2117;
+  text-align: center;
+  pointer-events: none;
+  background: #f8e9c9;
+  border: 1px solid rgba(92, 61, 29, .38);
+  box-shadow: 0 14px 36px rgba(20, 12, 5, .34);
+  transform: translate(-50%, 8px) rotate(-.4deg);
+  animation: combo-discovery-in .22s ease-out both;
+}
+.combo-discovery-note::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(92, 61, 29, .3);
+}
+.combo-discovery-note span,
+.combo-discovery-note b,
+.combo-discovery-note small { position: relative; display: block; }
+.combo-discovery-note span { font-size: 12px; font-weight: 900; }
+.combo-discovery-note b { margin: 5px 0 4px; color: #7e301f; font-size: 24px; }
+.combo-discovery-note small { font-size: 12px; opacity: .72; }
+.combo-discovery-note.leaving { animation: combo-discovery-out .22s ease-in both; }
+@keyframes combo-discovery-in { from { opacity: 0; transform: translate(-50%, 18px) rotate(-1.2deg) scale(.97); } }
+@keyframes combo-discovery-out { to { opacity: 0; transform: translate(-50%, -8px) rotate(.6deg) scale(.98); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .combo-discovery-note,
+  .combo-discovery-note.leaving { animation-duration: .01ms; }
+}
 @keyframes combo-show {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(-4deg); }
   18% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(-1deg); }
@@ -5562,7 +5828,7 @@ html[data-postprocessing='off'] .tip-bubble {
   right: 8px;
   left: 8px;
   z-index: 5;
-  height: 38px;
+  height: 48px;
   pointer-events: none;
 }
 .card-resource-meta .card-emotion {
@@ -5571,20 +5837,20 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .card-cost {
   position: absolute;
-  top: -5px;
-  right: -6px;
+  top: -8px;
+  right: -8px;
   z-index: 6;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   color: #fff5c7;
   background-image: var(--ink-cost-badge-image, radial-gradient(circle at 35% 28%, #7fd6ff, #176ca6 68%, #0b365d));
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
-  filter: drop-shadow(0 3px 3px rgba(19, 11, 23, .58)) drop-shadow(0 0 7px rgba(77, 201, 235, .36));
-  font-size: 15px;
+  filter: drop-shadow(0 4px 4px rgba(5, 4, 16, .85)) drop-shadow(0 0 10px rgba(91, 219, 255, .72));
+  font-size: 20px;
   font-weight: 1000;
   line-height: 1;
   text-shadow:
@@ -5617,7 +5883,7 @@ html[data-postprocessing='off'] .tip-bubble {
     -1px 0 0 #1c1a5d,
     0 -1px 0 #1c1a5d;
 }
-.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: grid; width: 38px; height: 38px; place-items: center; padding: 3px; border-radius: 50%; color: #fff8e7; background: rgba(8, 6, 14, .74); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 12px color-mix(in srgb, var(--emotion-color) 34%, transparent); }
+.card-emotion { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; width: 38px; min-width: 38px; height: 38px; align-items: center; justify-content: center; padding: 3px; border-radius: 19px; color: #fff8e7; background: rgba(8, 6, 14, .82); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color) 65%, transparent), 0 0 12px color-mix(in srgb, var(--emotion-color) 34%, transparent); }
 .card-emotion .emotion-face {
   width: 32px;
   height: 32px;
@@ -5637,6 +5903,10 @@ html[data-postprocessing='off'] .tip-bubble {
   align-items: center;
   flex: none;
   gap: 2px;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .7);
   color: #9a342b;
   white-space: nowrap;
 }
@@ -5651,6 +5921,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .card-front.art .card-action-inline.action-attack { color: #ff8c7e; }
 .card-front.art .card-action-inline.action-guard { color: #8bc8ff; }
 .card-front.art .card-action-inline.action-heal { color: #9ae889; }
+.card-front.art .card-action-inline { background: rgba(5, 5, 10, .62); }
 .emotion-face { display: block; width: 18px; height: 18px; flex: none; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .58)); }
 .emotion-symbol { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
 .emotion-joy { --emotion-color: #fdd355; --card-base-color: #fdd355; }
@@ -7107,6 +7378,21 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   border-top: 1px dashed rgba(255, 231, 180, .18);
 }
 .reward-controls .reward-skip { position: static; }
+.reward-deck {
+  margin-right: auto;
+  padding: 8px 14px;
+  color: #fff0c8;
+  border-radius: 4px 12px 4px 12px;
+  background: rgba(42, 70, 83, .68);
+  box-shadow: inset 0 0 0 1px rgba(139, 211, 226, .38), 0 5px 14px rgba(0, 0, 0, .28);
+  font-size: 13px;
+  font-weight: 900;
+  transition: transform .15s ease, background .15s ease;
+}
+.reward-deck b { margin-left: 7px; color: #9fe9f4; }
+.reward-deck:hover,
+.reward-deck:focus-visible { transform: translateY(-2px) rotate(-.3deg); background: rgba(54, 91, 105, .82); }
+.reward-deck:disabled { opacity: .42; }
 .reward-refresh {
   display: inline-flex;
   align-items: center;
@@ -7359,6 +7645,40 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
     inset 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 40%, transparent);
 }
 .rp-foil { border-radius: 20px; }
+.rp-word-meta {
+  position: absolute;
+  inset: 12px 12px auto;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.rp-word-meta .rp-emotion {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+  padding: 4px;
+  background: rgba(8, 6, 14, .78);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emotion-color, #d8c6a4) 78%, transparent), 0 0 14px color-mix(in srgb, var(--emotion-color, #d8c6a4) 42%, transparent), 0 4px 10px rgba(0,0,0,.5);
+}
+.rp-ink-cost {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  color: #fff9d9;
+  background-image: var(--ink-cost-badge-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 5px 5px rgba(5, 4, 16, .9)) drop-shadow(0 0 13px rgba(103, 218, 255, .72));
+  font-size: 23px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 2px 2px #171246, 1px 0 #171246, -1px 0 #171246, 0 -1px #171246, 0 0 7px rgba(255,255,255,.8);
+}
+.reward-pick.is-word .rp-unavailable { top: 76px; }
 .rp-top {
   position: relative;
   z-index: 2;
@@ -7382,6 +7702,52 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 62%, transparent);
   text-shadow: 0 0 9px var(--wglow, var(--gold));
 }
+.rd-facts {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 18px 0 20px;
+  padding: 9px;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(8, 6, 14, .56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16), 0 4px 14px rgba(0, 0, 0, .35);
+  backdrop-filter: blur(5px);
+}
+.rd-facts > span {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .055);
+}
+.rd-facts small {
+  flex: 0 0 auto;
+  color: rgba(255, 246, 225, .7);
+  font-size: 11px;
+  font-weight: 800;
+}
+.rd-facts b,
+.rd-fact-value {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 8px var(--wglow, var(--gold));
+}
+.rd-fact-value .card-action-inline {
+  justify-content: flex-end;
+  font-size: 13px;
+}
+.rd-fact-value .card-action-inline svg { width: 17px; height: 17px; }
 .is-reinforce { --wglow: #ffb24d; }
 .rp-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 0 14px 14px; text-align: center; }
 .rp-name {
@@ -7392,6 +7758,20 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-pick.has-medium-name .rp-name { font-size: 28px; }
 .reward-pick.has-long-name .rp-name { font-size: 24px; line-height: 1.16; }
+.rp-slot-label {
+  width: max-content;
+  margin: 8px auto 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: #fff3cf;
+  background: rgba(8, 6, 14, .76);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 58%, transparent);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  line-height: 1;
+  text-shadow: 0 0 8px var(--wglow, var(--gold));
+}
 .rp-base-stats {
   display: flex;
   align-items: center;
@@ -7418,10 +7798,25 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .rp-base-stat.stat-guard { --stat-color: #79c9ff; }
 .rp-base-stat.stat-heal { --stat-color: #9fe27a; }
 .rp-base-stat.stat-luck { --stat-color: #ffe070; }
+.rp-item-passive {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 3px 7px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(7, 5, 12, .78);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 62%, transparent);
+  text-align: left;
+}
+.rp-item-passive small { color: #ffd991; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.rp-item-passive b { color: #fff; font-size: 13px; }
+.rp-item-passive span { grid-column: 1 / -1; color: #fff4de; font-size: 12px; line-height: 1.35; }
 .rp-effect {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   min-height: 40px;
   margin-top: 3px;
   font-size: 15px;
@@ -7432,39 +7827,65 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   overflow-wrap: anywhere;
   text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 6px rgba(0, 0, 0, 0.98);
 }
-.rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.rp-detail {
-  padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #fff;
-  background: rgba(8, 6, 14, 0.5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); transition: box-shadow 0.15s;
+.rp-effect .card-action-inline {
+  gap: 5px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: rgba(7, 5, 12, .72);
 }
-.rp-detail:hover { box-shadow: inset 0 0 0 1px var(--wglow, var(--gold)), 0 0 12px color-mix(in srgb, var(--wglow, var(--gold)) 50%, transparent); }
-.rp-take {
-  padding: 7px 11px;
-  border-radius: 12px 4px 12px 4px;
-  color: #fff;
-  background: rgba(18, 12, 25, .76);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 58%, transparent), 0 4px 10px rgba(0, 0, 0, .36);
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-shadow: 0 0 10px var(--wglow, var(--gold)), 0 2px 5px rgba(0, 0, 0, 0.95);
-  transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
-}
-.rp-take:hover,
-.rp-take:focus-visible { transform: translateY(-2px); filter: brightness(1.18); box-shadow: inset 0 0 0 2px var(--wglow, var(--gold)), 0 0 18px color-mix(in srgb, var(--wglow, var(--gold)) 44%, transparent); }
-.rp-take:active { transform: translateY(1px) scale(.97); }
-.rp-price {
-  display: inline-block;
-  margin-right: 4px;
-  padding: 3px 7px;
-  color: #ffe089;
+.rp-effect .card-action-inline svg,
+.rp-effect .card-action-inline .baked-stat-icon { width: 20px; height: 20px; }
+.rp-effect .card-action-inline b { font-size: 14px; }
+.rp-effect-copy { min-width: 0; }
+.rp-actions { margin-top: 11px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.rp-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(15, 10, 20, .72);
-  box-shadow: inset 0 0 0 1px rgba(255, 220, 133, .42);
+  color: #ffe089;
+  background: rgba(15, 10, 20, .76);
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 133, .48), 0 3px 10px rgba(0, 0, 0, .34);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 9px rgba(255, 195, 67, .7);
 }
-.reward-pick.is-unaffordable .rp-price { color: #ff9d8b; box-shadow: inset 0 0 0 1px rgba(255, 118, 91, .62); }
-.reward-pick.is-unaffordable .rp-take { color: #ffd0c5; }
+.rp-cost i {
+  color: #fff0a8;
+  font-style: normal;
+  font-size: 17px;
+}
+.rp-unavailable {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  min-width: 88px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #fff1ed;
+  background: rgba(91, 24, 26, .92);
+  box-shadow: inset 0 0 0 1px rgba(255, 151, 126, .7), 0 4px 16px rgba(0, 0, 0, .46);
+  transform: rotate(2deg);
+}
+.rp-unavailable b,
+.rp-unavailable small { display: block; }
+.rp-unavailable b { font-size: 14px; letter-spacing: .5px; }
+.rp-unavailable small { margin-top: 2px; color: #ffc2b3; font-size: 10px; font-weight: 800; }
+.reward-pick.is-unaffordable {
+  filter: saturate(.45) brightness(.72);
+  box-shadow: 0 9px 22px rgba(0, 0, 0, .5), inset 0 0 0 2px rgba(255, 112, 88, .36);
+}
+.reward-pick.is-unaffordable .rp-unavailable { display: block; }
+.reward-pick.is-unaffordable .rp-cost {
+  color: #ffd0c5;
+  background: rgba(80, 21, 24, .84);
+  box-shadow: inset 0 0 0 1px rgba(255, 118, 91, .75);
+}
+.reward-pick.is-unaffordable:hover { filter: saturate(.55) brightness(.78); }
 .reward-pick.is-unaffordable::before { opacity: .18; }
 .reward-pick.detailing { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 26px color-mix(in srgb, var(--wglow, var(--gold)) 45%, transparent), inset 0 1px 0 var(--glass-hi); }
 .rp-owned-stamp {
@@ -7506,28 +7927,19 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   will-change: transform, opacity;
 }
 
-/* 아이템은 단어 카드의 둥근 사각 프레임과 다른 비대칭 이중 금속 프레임을 쓴다. */
-.reward-pick.is-item { border-radius: 30px 9px 30px 9px; box-shadow: 0 12px 30px rgba(0,0,0,.54), inset 0 0 0 3px rgba(255,214,126,.34), inset 0 0 0 7px rgba(65,43,35,.58); }
-.reward-pick.is-item::after {
-  content: '';
-  position: absolute;
-  inset: 9px;
-  z-index: 3;
-  border: 3px double rgba(255,224,151,.72);
-  border-radius: 21px 5px 21px 5px;
-  pointer-events: none;
-  box-shadow: inset 0 0 18px rgba(255,181,72,.16);
-}
-.reward-pick.is-item .rp-bg { inset: 7px; border-radius: 22px 4px; overflow: hidden; }
+/* 단어와 아이템이 같은 선택 규칙으로 읽히도록 프레임 문법도 하나로 맞춘다. */
+.reward-pick.is-item { border-radius: 20px; }
+.reward-pick.is-item::after { display: none; }
+.reward-pick.is-item .rp-bg { inset: 0; border-radius: 20px; overflow: hidden; }
 /* 아이템 일러스트는 정사각형이라 소품이 한가운데 있다 — 카드 단어처럼 위를 잘라내지 않는다. */
 .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
-.reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 7px; border-radius: 22px 4px; }
+.reward-pick.is-item .rp-veil, .reward-pick.is-item .rp-foil { inset: 0; border-radius: 20px; }
 
 /* 우측 상세 칸은 참고 화면의 카드 선택 구성을 복원한다. 날씨·다음 날 안내는 두지 않는다. */
 .reward-dock {
   position: static;
   inset: auto;
-  width: 322px;
+  width: 382px;
   flex: none;
   align-self: stretch;
   min-height: 468px;
@@ -7538,6 +7950,45 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
 .rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
 .rd-hint b { color: var(--gold); }
+.rd-deck-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: #fff3d5;
+  font-size: 21px;
+  font-weight: 900;
+}
+.rd-deck-head b,
+.rd-deck-slots h3 b,
+.rd-deck-combos h3 b { color: #9fe9f4; }
+.rd-deck-slots { display: grid; gap: 13px; }
+.rd-deck-slots section { padding-bottom: 12px; border-bottom: 1px dashed rgba(255, 236, 196, .16); }
+.rd-deck-slots h3,
+.rd-deck-combos h3 { margin: 0 0 7px; color: rgba(255, 241, 213, .72); font-size: 12px; font-weight: 900; }
+.rd-deck-slots section > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.rd-deck-slots section span {
+  padding: 5px 7px;
+  border-radius: 4px;
+  color: #fff;
+  background: rgba(255, 255, 255, .07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+  font-size: 12px;
+  font-weight: 800;
+}
+.rd-deck-slots em { color: #ffd48d; font-size: 10px; font-style: normal; }
+.rd-deck-combos { margin-top: 17px; }
+.rd-deck-combos > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  color: #fff2d6;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  font-size: 12px;
+}
+.rd-deck-combos em { color: #ffd27a; font-style: normal; font-weight: 900; }
+.rd-deck-combos p { color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
 .rf-deltas {
   margin-top: 14px; padding: 12px 14px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
@@ -8808,7 +9259,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   transition: opacity 1.4s ease 0.8s;
 }
 
-/* ── 보상등급 — 운이 바닥을 깔고, 오버킬이 천장을 당긴다 ── */
+/* ── 보상등급 — 운이 바닥을 깔고, 빠른 클리어가 높은 값을 지킨다 ── */
 .grade-badge {
   --wglow: var(--rarity-color, var(--gold));
   position: relative;
@@ -8872,14 +9323,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   text-shadow: 0 0 12px var(--wglow, var(--glow));
   transition: color 0.25s, text-shadow 0.25s;
 }
-.grade-badge.ding b {
-  animation: grade-ding 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
-}
-@keyframes grade-ding {
-  0% { transform: scale(0.9); }
-  40% { transform: scale(1.55); }
-  100% { transform: scale(1); }
-}
 .grade-badge.down {
   animation: grade-down 0.45s ease-out;
 }
@@ -8888,23 +9331,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   30% { transform: translateY(3px); filter: grayscale(0.7) brightness(0.8); }
   100% { transform: translateY(0); filter: none; }
 }
-.grade-pop {
-  position: absolute;
-  right: 10px;
-  top: -6px;
-  font-size: 14px;
-  font-weight: 900;
-  color: var(--wglow, var(--gold));
-  text-shadow: 0 0 10px var(--wglow, var(--glow));
-  animation: grade-pop 0.65s ease-out forwards;
-  pointer-events: none;
-}
-@keyframes grade-pop {
-  0% { opacity: 0; transform: translateY(4px) scale(0.7); }
-  25% { opacity: 1; transform: translateY(-6px) scale(1.2); }
-  100% { opacity: 0; transform: translateY(-22px) scale(1); }
-}
-
 /* 보상 화면 — 구매 전에 잔액을 놓치지 않도록 제목 바로 아래에 지갑을 독립시킨다. */
 .reward-wallet {
   width: fit-content;
@@ -8932,6 +9358,18 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-weight: 800;
 }
 .reward-wallet-earned b { display: block; margin-top: 2px; color: #9de5ab; font-size: 18px; }
+.reward-build-preview {
+  width: min(620px, calc(100% - 32px));
+  margin: 10px auto 0;
+  padding: 7px 12px;
+  border-left: 3px solid #ffd776;
+  color: #f6e7c6;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: left;
+  background: rgba(28, 23, 39, .62);
+}
 .reward-wallet.is-spending { animation: reward-wallet-spend .43s ease both; }
 .reward-wallet.is-short { animation: reward-wallet-short .56s cubic-bezier(.36,.07,.19,.97) both; }
 .reward-wallet.is-short .reward-wallet-balance b { color: #ff9d8b; text-shadow: 0 0 16px rgba(255, 92, 70, .8); }
@@ -9490,6 +9928,32 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .result-cause.is-self .rc-name { color: #e0c4ff; }
 .rc-note { margin-top: 3px; font-size: 15px; color: var(--ink-dim); line-height: 1.5; }
 
+.demo-discoveries {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: -8px 0 14px;
+}
+.demo-discoveries > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 164, .12);
+}
+.demo-discoveries span { color: rgba(255, 239, 208, .68); font-size: 12px; font-weight: 800; }
+.demo-discoveries span b { margin-left: 4px; color: #ffd484; font-size: 16px; }
+.demo-discoveries p {
+  margin: 5px 0 0;
+  min-height: 31px;
+  color: #fff2d9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 /* 세 칸 — 마지막 몸 / 갉아 낸 벌레 / 주워 담은 것 */
 .result-cols {
   display: grid;
@@ -9589,6 +10053,37 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   text-shadow: 0 0 14px rgba(255, 152, 64, 0.6);
 }
 .rr-best-sentence { font-size: 16px; color: var(--ink-dim); }
+
+.demo-release {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-top: 14px;
+  padding: 13px 17px;
+  border-radius: 8px;
+  text-align: left;
+  background: rgba(255, 207, 112, .1);
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 126, .28);
+}
+.demo-release h2 { margin: 0 0 3px; color: #ffe0a0; font-size: 16px; }
+.demo-release p { margin: 0; color: #fff1d4; font-size: 13px; font-weight: 700; }
+.demo-release small { display: block; margin-top: 4px; color: rgba(255, 239, 210, .56); font-size: 10px; }
+.demo-feedback {
+  flex: 0 0 auto;
+  padding: 10px 15px;
+  border-radius: 6px;
+  color: #23170b;
+  background: #ffd077;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, .28);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+.demo-feedback:hover,
+.demo-feedback:focus-visible { transform: translateY(-2px); filter: brightness(1.08); }
+.result-scene[data-demo='true'] .result-cause { margin-bottom: 16px; }
+.result-scene[data-demo='true'] .result-actions { margin-top: 14px; }
 
 .result-actions { display: flex; justify-content: center; gap: 14px; margin-top: 22px; }
 .result-actions button {

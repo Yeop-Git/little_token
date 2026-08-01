@@ -33,7 +33,9 @@ export function wordInkCost(word: Word): number {
   }
 
   if (word.slot === 'verb' || word.slot === 'verb2') {
-    let cost = 2 + rarity
+    // Rarity already carries the tier's base coefficient budget; charging two base Ink
+    // would count that strength twice once coefficient and tactical effects are added.
+    let cost = 1 + rarity
     cost += Math.max(0, Math.ceil(((word.statMult ?? 1) - 1) / 0.5))
     if (word.aoe === 'all') cost += 1
     else if (word.targetCount === 'all') cost += 1
@@ -41,6 +43,15 @@ export function wordInkCost(word: Word): number {
     if ((word.effects?.hitCount ?? 1) > 1) cost += 1
     if (word.effects?.pierceGuard) cost += 1
     if ((word.effects?.counterMultiplier ?? 0) > 0) cost += 1
+    if ((word.effects?.magicShield ?? 0) > 0) cost += 3
+    cost += Math.ceil(Math.max(0, word.effects?.guardAttackMultiplier ?? 0) * 2)
+    cost += Math.ceil(Math.max(0, word.effects?.overhealDamageMultiplier ?? 0))
+    cost += Math.ceil(Math.max(0, word.effects?.lifeStealRate ?? 0) * 2)
+    cost += Math.abs(word.effects?.attackRank ?? 0)
+    cost += Math.abs(word.effects?.guardRank ?? 0)
+    cost += Math.abs(word.effects?.enemyAttackRank ?? 0)
+    cost += Math.max(0, word.effects?.carryInk ?? 0)
+    cost += Math.max(0, word.effects?.bonusDraws ?? 0)
     return Math.max(1, Math.min(5, cost))
   }
 

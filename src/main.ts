@@ -19,7 +19,7 @@ import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, REWARD_REFRESH_COST, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
-import { applyItemReward, gainInspiration, newRun, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
+import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import { sharedTokenMind } from '@core/tokenMind'
@@ -39,9 +39,11 @@ import { applyLocaleToDocument, currentLocale } from '@/localization'
 import { applyContentLocalization } from '@/localization/content'
 import { applyDetailedContentLocalization } from '@/localization/contentDetails'
 import { installDomLocalization } from '@/localization/dom'
+import { DEMO_FLOORS, FEEDBACK_URL, IS_DEMO, STRICT_RESOURCE_LOADING, isEditionFinalFloor } from '@/config/edition'
+import { installResourceFailureMonitor } from '@/ui/ResourceFailures'
+import { pickFieldBackground, type FieldBackground } from '@data/backgrounds'
+import { installMobileViewport } from '@/ui/MobileViewport'
 
-const STAGE_W = 1920
-const STAGE_H = 1080
 /** 시네마틱이 걷힌 뒤 제목·메뉴를 올리기까지 두는 시간. */
 const TITLE_UI_HOLD_MS = 850
 /**
@@ -50,13 +52,17 @@ const TITLE_UI_HOLD_MS = 850
  * 한다 — 어느 쪽에 붙어도 그 순간이 한 번 걸린다. 그 사이 조용한 틈에 넣는다.
  */
 const AMBIENT_THAW_MS = 260
+const STAGE_TRANSITION_COVER_MS = 320
+const STAGE_TRANSITION_REVEAL_MS = 520
 /** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
-const DEV_CHEAT_ENABLED = true
+const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
 let devCheatCleanup: (() => void) | null = null
 let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0
+let preparedBackground: { day: number; value: FieldBackground } | null = null
+installResourceFailureMonitor()
 applyLocaleToDocument()
 applyContentLocalization()
 if (currentLocale !== 'ko') applyDetailedContentLocalization(currentLocale)
@@ -64,26 +70,25 @@ installDomLocalization()
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
 installFoilShaders()
-CustomCursor.install()
-ClickScribble.install()
+if (!matchMedia('(pointer: coarse)').matches) {
+  CustomCursor.install()
+  ClickScribble.install()
+}
 
 if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('profile') === '1') {
   void import('@/ui/RuntimeProfiler').then(({ startRuntimeProfiler }) => startRuntimeProfiler())
 }
 
-function fit() {
-  const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
-  stage.style.setProperty('--scale', String(s))
-}
-window.addEventListener('resize', fit)
-fit()
+installMobileViewport(stage)
 
 // 저장된 런이 있으면 그 다음 전투를 예열한다. 항상 새 런부터 예열하면 이어하기에서
 // 1층 모델을 받은 직후 현재 층 모델을 또 받아 네트워크·파싱 비용이 두 번 든다.
 let run = loadRun() ?? newRun()
 // 타이틀을 보는 동안 현재 덱의 전투 리소스를 디코딩해 첫 스테이지의 검은 프레임을 막는다.
 // 보상으로 덱이 바뀌면 goBattle에서 새 카드만 이어서 예열한다.
-void preloadUpcomingBattle().catch(() => undefined)
+void preloadUpcomingBattle().catch((error) => {
+  if (STRICT_RESOURCE_LOADING) throw error
+})
 type CurrentView = { destroy?: () => void } & Partial<Pick<BattleViewType,
   'debugDefeat' | 'debugSetCombatModes' | 'debugSpawnCard'>>
 let current: CurrentView | null = null
@@ -179,7 +184,7 @@ const DEBUG_BOSSES = [
 function jumpToStage(day: number) {
   if (!Number.isFinite(day)) return
   run.day = Math.max(1, Math.floor(day))
-  if (run.day > 15) {
+  if (run.day > STORY_FLOORS) {
     run.endless = true
     run.endingSeen = true
   }
@@ -380,7 +385,7 @@ function mountDevCheat(active: SceneName) {
   // 고정 무대 왼쪽에 레터박스가 생기면 그 여백 전체도 숨은 클릭 영역에 포함한다.
   const fitCorner = () => {
     const rect = stage.getBoundingClientRect()
-    const scale = rect.width / STAGE_W || 1
+    const scale = rect.width / Math.max(1, stage.offsetWidth) || 1
     corner.style.width = `${Math.max(34, rect.left + 34 * scale)}px`
     corner.style.height = rect.left > 1 ? `${window.innerHeight}px` : `${Math.max(34, rect.top + 34 * scale)}px`
   }
@@ -417,6 +422,26 @@ function reset() {
   cinematicCleanup?.()
   cinematicCleanup = null
   stage.innerHTML = ''
+}
+
+const waitForFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const waitForMs = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+/** 보상 종이를 덮은 뒤 무거운 전투 리소스를 준비해 로딩 프레임을 감춘다. */
+async function coverStageForNextBattle(): Promise<void> {
+  stage.classList.add('stage-transition-active')
+  await waitForFrame()
+  stage.classList.add('is-stage-covered')
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) await waitForMs(STAGE_TRANSITION_COVER_MS)
+}
+
+/** 새 전장이 완전히 마운트된 다음에만 덮개를 걷는다. */
+function revealPreparedStage(): void {
+  if (!stage.classList.contains('stage-transition-active')) return
+  void waitForFrame().then(() => {
+    stage.classList.remove('is-stage-covered')
+    window.setTimeout(() => stage.classList.remove('stage-transition-active'), STAGE_TRANSITION_REVEAL_MS)
+  })
 }
 
 function startNewRunBattle() {
@@ -457,6 +482,7 @@ function goTitle(withIntro: unknown = false) {
       if (!saved) sharedTokenMind().beginRun()
       if (!saved) saveRun(run)
       if (fresh || !saved) startNewRunBattle()
+      else if (run.pendingEndingGrade != null) goEnding(run.pendingEndingGrade, run.pendingEndingEarned ?? run.pendingEndingGrade)
       else if (run.reward?.day === run.day) {
         if (run.reward.phase === 'complete') finishReward()
         else goReward(run.reward.grade, run.reward.phase)
@@ -537,13 +563,16 @@ function goBattleWithBossIntro() {
 
 async function goBattle(intro = false, onIntroComplete?: () => void) {
   const request = ++battleRequest
+  // 전투 내부 상태는 저장하지 않는다. 홈 이동이나 강제 종료는 이 완전한 시작 상태로 돌아온다.
+  const battleCheckpoint = structuredClone(run)
   const st = stageFor(run.day)
+  const background = backgroundFor(run.day, st.isBoss, st.encounter[0])
   const [{ BattleView }, { preloadBattleResources }] = await Promise.all([
     import('@views/BattleView'),
     import('@/ui/ResourcePreloader'),
   ])
   await Promise.all([
-    preloadBattleResources(run.player.deck, run.player.items, st.encounter),
+    preloadBattleResources(run.player.deck, run.player.items, st.encounter, [background.next, background.prev].filter((src): src is string => !!src)),
     GameAudio.preloadBattleAudio(run.day, st.isBoss ? st.encounter[0] : undefined),
   ])
   if (request !== battleRequest) return
@@ -557,9 +586,9 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     atkMult: st.atkMult,
     isBoss: st.isBoss,
     day: run.day,
+    background,
     inspiration: run.inspiration,
     bossHealthBars: st.bossHealthBars,
-    modeLabel: st.endlessCycle > 0 ? `ENDLESS ${st.endlessCycle} · ${st.floor}층` : undefined,
     player: run.player,
     record: run.record,
     resources: run.combat,
@@ -571,8 +600,8 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
       clearRun()
       goResult('lost', cause)
     },
-    onHome: (resources) => {
-      run.combat = resources
+    onHome: () => {
+      run = battleCheckpoint
       saveRun(run)
       goTitle()
     }, // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
@@ -582,56 +611,66 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     onIntroComplete,
   })
   mountMeta(intro ? 'intro' : 'battle')
+  revealPreparedStage()
 }
 
 /** 타이틀 첫 화면을 막지 않고 다음 전투 런타임과 실제 편성 리소스를 뒤에서 준비한다. */
 async function preloadUpcomingBattle() {
   const { preloadBattleResources } = await import('@/ui/ResourcePreloader')
   const st = stageFor(run.day)
+  const background = backgroundFor(run.day, st.isBoss, st.encounter[0])
   await Promise.all([
-    preloadBattleResources(run.player.deck, run.player.items, st.encounter),
+    preloadBattleResources(run.player.deck, run.player.items, st.encounter, [background.next, background.prev].filter((src): src is string => !!src)),
     GameAudio.preloadBattleAudio(run.day, st.isBoss ? st.encounter[0] : undefined),
   ])
 }
 
-function handleBattleWin(grade: number, resources: { hp: number; guard: number }) {
+function backgroundFor(day: number, isBoss: boolean, bossId?: string): FieldBackground {
+  if (preparedBackground?.day === day) return preparedBackground.value
+  const value = pickFieldBackground(day, isBoss, bossId)
+  preparedBackground = { day, value }
+  return value
+}
+
+function handleBattleWin(grade: number, resources: { hp: number; guard: number }, earned: number = grade) {
   run.combat = resources
   // 넘긴 날 — 결과 종이가 "어디까지 갔는지"로 읽는 값이다.
   run.record.daysCleared += 1
   if (floorInCycle(run.day) === STORY_FLOORS && !run.endless && !run.endingSeen) {
-    goEnding(grade)
+    checkpointStoryEnding(run, grade, earned)
+    saveRun(run)
+    goEnding(grade, earned)
     return
   }
-  beginReward(grade)
+  beginReward(grade, earned)
 }
 
-function goEnding(grade = startGrade(run.player.stats.luck)) {
+function goEnding(
+  grade = run.pendingEndingGrade ?? startGrade(run.player.stats.luck),
+  earned = run.pendingEndingEarned ?? grade,
+) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'night')
   current = new EndingView(stage, {
     onComplete: () => {
-      run.endingSeen = true
-      run.endless = true
+      completeStoryEnding(run)
+      prepareReward(grade, earned)
       // 컷씬이 끝나면 이 판의 기록을 종이 한 장으로 정산해 보여 주고, 거기서
       // 엔들리스로 이어 간다. 승리도 패배와 같은 종이를 쓴다(도장만 다르다).
-      goResult('won', null, () => beginReward(grade))
+      goResult('won', null, () => goReward(grade, 'subject'))
     },
   })
   mountMeta('ending')
 }
 
-function beginReward(grade: number) {
-  gainInspiration(run, grade)
-  run.reward = {
-    day: run.day,
-    grade,
-    phase: 'subject',
-    picks: [],
-    seed: Math.floor(Math.random() * 0x7fffffff),
-    refreshes: { subject: 0, item: 0, verb: 0 },
-  }
+function prepareReward(grade: number, earned: number = grade) {
+  preparePendingReward(run, grade, Math.floor(Math.random() * 0x7fffffff), earned)
   saveRun(run)
+}
+
+function beginReward(grade: number, earned: number = grade) {
+  prepareReward(grade, earned)
   goReward(grade, 'subject')
 }
 
@@ -649,16 +688,17 @@ function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) 
   if (pick) sharedTokenMind().feel('rewardTaken')
   const picks = [...(run.reward?.picks ?? [])]
   const seed = run.reward?.seed ?? Math.floor(Math.random() * 0x7fffffff)
+  const earned = run.reward?.earned ?? Math.max(0, Math.round(grade))
   const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }
   if (pick) picks.push(pick)
   if (phase === 'subject') {
-    run.reward = { day: run.day, grade, phase: 'item', picks, seed, refreshes }
+    run.reward = { day: run.day, grade, earned, phase: 'item', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'item')
     return
   }
   if (phase === 'item') {
-    run.reward = { day: run.day, grade, phase: 'verb', picks, seed, refreshes }
+    run.reward = { day: run.day, grade, earned, phase: 'verb', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'verb')
     return
@@ -666,10 +706,16 @@ function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) 
   finishReward()
 }
 
-function finishReward() {
+async function finishReward() {
   run.reward = null
+  if (IS_DEMO && isEditionFinalFloor(run.day)) {
+    clearRun()
+    goResult('won', null, undefined, true)
+    return
+  }
   run.day++
   saveRun(run)
+  await coverStageForNextBattle()
   goBattleWithBossIntro()
 }
 
@@ -699,12 +745,25 @@ function goReward(
   stage.setAttribute('data-theme', 'day')
   const seed = run.reward?.seed ?? 0
   const refreshes = run.reward?.refreshes?.[phase] ?? 0
-  const options = genRewards(run.player, grade, run.day, phase, rewardOfferRng(seed, phase, refreshes))
+  const options = genRewards(
+    run.player,
+    grade,
+    run.day,
+    phase,
+    rewardOfferRng(seed, phase, refreshes),
+    run.inspiration,
+  )
+  // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
+  // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
+  if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {
+    advanceReward(grade, phase)
+    return
+  }
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
     inspiration: run.inspiration,
-    earned: Math.max(0, Math.round(grade)),
+    earned: run.reward?.earned ?? Math.max(0, Math.round(grade)),
     phase,
     options,
     onPick: (opt) => {
@@ -778,7 +837,12 @@ function goItem(
  * 런 결과 종이 — 승리와 패배가 같은 화면을 쓰고 도장만 갈린다.
  * 저장은 이미 지워졌어도 메모리의 run에는 이 판의 기록이 남아 있어서 그걸 읽는다.
  */
-function goResult(outcome: RunOutcome, cause?: DefeatCause | null, onContinue?: () => void) {
+function goResult(
+  outcome: RunOutcome,
+  cause?: DefeatCause | null,
+  onContinue?: () => void,
+  demoComplete = false,
+) {
   battleRequest++
   // 런이 끝나는 유일한 길목. 토큰은 여기서만 이번 런을 기억에 넣고 성향이 조금 움직인다 —
   // 승패가 함께 지나는 곳이라 한쪽만 세는 일이 생기지 않는다.
@@ -795,7 +859,9 @@ function goResult(outcome: RunOutcome, cause?: DefeatCause | null, onContinue?: 
     player: run.player,
     record: run.record,
     cause,
-    endless: run.endless,
+    demoComplete,
+    buildVersion: packageInfo.version,
+    feedbackUrl: FEEDBACK_URL,
     onNewRun: () => {
       run = newRun()
       sharedTokenMind().beginRun()
@@ -812,8 +878,34 @@ function goDefeat() {
   goResult('lost', null)
 }
 
+/** 개발용 데모 결과 화면에 실제 런에 가까운 밀도의 기록을 채운다. */
+function prepareDemoResultFixture() {
+  run.day = DEMO_FLOORS
+  run.record.daysCleared = DEMO_FLOORS
+  run.record.sentences = 18
+  run.record.bestMult = 4.2
+  run.record.bestCombo = 3
+  run.record.bestHit = { dmg: 86, sentence: '나는 미친듯이 때렸다' }
+  registerWord(run.player, ALL_REWARD_WORDS[0])
+  registerWord(run.player, ALL_REWARD_WORDS[1])
+  registerWord(run.player, run.player.deck.subj[0])
+  const item = ITEMS.candle
+  applyItemReward(run.player, {
+    id: item.id,
+    name: item.name,
+    rarity: item.rarity,
+    art: item.art,
+    line: '데모 결과 검수',
+    stats: { ...item.base },
+    passive: item.passive,
+  })
+}
+
 // ?scene= 로 직접 진입(스샷/검수용). ?day= 를 붙이면 그 날짜의 편성으로 바로 들어간다.
 const params = import.meta.env.DEV ? new URLSearchParams(location.search) : new URLSearchParams()
+if (import.meta.env.DEV && STRICT_RESOURCE_LOADING && params.get('qaMissingResource') === 'image') {
+  void import('@/ui/ResourceLibrary').then(({ preloadImage }) => preloadImage('/__qa_missing_image__.webp'))
+}
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
@@ -823,6 +915,10 @@ void FontManager.load()
 if (start === 'reward') goReward()
 else if (start === 'item') goItem(ITEMS.candle)
 else if (start === 'ending') goEnding()
+else if (start === 'defeat' && params.get('demo') === '1') {
+  prepareDemoResultFixture()
+  goResult('won', null, undefined, true)
+}
 else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()

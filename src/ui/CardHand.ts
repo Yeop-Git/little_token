@@ -5,6 +5,7 @@ import { wordCardDisplayNote, wordCardFrontHtml, wordMood } from '@/ui/WordCardF
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
+import { FREE_DRAWS_PER_STAGE } from '@core/draw'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -15,7 +16,7 @@ export const CARD_HAND_CONFIG = {
   verbInitialHand: 4,
   maxHand: 6,
   /** 한 스테이지에서 추가로 뽑을 수 있는 횟수. 전투를 시작할 때 이 값으로 초기화된다. */
-  drawsPerStage: 2,
+  drawsPerStage: FREE_DRAWS_PER_STAGE,
   cardWidth: 158,
   cardHeight: 218,
   maxSpacing: 170,
@@ -122,6 +123,7 @@ interface CardHandOptions {
   onHoverEnd?: () => void
   onPreview: (word: Word) => void
   onPreviewEnd: () => void
+  onDraw?: () => void
 }
 
 type ConflictResolver = (word: Word) => string | null
@@ -138,7 +140,6 @@ export class CardHand {
   private readonly sealedWordIds = new Set<string>()
   // 스테이지(전투) 단위 추가 드로우 예산. 턴이 바뀌어도 이어지고, 전투를 새로 열 때만 채워진다.
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
-  private nextOpeningHandBonus = 0
   private processing = false
   private inputEnabled = true
   private serial = 0
@@ -289,8 +290,7 @@ export class CardHand {
       const handTarget = slotKey === 'verb' || slotKey === 'verb2'
         ? CARD_HAND_CONFIG.verbInitialHand
         : CARD_HAND_CONFIG.initialHand
-      const initialCount = Math.min(handTarget + this.nextOpeningHandBonus, words.length)
-      this.nextOpeningHandBonus = 0
+      const initialCount = Math.min(handTarget, words.length)
       const shuffled = ensureCardInInitialDraw(
         this.shuffle(words),
         initialCount,
@@ -364,13 +364,16 @@ export class CardHand {
     return result
   }
 
-  /** 이번 전투에서 아직 쓰지 않은 뽑기 횟수 — 승리 시 영감으로 환산된다. */
+  /** 쓰지 않은 무료 드로우는 희귀도가 아닌 최종 영감 수치에 더해진다. */
   get savedDraws(): number {
-    return Math.max(0, this.drawsLeft)
+    return Math.min(FREE_DRAWS_PER_STAGE, Math.max(0, this.drawsLeft))
   }
 
-  grantNextOpeningHand(count: number) {
-    this.nextOpeningHandBonus += Math.max(0, Math.floor(count))
+  /** 카드 효과로 이번 전투의 실제 덱 뽑기 횟수를 늘린다. */
+  grantDraws(count: number) {
+    this.drawsLeft += Math.max(0, Math.floor(count))
+    const state = this.currentState()
+    if (state) this.updateDeckButton(state)
   }
 
   /** 개발 치트 전용 — 뽑기 횟수를 쓰지 않고 현재 슬롯 손패에 카드 한 장을 넣는다. */
@@ -417,6 +420,7 @@ export class CardHand {
     const epoch = this.epoch
     const next = state.deck.shift()!
     this.drawsLeft--
+    this.opts.onDraw?.()
     this.processing = true
     state.hand.push(next)
     this.drawingId = next.instanceId
@@ -732,10 +736,9 @@ export class CardHand {
     const spent = this.drawsLeft <= 0
     const disabled = !this.inputEnabled || this.processing || full || spent || pileLeft === 0
     const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
-    // 아끼면 그만큼 영감이 오른다 — 뽑기를 참는 선택에 값을 붙여 둔다.
     const saveHint = this.drawsLeft > 0 ? ` · 아끼면 영감 +${this.drawsLeft}` : ''
     this.opts.deckButton.disabled = disabled
-    this.opts.deckButton.title = `남은 뽑기 ${this.savedDraws}회${saveHint}`
+    this.opts.deckButton.title = `남은 뽑기 ${this.drawsLeft}회${saveHint}`
     this.opts.deckButton.setAttribute('aria-label', (disabled ? `카드 뽑기 불가: ${note}` : `카드 뽑기, ${note}`) + saveHint)
     const overlayNote = note.replace('회 남음', '회남음')
     this.opts.deckButton.innerHTML = `<span class="deck-stack" aria-hidden="true"><i></i><i></i><span class="deck-overlay"><b>카드 뽑기</b><small>(${overlayNote})</small></span></span>`

@@ -34,10 +34,10 @@ import { eul } from '@core/josa'
 import { conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
-import { emotionOrNeutral, EMOTION_LABEL, RARITY_LABEL, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
+import { emotionOrNeutral, EMOTION_LABEL, RARITY_LABEL, type Combo, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
-import { ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, REWARD_WORDS, tablesForEncounter } from '@data/earlyWords'
-import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL } from '@data/enemies'
+import { ALL_REWARD_WORDS, ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, tablesForEncounter } from '@data/earlyWords'
+import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, enemyDefForEncounter } from '@data/enemies'
 import { tacticalGuideForEnemy } from '@data/tacticalCards'
 import {
   activeEnemyPart,
@@ -50,7 +50,7 @@ import {
   applyPreparation,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
-  bossTurnPressureMultiplier,
+  enemyAttackForecast,
   enemyGuardBreakRequirement,
   enemyTurn,
   engageFront,
@@ -74,13 +74,17 @@ import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
-import { GRADE_MAX, bumpGrade, decayGrade, gradeTier, overkillGain, startGrade } from '@core/grade'
+import { clearRewardValue, gradeForElapsedTurns, gradeTier, startGrade } from '@core/grade'
+import { rankedStat } from '@core/combatRules'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
-import { DOUBT_RANGE, DOUBT_SUFFIX, hasPassive, modsFor, PASSIVES } from '@core/passives'
+import { discoverCombos, discoveredComboIds } from '@core/comboDiscovery'
+import { beanstalkGrowthFor, DOUBT_RANGE, DOUBT_SUFFIX, ECHO_REPEAT_SCALE, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
+import { BOSS_BY_FLOOR, stageFor, type Stage } from '@data/stages'
+import { DISPLAY_FLOORS } from '@/config/edition'
 import { CARD_HAND_CONFIG, CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
 import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
 import { GameAudio } from '@/audio/GameAudio'
@@ -95,8 +99,22 @@ import {
 } from '@data/backgrounds'
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
+import { growthText } from '@/localization/growth'
+
+const BUILD_EFFECT_TEXT = {
+  ko: { magic: '매직실드', magicTip: '다음 적 공격을 관통 여부와 무관하게 막음', magicReady: '매직실드 1겹 준비', magicBlocked: '매직실드가 적의 공격을 통째로 막고 사라졌다.', blocked: '매직실드 방어!', healed: '흡혈로 체력 {value} 회복', overflow: '넘친 회복이 피해 {value}(으)로 바뀌었다.', healPop: '회복+{value}' },
+  en: { magic: 'Magic Shield', magicTip: 'Blocks the next enemy attack even if it pierces Guard', magicReady: 'Magic Shield: 1 layer ready', magicBlocked: 'The Magic Shield erased the enemy attack and vanished.', blocked: 'Magic Shield!', healed: 'Lifesteal restored {value} HP', overflow: 'Overhealing became {value} damage.', healPop: 'Heal +{value}' },
+  ja: { magic: 'マジックシールド', magicTip: '防御貫通を含む次の敵攻撃を防ぐ', magicReady: 'マジックシールド1層を準備', magicBlocked: 'マジックシールドが敵の攻撃を防いで消えた。', blocked: 'マジックシールド！', healed: '吸収で体力を{value}回復', overflow: '超過回復が{value}ダメージに変わった。', healPop: '回復+{value}' },
+  ru: { magic: 'Магический щит', magicTip: 'Блокирует следующую атаку врага, даже пробивающую защиту', magicReady: 'Готов 1 слой магического щита', magicBlocked: 'Магический щит полностью поглотил атаку и исчез.', blocked: 'Магический щит!', healed: 'Вампиризм восстановил {value} здоровья', overflow: 'Избыток лечения превратился в {value} урона.', healPop: 'Лечение +{value}' },
+  'zh-Hans': { magic: '魔法盾', magicTip: '无视是否贯穿防御，抵挡下一次敌方攻击', magicReady: '已准备1层魔法盾', magicBlocked: '魔法盾完全挡住敌方攻击后消失了。', blocked: '魔法盾防御！', healed: '吸血恢复了{value}点生命', overflow: '过量治疗转化为{value}点伤害。', healPop: '恢复+{value}' },
+  'zh-Hant': { magic: '魔法盾', magicTip: '無視是否貫穿防禦，抵擋下一次敵方攻擊', magicReady: '已準備1層魔法盾', magicBlocked: '魔法盾完全擋住敵方攻擊後消失了。', blocked: '魔法盾防禦！', healed: '吸血恢復了{value}點生命', overflow: '過量治療轉化為{value}點傷害。', healPop: '恢復+{value}' },
+}[currentLocale]
+
+const buildEffectText = (key: keyof typeof BUILD_EFFECT_TEXT, value?: number): string =>
+  BUILD_EFFECT_TEXT[key].replace('{value}', String(value ?? ''))
 import { bossTokenLine, type TokenLine } from '@/localization/bossToken'
 import { enemySentenceText as bossText } from '@/localization/enemySentences'
+import { comboCodexText } from '@/localization/comboCodex'
 import {
   characterAnimationOf,
   destroyCharacterModels,
@@ -126,11 +144,11 @@ interface Opts {
   /** 런 전체에서 보유 중인 영감. 전투 HUD에서는 이번 전투 획득 예정치와 분리해 보여 준다. */
   inspiration?: number
   /** 전투가 끝난 시점의 영감 획득량을 들고 나간다 — 런 재화와 보상 희귀도 확률에 함께 쓰인다. */
-  onWin: (grade: number, resources: { hp: number; guard: number }) => void
+  onWin: (grade: number, resources: { hp: number; guard: number }, rewardValue: number) => void
   onLose: (cause: DefeatCause | null) => void
   /** 런 내내 누적되는 기록. 결과 화면의 찢어진 종이가 이걸 읽는다. */
   record?: RunRecord
-  onHome?: (resources: { hp: number; guard: number }) => void
+  onHome?: () => void
   onResetAll?: () => void
   player?: PlayerState
   /** 직전 스테이지에서 남긴 체력과 방어막. */
@@ -141,10 +159,10 @@ interface Opts {
   isBoss?: boolean
   /** 현재 층. 배경 고르기에 쓴다 — 1스테이지는 늘 첫 배경으로 고정한다. */
   day?: number
+  /** 진입 전에 이미지 디코딩까지 마친 이번 전투 배경. */
+  background?: FieldBackground
   /** 현재 보스의 체력 막 수. 일반 전투에는 전달하지 않는다. */
   bossHealthBars?: number
-  /** 본편 이후 반복 구간에서 현재 엔드리스 회차와 층을 표시한다. */
-  modeLabel?: string
   /** 오프닝 다이얼로그(토큰 컷신)를 이 전투 위에서 먼저 재생한다. */
   intro?: boolean
   /** 오프닝을 끝까지 보거나 SKIP으로 정상 종료한 뒤 호출한다. */
@@ -309,7 +327,7 @@ interface Tally {
 export class BattleView {
   private t: Tables = TABLES
   private field: FieldDef
-  private onWin: (grade: number, resources: { hp: number; guard: number }) => void
+  private onWin: (grade: number, resources: { hp: number; guard: number }, rewardValue: number) => void
   private onLose: (cause: DefeatCause | null) => void
   /** 런 기록 — 전달되지 않으면(스샷·검수 진입) 빈 기록에 적고 버린다. */
   private record: RunRecord
@@ -317,13 +335,13 @@ export class BattleView {
   private lastHurtBy: DefeatCause | null = null
   /** 방금 꽂은 문장 — 자해로 쓰러졌을 때 사인으로 적는다. */
   private lastSentence = ''
-  private onHome?: (resources: { hp: number; guard: number }) => void
+  private onHome?: () => void
   private onResetAll?: () => void
   private onIntroComplete?: () => void
   private isBoss = false
   private playerVisual: CharacterVisualDef
-  private modeLabel = ''
-  // 획득 예정 영감 — 운으로 시작·바닥, 턴 경과로 감소, 한 턴 멀티킬로 상승.
+  private stageInfo: Stage
+  // 희귀도용 속도 등급. 실제 영감 획득량에는 쓰지 않은 무료 드로우가 별도로 더해진다.
   private grade = 0
   private inspiration = 0
   private player: PlayerState
@@ -356,6 +374,8 @@ export class BattleView {
   // 배율 릴 세대 — 새 선택이 들어오면 이전 릴은 조용히 물러난다.
   private multReelToken = 0
   private parkedTally: HTMLElement | null = null
+  /** 정산이 끝난 문장의 실제 값. 다음 문장에서 첫 단어를 고를 때까지 손패 위에 남긴다. */
+  private lastResolvedTally: Tally | null = null
   private dockRestore: (() => void) | null = null
   private dockTimer = 0
   private pointerDown = false
@@ -392,8 +412,11 @@ export class BattleView {
   }
   /** 손패에만 생성한 미보유 카드를 일반 테이블을 바꾸지 않고 선택하기 위한 임시 조회표. */
   private readonly debugSpawnedWords = new Map<string, Word>()
+  private readonly discoveredCombos = discoveredComboIds()
   /** 아기돼지 바베큐 — 이번 전투에서 지금까지 잡은 적 수(배율에 들어간다). */
   private killsThisBattle = 0
+  /** 잭의 하늘나물은 각 전투의 첫 문장에만 한 번 자란다. */
+  private beanstalkGrownThisBattle = false
   private tokenSpeechIndex = 0
   private tokenSpeechTimer = 0
   private bossPatternSolved = false
@@ -425,13 +448,18 @@ export class BattleView {
     this.playerVisual = this.isBoss
       ? { ...CHARACTER_VISUALS.player, modelYaw: Math.PI }
       : CHARACTER_VISUALS.player
-    this.modeLabel = opts.modeLabel ?? ''
+    this.stageInfo = stageFor(opts.day ?? 1)
     this.inspiration = Math.max(0, Math.floor(opts.inspiration ?? 0))
     this.t = tablesForEncounter(opts.tables ?? TABLES, opts.encounter[0])
     this.player = opts.player ?? defaultPlayer()
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
-    const enemies = opts.encounter.map((id) =>
-      makeEnemy(ENEMIES[id], atkMult, opts.hpMult ?? 1, this.isBoss ? opts.bossHealthBars ?? 3 : 1),
+    const enemies = opts.encounter.map((id, index) =>
+      makeEnemy(
+        enemyDefForEncounter(id, this.stageInfo.floor, this.stageInfo.endlessCycle, index, opts.encounter.length),
+        atkMult,
+        opts.hpMult ?? 1,
+        this.isBoss ? opts.bossHealthBars ?? 3 : 1,
+      ),
     )
     // 최대 체력은 스탯에서, 현재 체력과 방어막은 런의 직전 스테이지에서 이어받는다.
     const maxHp = this.player.stats.hp
@@ -442,6 +470,9 @@ export class BattleView {
       playerMax: maxHp,
       guard: Math.max(0, Math.min(playerGuardLimit(maxHp), savedGuard)),
       counterMultiplier: 0,
+      playerMagicShield: 0,
+      playerAttackRank: 0,
+      playerGuardRank: 0,
       turn: 1,
       enemies,
       pending: null,
@@ -453,7 +484,7 @@ export class BattleView {
     // 배경은 판마다 갈린다(1스테이지 고정 · 보스별 지정 · 나머지는 직전 것 빼고 무작위).
     // 이 한 줄이 조명과 무대 배치까지 함께 정한다.
     this.day = opts.day ?? 1
-    this.bg = pickFieldBackground(this.day, this.isBoss, opts.encounter[0])
+    this.bg = opts.background ?? pickFieldBackground(this.day, this.isBoss, opts.encounter[0])
     // 여왕벌의 첫 일벌은 배경·연출 기준값을 확정한 뒤, 첫 행동 순서를 잡기 전에 소환한다.
     summonAtTurnStart(this.state)
     engageInitialFront(this.state)
@@ -698,11 +729,12 @@ export class BattleView {
           </div>
           <div class="hud-status">
             <div class="hud-status-bar">
+              ${this.stageProgressHtml()}
               <div class="hud-actions glass" aria-label="시스템 메뉴">
                 <button id="settings-btn" type="button" aria-label="설정" data-tooltip="${hudTip('hudSettingsTip', '설정\n그래픽, 소리, 언어와 플레이 기록을 조정한다.')}">${icon('settings')}</button>
                 <button id="bond-btn" type="button" aria-label="토큰과의 유대" data-tooltip="${hudTip('hudBondTip', '토큰과의 유대\n함께한 기록과 토큰이 너에 대해 알게 된 것을 본다.')}">${icon('bond')}</button>
                 <button id="codex-btn" type="button" aria-label="그림일기 도감" data-tooltip="${hudTip('hudCodexTip', '그림일기 도감\n단어, 카드, 만난 벌레와 획득한 아이템을 살펴본다.')}">${icon('collection')}</button>
-                <button id="home-btn" type="button" aria-label="홈으로" data-tooltip="${hudTip('hudHomeTip', '홈\n전투를 나가 타이틀 화면으로 돌아간다.')}">${icon('home')}</button>
+                <button id="home-btn" type="button" aria-label="홈으로" data-tooltip="${hudTip('hudHomeTip', '홈\n이번 전투를 시작 전으로 되돌리고 타이틀로 돌아간다.')}">${icon('home')}</button>
               </div>
             </div>
             <div class="effect-log" id="log"></div>
@@ -710,7 +742,6 @@ export class BattleView {
         </div>
 
         <div class="stage-area" id="pbox">
-          ${this.modeLabel ? `<div class="endless-ribbon" role="status"><span>끝나지 않은 이야기</span><b>${this.modeLabel}</b></div>` : ''}
           ${this.isBoss ? this.bossHudHtml() : ''}
           ${this.isBoss ? '<section class="boss-sentence-board" id="boss-sentence-board" role="status" aria-live="polite" hidden></section>' : ''}
           <div class="chain-rail" id="chain"></div>
@@ -721,8 +752,6 @@ export class BattleView {
           <div id="actors"></div>
           <div class="model-prewarm-stage" aria-hidden="true"></div>
         </div>
-
-        ${this.isBoss ? this.bossPlayerHudHtml() : ''}
 
         <div class="slot-step" id="steps" aria-label="문장 조립 단계"></div>
         ${inkMeterHtml()}
@@ -775,7 +804,7 @@ export class BattleView {
     this.q('#bond-btn').addEventListener('click', () => this.openBondRecord())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
-    this.q('#home-btn').addEventListener('click', () => this.onHome?.(this.combatResources()))
+    this.q('#home-btn').addEventListener('click', () => this.onHome?.())
     this.q('#battle-help-button').addEventListener('click', () => this.setHelpOpen(!this.helpOpen))
     this.q('#steps').addEventListener('click', (event) => {
       const button = (event.target as Element | null)?.closest<HTMLButtonElement>('.step[data-i]')
@@ -788,6 +817,7 @@ export class BattleView {
     this.cardHand = new CardHand({
       handRoot: this.q('#card-hand'),
       deckButton: this.q<HTMLButtonElement>('#draw-deck'),
+      onDraw: () => this.renderGrade(),
       onConfirm: (word) => {
         if (!this.busy && !this.over) this.pick(word.id)
       },
@@ -845,6 +875,61 @@ export class BattleView {
       return bossTokenLine('styleEmotion', 'calm', { emotion: EMOTION_LABEL[style.favoriteEmotion] })
     }
     return null
+  }
+
+  private stageProgressHtml(): string {
+    if (this.isBoss) return ''
+    const { day, floor, endlessCycle } = this.stageInfo
+    const isEndless = endlessCycle > 0
+    const bossFloors = Object.keys(BOSS_BY_FLOOR).map(Number).filter((value) => value <= DISPLAY_FLOORS).sort((a, b) => a - b)
+    const nextBossFloor = bossFloors.find((bossFloor) => bossFloor >= floor) ?? DISPLAY_FLOORS
+    const bossName = ENEMIES[BOSS_BY_FLOOR[nextBossFloor]]?.name ?? t('hudBoss', '보스')
+    const remaining = Math.max(0, nextBossFloor - floor)
+    const next = remaining === 0
+      ? hudTip('hudBossNow', '{boss} 보스전', { boss: bossName })
+      : hudTip('hudNextBoss', '{boss}까지 {count}스테이지', { boss: bossName, count: remaining })
+    const cycle = isEndless
+      ? hudTip('hudEndlessCycle', '엔드리스 {cycle}주기', { cycle: endlessCycle })
+      : t('hudStoryCycle', '첫 번째 이야기')
+    const aria = isEndless
+      ? hudTip('hudEndlessStageAria', '엔드리스 {cycle}주기. 주기 {floor}/{total}스테이지. 누적 {day}스테이지. {next}', {
+        cycle: endlessCycle,
+        floor,
+        total: DISPLAY_FLOORS,
+        day,
+        next,
+      })
+      : hudTip('hudStageAria', '{cycle}. {floor}/{total}스테이지. {next}', {
+        cycle,
+        floor,
+        total: DISPLAY_FLOORS,
+        next,
+      })
+    const summary = isEndless
+      ? hudTip('hudEndlessStage', '엔드리스 · {day}스테이지', { day })
+      : `${t('hudStageLabel', '스테이지')} ${floor}<em>/${DISPLAY_FLOORS}</em>`
+    const detailLead = isEndless
+      ? hudTip('hudEndlessCycleProgress', '{cycle}주기 진행 · {floor}/{total}', { cycle: endlessCycle, floor, total: DISPLAY_FLOORS })
+      : cycle
+    const progress = Math.min(100, Math.max(0, (floor / DISPLAY_FLOORS) * 100))
+    const bossMarks = bossFloors
+      .map((bossFloor) => `<i class="stage-progress-boss${floor >= bossFloor ? ' passed' : ''}" style="--boss-at:${(bossFloor / DISPLAY_FLOORS) * 100}%" aria-hidden="true"></i>`)
+      .join('')
+    const bossList = bossFloors
+      .map((bossFloor) => `<span><b>${isEndless ? endlessCycle * DISPLAY_FLOORS + bossFloor : bossFloor}</b>${ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')}</span>`)
+      .join('')
+    return `
+      <section class="stage-progress glass${isEndless ? ' is-endless' : ''}" role="img" tabindex="0" aria-label="${aria}">
+        <span class="stage-progress-summary"><i aria-hidden="true">${isEndless ? '∞' : '✦'}</i><b>${summary}</b></span>
+        <span class="stage-progress-detail" aria-hidden="true">
+          <span class="stage-progress-copy"><small>${detailLead}</small><b>${next}</b></span>
+          <span class="stage-progress-track">
+            <i class="stage-progress-fill" style="width:${progress}%"></i>
+            ${bossMarks}
+          </span>
+          <span class="stage-progress-boss-list">${bossList}</span>
+        </span>
+      </section>`
   }
 
   private setHelpOpen(open: boolean, restoreFocus = false) {
@@ -1036,7 +1121,7 @@ export class BattleView {
     for (const index of waiting) {
       const enemy = this.state.enemies[index]
       if (!enemy || enemy.dead) continue
-      const key = enemy.def.id
+      const key = this.enemyPoolKey(enemy)
       const visual = this.visualForEnemy(enemy)
       if (!visual.model3d || this.prewarmingEnemyKeys.has(key)) continue
       const pool = this.enemyPool.get(key) ?? []
@@ -1062,7 +1147,7 @@ export class BattleView {
   }
 
   private prewarmEnemyModel(enemy: EnemyInst): Promise<void> {
-    const key = enemy.def.id
+    const key = this.enemyPoolKey(enemy)
     const visual = this.visualForEnemy(enemy)
     const host = this.root.querySelector<HTMLElement>('.model-prewarm-stage')
     if (this.destroyed || !host || !visual.model3d) {
@@ -1118,8 +1203,12 @@ export class BattleView {
     return CHARACTER_VISUALS[visualBySprite[enemy.def.sprite] ?? 'moth']
   }
 
+  private enemyPoolKey(enemy: EnemyInst): string {
+    return `${enemy.def.id}:${enemy.def.elite?.rarity ?? 'common'}`
+  }
+
   private acquireFoe(i: number, enemy: EnemyInst): HTMLElement {
-    const key = enemy.def.id
+    const key = this.enemyPoolKey(enemy)
     const visual = this.visualForEnemy(enemy)
     const pool = this.enemyPool.get(key)
     let pooled: HTMLElement | undefined
@@ -1144,12 +1233,15 @@ export class BattleView {
     el.dataset.i = String(i)
     el.dataset.character = visual.id
     el.dataset.poolKey = key
+    el.dataset.enemyRarity = enemy.def.elite?.rarity ?? 'common'
+    el.dataset.enemyTrait = enemy.def.elite?.trait ?? ''
     el.setAttribute('aria-label', `${enemy.def.name} 상세 보기`)
     el.querySelector<HTMLElement>('.nm')!.textContent = enemy.def.name
     const image = el.querySelector<HTMLImageElement>(':scope > .model-shell > .battle-sprite')!
     image.src = visual.portrait2d
     image.alt = enemy.def.name
     const modelShell = el.querySelector<HTMLElement>(':scope > .model-shell')!
+    modelShell.dataset.enemyRarity = enemy.def.elite?.rarity ?? 'common'
     if (!visual.model3d) modelShell.dataset.modelStatus = 'fallback-2d'
     if (this.isBoss) this.queueDeferredCharacterModel(el, visual, 0)
     else mountCharacterModel(el, visual)
@@ -1257,7 +1349,7 @@ export class BattleView {
     host.closest('.action-order')?.classList.toggle('is-preempting', this.playerPreempting)
     host.innerHTML = entries.map((entry, index) => `
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
-        data-order-key="${entry.key}" style="--order-i:${index}">
+        data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
         <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
         <div class="action-order-copy"><b>${entry.name}</b><span>${entry.note}</span></div>
       </li>`).join('')
@@ -1272,6 +1364,7 @@ export class BattleView {
         { duration: 520, easing: 'cubic-bezier(.2, .9, .25, 1)' },
       )
     })
+    this.renderCombatForecast()
   }
 
   private playerHtml(): string {
@@ -1319,9 +1412,7 @@ export class BattleView {
 
   private bossSentenceTokenHtml(token: EnemySentenceToken): string {
     const emotion = token.emotion ? ` emotion-${token.emotion}` : ''
-    const roleLabel = bossText(token.role === 'subject' ? 'roleSubject' : token.role === 'modifier' ? 'roleModifier' : token.role === 'object' ? 'roleObject' : 'roleAction')
     return `<span class="boss-sentence-token role-${token.role}${emotion}${token.crossed ? ' is-crossed' : ''}">
-      <small>${roleLabel}</small>
       <b>${token.text}</b>
     </span>`
   }
@@ -1397,21 +1488,19 @@ export class BattleView {
     this.timers.push(this.bossSentenceEventTimer)
   }
 
-  private bossPlayerHudHtml(): string {
-    return `
-      <section class="boss-player-health-hud nameplate glass" id="boss-player-health-hud" aria-label="${t('playerName', '프롬')} 체력">
-        <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
-        <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
-      </section>`
-  }
-
   private bossHudHtml(): string {
     const bossName = this.state.enemies[0]?.def.name ?? '보스'
+    const { floor, endlessCycle } = this.stageInfo
+    const cycle = endlessCycle > 0
+      ? hudTip('hudEndlessCycle', '엔드리스 {cycle}주기', { cycle: endlessCycle })
+      : t('hudStoryCycle', '첫 번째 이야기')
     return `
-      <section class="boss-health-hud" id="boss-health-hud" aria-label="${bossName} 보스 체력">
+      <section class="boss-health-hud" id="boss-health-hud" aria-label="${bossName} 보스 체력. ${cycle}. ${floor}/${DISPLAY_FLOORS}스테이지">
         <div class="boss-health-heading">
-          <span class="boss-health-mark" aria-hidden="true">BOSS</span>
-          <b class="nm">${bossName}</b>
+          <span class="boss-health-kicker">
+            <span class="boss-health-mark" aria-hidden="true">BOSS</span>
+          </span>
+          <span class="boss-health-title"><b class="nm">${bossName}</b><em class="boss-health-stage">${t('hudStageLabel', '스테이지')} ${floor}/${DISPLAY_FLOORS}</em></span>
           <span class="hpn"></span>
         </div>
         <div class="hp-row">
@@ -1517,11 +1606,11 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
+    if (this.isBoss) return
     const guardLimit = playerGuardLimit(s.playerMax)
-    const hud = this.isBoss ? this.q('#boss-player-health-hud') : el
-    hud.querySelector<HTMLElement>('.hpn')!.innerHTML =
-      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}`
-    this.paintGuardedHpBar(hud.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
+      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
+    this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
   /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
@@ -1712,7 +1801,7 @@ export class BattleView {
     }
 
     // 공략 쪽지가 줄의 초입에 선다. 뒤따르는 능력 뱃지와 섞이지 않도록 모양·색·라벨이 모두 다르다.
-    const tacticalGuide = tacticalGuideForEnemy(e.def.id)
+    const tacticalGuide = tacticalGuideForEnemy(e.def.id, e.def.tacticalGuideId)
     if (tacticalGuide) {
       const tooltip = tip(tacticalGuide.title, tacticalGuide.tooltip)
       icons.push(`<span class="enemy-tip-note" role="img" tabindex="0" aria-label="공략 팁 · ${tooltip}" data-tooltip="${tooltip}" data-tip-label="TIP" data-tip-place="above">${icon('note')}<b>TIP</b></span>`)
@@ -1751,6 +1840,9 @@ export class BattleView {
       tip(`거미줄 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards}`, '드러난 다리를 때리거나 약점 감정으로 막고 회복하면 풀린다'),
     )
     if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', tip('그로기', `지금 주는 피해가 ${e.groggyDamageMult.toFixed(1)}배가 되고 예정된 공격을 한 턴 거른다`))
+    if (e.def.elite) {
+      add(`elite elite-${e.def.elite.rarity}`, '<b>◆</b>', tip(`${e.def.name} · ${e.def.elite.label}`, e.def.note))
+    }
 
     host.hidden = icons.length === 0
     host.innerHTML = icons.join('')
@@ -1879,11 +1971,13 @@ export class BattleView {
     const host = this.q('#detail')
     let stats: string
     if (id === 'player') {
-      const p = this.player.stats
+      const p = this.combatStats()
+      const attackRank = this.state.playerAttackRank ?? 0
+      const guardRank = this.state.playerGuardRank ?? 0
       stats = [
         ['체력', `${Math.max(0, this.state.playerHp)} / ${this.state.playerMax}`],
-        ['공격', String(p.atk)],
-        ['방어', String(p.guard)],
+        ['공격', `${p.atk}${attackRank ? ` (${attackRank > 0 ? '↑' : '↓'}${Math.abs(attackRank)})` : ''}`],
+        ['방어', `${p.guard}${guardRank ? ` (${guardRank > 0 ? '↑' : '↓'}${Math.abs(guardRank)})` : ''}`],
         ['회복', String(p.heal)],
         ['운', String(p.luck)],
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
@@ -1892,20 +1986,17 @@ export class BattleView {
       const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
       const attackStage = enemy ? bossAttackStage(enemy) : 1
       const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
-      const pressureMultiplier = enemy ? bossTurnPressureMultiplier(enemy, this.state.turn) : 1
       const attackStep = enemy ? nextEnemyAttackStep(enemy) : null
       const summonPattern = enemy?.def.summonPattern
       const summons = enemy ? summonCount(enemy) : 0
       const currentPart = enemy ? activeEnemyPart(enemy) : null
-      const attackBonus = (attackStep?.bonusAtk ?? 0)
-        + summons * (summonPattern?.attackBonusPerUnit ?? 0)
-      const attackScale = attackStep?.damageScale ?? 1
-      const attackLow = enemy ? Math.round((enemy.def.atk + attackBonus) * enemy.atkMult * attackMultiplier * attackScale * pressureMultiplier) : 0
-      const attackHigh = enemy ? Math.round((enemy.def.atk + attackBonus + 2) * enemy.atkMult * attackMultiplier * attackScale * pressureMultiplier) : 0
+      // 상세 정보도 실행부와 같은 공용 예상값을 쓴다. 공격 감소·거미줄 상한·다음
+      // 공격 턴의 압박 배율을 따로 재구현하지 않는다.
+      const [attackLow, attackHigh] = enemy ? enemyAttackForecast(this.state, enemy).raw : [0, 0]
       stats = enemy
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
-            ['공격', attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`],
+            ['공격', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
             ...(attackStep ? [['다음 기술', attackStep.name]] : []),
             ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
@@ -1972,7 +2063,8 @@ export class BattleView {
     if (anyPicked) {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
-        extra += `<span class="chain-word ctx perfect"><b class="cw-text">「${c.name}」</b><em class="cw-note combo">완벽한 맥락 ×${c.mult}</em></span>`
+        const known = this.discoveredCombos.has(c.id)
+        extra += `<span class="chain-word ctx perfect"><b class="cw-text">${known ? `「${c.name}」` : '?'}</b><em class="cw-note combo">${known ? `완벽한 맥락 ×${c.mult}` : '새로운 맥락?'}</em></span>`
       }
       // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
       if (intent.doubtCount > 0) {
@@ -2137,19 +2229,12 @@ export class BattleView {
       .join('<span class="sep">·</span>')
 
     const key = this.order()[this.slotIndex]
-    // 테이블 목록을 먼저 본다 — 덱에 없는 유령 카드(무럭무럭·문장부호)가 여기에만 있다.
-    // 덱을 먼저 보면 주어·수식·동사 칸에서 유령 카드가 통째로 사라진다.
+    // 테이블 목록을 먼저 본다 — 덱에 없는 문장부호·조우 전용 카드가 여기에만 있다.
+    // 덱을 먼저 보면 아이템과 보스 공략이 연 임시 선택지가 사라진다.
     const slotWords = this.t.words[key] ?? this.player.deck[key] ?? []
-    // 체력이 가득 찬 턴에는 순수 회복 동사를 드로우 풀에서도 뺀다. 다만 현재 문맥에서
-    // 선택 가능한 비회복 동사가 기본 네 장보다 적으면 소프트락을 피하려고 회복도 허용한다.
-    const verbSlot = key === 'verb' || key === 'verb2'
-    const usableNonHealCount = verbSlot
-      ? slotWords.filter((word) => word.kind !== 'heal' && !conflictReason(word, this.slotIndex, this.sel, this.t)).length
-      : 0
-    const hideHealVerbs = this.state.playerHp >= this.state.playerMax
-      && verbSlot
-      && usableNonHealCount >= CARD_HAND_CONFIG.verbInitialHand
-    const words = hideHealVerbs ? slotWords.filter((word) => word.kind !== 'heal') : slotWords
+    // 회복은 체력이 가득 차도 숨기지 않는다. 초과 회복 전환과 회복 기반 관용구는
+    // 만피에서 시작하는 빌드이므로 드로우 단계가 임의로 전략을 지우면 안 된다.
+    const words = slotWords
     const front = this.state.enemies[frontIdx(this.state)]
     const needsQueenAnswer = front?.def.id === 'queenBee'
       && summonCount(front) > 0
@@ -2163,6 +2248,112 @@ export class BattleView {
     )
     this.castPendingSpiderWeb(key)
     this.renderDetail(null)
+    this.renderCombatForecast()
+  }
+
+  /** 카드 위를 가리지 않고 좌상단 행동 순서의 각 초상화 호버에 실제 예상값을 붙인다. */
+  private renderCombatForecast(): void {
+    const selected = this.order().some((key) => !!this.sel[key])
+    let sentenceValue = bossText('forecastWaiting')
+    let sentenceLabel = bossText('forecastMySentence')
+    let sentenceMeta = ''
+
+    if (selected) {
+      const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
+      const chosenCount = this.order().filter((key) => !!this.sel[key]).length
+      const actionReady = effectiveBase(intent) > 0
+        || intent.guard > 0
+        || intent.heal > 0
+        || (intent.guardAttackMultiplier > 0 && this.state.guard > 0)
+        || intent.attackRank !== 0
+        || intent.guardRank !== 0
+        || intent.enemyAttackRank !== 0
+        || intent.magicShield > 0
+      if (!actionReady) {
+        sentenceValue = bossText('forecastProgress', { current: chosenCount, total: this.order().length })
+      } else {
+        const normalMult = resolveMultiplier(intent, this.multCtx(intent), .99).mult
+        const guardPreview = Math.round(intent.guard * normalMult * intent.castScale * intent.castCount)
+        const healPreview = Math.round(intent.heal * normalMult * intent.castScale * intent.castCount)
+        const overhealDamage = Math.round(
+          Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
+            * intent.overhealDamageMultiplier,
+        )
+        const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+        const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+        const damageValue = Math.round(
+          (effectiveBase(intent) * normalMult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount,
+        )
+        const value = isDamageIntent(intent)
+          ? damageValue
+          : intent.guard > 0
+            ? guardPreview
+            : healPreview
+        const kindKey = intent.kind === 'attack'
+          ? 'forecastAttack'
+          : intent.kind === 'guard'
+            ? 'forecastGuard'
+            : intent.kind === 'heal'
+              ? 'forecastHeal'
+              : 'forecastDebuff'
+        const targetCount = intent.targetCount === 'all'
+          ? aliveIdx(this.state).length
+          : Math.min(intent.targetCount, aliveIdx(this.state).length)
+        sentenceValue = bossText('forecastContextValue', { value })
+        const enemyTargets = bossText('forecastTargets', { count: Math.max(1, targetCount) })
+        const targetText = intent.targetMode === 'self'
+          ? bossText('forecastSelf')
+          : intent.targetMode === 'both'
+            ? `${enemyTargets} + ${bossText('forecastSelf')}`
+            : enemyTargets
+        sentenceMeta = `${bossText(kindKey)} · ${targetText}`
+        if (!isDamageIntent(intent) && damageValue > 0) {
+          sentenceMeta += ` · ${bossText('forecastAttack')} ${damageValue}`
+        }
+      }
+    } else if (this.lastResolvedTally) {
+      const tally = this.lastResolvedTally
+      sentenceLabel = bossText('forecastLastSentence')
+      sentenceValue = bossText('forecastExact', {
+        base: tally.base,
+        mult: tally.mult.toFixed(2),
+        total: tally.total,
+      })
+      sentenceMeta = bossText(tally.kind === 'dmg' ? 'forecastAttack' : tally.kind === 'guard' ? 'forecastGuard' : 'forecastHeal')
+    }
+
+    const enemy = this.state.enemies[frontIdx(this.state)]
+    let enemyTooltip = ''
+    if (enemy) {
+      const forecast = enemyAttackForecast(this.state, enemy)
+      const timing = forecast.attackTurn > this.state.turn
+        ? bossText('turnsLater', { count: forecast.attackTurn - this.state.turn })
+        : bossText(enemy.initiativePhase === 'first' ? 'first' : 'second')
+      const projected = enemySentenceFor(this.state, enemy)
+      const action = projected?.tokens.map((token) => token.text).join(' ') ?? bossText('forecastAttack')
+      const defense = forecast.magicShieldBlocked
+        ? bossText('forecastMagicBlock')
+        : forecast.guardShattered
+          ? bossText('forecastGuardShatter')
+          : forecast.piercedGuard
+            ? bossText('forecastPierce')
+            : forecast.dealt[1] === 0 && this.state.guard > 0
+              ? bossText('forecastGuardBlock')
+              : ''
+      enemyTooltip = [
+        bossText('forecastEnemy'),
+        bossText('forecastEnemyAction', { name: action, timing }),
+        `${bossText('forecastTargetPlayer')} · ${bossText('forecastRawDamage', { min: forecast.raw[0], max: forecast.raw[1] })}`,
+        bossText('forecastHpAfter', { min: forecast.hpAfter[0], max: forecast.hpAfter[1] }),
+        defense,
+      ].filter(Boolean).join('\n')
+    }
+
+    const playerTooltip = [sentenceLabel, sentenceValue, sentenceMeta].filter(Boolean).join('\n')
+    const playerOrder = this.root.querySelector<HTMLElement>('.action-order-item.player')
+    const enemyOrder = this.root.querySelector<HTMLElement>('.action-order-item.enemy:not(.timing-waiting):not(.timing-summary)')
+    if (playerOrder) playerOrder.dataset.tooltip = playerTooltip
+    if (enemyOrder && enemyTooltip) enemyOrder.dataset.tooltip = enemyTooltip
   }
 
   /** 장로거미는 문장마다 슬롯을 순환 지정한다. 해당 슬롯이 열릴 때 카드 한 장만 묶는다. */
@@ -2269,7 +2460,7 @@ export class BattleView {
     const sealed = this.cardHand.isSealed(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
-    const intent = compile(trial, this.t, this.combatStats(), this.mods())
+    const intent = compile(trial, this.t, this.combatStats(trial), this.mods())
     const warn = intent.penalties.length
       ? `<div class="wd-warn">⚠ ${intent.penalties[0]} · 위력 ×${intent.coherence.toFixed(2)}</div>`
       : ''
@@ -2291,15 +2482,21 @@ export class BattleView {
       ${sealed ? `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>` : ''}`
   }
 
-  private multCtx(intent: Intent) {
-    const stats = this.combatStats()
+  private multCtx(intent: Intent, selection: Selection = this.sel) {
+    const stats = this.combatStats(selection)
     return { luck: stats.luck, statBias: statBiasOf(intent, stats) }
   }
 
-  /** The boost changes only outgoing attack-stat cards, never saved stats or heal/guard values. */
-  private combatStats() {
-    if (this.debugAttackMultiplier === 1) return this.player.stats
-    return { ...this.player.stats, atk: this.player.stats.atk * this.debugAttackMultiplier }
+  /** 전투 랭크는 저장 스탯을 바꾸지 않고 이 전투의 컴파일 입력에만 반영한다. */
+  private combatStats(selection: Selection = this.sel) {
+    const selected = Object.values(selection)
+    const pendingAttackRank = selected.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), 0)
+    const pendingGuardRank = selected.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), 0)
+    return {
+      ...this.player.stats,
+      atk: rankedStat(this.player.stats.atk * this.debugAttackMultiplier, (this.state.playerAttackRank ?? 0) + pendingAttackRank),
+      guard: rankedStat(this.player.stats.guard, (this.state.playerGuardRank ?? 0) + pendingGuardRank),
+    }
   }
 
   /** 보유 패시브 → 컴파일러 수정자. 바베큐는 이번 전투 처치 수를 먹는다. */
@@ -2326,12 +2523,16 @@ export class BattleView {
   // 공/방/회 모두 하나의 배율을 공유한다(execute와 동일 규칙, 룰렛만 미확정).
   // 스탯은 이미 동사의 깡수치로 들어가 있으니 여기서 또 더하지 않는다.
   private projectFinal(sel: Selection): { dmg: number; heal: number; guard: number; self: number; multiplier: number } {
-    const intent = compile(sel, this.t, this.combatStats(), this.mods())
-    const m = resolveMultiplier(intent, this.multCtx(intent), 0.5).mult
+    const intent = compile(sel, this.t, this.combatStats(sel), this.mods())
+    const m = resolveMultiplier(intent, this.multCtx(intent, sel), 0.5).mult
     const castPower = intent.castCount * intent.castScale
     const guard = Math.round(intent.guard * m * castPower)
     const heal = Math.round(intent.heal * m * castPower)
-    const dmg = Math.round(effectiveBase(intent) * m * intent.hitCount * castPower)
+    const missingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
+    const overhealDamage = Math.round(Math.max(0, heal - missingHp) * intent.overhealDamageMultiplier)
+    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guard)
+    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+    const dmg = Math.round((effectiveBase(intent) * m * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
     return { dmg, heal, guard, self: intent.recoil, multiplier: m }
   }
@@ -2381,7 +2582,13 @@ export class BattleView {
       `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
-          const value = m.key === 'hp' ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}` : String(this.player.stats[m.key])
+          const value = m.key === 'hp'
+            ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}${this.state.guard ? ` ◈${this.state.guard}` : ''}${this.state.playerMagicShield ? ' ✦1' : ''}`
+            : m.key === 'atk'
+              ? `${this.combatStats().atk}${this.state.playerAttackRank ? ` ${this.state.playerAttackRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerAttackRank)}` : ''}`
+              : m.key === 'guard'
+                ? `${this.combatStats().guard}${this.state.playerGuardRank ? ` ${this.state.playerGuardRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerGuardRank)}` : ''}`
+                : String(this.player.stats[m.key])
           return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
@@ -2564,20 +2771,40 @@ export class BattleView {
     GameAudio.play('paper')
   }
 
+  private async showComboDiscovery(combos: Combo[]): Promise<void> {
+    const note = document.createElement('div')
+    note.className = 'combo-discovery-note'
+    note.setAttribute('role', 'status')
+    note.setAttribute('aria-live', 'polite')
+    note.innerHTML = `
+      <span>${comboCodexText('discovery')}</span>
+      <b>「${combos.map((combo) => combo.name).join(' · ')}」</b>
+      <small>${comboCodexText('recorded')} · ${comboCodexText('found')} ${this.t.combos.filter((combo) => this.discoveredCombos.has(combo.id)).length} / ${this.t.combos.length}</small>`
+    this.root.append(note)
+    GameAudio.play('paper')
+    await sleep(900)
+    note.classList.add('leaving')
+    await sleep(220)
+    note.remove()
+  }
+
+  // ── 도감 — 현재 단어장과 카드·관용구·적·아이템 기록을 왼쪽 인덱스로 넘겨 본다. ──
   private openCodex() {
     const host = this.q('#overlay')
     const slots = this.t.template.slots
     const ownedWords = Object.values(this.player.deck).flat()
     // 문장부호는 덱에 들어오지 않는다 — 칸을 여는 아이템(올림프의 당근)을 얻으면 기록된다.
-    // 무럭무럭은 카드풀에 유령처럼 섞이는 성장 카드라 도감에 남기지 않는다.
+    // 보상으로 얻는 무럭무럭은 실제 덱 카드이므로 다른 단어와 같은 방식으로 기록한다.
     const punctOwned = hasPassive(this.player, 'punct')
     const owned = new Set([
       ...Object.values(this.player.deck).flat().map((word) => word.id),
       ...(punctOwned ? PUNCT_WORDS.map((word) => word.id) : []),
     ])
-    const catalog = [...Object.values(EARLY_WORDS).flat(), ...Object.values(REWARD_WORDS).flat(), ...PUNCT_WORDS]
+    const catalog = [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS, ...PUNCT_WORDS]
       .filter((word, index, all) => all.findIndex((entry) => entry.id === word.id) === index)
     const found = catalog.filter((word) => owned.has(word.id)).length
+    const comboCatalog = this.t.combos
+    const foundCombos = comboCatalog.filter((combo) => this.discoveredCombos.has(combo.id)).length
     const slotLabel: Record<string, string> = { subj: '주어', adv: '수식', obj: '목적어', verb: '동사', end: '어미', punct: '문장부호' }
     const groups = [...new Set(catalog.map((word) => word.slot))]
     const encountered = new Set(this.state.enemies.map((enemy) => enemy.def.id))
@@ -2612,6 +2839,19 @@ export class BattleView {
           }).join('')}
         </div>
       </section>`).join('')}
+    </div>`
+
+    const comboContent = `<div class="codex-page codex-combo-page" data-codex-page="combo" hidden>
+      <p class="codex-intro">${comboCodexText('intro')}</p>
+      <div class="codex-grid codex-combo-grid">
+        ${comboCatalog.map((combo) => {
+          const discovered = this.discoveredCombos.has(combo.id)
+          return `<article class="codex-entry combo-entry${discovered ? ' discovered' : ' missing'}">
+            <span class="codex-mark">${discovered ? '✦' : '?'}</span>
+            <div><b>${discovered ? `「${combo.name}」` : comboCodexText('unknown')}</b><span>${discovered ? `${currentLocale === 'ko' && combo.flavor ? combo.flavor : comboCodexText('knownHint')} · ×${combo.mult.toFixed(2)}` : comboCodexText('unknownHint')}</span></div>
+          </article>`
+        }).join('')}
+      </div>
     </div>`
 
     const enemyContent = `<div class="codex-page" data-codex-page="enemy" hidden>
@@ -2653,12 +2893,14 @@ export class BattleView {
           <nav class="codex-index" aria-label="도감 분류">
             <button type="button" class="on" data-codex-tab="owned" data-count="내 단어 ${ownedWords.length}"><span>01</span><b>현재 내 단어</b><small>${ownedWords.length}장</small></button>
             <button type="button" data-codex-tab="card" data-count="카드 ${found} / ${catalog.length}"><span>02</span><b>카드 도감</b><small>${found} / ${catalog.length}</small></button>
-            <button type="button" data-codex-tab="enemy" data-count="적 ${foundEnemies} / ${enemyCatalog.length}"><span>03</span><b>적 도감</b><small>${foundEnemies} / ${enemyCatalog.length}</small></button>
-            <button type="button" data-codex-tab="item" data-count="아이템 ${foundItems} / ${itemCatalog.length}"><span>04</span><b>아이템 도감</b><small>${foundItems} / ${itemCatalog.length}</small></button>
+            <button type="button" data-codex-tab="combo" data-count="${comboCodexText('tab')} ${foundCombos} / ${comboCatalog.length}"><span>03</span><b>${comboCodexText('tab')}</b><small>${foundCombos} / ${comboCatalog.length}</small></button>
+            <button type="button" data-codex-tab="enemy" data-count="적 ${foundEnemies} / ${enemyCatalog.length}"><span>04</span><b>적 도감</b><small>${foundEnemies} / ${enemyCatalog.length}</small></button>
+            <button type="button" data-codex-tab="item" data-count="아이템 ${foundItems} / ${itemCatalog.length}"><span>05</span><b>아이템 도감</b><small>${foundItems} / ${itemCatalog.length}</small></button>
           </nav>
           <div class="codex-content">
             ${ownedContent}
             ${cardContent}
+            ${comboContent}
             ${enemyContent}
             ${itemContent}
           </div>
@@ -2790,6 +3032,7 @@ export class BattleView {
     // CardHand 외부의 개발 입력이나 지연된 confirm도 정산 잠금 뒤에는 선택을 바꾸지 못한다.
     if (this.busy || this.over) return
     this.inkPreviewSpent = null
+    if (!this.order().some((slot) => !!this.sel[slot])) this.lastResolvedTally = null
     const key = this.order()[this.slotIndex]
     const debugKey = `${key}:${id}`
     const w = this.t.words[key].find((x) => x.id === id) ?? this.debugSpawnedWords.get(debugKey)
@@ -3265,7 +3508,12 @@ export class BattleView {
       this.doubtRolls(intent),
     )
     const mult = resolved.mult
-    const dmg = Math.round(effectiveBase(intent) * mult * intent.hitCount * intent.castCount * intent.castScale)
+    const healPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
+    const overhealDamage = Math.round(Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
+    const guardPreview = Math.round(intent.guard * mult * intent.castScale * intent.castCount)
+    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+    const dmg = Math.round((effectiveBase(intent) * mult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
@@ -3286,6 +3534,11 @@ export class BattleView {
     if (intent.combos.length) {
       GameAudio.play('contextBonus')
       const combos = matchCombos(this.sel, this.t.combos, order)
+      const newlyDiscovered = combos.filter((combo) => !this.discoveredCombos.has(combo.id))
+      if (newlyDiscovered.length) {
+        discoverCombos(newlyDiscovered.map((combo) => combo.id))
+        newlyDiscovered.forEach((combo) => this.discoveredCombos.add(combo.id))
+      }
       const comboMult = combos.reduce((m, c) => m * c.mult, 1)
       const el = this.q('#combo')
       el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">위력 ×${comboMult.toFixed(1)}</div>`
@@ -3294,21 +3547,26 @@ export class BattleView {
       el.classList.add('show')
       await sleep(520)
       el.classList.remove('show')
+      if (newlyDiscovered.length) await this.showComboDiscovery(newlyDiscovered)
     }
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
     //    이 숫자를 들고 준비 효과 → 선공 → 내 공격까지 이어가므로 중간에 다시 계산하지 않는다.
     this.noteSentence(intent.sentence, mult, dealsDamage ? dmg : 0)
     const tally = this.buildTally(intent, resolved, dealsDamage)
+    this.lastResolvedTally = tally
     if (tally.total > 0) await this.playTally(tally)
 
-    // 무럭무럭 — 배율을 받지 않는 고정 성장이라 배율 정산과 별개로 먼저 자란다.
-    // 최대 체력과 현재 체력을 함께 올려야 "자랐다"가 체감된다.
-    if (intent.growHp > 0) await this.growUp(intent.growHp)
+    // 보상 카드의 성장과 하늘나물의 첫 문장 성장을 한 번에 보여 준다.
+    const passiveGrowth = beanstalkGrowthFor(this.player, !this.beanstalkGrownThisBattle)
+    if (passiveGrowth > 0) this.beanstalkGrownThisBattle = true
+    const totalGrowth = intent.growHp + passiveGrowth
+    if (totalGrowth > 0) await this.growUp(totalGrowth)
 
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
+    if (prep.attackRankGain || prep.guardRankGain || prep.enemyAttackRankChange) this.renderStats()
     if (prep.guardGain > 0) {
       GameAudio.play('shield')
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
@@ -3321,6 +3579,13 @@ export class BattleView {
     if (prep.guardAttempted > prep.guardGain) {
       this.popPlayer(`실드 한도 ${playerGuardLimit(this.state.playerMax)}`, 'guard')
       this.log(`방어막은 최대 체력만큼만 비축한다 — ${this.state.guard}/${playerGuardLimit(this.state.playerMax)}`)
+    }
+    if (prep.magicShieldGain > 0) {
+      GameAudio.play('shield')
+      playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
+      await this.flyToPlayer(BUILD_EFFECT_TEXT.magic, 'guard', 'guard')
+      this.log(`${intent.sentence} → ${BUILD_EFFECT_TEXT.magicReady}`)
     }
     this.renderActors()
 
@@ -3379,6 +3644,14 @@ export class BattleView {
     )
     this.releaseTally()
     await this.strike(res, sweep, heavy)
+    if ((res.lifeStolen ?? 0) > 0) {
+      this.updatePlayer(this.q<HTMLElement>('.actor.you'))
+      await this.flyToPlayer(buildEffectText('healPop', res.lifeStolen), 'heal', 'heal')
+      this.log(buildEffectText('healed', res.lifeStolen))
+    }
+    if ((res.convertedDamage ?? 0) > 0) {
+      this.log(buildEffectText('overflow', res.convertedDamage))
+    }
     if (missedSpiderWeakness) this.showBossTokenHint(TOKEN_BOSS_HINTS.elderSpiderMiss)
     if (res.summonDamage > 0) {
       this.log(`문장이 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
@@ -3404,13 +3677,13 @@ export class BattleView {
 
     if (res.overflow > 0 && !allDead(this.state)) {
       this.showCombatCoach('overflow')
-      kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+      kills += await this.resolveOverflow(res.overflow, sweep, heavy, intent)
     }
 
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
     // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
     if (resolved.outcome === 'crit' && hasPassive(this.player, 'echo') && !allDead(this.state)) {
-      kills += await this.echoStrike(intent, mult, sweep, heavy)
+      kills += await this.echoStrike(intent, mult * ECHO_REPEAT_SCALE, sweep, heavy)
     }
 
     // 맞대던 적이 죽었으면 새 최전방을 여기서 맞댄다 — 행동 순서 표시도 같은 상태를 읽는다.
@@ -3419,10 +3692,6 @@ export class BattleView {
     // 아기돼지 바베큐 — 잡은 수가 다음 문장의 배율이 된다.
     this.killsThisBattle += kills
     for (let i = 0; i < kills; i++) this.token?.feel('enemyKilled')
-
-    // 한 턴에 두 마리 이상 쓸어담으면 획득 예정 영감이 띵·띵·띵 오른다. 전멸 마무리면 +1.
-    const gradeGain = overkillGain(kills, allDead(this.state))
-    if (gradeGain > 0) await this.dingGrade(gradeGain)
 
     if (allDead(this.state)) {
       this.log('마지막 벌레가 책장 밖으로 떨어졌다.')
@@ -3458,9 +3727,6 @@ export class BattleView {
         for (const k of result.killed) await this.playDeath(k, 1)
         this.renderActors()
         if (result.killed.length > 0) engageFront(this.state)
-        // 예약 문장의 몰살도 오버킬로 인정한다.
-        const pendingGain = overkillGain(result.killed.length, allDead(this.state))
-        if (pendingGain > 0) await this.dingGrade(pendingGain)
       }
     }
 
@@ -3478,7 +3744,7 @@ export class BattleView {
     this.endSlowmo()
     this.sel = {}
     this.clearNormalTokenWarning()
-    this.cardHand.grantNextOpeningHand(intent.drawCards)
+    this.cardHand.grantDraws(intent.bonusDraws)
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++
@@ -3494,9 +3760,10 @@ export class BattleView {
     const turnSummons = summonAtTurnStart(this.state)
     this.renderActors()
     if (turnSummons.length > 0) await this.playTurnSummons(turnSummons)
-    // 턴이 넘어가면 등급이 식는다 — 운이 보장하는 바닥까지만.
+    // 세 문장을 쓸 때마다 등급이 한 번 식는다. 방어·회복이 공격보다 한 문장 길다는
+    // 이유만으로 매번 보상을 잃지 않되, 아주 오래 끄는 전투에는 여전히 비용이 남는다.
     const prevGrade = this.grade
-    this.grade = decayGrade(this.grade, this.player.stats.luck)
+    this.grade = gradeForElapsedTurns(this.player.stats.luck, Math.max(0, this.state.turn - 1))
     if (this.grade < prevGrade) this.tickGradeDown()
     this.setPhase('주어 선택')
     this.busy = false
@@ -3526,23 +3793,21 @@ export class BattleView {
   /**
    * 무럭무럭 — 최대 체력이 영구히 자란다. 배율을 받지 않는 고정 수치다.
    * 런 전체에 남아야 하므로 플레이어 스탯(hp)까지 함께 올린다.
-   * 겹칠수록 이름이 길어진다: 무럭무럭 → 무럭무럭무럭무럭.
    */
   private async growUp(n: number): Promise<void> {
     this.player.stats.hp += n
     this.state.playerMax += n
     this.state.playerHp += n
-    // 카드 한 장이 +2라 자란 만큼 그대로 반복하면 한 장은 "무럭무럭"으로 읽힌다.
-    const label = '무럭'.repeat(Math.min(n, 8)) + (n > 8 ? '…' : '')
-    this.popPlayer(`${label} 최대체력+${n}`, 'heal')
-    this.log(`${label} — 최대 체력이 ${n} 자랐다.`)
+    const text = growthText(n)
+    this.popPlayer(text.pop, 'heal')
+    this.log(text.log)
     this.renderStats()
     this.renderActors()
     await sleep(420)
   }
 
   /**
-   * 메아리 재발동 — 같은 문장을 같은 배율로 한 번 더 꽂는다.
+   * 메아리 재발동 — 같은 문장을 확정 배율의 50%로 한 번 더 꽂는다.
    * 배율을 다시 굴리지 않으므로 대성공 ×1.5가 두 번 그대로 들어간다.
    * 반환값은 이번 재발동으로 늘어난 처치 수(오버킬 등급에 합산).
    */
@@ -3573,7 +3838,7 @@ export class BattleView {
     this.renderActors()
 
     let kills = res.killed.length
-    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy)
+    if (res.overflow > 0 && !allDead(this.state)) kills += await this.resolveOverflow(res.overflow, sweep, heavy, intent)
     return kills
   }
 
@@ -4212,8 +4477,13 @@ export class BattleView {
   // 오버플로우 — 초과 피해가 꼬챙이처럼 다음 적을 깊게 관통한다(빠바바박).
   // 한 마리씩 쓰러질수록 콤보가 오르고 불꽃·흔들림·배지가 점점 화려해진다.
   // 강타에서는 그 초과 피해가 검기가 되어 레일을 훑고 뒤로 빠져나간다.
-  // 반환값: 관통으로 추가 처치한 수(보상등급 오버킬 집계용).
-  private async resolveOverflow(overflow: number, sweep = false, heavy: AttackCut | null = null): Promise<number> {
+  // 반환값: 관통으로 추가 처치한 수(전투 중 처치 누적과 패시브 계산용).
+  private async resolveOverflow(
+    overflow: number,
+    sweep = false,
+    heavy: AttackCut | null = null,
+    intent?: Pick<Intent, 'emotions' | 'tags' | 'combos'>,
+  ): Promise<number> {
     const actors = this.q('#actors')
     if (sweep) actors.classList.add('rail-rush')
     let combo = 1 // strike의 첫 처치가 콤보 1. 관통마다 +1.
@@ -4239,7 +4509,11 @@ export class BattleView {
       await sleep(beamMs > 0 ? beamMs : gap)
       // 오버킬 전이는 일반 방어막과 매직실드를 소모하지 않고 체력에 직접 꽂힌다.
       // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
-      const transfer = applyOverkillTransfer(this.state, front, overflow)
+      const transfer = applyOverkillTransfer(this.state, front, overflow, {
+        emotions: intent?.emotions,
+        tags: intent?.tags,
+        comboMatched: (intent?.combos.length ?? 0) > 0,
+      })
       GameAudio.playSwordHit(this.swordHitCount++)
       // 깊고 화려한 관통 — 콤보에 따라 블라스트/불꽃/흔들림이 커진다.
       ember.classList.add('stab')
@@ -4351,18 +4625,17 @@ export class BattleView {
   // 보상등급 배지 — 현재 등급 숫자와, 그 등급이면 노려볼 만한 희귀도의 색.
   private renderGrade() {
     const badge = this.q('#grade-badge')
+    const unusedDraws = this.cardHand?.savedDraws ?? CARD_HAND_CONFIG.drawsPerStage
+    const rewardValue = clearRewardValue(this.grade, unusedDraws)
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${this.grade}\n획득 예정 영감이다. 전투가 길어지면 줄고, 한 턴에 쓸어담으면 늘어난다.`, { value: this.grade })
-    badge.setAttribute('aria-label', `클리어 보상 +${this.grade}`)
+    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${rewardValue}\n속도 등급 ${this.grade} + 미사용 무료 드로우 ${unusedDraws}. 속도 등급은 빠르게 끝낼수록 높다.`, { value: rewardValue, speed: this.grade, draws: unusedDraws })
+    badge.setAttribute('aria-label', `클리어 보상 +${rewardValue}, 속도 등급 ${this.grade}, 미사용 무료 드로우 ${unusedDraws}`)
     badge.dataset.tooltip = tooltip
-    this.q('#grade').textContent = `+${this.grade}`
+    this.q('#grade').textContent = `+${rewardValue}`
   }
 
-  /**
-   * 승리 마무리 — 아낀 카드 뽑기를 영감으로 바꾼 뒤 피날레를 돌린다.
-   * 뽑기를 참으면 그만큼 전리품이 좋아지므로 "지금 손패로 버틸까"가 선택이 된다.
-   */
+  /** 승리 마무리 — 현재 속도 등급을 그대로 확정하고 피날레를 돌린다. */
   private async finishWin(pause: number): Promise<void> {
     this.over = true
     this.setPhase('전투 승리')
@@ -4370,11 +4643,6 @@ export class BattleView {
     const victory = Math.random() < 0.5 ? 'victory1' : 'victory2'
     playCharacterAnimation(this.q<HTMLElement>('.actor.you'), victory)
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
-    const saved = this.cardHand.savedDraws
-    if (saved > 0) {
-      this.log(`카드 뽑기 ${saved}회를 아꼈다 — 영감 +${saved}`)
-      await this.dingGrade(saved)
-    }
     await sleep(pause)
     await this.gradeFinale()
     this.token?.feel(this.isBoss ? 'bossDown' : 'runCleared')
@@ -4382,32 +4650,13 @@ export class BattleView {
     await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)
-    this.onWin(this.grade, this.combatResources())
+    this.onWin(this.grade, this.combatResources(), clearRewardValue(this.grade, this.cardHand.savedDraws))
   }
 
   private combatResources(): { hp: number; guard: number } {
     return {
       hp: Math.max(0, Math.min(this.state.playerMax, this.state.playerHp)),
       guard: Math.max(0, Math.min(playerGuardLimit(this.state.playerMax), this.state.guard)),
-    }
-  }
-
-  // 띵·띵·띵 — 처치 수만큼 등급이 연타로 튀어오른다. 만렙이면 조용히 멈춘다.
-  private async dingGrade(n: number) {
-    const badge = this.q('#grade-badge')
-    for (let i = 0; i < n; i++) {
-      if (this.grade >= GRADE_MAX) break
-      this.grade = bumpGrade(this.grade, 1)
-      this.renderGrade()
-      badge.classList.remove('ding')
-      void (badge as HTMLElement).offsetWidth
-      badge.classList.add('ding')
-      const pop = document.createElement('span')
-      pop.className = 'grade-pop'
-      pop.textContent = '+1'
-      badge.appendChild(pop)
-      this.timers.push(window.setTimeout(() => pop.remove(), 700))
-      await sleep(150)
     }
   }
 
@@ -4442,7 +4691,7 @@ export class BattleView {
 
   /** 클리어 보상을 중앙 배지에서 좌상단 보유 영감으로 옮기고 실제 지급값까지 카운트업한다. */
   private async collectClearInspiration() {
-    const gained = Math.max(0, Math.round(this.grade))
+    const gained = clearRewardValue(this.grade, this.cardHand.savedDraws)
     const wallet = this.q<HTMLElement>('.inspiration-wallet')
     const balance = wallet.querySelector<HTMLElement>('.inspiration-wallet-copy b')
     const source = this.q<HTMLElement>('#grade-badge')
@@ -4751,6 +5000,12 @@ export class BattleView {
       if (st.dealt > 0) this.noteAttacker(st.idx)
       if (st.dealt <= 0) {
         this.log(st.text)
+        if (st.magicShieldBroken) {
+          const you = this.q<HTMLElement>('.actor.you')
+          SquareBurst.playOn(you, 'guard', { spread: 130 })
+          this.popPlayer(BUILD_EFFECT_TEXT.blocked, 'guard big')
+          this.log(BUILD_EFFECT_TEXT.magicBlocked)
+        }
         if (st.telegraphText) {
           if (this.state.enemies[st.idx]?.def.id === 'mantis') {
             this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisTelegraph)

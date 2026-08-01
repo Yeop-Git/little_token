@@ -27,7 +27,7 @@ import { numericNoteParts, wordNoteText } from '@core/wordText'
 import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
 import { RARITY_LABEL, type Tables, type Word } from '@core/types'
-import { EARLY_WORDS, GROW_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, GROW_WORDS, LEGENDARY_REWARD_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { TABLES } from '@data/tables'
 
@@ -132,10 +132,10 @@ function checkBudget(): string[] {
     const rarity = w.rarity ?? 'common'
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
     if (slot === 'adv') {
-      const staleStats = w.bonus != null || w.crit != null || w.stat != null
+      const staleStats = w.crit != null || w.stat != null
       if (staleStats) {
-        out.push(`${pool}/${w.text}: 수식어에 배율·대성공·룰렛 스탯이 남아 있다`)
-        console.log(`  위반  ${pool} · ${w.text} — 수식어는 배율·대성공·룰렛 스탯을 가질 수 없다`)
+        out.push(`${pool}/${w.text}: 수식어에 대성공·룰렛 스탯이 남아 있다`)
+        console.log(`  위반  ${pool} · ${w.text} — 수식어는 대성공·룰렛 스탯을 가질 수 없다`)
       }
       if (!hasModifierTactic(w)) {
         out.push(`${pool}/${w.text}: 공개 전술 기능이 없다`)
@@ -203,13 +203,8 @@ function checkBudget(): string[] {
   return out
 }
 
-/**
- * 무럭무럭 커버리지 — "모든 맥락에 끼어든다"가 이 카드의 정체다.
- * 슬롯을 여는 아이템을 전부 든 상태로 테이블을 만들어, 열린 칸이 하나도 빠짐없이
- * 무럭무럭을 갖는지 본다. 새 슬롯을 추가하고 여기서 걸리면 데이터가 아니라
- * earlyWords의 스탬핑을 봐야 한다는 뜻이다.
- */
-function checkGrowCoverage(): string[] {
+/** 하늘나물의 전투당 패시브와 보상으로 등록되는 무럭무럭 카드를 서로 섞지 않는다. */
+function checkGrowthRules(): string[] {
   const out: string[] = []
   const items: OwnedItem[] = (['beanstalk', 'punct', 'twinSubj', 'twinVerb'] as PassiveId[]).map(
     (passive, i) => ({
@@ -224,18 +219,21 @@ function checkGrowCoverage(): string[] {
   )
   const player = { ...defaultPlayer(), items }
   const t = makeEarlyTables(player.deck, player)
-  console.log(`\n무럭무럭 커버리지 — 열린 칸 ${t.template.slots.length}개`)
-  for (const s of t.template.slots) {
-    const has = (t.words[s.key] ?? []).some((w) => w.growHp)
-    console.log(`  ${has ? '통과' : '위반'}  ${s.label}(${s.key}) — 무럭무럭 ${has ? '있음' : '없음'}`)
-    if (!has) out.push(`${s.key}: 무럭무럭 없음`)
-  }
-  // 수치가 한 곳에서만 나오는지 — 칸마다 다르면 "같은 카드"가 아니다.
-  const grown = t.template.slots.flatMap((s) => (t.words[s.key] ?? []).filter((w) => w.growHp))
-  const shapes = new Set(grown.map((w) => `${w.growHp}|${w.rarity}|${w.art}|${w.note}`))
+  console.log('\n무럭무럭 성장 규칙')
+  const injected = t.template.slots.flatMap((s) => (t.words[s.key] ?? []).filter((w) => w.growHp))
+  console.log(`  ${injected.length === 0 ? '통과' : '위반'}  하늘나물 아이템이 슬롯에 유령 카드를 넣지 않음`)
+  if (injected.length > 0) out.push(`하늘나물이 유령 카드 ${injected.length}장을 주입함`)
+
+  const rewardSlots = new Set(LEGENDARY_REWARD_WORDS.map((word) => word.slot))
+  const expectedSlots = ['subj', 'adv', 'verb']
+  const rewardCoverage = expectedSlots.every((slot) => rewardSlots.has(slot)) && rewardSlots.size === expectedSlots.length
+  console.log(`  ${rewardCoverage ? '통과' : '위반'}  보상 카드가 초반 세 슬롯을 각각 담당`)
+  if (!rewardCoverage) out.push(`보상 무럭무럭 슬롯 ${[...rewardSlots].join('/')}`)
+
+  const shapes = new Set(LEGENDARY_REWARD_WORDS.map((w) => `${w.growHp}|${w.rarity}|${w.art}|${w.note}`))
   if (shapes.size > 1) {
-    out.push(`무럭무럭 수치가 칸마다 다르다(${shapes.size}종)`)
-    console.log(`  위반  칸마다 수치가 다르다 — ${[...shapes].join(' / ')}`)
+    out.push(`보상 무럭무럭 수치가 슬롯마다 다르다(${shapes.size}종)`)
+    console.log(`  위반  보상 카드 수치가 다르다 — ${[...shapes].join(' / ')}`)
   }
   return out
 }
@@ -247,13 +245,13 @@ const violations = [
 ]
 const brokenArt = checkArt()
 const budget = checkBudget()
-const grow = checkGrowCoverage()
+const grow = checkGrowthRules()
 
 if (violations.length || brokenArt.length || budget.length || grow.length) {
   if (violations.length) console.log(`\n위반 ${violations.length}건 — 해당 슬롯에 태그 없는 중립 단어를 추가하라.`)
   if (brokenArt.length) console.log(`일러스트 위반 ${brokenArt.length}건 — assets/index.ts의 SKILL_ART에 키를 등록하라.`)
   if (budget.length) console.log(`예산 위반 ${budget.length}건 — words.csv의 수치나 rarity를 고쳐라(기준: src/core/budget.ts).`)
-  if (grow.length) console.log(`무럭무럭 위반 ${grow.length}건 — earlyWords의 growCardFor 스탬핑을 확인하라.`)
+  if (grow.length) console.log(`무럭무럭 위반 ${grow.length}건 — 하늘나물 패시브와 보상 카드 분리를 확인하라.`)
   process.exit(1)
 }
-console.log('\n모든 슬롯에 중립 바닥 확보 · 일러스트 키 전부 연결됨 · 등급 예산 일치 · 무럭무럭 전 칸 커버.')
+console.log('\n모든 슬롯에 중립 바닥 확보 · 일러스트 키 전부 연결됨 · 등급 예산 일치 · 성장 패시브/보상 분리.')

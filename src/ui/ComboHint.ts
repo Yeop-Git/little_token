@@ -9,6 +9,7 @@
 import { comboLeads } from '@core/compiler'
 import { gwa } from '@core/josa'
 import type { Combo, Word } from '@core/types'
+import { discoveredComboIds } from '@core/comboDiscovery'
 
 export interface ComboHintSource {
   combos: Combo[]
@@ -38,7 +39,8 @@ function partnersFor(tags: string[], src: ComboHintSource, self: Word): string {
 
 /** 활성 관용구 이름 목록(`Intent.combos`)을 주면 지금 터지는 줄에 표시를 남긴다. */
 export function comboHintHtml(w: Word, src: ComboHintSource, active: string[] = []): string {
-  const leads = comboLeads(w, src.combos)
+  const discovered = discoveredComboIds()
+  const leads = comboLeads(w, src.combos).filter(({ combo }) => discovered.has(combo.id))
   if (!leads.length) return ''
   const rows = leads
     .slice(0, MAX_ROWS)

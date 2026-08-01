@@ -28,10 +28,10 @@ export interface RewardOption {
 
 /** 영감 가격은 희귀도만 읽는다. 같은 등급 안에서는 새 카드와 반복강화가 같은 선택 무게를 갖는다. */
 export const REWARD_PRICE: Readonly<Record<Rarity, number>> = {
-  common: 2,
-  rare: 4,
-  epic: 7,
-  legendary: 10,
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
 }
 export const REWARD_REFRESH_COST = 1
 
@@ -72,6 +72,11 @@ function nearestPool(pools: Map<Rarity, RewardOption[]>, want: Rarity): RewardOp
 
 export const GUARANTEED_LEGENDARY_ITEM_FLOOR = 10
 export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
+export const EARLY_BUILD_REWARD_DAY = 2
+/** 2층에서 수식어로 먼저 고르는 방어·회복·순환 전술의 방향. */
+export const EARLY_BUILD_MODIFIER_IDS = ['deulsseogimyeo', 'pogeunhage', 'gyeongkwaehage'] as const
+/** 같은 보상의 동사 단계에서 각 전술을 실제 승리 엔진으로 완성한다. */
+export const EARLY_BUILD_CARD_IDS = ['storedResolve', 'overflowingHeart', 'drinkInk'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -200,9 +205,11 @@ const toItemOption = (item: ItemDef): RewardOption => ({
 
 function itemOptions(player: PlayerState): RewardOption[] {
   const owned = new Set(player.items.map((item) => item.id))
-  const unownedPassives = Object.values(PASSIVE_ITEMS).filter((item) => !owned.has(item.id))
-  const passives = unownedPassives.length ? unownedPassives : Object.values(PASSIVE_ITEMS)
-  return [...Object.values(ITEMS), ...passives].map(toItemOption)
+  // 아이템은 슬롯 제한 없이 영구 누적되므로 같은 정의를 다시 주면 감탄사 스탯만
+  // 무한히 쌓인다. 한 런에서는 일반 스탯 아이템과 규칙 아이템 모두 한 번만 등장한다.
+  return [...Object.values(ITEMS), ...Object.values(PASSIVE_ITEMS)]
+    .filter((item) => !owned.has(item.id))
+    .map(toItemOption)
 }
 
 function generateWordRewards(player: PlayerState, grade: number, day: number, phase: 'subject' | 'verb', rng: () => number): RewardOption[] {
@@ -211,6 +218,27 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
   const used = new Set<string>()
   const picks: RewardOption[] = []
   const emotionProfile = deckEmotionProfile(player)
+
+  // 공격만 고르는 습관이 굳기 전에, 수식어 자체가 문장의 전술을 바꾼다는 것을
+  // 세 갈래로 직접 보여 준다. 방어도 피해·초과 회복 피해·손패 순환은 어느 쪽도
+  // 실패나 자해가 없고, 공격하지 않는 선택에도 독립된 성장 방향을 준다.
+  if (phase === 'subject' && day === EARLY_BUILD_REWARD_DAY) {
+    for (const id of EARLY_BUILD_MODIFIER_IDS) {
+      const option = pickOne(all.filter((entry) => entry.word?.id === id), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
+    if (picks.length === 3) return shuffle(picks, rng)
+  }
+
+  // 첫 보스 전에 방어 전환·초과 회복·흡혈 중 하나를 직접 고르게 한다. 핵심 빌드가
+  // 무작위 보상에 묻히면 스탯만 올리고 그 스탯을 쓸 문장을 끝내 못 얻을 수 있다.
+  if (phase === 'verb' && day === EARLY_BUILD_REWARD_DAY) {
+    for (const id of EARLY_BUILD_CARD_IDS) {
+      const option = pickOne(all.filter((entry) => entry.word?.id === id), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
+    if (picks.length === 3) return shuffle(picks, rng)
+  }
 
   // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)
@@ -240,6 +268,15 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
     const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
     if (option) picks.push(option)
+  }
+  // 동사 보상은 공격 카드만 셋 겹쳐 나오지 않게 한다. 이미 보장 카드가 들어왔다면
+  // 남은 칸부터 비어 있는 행동 축을 채워 공격·방어·회복 빌드를 화면에서 함께 읽힌다.
+  if (phase === 'verb') {
+    for (const kind of ['guard', 'heal', 'attack'] as const) {
+      if (picks.length >= 3 || picks.some((entry) => entry.word?.kind === kind)) continue
+      const option = pickOne(all.filter((entry) => entry.word?.kind === kind), grade, day, used, rng)
+      if (option) picks.push(option)
+    }
   }
   if (emotionProfile.preferred && picks.length < 3 && !picks.some((entry) => entry.word?.emotion === emotionProfile.preferred)) {
     const option = pickOne(all.filter((entry) => entry.word?.emotion === emotionProfile.preferred), grade, day, used, rng)
@@ -281,10 +318,46 @@ export function genRewards(
   day = 1,
   phase: RewardPhase = 'subject',
   rng: () => number = Math.random,
+  availableInspiration = Number.POSITIVE_INFINITY,
 ): RewardOption[] {
   const effectiveGrade = rewardGradeForDay(grade, day)
-  if (phase === 'item') return generateItemRewards(player, effectiveGrade, day, rng)
-  return generateWordRewards(player, effectiveGrade, day, phase, rng)
+  const candidates = phase === 'item'
+    ? itemOptions(player)
+    : wordOptions(player, phase === 'subject' ? ['subj', 'adv'] : ['verb'])
+  const picks = phase === 'item'
+    ? generateItemRewards(player, effectiveGrade, day, rng)
+    : generateWordRewards(player, effectiveGrade, day, phase, rng)
+  if (!picks.length || picks.some((option) => rewardPrice(option) <= availableInspiration)) return picks
+
+  // 구매 불가 카드를 고급 선택지로 보여 줄 수는 있지만 셋 전부 잠기지는 않는다.
+  // 같은 단계의 후보 중 현재 잔액으로 살 수 있는 가장 좋은 한 장을 마지막 칸에 보장한다.
+  const shownIds = new Set(picks.map((option) => option.word?.id ?? option.item?.id ?? option.name))
+  const affordable = candidates
+    .filter((option) => rewardPrice(option) <= availableInspiration)
+    .sort((a, b) => rewardPrice(b) - rewardPrice(a))
+  const replacements = affordable.filter((option) => !shownIds.has(option.word?.id ?? option.item?.id ?? option.name))
+  if (!replacements.length && affordable[0]) replacements.push(affordable[0])
+  if (!replacements.length) return picks
+
+  let best = { score: Number.NEGATIVE_INFINITY, picks }
+  const milestoneRarity = bossRewardRarity(day)
+  for (let index = 0; index < picks.length; index++) {
+    const removesOnlyMilestone = milestoneRarity
+      && picks[index].rarity === milestoneRarity
+      && picks.filter((option) => option.rarity === milestoneRarity).length === 1
+    for (const replacement of replacements) {
+      const proposal = picks.map((option, optionIndex) => optionIndex === index ? replacement : option)
+      const actionKinds = phase === 'verb'
+        ? new Set(proposal.map((option) => option.word?.kind).filter(Boolean)).size
+        : 0
+      const grammarSlots = phase === 'subject'
+        ? new Set(proposal.map((option) => option.word?.slot).filter(Boolean)).size
+        : 0
+      const score = actionKinds * 100 + grammarSlots * 20 + (removesOnlyMilestone ? -1_000 : 0) + rewardPrice(replacement)
+      if (score > best.score) best = { score, picks: proposal }
+    }
+  }
+  return shuffle(best.picks, rng)
 }
 
 /** 저장된 씨앗·단계·새로고침 횟수에서 같은 진열을 재현하는 작은 PRNG. */

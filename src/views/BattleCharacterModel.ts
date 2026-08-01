@@ -4,6 +4,8 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
 import { GraphicsSettings } from '@/ui/GameSettings'
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 export type BattleAnimation = 'idle' | 'idle2' | 'walk' | 'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat'
 /** 한 번만 재생하고 끝나는 동작. idle 계열과 walk는 계속 도는 클립이라 여기 안 든다. */
@@ -157,6 +159,7 @@ function loadModel(url: string): Promise<GLTF> {
   const pending = modelLoader.loadAsync(url).catch((error) => {
     // 한 번의 전송/파싱 실패를 세션 전체의 영구 실패로 만들지 않는다.
     modelLoads.delete(url)
+    reportResourceFailure('model load', url, error)
     throw error
   })
   modelLoads.set(url, pending)
@@ -414,6 +417,8 @@ class BattleCharacterModel {
   private readonly brokenSpiderParts = new Set<string>()
   private readonly spiderPartOriginals = new Map<string, { root: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Euler }>()
   private spiderPartDissolves: SpiderPartDissolve[] = []
+  private eliteElapsed = 0
+  private readonly eliteTimeUniforms: Array<{ value: number }> = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = acquireRenderer()
@@ -568,6 +573,14 @@ class BattleCharacterModel {
     atmosphere: BattleAtmosphere,
     weather: BattleWeather,
   ) {
+    const rarity = this.shell.dataset.enemyRarity
+    const eliteTier = rarity === 'rare' ? 1 : rarity === 'epic' ? 2 : rarity === 'legendary' ? 3 : 0
+    const phaseSource = `${material.name}:${material.uuid}`
+    let elitePhaseHash = 0
+    for (let index = 0; index < phaseSource.length; index += 1) {
+      elitePhaseHash = (elitePhaseHash * 31 + phaseSource.charCodeAt(index)) >>> 0
+    }
+    const elitePhase = (elitePhaseHash % 1009) / 1009
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uBattleSkyTint = { value: atmosphere.skyTint }
       shader.uniforms.uBattleGroundTint = { value: atmosphere.groundTint }
@@ -577,15 +590,30 @@ class BattleCharacterModel {
       shader.uniforms.uBattleExposure = { value: atmosphere.exposure * (boss ? BOSS_EXPOSURE_BOOST : 1) }
       shader.uniforms.uBattleShadowFloor = { value: atmosphere.shadowFloor }
       shader.uniforms.uPartDissolve = material.userData.partDissolveUniform
+      shader.uniforms.uEliteTier = { value: eliteTier }
+      shader.uniforms.uElitePhase = { value: elitePhase }
+      const eliteTime = { value: this.eliteElapsed }
+      shader.uniforms.uEliteTime = eliteTime
+      this.eliteTimeUniforms.push(eliteTime)
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
 varying float vBattleHeight;
-varying float vBattleSide;`)
+varying float vBattleSide;
+varying vec3 vEliteNormalView;
+varying vec3 vEliteViewDir;
+varying vec3 vEliteWorldPosition;`)
         .replace('#include <project_vertex>', `#include <project_vertex>
 vec4 battleWorldPosition = modelMatrix * vec4(transformed, 1.0);
 vBattleHeight = smoothstep(0.0, ${MODEL_FIT_HEIGHT.toFixed(2)}, battleWorldPosition.y);
-vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);`)
+vBattleSide = smoothstep(-${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, ${(MODEL_FIT_HEIGHT * 0.55).toFixed(2)}, battleWorldPosition.x);
+vEliteWorldPosition = battleWorldPosition.xyz;
+#if defined ( USE_SKINNING ) || defined ( USE_ENVMAP )
+  vEliteNormalView = normalize(transformedNormal);
+#else
+  vEliteNormalView = normalize(normalMatrix * normal);
+#endif
+vEliteViewDir = normalize(-mvPosition.xyz);`)
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
@@ -596,8 +624,19 @@ uniform float uBattleGroundMix;
 uniform float uBattleExposure;
 uniform float uBattleShadowFloor;
 uniform float uPartDissolve;
+uniform float uEliteTier;
+uniform float uEliteTime;
+uniform float uElitePhase;
 varying float vBattleHeight;
-varying float vBattleSide;`)
+varying float vBattleSide;
+varying vec3 vEliteNormalView;
+varying vec3 vEliteViewDir;
+varying vec3 vEliteWorldPosition;
+
+vec3 eliteSpectrum(float h) {
+  vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return k * k * (3.0 - 2.0 * k);
+}`)
         // The stepped directional term exposes individual low-poly faces. Keep
         // ambient/AO darkness and emissive texture color, but omit only that term.
         .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', `vec3 outgoingLight = reflectedLight.indirectDiffuse + totalEmissiveRadiance;
@@ -617,13 +656,132 @@ vec3 battleTintedAlbedo = diffuseColor.rgb;
 battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleGroundTint, battleGroundWeight * 0.3);
 battleTintedAlbedo = mix(battleTintedAlbedo, battleTintedAlbedo * uBattleSkyTint, battleSkyWeight * 0.3);
 outgoingLight = max(outgoingLight, battleTintedAlbedo * uBattleShadowFloor);
+
+// Enemy rarity is a separate fantasy material language layered over the model.
+// Keep the source illustration readable: Rare is blue ink lacquer, Epic is violet
+// storybook foil, and Legendary is an icy prism crystal (the external Mystic tier).
+if (uEliteTier > 0.5) {
+  vec3 eliteNormal = normalize(vEliteNormalView);
+  vec3 eliteView = normalize(vEliteViewDir);
+  float facing = clamp(dot(eliteNormal, eliteView), 0.0, 1.0);
+  float eliteRim = pow(1.0 - facing, 2.2);
+
+  // World position is calculated after skinning, so grain, facets and stars stay
+  // painted onto moving limbs instead of sliding over the output canvas.
+  vec3 rarityCell = floor(vEliteWorldPosition * 7.0 + eliteNormal * 1.7);
+  float raritySeed = fract(sin(dot(rarityCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+
+  // Each promotion owns one material language. Not stacking lower-tier coats is
+  // what preserves faces, costume colors and the readability of the silhouette.
+  if (uEliteTier < 1.5) {
+    // Rare -> sapphire ink lacquer. Two interference waves form a restrained
+    // caustic ribbon, like light passing through a thick blue ink wash.
+    vec3 sapphireInk = vec3(0.035, 0.13, 0.52);
+    float rareWaveA = sin(vEliteWorldPosition.y * 10.5 + vEliteWorldPosition.x * 4.2 - uEliteTime * 1.10);
+    float rareWaveB = sin(vEliteWorldPosition.y * 7.3 - vEliteWorldPosition.z * 5.1 + uEliteTime * 0.82);
+    float rareCaustic = pow(clamp(0.52 + (rareWaveA + rareWaveB) * 0.20, 0.0, 1.0), 9.0);
+    float rarePin = pow(max(0.0, sin(uEliteTime * 2.1 + raritySeed * 31.0)), 16.0)
+      * smoothstep(0.90, 0.985, raritySeed);
+    outgoingLight = mix(outgoingLight, outgoingLight * 0.70 + sapphireInk * 0.42, 0.31);
+    outgoingLight += vec3(0.22, 0.63, 1.0) * eliteRim * 0.48;
+    outgoingLight += vec3(0.62, 0.88, 1.0) * rareCaustic * (0.08 + facing * 0.12);
+    outgoingLight += vec3(0.86, 0.96, 1.0) * rarePin * 0.30;
+  } else if (uEliteTier < 2.5) {
+    // Epic -> violet storybook foil. Low-frequency surface cells read as cut
+    // paper facets; a slow aurora travels across them without erasing the art.
+    vec3 epicCell = floor(vEliteWorldPosition * 5.2 + eliteNormal * 2.1);
+    float epicFacet = fract(sin(dot(epicCell, vec3(23.17, 61.73, 11.91))) * 31415.9265);
+    float epicFacetSeam = clamp(fwidth(epicFacet) * 2.25, 0.0, 1.0);
+    float auroraPhase = vEliteWorldPosition.y * 0.72 + vEliteWorldPosition.x * 0.34
+      + epicFacet * 0.31 - uEliteTime * 0.050;
+    vec3 violetFoil = mix(
+      vec3(0.27, 0.08, 0.61),
+      vec3(0.91, 0.42, 1.0),
+      0.5 + 0.5 * sin(auroraPhase * 6.28318)
+    );
+    float epicPulse = 0.5 + 0.5 * sin(uEliteTime * 1.05 + epicFacet * 17.0);
+    float epicGlint = pow(epicPulse, 9.0) * (0.20 + 0.80 * facing);
+    // Epic cards are defined by starlight. The grid now comes from the skinned
+    // surface position, making each four-point star travel with the character.
+    vec2 starGrid = vEliteWorldPosition.xy * 8.8 + eliteNormal.xy * 1.4;
+    vec2 starCell = floor(starGrid);
+    vec2 starLocal = abs(fract(starGrid) - 0.5);
+    float starSeed = fract(sin(dot(starCell, vec2(41.73, 93.17))) * 24634.6345);
+    float starRadius = length(starLocal);
+    float starCore = 1.0 - smoothstep(0.035, 0.16, starRadius);
+    float starCross = 1.0 - smoothstep(0.022, 0.082, min(starLocal.x, starLocal.y));
+    float starReach = 1.0 - smoothstep(0.12, 0.46, max(starLocal.x, starLocal.y));
+    float starShape = max(starCore, starCross * starReach);
+    float starHalo = 1.0 - smoothstep(0.08, 0.38, starRadius);
+    float starTwinkle = pow(
+      0.5 + 0.5 * sin(uEliteTime * (2.15 + starSeed * 1.55) + starSeed * 37.0),
+      6.0
+    );
+    float starAmount = step(0.58, starSeed)
+      * (starShape + starHalo * 0.24)
+      * (0.14 + starTwinkle * 0.86);
+    float starDust = smoothstep(0.88, 0.99, raritySeed)
+      * pow(max(0.0, sin(uEliteTime * 3.4 + raritySeed * 43.0)), 10.0);
+    outgoingLight = mix(outgoingLight, outgoingLight * 0.66 + violetFoil * 0.50, 0.41);
+    outgoingLight *= 1.0 - epicFacetSeam * 0.14;
+    outgoingLight += vec3(0.66, 0.28, 1.0) * eliteRim * 0.48;
+    outgoingLight += vec3(0.95, 0.70, 1.0) * epicGlint * 0.22;
+    outgoingLight += mix(vec3(0.76, 0.82, 1.0), vec3(1.0, 0.82, 0.98), starSeed)
+      * starAmount * 1.18;
+    outgoingLight += vec3(0.88, 0.72, 1.0) * starDust * 0.42;
+  } else {
+    // Legendary -> reference Mystic: frosted crystal planes with restrained
+    // prismatic refraction. Fracture veins give the surface a crafted storybook
+    // crystal structure while keeping the face and costume readable.
+    vec3 crystalCell = floor(vEliteWorldPosition * 6.8 + eliteNormal * 2.4);
+    float crystalFacet = fract(sin(dot(crystalCell, vec3(19.19, 73.31, 41.17))) * 27182.8183);
+    float crystalSeam = clamp(fwidth(crystalFacet) * 2.35, 0.0, 1.0);
+    float fractureA = 1.0 - smoothstep(0.018, 0.065, abs(fract(
+      dot(vEliteWorldPosition, vec3(0.73, 1.0, 0.37)) * 3.1 + crystalFacet
+    ) - 0.5));
+    float fractureB = 1.0 - smoothstep(0.016, 0.055, abs(fract(
+      dot(vEliteWorldPosition, vec3(-0.46, 0.58, 1.0)) * 3.8 - crystalFacet * 0.7
+    ) - 0.5));
+    float fractureVein = max(fractureA, fractureB * 0.72) * (0.35 + 0.65 * eliteRim);
+    float shellHue = fract(uElitePhase + uEliteTime * (0.032 + uElitePhase * 0.026));
+    float refractionPhase = shellHue + crystalFacet * 0.68 + raritySeed * 0.16
+      + vEliteWorldPosition.y * 0.15 - vEliteWorldPosition.x * 0.06;
+    vec3 prism = eliteSpectrum(fract(refractionPhase));
+    float facetPulse = 0.5 + 0.5 * sin(
+      uEliteTime * (1.18 + raritySeed * 1.24)
+      + crystalFacet * 29.0
+      + uElitePhase * 19.0
+    );
+    float facetBrilliance = 0.42 + pow(facetPulse, 3.0) * 0.58;
+    vec3 frost = mix(vec3(0.38, 0.65, 0.96), vec3(0.88, 0.96, 1.0), facing);
+    float crystalEdge = pow(1.0 - facing, 1.35);
+    float travelingGlint = pow(
+      max(0.0, sin(uEliteTime * 1.42 + crystalFacet * 31.0 + vEliteWorldPosition.y * 8.0)),
+      20.0
+    );
+    float starGate = smoothstep(0.82, 0.97, raritySeed);
+    float starGlint = travelingGlint * starGate;
+    outgoingLight = mix(outgoingLight, outgoingLight * 0.78 + frost * 0.28, 0.34);
+    outgoingLight = mix(
+      outgoingLight,
+      outgoingLight * (0.70 + prism * (0.54 + facetBrilliance * 0.24)),
+      0.30 + facetBrilliance * 0.13
+    );
+    outgoingLight *= 1.0 - crystalSeam * 0.16;
+    outgoingLight += vec3(0.22, 0.46, 0.76) * fractureVein * 0.34;
+    outgoingLight += prism * crystalEdge * (0.42 + facetBrilliance * 0.24);
+    outgoingLight += prism * pow(facetPulse, 5.0) * (0.10 + facing * 0.16);
+    outgoingLight += vec3(0.80, 0.94, 1.0) * crystalEdge * crystalEdge * 0.24;
+    outgoingLight += vec3(1.0) * starGlint * 0.52;
+  }
+}
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
           float partDissolveEdge = partDissolveActive * (1.0 - smoothstep(0.0, 0.09, partDissolveNoise - uPartDissolve));
 outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolve);`)
     }
-    material.customProgramCacheKey = () => `battle-atmosphere-${weather}`
+    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v4-${weather}`
   }
 
   private fitModel(model: THREE.Object3D): THREE.Box3 | null {
@@ -1278,6 +1436,8 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.updateModelYawReturn(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
+    this.eliteElapsed += frameDelta
+    this.eliteTimeUniforms.forEach((uniform) => { uniform.value = this.eliteElapsed })
     const zoomBlend = 1 - Math.exp(-frameDelta * 8)
     const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
     if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {
@@ -1396,7 +1556,8 @@ export function mountCharacterModel(actor: HTMLElement, visual: CharacterVisualD
 /** GLB 다운로드뿐 아니라 GLTF 파싱·텍스처 디코딩이 끝날 때까지 기다린다. */
 export function preloadCharacterModelResources(visuals: CharacterVisualDef[]): Promise<void> {
   const urls = [...new Set(visuals.flatMap((visual) => (visual.model3d ? [visual.model3d] : [])))]
-  return Promise.all(urls.map((url) => loadModel(url).then(() => undefined).catch(() => undefined)))
+  const pending = urls.map((url) => loadModel(url).then(() => undefined))
+  return Promise.all(STRICT_RESOURCE_LOADING ? pending : pending.map((load) => load.catch(() => undefined)))
     .then(() => undefined)
 }
 

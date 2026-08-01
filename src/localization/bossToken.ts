@@ -17,7 +17,7 @@ const KOREAN = {
   coachInkOverdraw: '여백 밖까지 쓸 수는 있지만, 넘친 만큼 네가 지치게 돼!',
   coachEnemyFirst: '저 벌레가 먼저 움직이려 해! 방어 문장도 생각해 봐!',
   coachOverflow: '남은 힘이 앞의 벌레를 넘어 다음 녀석까지 이어졌어!',
-  mantisStart: '기본공격 뒤에 큰낫을 들어! 그때 방어로 막자 — 슬픔이 약점이야!!',
+  mantisStart: '처음부터 큰낫을 들어! 다음 문장은 방어로 막자 — 슬픔이 약점이야!!',
   mantisTelegraph: '큰낫이 올라갔어! 다음 문장은 방어야! 표시된 수치만큼 반드시 방어해!!',
   mantisGroggy: '실드는 깨졌지만 강공격은 취소야! 사마귀가 그로기에 빠져서 다음 공격을 한 턴 걸러!!',
   mantisPunished: '못 막았어...! 다음에 큰낫을 들면 그땐 꼭 방어야!!',
@@ -57,7 +57,7 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
   en: {
     idleConcern: 'What do we do...?! Help, Prompt!!', idleHuge: 'Prompt, that thing is huge...!', idleStand: "Nngh... We still can't back down!", idleIncoming: "Careful! Something's coming!",
     coachSubject: 'First, choose who will act!', coachModifier: 'Good! Now add a word that describes the one before it.', coachVerb: 'The final verb decides whether you attack, guard, or heal!', coachResonance: 'Matching emotions are resonating!', coachContext: 'Those words fit beautifully! That is strong Context!', coachInkLow: 'We are running low on Ink. Check the blue number on the next card!', coachInkOverdraw: 'You can write past the margin, but the excess will tire you out!', coachEnemyFirst: 'That bug is about to move first! Consider a Guard sentence!', coachOverflow: 'The remaining force carried past the first bug into the next one!',
-    mantisStart: 'It raises its great scythe after a normal attack! Block it then — Sorrow is its weakness!!', mantisTelegraph: 'The great scythe is raised! Your next sentence must Guard! Reach the displayed Guard value!!', mantisGroggy: 'The shield broke, but the heavy attack was canceled! The mantis is exposed and will skip its next attack!!', mantisPunished: "We couldn't block it...! Next time it raises that scythe, we have to Guard!!",
+    mantisStart: 'It raises its great scythe right away! Guard with your next sentence — Sorrow is its weakness!!', mantisTelegraph: 'The great scythe is raised! Your next sentence must Guard! Reach the displayed Guard value!!', mantisGroggy: 'The shield broke, but the heavy attack was canceled! The mantis is exposed and will skip its next attack!!', mantisPunished: "We couldn't block it...! Next time it raises that scythe, we have to Guard!!",
     queenBeeStart: "Our attacks can't hurt the queen yet! Let's defeat the workers blocking the way first!!", queenBeeDispersed: 'Great, Prompt! A worker is down!!',
     elderSpiderMiss: 'Anything but the weakness stops at that leg! Aim for the weakness now!!', elderSpiderWebReady: "The webs are fully tightened! We have to hit the weakness this time!!", elderSpiderWebCut: 'That worked, Prompt! The webs are loosening!!',
     spiderNextWeakness: 'That leg is down! This time, {weakness} is the weakness!!', spiderBody: "All the legs are severed! Now for the body — no weakness, so give it everything!!", spiderOpeningWeak: 'The Magic Shield blocks the first hit! Strip it with multiple hits, then target the first leg with {weakness} — the webs pierce Guard too!!', spiderOpeningGeneric: 'The webs pierce Guard! You need to hit the exposed weakness to break through!!', spiderShieldBroken: 'The Magic Shield is broken! Now target this leg with {weakness}!!',
@@ -68,7 +68,7 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
   ja: {
     idleConcern: 'どうしよう…！助けて、プロンプト！！', idleHuge: 'プロンプト、あいつ大きすぎるよ…！', idleStand: 'うう…それでも退いちゃだめだ！', idleIncoming: '気をつけて！何か来るよ！',
     coachSubject: 'まず、誰が動くのか選んで！', coachModifier: 'いいね！次は前の言葉を飾る言葉をつけよう。', coachVerb: '最後の動詞が、攻撃・防御・回復を決めるよ！', coachResonance: '同じ感情が集まって共鳴してる！', coachContext: '言葉がきれいにかみ合った！いい文脈だよ！', coachInkLow: 'インクが残り少ないよ。次のカードの青い数字を見て！', coachInkOverdraw: '余白を越えて書けるけど、超えた分だけ君が疲れるよ！', coachEnemyFirst: 'あの虫が先に動くよ！防御の文も考えて！', coachOverflow: '余った力が前の虫を越えて、次の虫まで届いたよ！',
-    mantisStart: '通常攻撃のあとに大鎌を構えるよ！その時に防御で止めよう――弱点は悲しみだ！！', mantisTelegraph: '大鎌を構えた！次の文は防御だよ！表示された数値まで必ず防御して！！', mantisGroggy: 'シールドは壊れたけど強攻撃は中止！カマキリはグロッキーで次の攻撃を一回休むよ！！', mantisPunished: '防げなかった…！次に大鎌を構えたら、今度こそ防御だよ！！',
+    mantisStart: '最初から大鎌を構えるよ！次の文を防御で止めよう――弱点は悲しみだ！！', mantisTelegraph: '大鎌を構えた！次の文は防御だよ！表示された数値まで必ず防御して！！', mantisGroggy: 'シールドは壊れたけど強攻撃は中止！カマキリはグロッキーで次の攻撃を一回休むよ！！', mantisPunished: '防げなかった…！次に大鎌を構えたら、今度こそ防御だよ！！',
     queenBeeStart: '今は女王蜂の本体に攻撃が通らない！先に前をふさぐ働き蜂を倒そう！！', queenBeeDispersed: 'いいぞ、プロンプト！働き蜂を倒したよ！！',
     elderSpiderMiss: '弱点じゃないとその脚で止まるよ！今の弱点を狙って！！', elderSpiderWebReady: '蜘蛛の糸が締まりきった！今度こそ弱点を狙おう！！', elderSpiderWebCut: '当たったよ、プロンプト！蜘蛛の糸が緩んでる！！',
     spiderNextWeakness: '脚を落とした！今度は「{weakness}」の感情が弱点だ！！', spiderBody: '脚を全部切った！次は本体だ――弱点はない、全力で押し切ろう！！', spiderOpeningWeak: '最初の攻撃はマジックシールドが防ぐよ！連撃で剥がしてから「{weakness}」の感情で最初の脚を狙って――蜘蛛の糸は防御も貫通する！！', spiderOpeningGeneric: '蜘蛛の糸は防御を貫通する！今見えている弱点を狙わないと突破できないよ！！', spiderShieldBroken: 'マジックシールドが壊れた！今度は「{weakness}」の感情で今の脚を狙って！！',
@@ -79,7 +79,7 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
   ru: {
     idleConcern: 'Что же делать…?! Помоги, Промпт!!', idleHuge: 'Промпт, эта штука огромная…!', idleStand: 'Ух… Но отступать нельзя!', idleIncoming: 'Осторожно! Что-то приближается!',
     coachSubject: 'Сначала выбери, кто будет действовать!', coachModifier: 'Хорошо! Теперь добавь слово, которое уточнит предыдущее.', coachVerb: 'Последний глагол решает: атака, защита или лечение!', coachResonance: 'Одинаковые эмоции вошли в резонанс!', coachContext: 'Слова отлично соединились! Это сильный контекст!', coachInkLow: 'Чернил почти не осталось. Смотри на синее число следующей карты!', coachInkOverdraw: 'Можно писать за полями, но излишек утомит тебя!', coachEnemyFirst: 'Этот жук ходит первым! Подумай о защитной фразе!', coachOverflow: 'Оставшаяся сила прошла сквозь первого жука и достигла следующего!',
-    mantisStart: 'После обычной атаки он поднимает большую косу! Тогда блокируй — его слабость Печаль!!', mantisTelegraph: 'Большая коса поднята! Следующая фраза — Защита! Набери указанное значение Защиты!!', mantisGroggy: 'Щит сломан, но мощная атака отменена! Богомол уязвим и пропустит следующую атаку!!', mantisPunished: 'Не удалось заблокировать…! Когда он снова поднимет косу, обязательно защищайся!!',
+    mantisStart: 'Он сразу поднимает большую косу! Следующая фраза — Защита; его слабость Печаль!!', mantisTelegraph: 'Большая коса поднята! Следующая фраза — Защита! Набери указанное значение Защиты!!', mantisGroggy: 'Щит сломан, но мощная атака отменена! Богомол уязвим и пропустит следующую атаку!!', mantisPunished: 'Не удалось заблокировать…! Когда он снова поднимет косу, обязательно защищайся!!',
     queenBeeStart: 'Сейчас атаки не вредят самой королеве! Сначала победим рабочих, которые закрывают путь!!', queenBeeDispersed: 'Отлично, Промпт! Рабочая пчела повержена!!',
     elderSpiderMiss: 'Без попадания в слабость удар остановится на этой ноге! Целься в слабость!!', elderSpiderWebReady: 'Паутина затянулась до конца! Теперь обязательно попади в слабость!!', elderSpiderWebCut: 'Получилось, Промпт! Паутина ослабевает!!',
     spiderNextWeakness: 'Нога отсечена! Теперь слабость — {weakness}!!', spiderBody: 'Все ноги отсечены! Теперь тело — слабостей нет, бей изо всех сил!!', spiderOpeningWeak: 'Первый удар остановит Магический щит! Сбей его серией ударов, затем целься в первую ногу эмоцией «{weakness}» — паутина пробивает Защиту!!', spiderOpeningGeneric: 'Паутина пробивает Защиту! Чтобы прорваться, бей по открытой слабости!!', spiderShieldBroken: 'Магический щит сломан! Теперь целься в эту ногу эмоцией «{weakness}»!!',
@@ -90,7 +90,7 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
   'zh-Hans': {
     idleConcern: '怎么办……！帮帮我，提示词！！', idleHuge: '提示词，那家伙也太大了……！', idleStand: '呜……但我们不能后退！', idleIncoming: '小心！有什么要来了！',
     coachSubject: '先选出是谁要行动吧！', coachModifier: '很好！接着加上修饰前一个词的词语。', coachVerb: '最后的动词决定攻击、防御还是治疗！', coachResonance: '相同的情感正在产生共鸣！', coachContext: '词语漂亮地衔接起来了！这是很棒的语境！', coachInkLow: '墨水不多了，看看下一张卡的蓝色数字！', coachInkOverdraw: '可以写到页边之外，但超出的部分会让你疲惫！', coachEnemyFirst: '那只虫子要先行动！也考虑一下防御句吧！', coachOverflow: '剩余的力量越过前面的虫子，打到了下一只！',
-    mantisStart: '普通攻击后它会举起巨镰！那时用防御挡住——悲伤是它的弱点！！', mantisTelegraph: '巨镰举起来了！下一句必须防御！一定要达到标出的防御值！！', mantisGroggy: '护盾虽然破了，但强攻也取消了！螳螂陷入破绽，下次攻击会跳过一回合！！', mantisPunished: '没挡住……！下次它举起巨镰时一定要防御！！',
+    mantisStart: '它一开始就举起巨镰！下一句用防御挡住——悲伤是它的弱点！！', mantisTelegraph: '巨镰举起来了！下一句必须防御！一定要达到标出的防御值！！', mantisGroggy: '护盾虽然破了，但强攻也取消了！螳螂陷入破绽，下次攻击会跳过一回合！！', mantisPunished: '没挡住……！下次它举起巨镰时一定要防御！！',
     queenBeeStart: '现在攻击伤不到蜂后本体！先打倒挡在前面的工蜂吧！！', queenBeeDispersed: '太好了，提示词！工蜂倒下了！！',
     elderSpiderMiss: '没击中弱点就会停在那条腿！快瞄准当前弱点！！', elderSpiderWebReady: '蛛网已经完全收紧了！这次一定要击中弱点！！', elderSpiderWebCut: '打中了，提示词！蛛网正在松开！！',
     spiderNextWeakness: '那条腿断了！这次「{weakness}」情感是弱点！！', spiderBody: '所有腿都斩断了！接下来是本体——没有弱点，全力进攻吧！！', spiderOpeningWeak: '第一次攻击会被魔法盾挡住！先用连击剥掉盾，再用「{weakness}」情感攻击第一条腿——蛛网还能贯穿防御！！', spiderOpeningGeneric: '蛛网会贯穿防御！必须击中当前暴露的弱点才能突破！！', spiderShieldBroken: '魔法盾破了！现在用「{weakness}」情感攻击当前这条腿！！',
@@ -101,7 +101,7 @@ const FOREIGN: Record<ForeignLocale, Record<BossTokenLineKey, string>> = {
   'zh-Hant': {
     idleConcern: '怎麼辦……！幫幫我，提示詞！！', idleHuge: '提示詞，那傢伙也太大了……！', idleStand: '嗚……但我們不能後退！', idleIncoming: '小心！有什麼要來了！',
     coachSubject: '先選出是誰要行動吧！', coachModifier: '很好！接著加上修飾前一個詞的詞語。', coachVerb: '最後的動詞決定攻擊、防禦還是治療！', coachResonance: '相同的情感正在產生共鳴！', coachContext: '詞語漂亮地銜接起來了！這是很棒的語境！', coachInkLow: '墨水不多了，看看下一張卡的藍色數字！', coachInkOverdraw: '可以寫到頁邊之外，但超出的部分會讓你疲憊！', coachEnemyFirst: '那隻蟲子要先行動！也考慮一下防禦句吧！', coachOverflow: '剩餘的力量越過前面的蟲子，打到了下一隻！',
-    mantisStart: '普通攻擊後牠會舉起巨鐮！那時用防禦擋住——悲傷是牠的弱點！！', mantisTelegraph: '巨鐮舉起來了！下一句必須防禦！一定要達到標出的防禦值！！', mantisGroggy: '護盾雖然破了，但強攻也取消了！螳螂露出破綻，下次攻擊會跳過一回合！！', mantisPunished: '沒擋住……！下次牠舉起巨鐮時一定要防禦！！',
+    mantisStart: '牠一開始就舉起巨鐮！下一句用防禦擋住——悲傷是牠的弱點！！', mantisTelegraph: '巨鐮舉起來了！下一句必須防禦！一定要達到標出的防禦值！！', mantisGroggy: '護盾雖然破了，但強攻也取消了！螳螂露出破綻，下次攻擊會跳過一回合！！', mantisPunished: '沒擋住……！下次牠舉起巨鐮時一定要防禦！！',
     queenBeeStart: '現在攻擊傷不到蜂后本體！先打倒擋在前面的工蜂吧！！', queenBeeDispersed: '太好了，提示詞！工蜂倒下了！！',
     elderSpiderMiss: '沒擊中弱點就會停在那條腿！快瞄準目前弱點！！', elderSpiderWebReady: '蛛網已經完全收緊了！這次一定要擊中弱點！！', elderSpiderWebCut: '打中了，提示詞！蛛網正在鬆開！！',
     spiderNextWeakness: '那條腿斷了！這次「{weakness}」情感是弱點！！', spiderBody: '所有腿都斬斷了！接下來是本體——沒有弱點，全力進攻吧！！', spiderOpeningWeak: '第一次攻擊會被魔法盾擋住！先用連擊剝掉盾，再用「{weakness}」情感攻擊第一條腿——蛛網還能貫穿防禦！！', spiderOpeningGeneric: '蛛網會貫穿防禦！必須擊中目前暴露的弱點才能突破！！', spiderShieldBroken: '魔法盾破了！現在用「{weakness}」情感攻擊目前這條腿！！',

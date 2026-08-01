@@ -5,6 +5,8 @@
  */
 
 import { FONT_URL } from '@/assets'
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
+import { reportResourceFailure } from '@/ui/ResourceFailures'
 
 const FALLBACK = `'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif`
 let fontLoad: Promise<void> | null = null
@@ -18,10 +20,14 @@ export const FontManager = {
         display: 'swap',
       })
       // 로드 실패해도 폴백으로 게임은 돌아가야 한다.
-      const loaded = await face.load().catch(() => null)
+      const loaded = await face.load().catch((error) => {
+        reportResourceFailure('font load', FONT_URL, error)
+        return null
+      })
       if (!loaded) {
         // 일시 실패는 다음 화면 진입에서 재시도할 수 있게 한다.
         fontLoad = null
+        if (STRICT_RESOURCE_LOADING) throw reportResourceFailure('font load', FONT_URL)
         return
       }
       document.fonts.add(loaded)

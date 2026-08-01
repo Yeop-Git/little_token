@@ -11,6 +11,7 @@
 
 import { GameAudio } from '@/audio/GameAudio'
 import { acquireVideo, releaseVideo } from '@/ui/ResourceLibrary'
+import { STRICT_RESOURCE_LOADING } from '@/config/edition'
 
 interface Opts {
   /** 재생할 webm. */
@@ -115,7 +116,8 @@ export class BossCinematic {
     // 전장 준비가 실패해도 컷은 반드시 걷어야 한다 — 여기서 멈추면 검은 화면에 갇힌다.
     try {
       await this.opts.onCurtainReady()
-    } catch {
+    } catch (error) {
+      if (STRICT_RESOURCE_LOADING) throw error
       /* 준비 실패는 아래 걷기로 넘긴다 */
     }
     await this.wait(CURTAIN_HOLD_MS)

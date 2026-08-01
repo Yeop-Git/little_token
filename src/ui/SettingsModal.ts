@@ -15,6 +15,7 @@ type SettingsTab = 'graphics' | 'sound' | 'other'
 
 /** 전투와 타이틀이 같은 저장값·마크업을 쓰는 공용 설정 모달. */
 export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => void }) {
+  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   let host = root.querySelector<HTMLElement>('#overlay')
   if (!host) {
     host = document.createElement('div')
@@ -31,14 +32,14 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
 
   host.innerHTML = `
     <div class="ov-backdrop"></div>
-    <section class="ov-panel glass settings-panel" aria-label="${t('settings', '설정')}">
+    <section class="ov-panel glass settings-panel" role="dialog" aria-modal="true" aria-label="${t('settings', '설정')}">
       <div class="ov-head"><div class="ov-title">${icon('settings')} ${t('settings', '설정')}</div><button class="ov-close" id="ov-x" type="button" aria-label="${t('close', '닫기')}">${icon('close')}</button></div>
       <div class="settings-tabs" role="tablist" aria-label="${t('settingsCategories', '설정 분류')}">
-        <button type="button" role="tab" data-settings-tab="graphics" aria-selected="true">${t('graphics', '그래픽')}</button>
-        <button type="button" role="tab" data-settings-tab="sound" aria-selected="false">${t('sound', '사운드')}</button>
-        <button type="button" role="tab" data-settings-tab="other" aria-selected="false">${t('other', '기타')}</button>
+        <button id="settings-tab-graphics" type="button" role="tab" data-settings-tab="graphics" aria-controls="settings-panel-graphics" aria-selected="true" tabindex="0">${t('graphics', '그래픽')}</button>
+        <button id="settings-tab-sound" type="button" role="tab" data-settings-tab="sound" aria-controls="settings-panel-sound" aria-selected="false" tabindex="-1">${t('sound', '사운드')}</button>
+        <button id="settings-tab-other" type="button" role="tab" data-settings-tab="other" aria-controls="settings-panel-other" aria-selected="false" tabindex="-1">${t('other', '기타')}</button>
       </div>
-      <div class="settings-tab-panel graphics-settings-panel" data-settings-panel="graphics" role="tabpanel">
+      <div id="settings-panel-graphics" class="settings-tab-panel graphics-settings-panel" data-settings-panel="graphics" role="tabpanel" aria-labelledby="settings-tab-graphics">
         <div class="settings-group settings-wide">
           <div class="settings-label"><b>${t('qualityPreset', '품질 프리셋')}</b><span>${t('qualityPresetHint', '세부 항목을 한 번에 설정')}</span></div>
           <div class="graphics-options" role="group" aria-label="그래픽 품질">
@@ -85,14 +86,14 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
           </div>
         </div>
       </div>
-      <div class="settings-tab-panel" data-settings-panel="sound" role="tabpanel" hidden>
+      <div id="settings-panel-sound" class="settings-tab-panel" data-settings-panel="sound" role="tabpanel" aria-labelledby="settings-tab-sound" hidden>
         <div class="settings-group">
           <div class="settings-label"><b>${t('masterVolume', '마스터 볼륨')}</b><span id="volume-value">${volume}%</span></div>
           <input id="volume-range" type="range" min="0" max="100" step="5" value="${volume}" aria-label="마스터 볼륨">
           <p>${t('volumeHint', '배경음악과 효과음의 전체 크기를 조절합니다.')}</p>
         </div>
       </div>
-      <div class="settings-tab-panel" data-settings-panel="other" role="tabpanel" hidden>
+      <div id="settings-panel-other" class="settings-tab-panel" data-settings-panel="other" role="tabpanel" aria-labelledby="settings-tab-other" hidden>
         <div class="settings-group language-settings-group">
           <div class="settings-label"><b>${t('language', '언어')}</b><span>${LOCALE_NAMES[currentLocale]}</span></div>
           <select id="language-select" class="settings-select" aria-label="${t('language', '언어')}">
@@ -110,17 +111,59 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
   host.classList.add('open')
 
   const close = () => {
+    window.removeEventListener('keydown', onModalKeydown)
     host!.classList.remove('open')
     host!.innerHTML = ''
+    if (returnFocus?.isConnected) returnFocus.focus()
   }
   host.querySelector('#ov-x')!.addEventListener('click', close)
   host.querySelector('.ov-backdrop')!.addEventListener('click', close)
 
   const activateTab = (tab: SettingsTab) => {
     host!.querySelectorAll<HTMLElement>('[data-settings-panel]').forEach((panel) => { panel.hidden = panel.dataset.settingsPanel !== tab })
-    host!.querySelectorAll<HTMLElement>('[data-settings-tab]').forEach((button) => button.setAttribute('aria-selected', String(button.dataset.settingsTab === tab)))
+    host!.querySelectorAll<HTMLElement>('[data-settings-tab]').forEach((button) => {
+      const active = button.dataset.settingsTab === tab
+      button.setAttribute('aria-selected', String(active))
+      button.tabIndex = active ? 0 : -1
+    })
   }
-  host.querySelectorAll<HTMLButtonElement>('[data-settings-tab]').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.settingsTab as SettingsTab)))
+  const tabs = [...host.querySelectorAll<HTMLButtonElement>('[data-settings-tab]')]
+  tabs.forEach((button, index) => {
+    button.addEventListener('click', () => activateTab(button.dataset.settingsTab as SettingsTab))
+    button.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+      event.preventDefault()
+      const nextIndex = event.key === 'Home' ? 0
+        : event.key === 'End' ? tabs.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+      const next = tabs[nextIndex]
+      activateTab(next.dataset.settingsTab as SettingsTab)
+      next.focus()
+    })
+  })
+
+  function onModalKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      close()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const focusable = [...host!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [href], [tabindex]:not([tabindex="-1"])')]
+      .filter((element) => !element.closest('[hidden]'))
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+  window.addEventListener('keydown', onModalKeydown)
+  host.querySelector<HTMLButtonElement>('#ov-x')?.focus()
 
   host.querySelector<HTMLSelectElement>('#language-select')!.addEventListener('change', (event) => {
     const locale = (event.currentTarget as HTMLSelectElement).value as LocaleCode

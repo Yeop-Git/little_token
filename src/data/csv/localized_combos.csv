@@ -1,0 +1,19 @@
+pool,locale,id,name,need,mult,flavor,source
+early,ko,lc_ko_blessing,"전화위복",hurt|bright|mend,1.75,"상처를 더 밝은 다음 줄로 바꾼다",https://stdict.korean.go.kr/
+early,ko,lc_ko_after_rain,"비 온 뒤에 땅이 굳어진다",hurt|solid|mend,1.65,"시련을 견딘 자리가 더 단단해진다",https://stdict.korean.go.kr/
+early,ko,lc_ko_smiling_face,"웃는 낯에 침 못 뱉는다",calm|smile|grd,1.65,"부드러운 웃음으로 적의를 누그러뜨린다",https://stdict.korean.go.kr/
+early,en,lc_en_grin,"Grin and Bear It",grit|smile|grd,1.75,"Meet the hard moment with a steady smile",https://dictionary.cambridge.org/dictionary/english/grin-and-bear-it
+early,en,lc_en_silver_lining,"Every Cloud Has a Silver Lining",hurt|bright|mend,1.65,"Find a hopeful edge inside a hard turn",https://dictionary.cambridge.org/dictionary/english/every-cloud-has-a-silver-lining
+early,en,lc_en_many_hands,"Many Hands Make Light Work",both|warm|hold,1.65,"Shared effort makes a heavy task easier",https://www.dictionary.com/browse/many-hands-make-light-work
+early,ja,lc_ja_rise,"七転び八起き",hurt|endure|mend,1.75,"何度転んでも、また立ち上がる",https://kotobank.jp/word/七転び八起き-589160
+early,ja,lc_ja_after_rain,"雨降って地固まる",hurt|solid|mend,1.65,"困難の後で結びつきが強くなる",https://kotobank.jp/word/雨降つて地固まる-3206810
+early,ja,lc_ja_laughing_gate,"笑う門には福来る",bright|smile|mend,1.65,"笑顔のある所へ幸せが訪れる",https://kotobank.jp/word/笑う門には福来る-665616
+early,ru,lc_ru_will,"Собрать волю в кулак",grit|force|atk,1.75,"Собрать всю решимость для одного удара",https://gramota.ru/meta/kulak
+early,ru,lc_ru_blessing,"Не было бы счастья, да несчастье помогло",hurt|bright|mend,1.65,"Обратить испытание в неожиданную удачу",https://gramota.ru/poisk?query=Не%20было%20бы%20счастья%2C%20да%20несчастье%20помогло&simple=0
+early,ru,lc_ru_together,"Один в поле не воин",both|solid|hold,1.65,"Вместе легче устоять перед угрозой",https://gramota.ru/poisk?query=Один%20в%20поле%20не%20воин&simple=0
+early,zh-Hans,lc_zh_hans_boats,"破釜沉舟",force|reckless|atk,1.75,"断绝退路，决心一战",https://dict.idioms.moe.edu.tw/idiomView.jsp?ID=-5598
+early,zh-Hans,lc_zh_hans_old_man,"塞翁失马",hurt|soft|mend,1.65,"从眼前的损失中发现转机",https://dict.idioms.moe.edu.tw/idiomView.jsp?ID=-536
+early,zh-Hans,lc_zh_hans_one_city,"众志成城",both|solid|hold,1.65,"众人同心便能筑成坚城",https://dict.idioms.moe.edu.tw/idiomView.jsp?ID=189&la=0&webMd=1
+early,zh-Hant,lc_zh_hant_soft,"以柔克剛",force|soft|grd,1.75,"用柔弱之道戰勝剛強",https://dict.concised.moe.edu.tw/dictView.jsp?ID=40472
+early,zh-Hant,lc_zh_hant_old_man,"塞翁失馬",hurt|endure|mend,1.65,"從眼前的損失中發現轉機",https://dict.idioms.moe.edu.tw/idiomView.jsp?ID=-536
+early,zh-Hant,lc_zh_hant_one_city,"眾志成城",both|solid|hold,1.65,"眾人同心便能築成堅城",https://dict.idioms.moe.edu.tw/idiomView.jsp?ID=189&la=0&webMd=1

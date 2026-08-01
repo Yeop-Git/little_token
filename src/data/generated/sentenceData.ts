@@ -74,12 +74,13 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       ],
       "emotion": "joy",
       "inkCost": 1,
+      "bonus": 0.2,
       "rarity": "common",
       "art": "2002",
-      "note": "다음 적 공격 −3",
-      "lore": "거친 벌레의 기세를 부드럽게 누그러뜨린다.",
+      "note": "배율 ×1.20 · 카운터 ×0.75",
+      "lore": "다정히 막아 낸 충격을 작게 되돌려준다.",
       "effects": {
-        "enemyAttackDown": 3
+        "counterMultiplier": 0.75
       }
     },
     {
@@ -87,18 +88,15 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "text": "살짝",
       "slot": "adv",
       "tags": [
-        "soft"
+        "soft",
+        "preempt"
       ],
       "emotion": "pleasure",
       "inkCost": 1,
       "rarity": "common",
       "art": "2003",
-      "note": "문장 비용 −1 · 다음 첫 손패 +1",
-      "lore": "잉크를 아끼고 다음 낱말을 살짝 당겨 둔다.",
-      "effects": {
-        "inkDiscount": 1,
-        "drawCards": 1
-      }
+      "note": "선공 상대보다 먼저 행동",
+      "lore": "상대의 공격보다 살짝 먼저 움직인다."
     }
   ],
   "verb": [
@@ -552,11 +550,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2005",
-    "note": "카운터 ×1.00 · 다음 적 공격 −2",
-    "lore": "막아 낸 충격을 참았다가 그대로 돌려준다.",
+    "note": "카운터 ×1.00 · 방어 1랭크↑",
+    "lore": "막아 낸 충격을 참았다가 그대로 돌려주며 방어 태세를 다진다.",
     "effects": {
       "counterMultiplier": 1,
-      "enemyAttackDown": 2
+      "guardRank": 1
     }
   },
   {
@@ -570,11 +568,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2006",
-    "note": "다음 적 공격 −4 · 다음 첫 손패 +1",
-    "lore": "번진 글씨가 적의 기세를 흐리고 다음 낱말을 드러낸다.",
+    "note": "흡혈 50%",
+    "lore": "빼앗긴 이야기를 눈물 한 방울까지 되찾는다.",
     "effects": {
-      "enemyAttackDown": 4,
-      "drawCards": 1
+      "lifeStealRate": 0.5
     }
   },
   {
@@ -625,11 +622,8 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2007",
-    "note": "다음 첫 손패 +1 · 선공 상대보다 먼저 행동",
-    "lore": "숨 돌릴 틈 없이 다음 낱말까지 챙긴다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "선공 상대보다 먼저 행동",
+    "lore": "상대의 공격이 닿기 전에 먼저 움직인다."
   },
   {
     "id": "motdohage",
@@ -642,11 +636,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2008",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1",
-    "lore": "안 하려 했는데, 손이 먼저 나갔다.",
+    "note": "카운터 ×1.00 · 적 공격 1랭크↓",
+    "lore": "빈틈을 보인 척 적의 기세를 꺾고, 막은 힘은 되돌려준다.",
     "effects": {
       "counterMultiplier": 1,
-      "carryInk": 1
+      "enemyAttackRank": -1
     }
   },
   {
@@ -733,11 +727,8 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2011",
-    "note": "다음 문장 잉크 +1 · 선공 상대보다 먼저 행동",
-    "lore": "빛나는 줄을 따라 손이 가벼워진다.",
-    "effects": {
-      "carryInk": 1
-    }
+    "note": "선공 상대보다 먼저 행동",
+    "lore": "빛을 따라 상대보다 먼저 움직인다."
   },
   {
     "id": "pogeunhage",
@@ -750,12 +741,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2012",
-    "note": "문장 비용 −1 · 다음 문장 잉크 +1 · 다음 적 공격 −2",
-    "lore": "한 줄을 아껴 덮고 다음 줄까지 숨을 고른다.",
+    "note": "초과 회복량 125% 피해",
+    "lore": "몸에 다 담지 못한 온기가 벌레까지 힘껏 밀어낸다.",
     "effects": {
-      "inkDiscount": 1,
-      "carryInk": 1,
-      "enemyAttackDown": 2
+      "overhealDamageMultiplier": 1.25
     }
   },
   {
@@ -769,11 +758,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2013",
-    "note": "문장 비용 −1 · 다음 첫 손패 +1",
-    "lore": "새 페이지를 만나 다음 낱말을 앞당긴다.",
+    "note": "관통 · 흡혈 40%",
+    "lore": "되찾은 이야기가 방어를 넘어 상처까지 메운다.",
     "effects": {
-      "inkDiscount": 1,
-      "drawCards": 1
+      "pierceGuard": true,
+      "lifeStealRate": 0.4
     }
   },
   {
@@ -785,14 +774,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 2,
+    "bonus": 0.15,
     "targetCount": 2,
     "rarity": "rare",
     "art": "2014",
-    "note": "2명(100%·70%) · 다음 첫 손패 +1",
-    "lore": "웃음이 옆 칸과 다음 줄까지 번진다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "배율 ×1.15 · 2명(100%·70%)",
+    "lore": "웃음이 커져 앞의 두 벌레에게 번진다."
   },
   {
     "id": "geochilge",
@@ -806,10 +793,10 @@ export const REWARD_WORDS: Word[] = [
     "targetCount": 2,
     "rarity": "rare",
     "art": "2015",
-    "note": "2명(100%·70%) · 다음 적 공격 −3",
-    "lore": "거친 기세로 적의 줄을 흔든다.",
+    "note": "2명(100%·70%) · 공격 1랭크↑",
+    "lore": "거친 기세로 앞의 두 벌레를 흔들고 공격 태세를 끌어올린다.",
     "effects": {
-      "enemyAttackDown": 3
+      "attackRank": 1
     }
   },
   {
@@ -823,12 +810,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 3,
     "rarity": "rare",
     "art": "2016",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1 · 다음 적 공격 −4",
-    "lore": "텅 빈 여백이 공격을 삼키고 다음 줄에 잉크를 남긴다.",
+    "note": "카운터 ×1.00 · 다음 문장 잉크 +2",
+    "lore": "빈 자리를 방패 삼아 버티고 다음 줄에 힘을 남긴다.",
     "effects": {
       "counterMultiplier": 1,
-      "carryInk": 1,
-      "enemyAttackDown": 4
+      "carryInk": 2
     }
   },
   {
@@ -842,11 +828,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2017",
-    "note": "문장 비용 −1 · 다음 문장 잉크 +1",
-    "lore": "흔들리는 손으로도 두 줄의 잉크를 아껴 쓴다.",
+    "note": "적 공격 1랭크↓",
+    "lore": "거칠어진 이야기를 눌러 적의 공격 태세를 꺾는다.",
     "effects": {
-      "inkDiscount": 1,
-      "carryInk": 1
+      "enemyAttackRank": -1
     }
   },
   {
@@ -858,14 +843,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
+    "bonus": 0.15,
     "targetCount": 2,
     "rarity": "rare",
     "art": "2018",
-    "note": "2명(100%·70%) · 다음 첫 손패 +1",
-    "lore": "낙서가 통통 튀며 다음 줄까지 달린다.",
-    "effects": {
-      "drawCards": 1
-    }
+    "note": "배율 ×1.15 · 2명(100%·70%)",
+    "lore": "신나는 낙서가 커져 앞의 두 칸으로 튄다."
   },
   {
     "id": "deulsseogimyeo",
@@ -878,12 +861,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "rare",
     "art": "2019",
-    "note": "카운터 ×1.00 · 다음 문장 잉크 +1 · 다음 첫 손패 +1",
-    "lore": "되튀는 박자가 막은 힘과 다음 낱말을 함께 남긴다.",
+    "note": "방어도 120% 피해",
+    "lore": "되튀는 박자가 쌓인 방어보다 한 걸음 더 세게 밀어낸다.",
     "effects": {
-      "counterMultiplier": 1,
-      "carryInk": 1,
-      "drawCards": 1
+      "guardAttackMultiplier": 1.2
     }
   },
   {
@@ -891,18 +872,17 @@ export const REWARD_WORDS: Word[] = [
     "text": "경쾌하게",
     "slot": "adv",
     "tags": [
-      "lively",
-      "preempt"
+      "lively"
     ],
     "emotion": "pleasure",
     "inkCost": 2,
     "rarity": "rare",
     "art": "2020",
-    "note": "문장 비용 −1 · 다음 첫 손패 +1 · 선공 상대보다 먼저 행동",
-    "lore": "가벼운 박자로 잉크와 낱말을 앞질러 챙긴다.",
+    "note": "문장 비용 −1 · 다시 뽑기 +1회",
+    "lore": "짧고 가벼운 박자가 덱에서 한 장 더 꺼낼 여유를 만든다.",
     "effects": {
       "inkDiscount": 1,
-      "drawCards": 1
+      "bonusDraws": 1
     }
   }
 ]
@@ -1311,7 +1291,7 @@ export const PUNCT_WORDS: Word[] = [
   }
 ]
 
-/** 무럭무럭 — '잭의 하늘나물'이 각 슬롯에 한 장씩 뿌리는 성장 카드. */
+/** 무럭무럭 — 보상으로 덱에 등록되는 성장 카드의 단일 원본. */
 export const GROW_WORDS: Word[] = [
   {
     "id": "gr",
@@ -1706,6 +1686,222 @@ export const COMBOS: Combo[] = [
     "flavor": "모두를 적시는 비"
   }
 ]
+
+/** Locale-native idioms. These are added only to the matching language catalog. */
+export const LOCALE_EARLY_COMBOS: Record<string, Combo[]> = {
+  "ko": [
+    {
+      "id": "lc_ko_blessing",
+      "name": "전화위복",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.75,
+      "flavor": "상처를 더 밝은 다음 줄로 바꾼다"
+    },
+    {
+      "id": "lc_ko_after_rain",
+      "name": "비 온 뒤에 땅이 굳어진다",
+      "need": [
+        "hurt",
+        "solid",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "시련을 견딘 자리가 더 단단해진다"
+    },
+    {
+      "id": "lc_ko_smiling_face",
+      "name": "웃는 낯에 침 못 뱉는다",
+      "need": [
+        "calm",
+        "smile",
+        "grd"
+      ],
+      "mult": 1.65,
+      "flavor": "부드러운 웃음으로 적의를 누그러뜨린다"
+    }
+  ],
+  "en": [
+    {
+      "id": "lc_en_grin",
+      "name": "Grin and Bear It",
+      "need": [
+        "grit",
+        "smile",
+        "grd"
+      ],
+      "mult": 1.75,
+      "flavor": "Meet the hard moment with a steady smile"
+    },
+    {
+      "id": "lc_en_silver_lining",
+      "name": "Every Cloud Has a Silver Lining",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "Find a hopeful edge inside a hard turn"
+    },
+    {
+      "id": "lc_en_many_hands",
+      "name": "Many Hands Make Light Work",
+      "need": [
+        "both",
+        "warm",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "Shared effort makes a heavy task easier"
+    }
+  ],
+  "ja": [
+    {
+      "id": "lc_ja_rise",
+      "name": "七転び八起き",
+      "need": [
+        "hurt",
+        "endure",
+        "mend"
+      ],
+      "mult": 1.75,
+      "flavor": "何度転んでも、また立ち上がる"
+    },
+    {
+      "id": "lc_ja_after_rain",
+      "name": "雨降って地固まる",
+      "need": [
+        "hurt",
+        "solid",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "困難の後で結びつきが強くなる"
+    },
+    {
+      "id": "lc_ja_laughing_gate",
+      "name": "笑う門には福来る",
+      "need": [
+        "bright",
+        "smile",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "笑顔のある所へ幸せが訪れる"
+    }
+  ],
+  "ru": [
+    {
+      "id": "lc_ru_will",
+      "name": "Собрать волю в кулак",
+      "need": [
+        "grit",
+        "force",
+        "atk"
+      ],
+      "mult": 1.75,
+      "flavor": "Собрать всю решимость для одного удара"
+    },
+    {
+      "id": "lc_ru_blessing",
+      "name": "Не было бы счастья, да несчастье помогло",
+      "need": [
+        "hurt",
+        "bright",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "Обратить испытание в неожиданную удачу"
+    },
+    {
+      "id": "lc_ru_together",
+      "name": "Один в поле не воин",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "Вместе легче устоять перед угрозой"
+    }
+  ],
+  "zh-Hans": [
+    {
+      "id": "lc_zh_hans_boats",
+      "name": "破釜沉舟",
+      "need": [
+        "force",
+        "reckless",
+        "atk"
+      ],
+      "mult": 1.75,
+      "flavor": "断绝退路，决心一战"
+    },
+    {
+      "id": "lc_zh_hans_old_man",
+      "name": "塞翁失马",
+      "need": [
+        "hurt",
+        "soft",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "从眼前的损失中发现转机"
+    },
+    {
+      "id": "lc_zh_hans_one_city",
+      "name": "众志成城",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "众人同心便能筑成坚城"
+    }
+  ],
+  "zh-Hant": [
+    {
+      "id": "lc_zh_hant_soft",
+      "name": "以柔克剛",
+      "need": [
+        "force",
+        "soft",
+        "grd"
+      ],
+      "mult": 1.75,
+      "flavor": "用柔弱之道戰勝剛強"
+    },
+    {
+      "id": "lc_zh_hant_old_man",
+      "name": "塞翁失馬",
+      "need": [
+        "hurt",
+        "endure",
+        "mend"
+      ],
+      "mult": 1.65,
+      "flavor": "從眼前的損失中發現轉機"
+    },
+    {
+      "id": "lc_zh_hant_one_city",
+      "name": "眾志成城",
+      "need": [
+        "both",
+        "solid",
+        "hold"
+      ],
+      "mult": 1.65,
+      "flavor": "眾人同心便能築成堅城"
+    }
+  ]
+}
+
+export const LOCALE_COMBOS: Record<string, Combo[]> = {}
 
 export const EARLY_CONFLICTS: Conflict[] = []
 
