@@ -176,6 +176,12 @@ const ENEMY_ENTER_DELAY_MS = 260
 const PLAYER_ENTER_MS = 1120
 const FOE_WALK_MS = 2260
 /**
+ * 보스는 복도 끝에서 걸어 나온다 — 레일 적보다 먼 길이라 더 오래 걷는다.
+ * style.css의 `--boss-walk-ms`(3.2초)와 짝이며, 여기 값이 더 커야 도착 프레임에
+ * 걷는 동작이 끊기지 않는다.
+ */
+const BOSS_WALK_MS = 3380
+/**
  * 뒷줄이 한 칸 당겨올 때 걷는 시간. style.css의 .actor 이동 트랜지션(0.42s)과
  * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
  */
@@ -605,16 +611,18 @@ export class BattleView {
     // is-intro-hold(opacity 0)가 영구히 남고 적이 끝까지 안 보였다.
     void scene.offsetWidth
     scene.classList.remove('is-intro-hold')
-    this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), 4000))
+    // 보스는 복도 끝에서 오므로 걷는 길이 더 길다. 그 길이만큼 등장 클래스도 늦게 거둔다.
+    const walkMs = this.isBoss ? BOSS_WALK_MS : FOE_WALK_MS
+    this.timers.push(window.setTimeout(() => scene.classList.remove('is-enemies-arriving'), walkMs + 1740))
     // 걸어서 들어온다. GLB에 walk 클립이 진작 들어 있었는데 매니페스트에 연결이 없어서
     // 여태 안 쓰이고 있었다(어택 클립으로 대신해 봤지만 440ms짜리라 앞부분만 달리고
     // 끝의 휘두르는 동작 때문에 등장하면서 공격하는 것처럼 보였다).
     // walk는 idle처럼 계속 도는 클립이라 도착할 때까지 반복되고, 다 오면 idle로 돌린다.
     this.root.querySelectorAll<HTMLElement>('.actor.foe').forEach((foe) => {
       playCharacterAnimation(foe, 'walk')
-      this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), FOE_WALK_MS))
+      this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), walkMs))
     })
-    this.timers.push(window.setTimeout(() => this.onEnemiesArrived(), FOE_WALK_MS))
+    this.timers.push(window.setTimeout(() => this.onEnemiesArrived(), walkMs))
   }
 
   /**

@@ -1794,8 +1794,13 @@ html[data-postprocessing='off'] .tip-bubble {
   --boss-bottom: -165px;
 }
 .actor.foe.boss[data-character='mantis'] {
-  /* 모델 중심보다 오른쪽에 모인 발 실루엣을 무대 중앙에 맞춘다. */
-  --boss-stage-offset-x: -84px;
+  /* 모델 중심보다 오른쪽에 모인 발 실루엣을 무대 중앙에 맞춘다. 큰낫이 왼쪽으로
+     길게 뻗어 있어 발끝만 맞추면 몸통이 오른쪽으로 밀려 보인다 — 실루엣 무게가
+     아니라 **소녀의 몸통**이 중앙선에 오도록 한 뼘 더 왼쪽으로 당긴다. */
+  --boss-stage-offset-x: -99px;
+  /* 프롬이 전경에서 화면을 절반 가까이 채운다. 보스가 복도 안쪽에 머물면 대치가
+     아니라 구경이 된다 — 카드 열 위 여백이 남는 선까지 앞으로 당겨 세운다. */
+  --boss-bottom: -182px;
 }
 .actor.foe.boss[data-character='queenBee'] {
   --boss-display-scale: 1.45;
@@ -8797,6 +8802,26 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
     transform 2.1s cubic-bezier(0.3, 0.3, 0.85, 1),
     opacity 0.8s ease;
   pointer-events: none;
+}
+
+/* 보스는 화면 옆에서 미끄러져 들어오지 않는다 — 복도 끝에서 걸어 나온다.
+   레일 적들은 오른쪽 밖에서 들어오면 그만이지만, 보스는 프롬과 정면으로 마주 서는
+   유일한 배우다. 옆에서 제 크기 그대로 미끄러져 오면 도착이 아니라 순간이동으로
+   읽힌다. 멀리서 작게 시작해 길을 따라 커지며 다가온다.
+   원점을 발밑에 두어야 커지는 동안 발이 바닥선을 벗어나지 않는다. */
+.scene.battle[data-boss='true'] .actor.foe.boss {
+  transform-origin: 50% 100%;
+}
+.scene.battle[data-boss='true'].is-intro-hold .actor.foe.boss {
+  opacity: 0 !important;
+  transform:
+    translate(var(--boss-enter-x, 0px), var(--boss-enter-y, -168px))
+    scale(var(--boss-enter-scale, .3));
+}
+.scene.battle[data-boss='true'].is-enemies-arriving .actor.foe.boss {
+  transition:
+    transform var(--boss-walk-ms, 3200ms) cubic-bezier(.36, .12, .58, 1),
+    opacity 1.1s ease;
 }
 
 /* 하단 단어 영역(밝은 카드/덱)은 반투명 대화창을 뚫고 비치므로 홀드 동안 숨기고,
