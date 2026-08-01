@@ -391,14 +391,6 @@ export class BattleView {
    */
   private heavyStopUsed = false
   private actionOrderSignature = ''
-  /** 좌상단 스탯 알약의 직전 HTML. 같은 결과면 다시 그리지 않는다. */
-  private statsSignature = ''
-  /**
-   * 관통 연쇄가 도는 동안 켜진다. 이 구간의 행동 순서 갱신은 목록 내용만 바꾸고
-   * FLIP 슬라이드는 건너뛴다 — 한 칸이 70~180ms라 0.52초짜리 슬라이드는 시작하자마자
-   * 다음 갱신에 덮여 어차피 안 보인다.
-   */
-  private chainSweeping = false
   private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
   private actorsInitialized = false
@@ -1352,12 +1344,8 @@ export class BattleView {
     if (signature === this.actionOrderSignature) return
     this.actionOrderSignature = signature
 
-    // FLIP은 "지우기 전 위치 재기 → 새로 그리기 → 다시 재기"라 강제 리플로우를 두 번
-    // 부른다. 연쇄 중에는 슬라이드가 어차피 안 보이므로 재는 일 자체를 건너뛴다.
-    const previous = this.chainSweeping
-      ? null
-      : new Map([...host.querySelectorAll<HTMLElement>('[data-order-key]')]
-        .map((item) => [item.dataset.orderKey!, item.getBoundingClientRect()]))
+    const previous = new Map([...host.querySelectorAll<HTMLElement>('[data-order-key]')]
+      .map((item) => [item.dataset.orderKey!, item.getBoundingClientRect()]))
     host.closest('.action-order')?.classList.toggle('is-preempting', this.playerPreempting)
     host.innerHTML = entries.map((entry, index) => `
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
@@ -1365,7 +1353,7 @@ export class BattleView {
         <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
         <div class="action-order-copy"><b>${entry.name}</b><span>${entry.note}</span></div>
       </li>`).join('')
-    if (previous) host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
+    host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
       const before = previous.get(item.dataset.orderKey!)
       if (!before) return
       const after = item.getBoundingClientRect()
@@ -2590,7 +2578,7 @@ export class BattleView {
 
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
-    const html =
+    this.q('#stats').innerHTML =
       `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
@@ -2607,13 +2595,6 @@ export class BattleView {
       </div>`
         },
       ).join('')
-    // 관통 연쇄는 적 하나가 쓰러질 때마다 renderActors를 다시 돌린다. 그때마다 이
-    // 알약 여섯 개를 innerHTML로 새로 만들고 있었는데, 연쇄 중에 프롬의 수치는
-    // 바뀌지 않는다 — 같은 글자를 다시 그리느라 레이아웃만 무효화했다.
-    // 결과가 같으면 손대지 않는다. 달라지면 예전과 **한 글자도 다르지 않게** 그린다.
-    if (html === this.statsSignature) return
-    this.statsSignature = html
-    this.q('#stats').innerHTML = html
   }
 
   // ── 보유 아이템 — 가방을 열지 않고 전장 좌측에 유물 아이콘으로 상시 표시한다. ──
@@ -4437,9 +4418,6 @@ export class BattleView {
   private endSlowmo() {
     this.q('#actors').classList.remove('slowmo')
     this.q('.scene.battle').classList.remove('slowmo-veil', 'heavy-windup', 'hit-stop')
-    // 연쇄 도중 예외로 빠져나갔더라도 여기서 슬라이드를 되살린다 — 한 번 접힌 채로
-    // 남으면 그 뒤 전투 내내 행동 순서가 툭툭 갈리기만 한다.
-    this.chainSweeping = false
   }
 
   // 불꽃 파편 — 지정 배우 근처에서 사방으로 튀며 사그라든다.
@@ -4508,8 +4486,6 @@ export class BattleView {
   ): Promise<number> {
     const actors = this.q('#actors')
     if (sweep) actors.classList.add('rail-rush')
-    // 연쇄가 도는 동안은 좌측 행동 순서의 슬라이드를 접는다(목록 내용은 그대로 갱신).
-    this.chainSweeping = true
     let combo = 1 // strike의 첫 처치가 콤보 1. 관통마다 +1.
     let killedCount = 0
     // 검기는 방금 베인 자리에서 다음 적으로 이어져야 한 줄기로 읽힌다.
@@ -4573,8 +4549,6 @@ export class BattleView {
         await sleep(sweep ? 160 : heavy ? 90 : 320)
       }
     }
-    // 연쇄가 끝났으니 마지막 한 번은 슬라이드까지 온전히 그린다.
-    this.chainSweeping = false
     this.renderActors()
     // 다 훑은 검기는 멈추지 않고 레일 뒤 화면 밖으로 주르륵 빠져나간다.
     if (heavy) this.launchSlashBeam(lastHit, null, 0.4)

@@ -186,38 +186,18 @@ function acquireRenderer(): THREE.WebGLRenderer {
   return sharedRenderer
 }
 
-/**
- * 배우 렌더에 한 프레임에서 쓸 수 있는 시간(ms).
- *
- * 배우 하나를 그리는 값은 `renderer.render` 한 번이 아니라 그 뒤의
- * `drawImage(webglCanvas → 2D)` 복사다. 이 복사는 GPU 파이프라인을 세우므로
- * 배우 수만큼 선형으로 붙는다. 대량 처치처럼 다섯 배우가 한꺼번에 갱신을 원하는
- * 프레임에서는 이 합이 프레임 예산을 통째로 먹는다.
- */
-const MODEL_FRAME_BUDGET_MS = 9
-/** 직전 프레임에 배우 렌더가 실제로 쓴 시간. 예산을 넘겼을 때만 다음 프레임을 줄인다. */
-let lastModelCostMs = 0
-
 function runAnimationFrame(now: number) {
   const frameMs = previousFrame ? now - previousFrame : 0
   const delta = Math.min(frameMs / 1000, 0.1)
   previousFrame = now
   if (!document.hidden) {
     const models = [...activeModels]
-    const wanted = models
-      .filter((model) => model.wantsRender(now))
-      .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
-    // 평소에는 원하는 배우를 다 그린다. **직전 프레임이 예산을 넘겼을 때만** 상위
-    // 몇으로 줄인다 — 이미 프레임을 흘리고 있는 순간에만 켜지는 안전 밸브다.
-    // 밀린 배우는 renderPriority에 `now - lastRenderedAt`이 들어 있어 다음 프레임에
-    // 맨 앞으로 온다. 그래서 특정 배우만 계속 굶는 일은 없다.
-    const cap = lastModelCostMs > MODEL_FRAME_BUDGET_MS && wanted.length > 1
-      ? Math.max(1, Math.floor(wanted.length * (MODEL_FRAME_BUDGET_MS / lastModelCostMs)))
-      : wanted.length
-    const allowed = new Set(wanted.slice(0, cap))
-    const startedAt = performance.now()
+    const allowed = new Set(
+      models
+        .filter((model) => model.wantsRender(now))
+        .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
+    )
     models.forEach((model) => model.render(delta, now, allowed.has(model)))
-    lastModelCostMs = performance.now() - startedAt
   }
   animationFrame = activeModels.size ? requestAnimationFrame(runAnimationFrame) : 0
   if (!animationFrame) previousFrame = 0
@@ -1373,29 +1353,9 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     return waitingEnemy ? profile.waitingFps : profile.activeFps
   }
 
-  /**
-   * 얼어 있어도 계속 움직이는 것들 — 이게 하나라도 있으면 정지 중에도 다시 그려야 한다.
-   * 정예 셰이더의 시간 유니폼과 회복·방어 이펙트, 거미 부위 용해, 카메라 줌 보간,
-   * 드래그 회전 복귀가 여기 해당한다.
-   */
-  private hasLiveMotionWhileFrozen() {
-    return this.eliteTimeUniforms.length > 0
-      || this.effectKind !== null
-      || this.spiderPartDissolves.length > 0
-      || this.returningToDefaultYaw
-      || this.dragPointerId !== null
-      || Math.abs(this.cameraZoom - this.cameraZoomTarget) > 0.0001
-  }
-
   wantsRender(now: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return false
     if (!this.firstFrameRendered || !this.lastRenderedAt) return true
-    // 히트스탑·강공격 예고로 얼어 있는 동안은 mixer가 0으로 돌아 **같은 그림**이 나온다.
-    // 그런데도 매 프레임 `renderToOutput`(WebGL → 2D 복사)을 돌리고 있었다. 화면이
-    // 멈춘 구간에서 가장 비싼 일을 계속하던 셈이라, 정지가 풀리며 이펙트가 터지는
-    // 바로 그 순간에 쓸 여유를 미리 깎아 먹었다.
-    // 캔버스에 남은 마지막 프레임이 그대로 보이므로 **화면은 한 픽셀도 달라지지 않는다.**
-    if (this.frozen && !this.hasLiveMotionWhileFrozen()) return false
     return now - this.lastRenderedAt >= 1000 / this.targetFps()
   }
 
@@ -1457,10 +1417,6 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       return
     }
     this.pendingRenderDelta = Math.min(0.1, this.pendingRenderDelta + delta)
-    // 얼어 있는 동안 못 그린 프레임의 델타가 쌓이면, 정지가 풀리는 순간 mixer가 그
-    // 합을 한꺼번에 먹어 동작이 최대 0.1초를 건너뛴다. 정지 중에는 한 프레임치만
-    // 들고 있는다 — 풀리는 프레임의 진행량이 예전과 똑같아진다.
-    if (this.frozen) this.pendingRenderDelta = Math.min(this.pendingRenderDelta, delta)
     if (!allowDraw) return
     const waitingEnemy = this.isWaitingEnemy()
     const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
