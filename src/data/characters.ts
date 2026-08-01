@@ -283,10 +283,11 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       // 오른손의 월드 궤적을 실측했다 — 큰낫이 가장 높은 순간이 클립의 20%다.
       //
       // `telegraph`는 손 높이가 아니라 **화면에 보이는 그림**으로 골랐다. 0.20은 손이
-      // 가장 높지만 몸이 돌아가 큰낫이 화면 밖으로 나가고, 0.26에서 몸을 낮추고 낫을
-      // 머리 위로 크게 치켜든 "내려칠 직전" 실루엣이 정면으로 선다. 실측 마디와
-      // 보기 좋은 마디는 다를 수 있다 — 예고 자세는 렌더된 프레임을 훑어 정한다.
-      attackBeats: { raise: 0.2, impact: 0.26, telegraph: 0.26 },
+      // 가장 높은 실측 마디지만 몸이 돌아가 큰낫이 화면 밖으로 나간다. 0.34는 낫을
+      // 뒤로 크게 감아 **장전한** 실루엣이라 "곧 내려친다"가 한눈에 읽힌다.
+      // 실측 마디와 보기 좋은 마디는 다를 수 있다 — 예고 자세는 렌더된 프레임을
+      // 훑어 눈으로 정한다.
+      attackBeats: { raise: 0.2, impact: 0.26, telegraph: 0.34 },
       durationsMs: { attack: 440, attack3: 440, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },

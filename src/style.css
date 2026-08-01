@@ -2030,6 +2030,13 @@ html[data-postprocessing='off'] .tip-bubble {
   --boss-display-scale: 1.4;
   --boss-bottom: -160px;
 }
+/* 예고 정지 자세 보정 — `attack3`의 0.34 마디는 몸을 크게 틀어 실루엣이 오른쪽으로
+   밀린다(실측: 셸 너비의 약 25%). 모델은 로드 시점의 대기 자세를 기준으로 가운데를
+   맞춰 두므로, 한 프레임을 붙들면 그 기준에서 벗어난다. 붙든 동안만 되민다.
+   `translate`는 아래 `transform: scale(...)`과 별개 속성이라 서로 덮지 않는다. */
+.actor.foe.boss > .model-shell[data-model-pose^='attack3'] {
+  translate: -35% 0;
+}
 .actor.foe.boss > .model-shell {
   transform: scale(calc(var(--model-scale, 1) * var(--boss-display-scale)));
 }

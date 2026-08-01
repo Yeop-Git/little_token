@@ -293,7 +293,6 @@ const spiderNextWeaknessLine = (weakness: string | null): TokenLine =>
  * 사마귀가 큰낫을 들어 올리는 데 쓰는 시간. 원본 강공격 클립을 이만큼 늘려 재생하다
  * 정점에서 멈춘다. 짧으면 드는 동작이 안 읽히고, 길면 예고가 늘어진다.
  */
-const MANTIS_TELEGRAPH_WINDUP_MS = 900
 
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
@@ -4964,16 +4963,13 @@ export class BattleView {
       // 예고는 **정지 프레임 한 장**이다. 몸을 낮추고 큰낫을 머리 위로 치켜든 마디까지
       // 클립을 틀고, 그 자리에서 자세를 붙들어 다음 턴 내려벨 때까지 그대로 세워 둔다.
       if (mantisTelegraph) {
-        // 예전에는 타이머로 mixer를 얼렸는데, 그 사이 레일이 다시 그려지면
-        // `updateFoe`가 얼음을 풀어(그쪽은 매 렌더 해제한다) 예고 자세 없이 그냥 서
-        // 있는 판이 생겼다. `poseCharacterAt`은 모델 상태로 박히므로 재렌더에 안 풀린다.
+        // 예고는 **그 한 프레임이 전부**다. 클립을 앞에서부터 틀다 멈추는 게 아니라
+        // 곧바로 그 자세로 세운다 — 타이머가 없으니 어떤 순서로 다시 그려져도
+        // 예고를 놓치지 않는다. 자세는 모델 상태로 박혀 재렌더에 풀리지 않는다.
+        // (예전에는 늘린 클립 + 타이머 정지였고, 그 사이 레일이 다시 그려지면
+        //  `updateFoe`가 얼음을 풀어 예고 없이 그냥 서 있는 판이 생겼다.)
         const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
-        const at = beats?.telegraph ?? beats?.raise ?? 0.2
-        playCharacterAnimation(foe ?? null, animation, MANTIS_TELEGRAPH_WINDUP_MS)
-        this.timers.push(window.setTimeout(
-          () => poseCharacterAt(foe ?? null, animation, at),
-          MANTIS_TELEGRAPH_WINDUP_MS * at,
-        ))
+        poseCharacterAt(foe ?? null, animation, beats?.telegraph ?? beats?.raise ?? 0.2)
       } else {
         playCharacterAnimation(foe ?? null, animation)
       }
