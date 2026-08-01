@@ -1258,16 +1258,6 @@ button {
   gap: 8px;
   list-style: none;
 }
-.action-order ol::before {
-  content: '';
-  position: absolute;
-  top: 23px;
-  bottom: 23px;
-  left: 31px;
-  width: 2px;
-  background: linear-gradient(180deg, rgba(255, 226, 168, .55), rgba(255, 207, 118, .12));
-  box-shadow: 0 0 9px rgba(255, 207, 118, .28);
-}
 .action-order-item {
   position: relative;
   display: flex;
