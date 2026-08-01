@@ -3350,26 +3350,6 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 이름/체력 HUD는 표시 전용이다. 선택 판정은 캐릭터 본체(model-shell)만 받는다. */
   pointer-events: none;
 }
-/* 잉크 마구리 — 판이 없어지면 적 다섯이 늘어섰을 때 옆 적의 밑줄과 이어져
-   한 줄로 읽힌다. 양 끝에 못을 박아 "여기서 끊긴다"를 만든다. */
-.nameplate::before,
-.nameplate::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  width: 4px;
-  height: 22px;
-  border-radius: 2px;
-  background: rgba(255, 232, 194, .85);
-  box-shadow: 0 0 8px rgba(0, 0, 0, .85);
-}
-.nameplate::before { left: -6px; }
-.nameplate::after { right: -6px; }
-/* 마구리에 약점 감정색을 물려 옆 적과 색으로도 갈린다 */
-.actor.foe .nameplate[class*='emotion-']::before,
-.actor.foe .nameplate[class*='emotion-']::after {
-  background: color-mix(in srgb, var(--emotion-color) 58%, #ffe8c2);
-}
 .actor.foe .nameplate {
   transform: translateX(-50%);
   transition: opacity 0.32s ease, filter 0.32s ease;
