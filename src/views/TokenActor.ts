@@ -27,7 +27,12 @@ import {
  * 자유 비행의 결. 셋은 토큰이 스스로 고르고(orbit·wander·inspect·peer), 둘은 바깥에서
  * 부른다(attend·alert) — 팁을 줄 때와 경고할 때는 요정의 변덕보다 용건이 앞선다.
  */
-export type TokenBehavior = 'orbit' | 'wander' | 'inspect' | 'peer' | 'attend' | 'alert'
+export type TokenBehavior =
+  | 'orbit' | 'wander' | 'inspect' | 'peer' | 'attend' | 'alert'
+  /** 톡 건드려서 화면 앞으로 나와 갸웃하는 중. */
+  | 'poke'
+  /** 붙잡혀서 바둥거리는 중. 손가락을 따라다닌다. */
+  | 'grab'
 
 /**
  * 상자 한 변. **가장 가까이 왔을 때**(scale 1)를 기준으로 잡고 멀 때는 축소만 한다.
@@ -54,6 +59,10 @@ const FLIGHT: Record<TokenBehavior, { speed: number; accel: number; slow: number
   peer: { speed: 620, accel: 2000, slow: 110, scale: 1, depth: 1 },
   attend: { speed: 760, accel: 2400, slow: 100, scale: 0.94, depth: 0.55 },
   alert: { speed: 360, accel: 2200, slow: 60, scale: 0.8, depth: 0.3 },
+  // 건드리면 코앞까지 나온다. peer보다 가깝고 더 빠르게 온다 — 부른 쪽이 사람이라서.
+  poke: { speed: 900, accel: 3000, slow: 90, scale: 1.06, depth: 1 },
+  // 붙잡힌 동안은 손가락이 목표다. 빠져나가려 애쓰므로 가속만 크고 감속 반경은 좁다.
+  grab: { speed: 1100, accel: 4200, slow: 40, scale: 1.02, depth: 0.9 },
 }
 
 /** 자율 결의 지속 시간(ms) 범위. attend·alert는 바깥이 놓아줄 때까지라 여기 없다. */
@@ -111,6 +120,11 @@ const DEPTH_SCALE = 0.34
 const DEPTH_BLUR_PX = 1.6
 const DEPTH_FADE = 0.22
 
+/** 이보다 오래 누르고 있으면 붙잡은 것으로 친다(ms). */
+const GRAB_HOLD_MS = 320
+/** 톡 건드렸을 때 화면 앞으로 나와 갸웃하는 시간(ms). */
+const POKE_MS = 1500
+
 /** 정책이 고르는 결. attend·alert는 바깥이 부르므로 학습 대상이 아니다. */
 const POLICY_BEHAVIOURS: readonly TokenBehavior[] = ['orbit', 'wander', 'inspect', 'peer']
 
@@ -161,6 +175,10 @@ export class TokenActor {
   private selectionStartedAt = 0
   /** 이번 전투에서 위기를 함께 넘긴 것을 이미 세었는가. */
   private stoodByCounted = false
+  /** 붙잡은 포인터와 그 손가락의 무대 좌표. 잡혀 있는 동안 이게 목표점이 된다. */
+  private grabPointer: number | null = null
+  private readonly grabAt: Vec = { x: 0, y: 0 }
+  private grabTimer = 0
 
   private playerEl: HTMLElement | null = null
   private frame = 0
@@ -190,6 +208,7 @@ export class TokenActor {
       `<div class="token-actor" data-behavior="orbit">
         <div class="token-body" aria-hidden="true">
           <div class="token-panic-lines"><i></i><i></i><i></i></div>
+          <b class="token-wonder" aria-hidden="true">?</b>
           <div class="model-shell" data-model-status="${modelStatus}">
             <img class="battle-sprite" src="${visual.portrait2d}" alt="">
           </div>
@@ -200,9 +219,9 @@ export class TokenActor {
     this.el = host.querySelector<HTMLElement>(':scope > .token-actor')!
     this.body = this.el.querySelector<HTMLElement>('.token-body')!
     this.bubble = this.el.querySelector<HTMLElement>('.token-speech')!
-    // 지금은 만질 수 없다(CSS에서 pointer-events: none). 나중에 토큰을 붙잡아 흔드는
-    // 장난을 넣는다면 여기서 .token-body에만 포인터를 열고, 잡힌 동안 비행 컨트롤러를
-    // 멈춘 뒤 놓는 순간의 커서 속도를 this.vel에 실어 주면 그대로 튕겨 날아간다.
+    // 만질 수 있는 건 몸통뿐이다(CSS에서 .token-body에만 pointer-events를 연다).
+    // 상자 전체를 열면 320px짜리 투명 사각형이 손패 클릭을 가로챈다.
+    this.body.addEventListener('pointerdown', this.onPointerDown)
     mountCharacterModel(this.body, visual)
     this.applyMood()
     this.enter('orbit')
@@ -389,6 +408,8 @@ export class TokenActor {
 
   destroy() {
     this.disposed = true
+    this.releaseGrab()
+    this.body.removeEventListener('pointerdown', this.onPointerDown)
     window.clearTimeout(this.speechHideTimer)
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = 0
@@ -421,8 +442,10 @@ export class TokenActor {
     this.warmup = this.leashed || !this.wokeAt
       ? 0
       : clamp((now - this.wokeAt) / WARMUP_MS, 0, 1)
-    if (!this.leashed && !this.holdingSpeech && this.behaviorUntil && now >= this.behaviorUntil) {
-      this.enter(this.pickNext())
+    // 잡혀 있는 동안에는 시간이 다 돼도 결이 바뀌지 않는다 — 손이 놓아야 끝난다.
+    if (this.behavior !== 'grab' && !this.holdingSpeech && this.behaviorUntil && now >= this.behaviorUntil) {
+      // 톡 건드려서 나온 갸웃은 묶여 있어도 제 시간을 다 쓴 뒤 제자리로 돌아간다.
+      this.enter(this.leashed ? 'orbit' : this.pickNext())
     }
     this.aim(delta)
     this.steer(delta)
@@ -477,6 +500,20 @@ export class TokenActor {
         // 프롬 앞 정위치. 말풍선이 오른쪽으로 펴질 자리를 남긴다.
         this.target.x = anchor.x + 26
         this.target.y = anchor.y - 66
+        break
+      }
+      case 'poke': {
+        // 화면 한가운데 앞으로 나와 살짝 갸웃한다. 프롬보다 조금 위 앞쪽이라
+        // 배우들을 가리지 않는다.
+        this.target.x = anchor.x + 210 + Math.sin(this.elapsed * 1.6) * 26
+        this.target.y = anchor.y - 96 + Math.sin(this.elapsed * 2.4) * 14
+        break
+      }
+      case 'grab': {
+        // 손가락이 목표지만 정확히 겹치지는 않는다. 빠져나가려 계속 어긋난다.
+        const wriggle = this.elapsed * 19
+        this.target.x = this.grabAt.x + Math.sin(wriggle) * 26
+        this.target.y = this.grabAt.y + Math.cos(wriggle * 1.3) * 22
         break
       }
       case 'alert': {
@@ -568,6 +605,8 @@ export class TokenActor {
     this.el.style.opacity = (1 - far * DEPTH_FADE).toFixed(3)
     // 오른쪽 끝에서는 말풍선을 왼쪽으로 넘긴다 — 안 그러면 무대 밖으로 밀려 잘린다.
     this.bubble.dataset.side = this.pos.x > 1180 ? 'left' : 'right'
+    // 갸웃 표시는 톡 건드렸을 때만. 붙잡힌 동안은 그럴 겨를이 없다.
+    this.el.classList.toggle('is-wondering', this.behavior === 'poke')
   }
 
   // ── 결 고르기 ─────────────────────────────────────────────────────────────
@@ -578,8 +617,14 @@ export class TokenActor {
     this.elapsed = 0
     const now = performance.now()
 
-    if (behavior === 'attend' || behavior === 'alert') {
+    if (behavior === 'attend' || behavior === 'alert' || behavior === 'grab') {
+      // 바깥이 놓아줄 때까지 유지한다(잡힌 동안은 손가락이 놓아줄 때까지).
       this.behaviorUntil = 0
+      return
+    }
+    if (behavior === 'poke') {
+      // 갸웃하는 동안만. 끝나면 평소 결로 돌아간다.
+      this.behaviorUntil = now + POKE_MS
       return
     }
     const [min, max] = DURATION[behavior]
@@ -641,6 +686,63 @@ export class TokenActor {
       playfulness: traits.playfulness,
       hesitation: this.situation.hesitation,
     }
+  }
+
+  // ── 만지기 ────────────────────────────────────────────────────────────────
+
+  /**
+   * 톡 건드리면 갸웃하며 앞으로 나오고, 꾹 누르고 있으면 붙잡힌다.
+   *
+   * 두 반응을 누르는 순간에 가르지 않는다 — 떼는 시점을 봐야 톡인지 꾹인지 알 수 있다.
+   * 그래서 누르는 즉시 잡은 것으로 두되, `GRAB_HOLD_MS` 전에 떼면 톡으로 돌린다.
+   */
+  private readonly onPointerDown = (event: PointerEvent) => {
+    if (this.disposed || this.grabPointer !== null) return
+    this.grabPointer = event.pointerId
+    this.trackGrab(event)
+    this.body.setPointerCapture?.(event.pointerId)
+    this.body.addEventListener('pointermove', this.onPointerMove)
+    this.body.addEventListener('pointerup', this.onPointerUp)
+    this.body.addEventListener('pointercancel', this.onPointerUp)
+    // 짧게 누른 뒤 떼는 사람에게 붙잡힌 연출을 보여 주지 않으려고 조금 기다렸다 켠다.
+    window.clearTimeout(this.grabTimer)
+    this.grabTimer = window.setTimeout(() => {
+      if (this.grabPointer !== null) this.enter('grab')
+    }, GRAB_HOLD_MS)
+  }
+
+  private readonly onPointerMove = (event: PointerEvent) => {
+    if (event.pointerId !== this.grabPointer) return
+    this.trackGrab(event)
+  }
+
+  private readonly onPointerUp = (event: PointerEvent) => {
+    if (event.pointerId !== this.grabPointer) return
+    const wasHeld = this.behavior === 'grab'
+    this.releaseGrab()
+    if (wasHeld) {
+      // 놓으면 손에서 벗어나려던 속도가 그대로 남아 튕겨 날아간다. 그 뒤에 갸웃한다.
+      this.vel.x += rand(-260, 260)
+      this.vel.y -= rand(120, 320)
+    }
+    this.enter('poke')
+  }
+
+  /** 손가락 위치를 무대 좌표로 옮겨 둔다. 잡혀 있는 동안 이게 목표점이다. */
+  private trackGrab(event: PointerEvent) {
+    const hostRect = this.host.getBoundingClientRect()
+    const scale = hostRect.width / (this.host.offsetWidth || 1) || 1
+    this.grabAt.x = (event.clientX - hostRect.left) / scale
+    this.grabAt.y = (event.clientY - hostRect.top) / scale
+  }
+
+  private releaseGrab() {
+    window.clearTimeout(this.grabTimer)
+    if (this.grabPointer !== null) this.body.releasePointerCapture?.(this.grabPointer)
+    this.grabPointer = null
+    this.body.removeEventListener('pointermove', this.onPointerMove)
+    this.body.removeEventListener('pointerup', this.onPointerUp)
+    this.body.removeEventListener('pointercancel', this.onPointerUp)
   }
 
   /** 무대 좌표로 환산한 프롬의 머리 언저리. 프롬이 없으면 무대 왼쪽 위를 기본으로 쓴다. */

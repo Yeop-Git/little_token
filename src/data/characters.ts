@@ -263,15 +263,24 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.boss_mantis,
     animations: {
       idle: 'Armature|idle1|BaseLayer',
-      // 예고 대기 자세는 원본 GLB의 `hold`다. `idle2`는 몸을 낮추고 큰낫을 옆으로
-      // 뉘인 다른 대기라, 예고 한 턴 동안 사마귀가 갑자기 작아진 것처럼 보였다.
-      // `hold`만 idle1과 같은 키·정면 실루엣으로 큰낫을 머리 위에 세워 둔다.
-      idle2: 'Armature|hold|BaseLayer',
+      /**
+       * `hold`는 이름과 달리 예비 동작이 아니다. 궤적을 재 보면 팔 회전 최대 35°에
+       * 왕복 5회로 제자리에서 흔들리다 처음 자세로 돌아온다 — 성격이 `idle1`(37°·왕복
+       * 5회)과 사실상 같은 또 하나의 대기다. 예고로 쓰면 큰낫을 드는 게 아니라 춤추는
+       * 것처럼 보인다. 그래서 예고는 이 클립이 아니라 강공격 클립(attack3)을 정점에서
+       * 멈춰 세워 만든다(BattleView.enemyPhase).
+       *
+       * idle2 자리에는 원본 `idle2`를 그대로 둔다. 지금은 쓰이지 않지만 잘못된 예고
+       * 대체재로 다시 끌려 나오지 않게 이름을 제자리에 돌려놓는다.
+       */
+      idle2: 'Armature|idle2|BaseLayer',
       walk: 'Armature|walk|BaseLayer',
       attack: 'Armature|attack1|BaseLayer',
-      // 강공격 예고는 준비 동작을 재생하지 않고 `hold`(idle2)로 바로 전환한다.
       attack3: 'Armature|attack3|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
+      // 강공격 예고가 멈춰 설 마디. `npm run clip:beats -- boss_mantis attack3 RightHand`로
+      // 오른손의 월드 궤적을 실측했다 — 큰낫이 가장 높은 순간이 클립의 20%다.
+      attackBeats: { raise: 0.2, impact: 0.26 },
       durationsMs: { attack: 440, attack3: 440, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },

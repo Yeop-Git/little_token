@@ -264,6 +264,12 @@ const spiderNextWeaknessLine = (weakness: string | null): TokenLine =>
   weakness
     ? bossTokenLine('spiderNextWeakness', 'relief', { weakness })
     : bossTokenLine('spiderBody', 'relief')
+/**
+ * 사마귀가 큰낫을 들어 올리는 데 쓰는 시간. 원본 강공격 클립을 이만큼 늘려 재생하다
+ * 정점에서 멈춘다. 짧으면 드는 동작이 안 읽히고, 길면 예고가 늘어진다.
+ */
+const MANTIS_TELEGRAPH_WINDUP_MS = 900
+
 const TRANSIENT_ACTOR_CLASSES = [
   'front',
   'target',
@@ -1634,6 +1640,9 @@ export class BattleView {
     el.classList.toggle('target', front)
     el.classList.toggle('back', !front)
     el.classList.toggle('groggy', this.state.turn <= e.groggyUntilTurn)
+    // 큰낫을 든 채 멈춰 있어도 되는 건 강공격이 아직 예고 상태일 때뿐이다. 막아서
+    // 취소됐거나 쓰러졌으면 여기서 정지를 푼다 — 안 그러면 그 자세로 굳는다.
+    if (e.dead || !nextEnemyAttackStep(e)?.shatterGuard) freezeCharacterAnimation(el, false)
     el.dataset.brokenLegs = String(e.parts.filter((part) => part.def.kind === 'leg' && part.broken).length)
     this.updateSummonedAllies(el, e)
     this.updateEnemyIntel(el, e)
@@ -4667,14 +4676,27 @@ export class BattleView {
     for (const st of enemyTurn(this.state, Math.random, phase)) {
       const foe = this.q<HTMLElement>(`#actors .actor.foe[data-i="${st.idx}"]`)
       const enemy = this.state.enemies[st.idx]
+      // 지난 예고에서 멈춰 세워 둔 자세가 있으면 먼저 푼다. 얼어붙은 채로 다음 클립을
+      // 걸면 믹서가 진행하지 않아 그 자세 그대로 굳는다.
+      freezeCharacterAnimation(foe ?? null, false)
       // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
-      // 사마귀의 강공격 예고는 준비 동작(attack2)을 거치지 않고 큰낫을 든
-      // 대기 자세(idle2)로 곧바로 전환해 다음 내려베기까지 유지한다.
-      const animation: BattleAnimation = enemy?.def.id === 'mantis' && st.telegraphText
-        ? 'idle2'
+      const mantisTelegraph = enemy?.def.id === 'mantis' && !!st.telegraphText
+      const animation: BattleAnimation = mantisTelegraph
+        ? 'attack3'
         : st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`
-      playCharacterAnimation(foe ?? null, animation)
+      // 예고는 강공격 클립을 늘려 큰낫이 가장 높은 마디에서 멈춰 세운다. 다음 턴
+      // 내려벨 때까지 그 자세로 버티는 게 예고의 전부다 — 흔들리는 대기 클립을
+      // 쓰면 위협이 아니라 춤으로 읽힌다.
+      const stretch = mantisTelegraph ? MANTIS_TELEGRAPH_WINDUP_MS : undefined
+      playCharacterAnimation(foe ?? null, animation, stretch)
+      if (mantisTelegraph) {
+        const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
+        this.timers.push(window.setTimeout(
+          () => freezeCharacterAnimation(foe ?? null, true),
+          MANTIS_TELEGRAPH_WINDUP_MS * (beats?.raise ?? 0.2),
+        ))
+      }
       if (!st.telegraphText) GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(
