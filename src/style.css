@@ -2062,6 +2062,22 @@ html[data-postprocessing='off'] .tip-bubble {
   width: 300px;
   opacity: .72;
 }
+/* 보스전 프롬 체력 — 프롬은 전경에서 화면 아래로 물려 서므로 머리 위 이름표가
+   화면 밖으로 나간다. 좌하단 고정 자리로 옮겨 앉힌다. 판 없는 잉크 밑줄 양식은
+   전장과 똑같이 쓴다 — 보스전만 다른 체력 표시를 두면 UI가 두 벌로 보인다. */
+.scene.battle[data-boss='true'] .actor.you .nameplate {
+  position: fixed;
+  left: 38px;
+  bottom: 28px;
+  top: auto;
+  z-index: 58;
+  width: 360px;
+  margin: 0;
+  transform: none;
+}
+.scene.battle[data-boss='true'] .actor.you .nameplate .nm { font-size: 21px; }
+.scene.battle[data-boss='true'] .actor.you .nameplate .hpn { font-size: 17px; }
+.scene.battle[data-boss='true'] .actor.you .nameplate .hpbar { height: 17px; }
 .scene.battle[data-boss='true'] .actor.foe.boss {
   /* 모델 원점은 카드 쪽으로 내려가지만 실제 발끝은 카드 위에 남는다. 투명 여백을
      포함한 박스가 아니라 화면에 보이는 실루엣을 기준으로 보스별 위치를 맞춘다. */
@@ -3667,7 +3683,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .enemy-intel-icon.guard > b { color: #082d3b; background: #a9efff; }
 .enemy-intel-icon:hover,
 .enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
-.enemy-intel-icon.attack, .enemy-intel-icon.stage { color: #ffb37d; border-color: rgba(255, 137, 83, .7); }
+.enemy-intel-icon.attack, .enemy-intel-icon.attack-stage { color: #ffb37d; border-color: rgba(255, 137, 83, .7); }
 .enemy-intel-icon.guard { color: #8ee4f4; border-color: rgba(142, 228, 244, .65); }
 .enemy-intel-icon.magic { color: #d9aaff; border-color: rgba(217, 170, 255, .72); }
 .enemy-intel-icon.pierce { color: #ff9d81; border-color: rgba(255, 157, 129, .72); }

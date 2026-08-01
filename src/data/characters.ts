@@ -27,7 +27,8 @@ export interface CharacterAnimationDef {
    *   impact  가장 빠르게 내려꽂는 순간. 히트스탑을 넣을 프레임
    * 눈대중이 아니라 `npm run clip:beats`로 손 본의 월드 궤적을 실측해 뽑는다.
    */
-  attackBeats?: { raise: number; impact: number }
+  /** 실측 마디(raise·impact)와, 예고가 멈춰 설 **눈으로 고른** 마디(telegraph). */
+  attackBeats?: { raise: number; impact: number; telegraph?: number }
   /** 원본 클립 길이와 무관하게 화면 연출에 맞출 단발 동작별 재생 시간. */
   durationsMs?: Partial<Record<'appear' | 'attack' | 'attack2' | 'attack3' | 'heal' | 'shield' | 'victory1' | 'victory2' | 'defeat', number>>
   /** 원본 동작을 보존하면서 조절할 클립별 재생 배속. */
@@ -280,7 +281,12 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       defeat: 'Armature|defeat|BaseLayer',
       // 강공격 예고가 멈춰 설 마디. `npm run clip:beats -- boss_mantis attack3 RightHand`로
       // 오른손의 월드 궤적을 실측했다 — 큰낫이 가장 높은 순간이 클립의 20%다.
-      attackBeats: { raise: 0.2, impact: 0.26 },
+      //
+      // `telegraph`는 손 높이가 아니라 **화면에 보이는 그림**으로 골랐다. 0.20은 손이
+      // 가장 높지만 몸이 돌아가 큰낫이 화면 밖으로 나가고, 0.26에서 몸을 낮추고 낫을
+      // 머리 위로 크게 치켜든 "내려칠 직전" 실루엣이 정면으로 선다. 실측 마디와
+      // 보기 좋은 마디는 다를 수 있다 — 예고 자세는 렌더된 프레임을 훑어 정한다.
+      attackBeats: { raise: 0.2, impact: 0.26, telegraph: 0.26 },
       durationsMs: { attack: 440, attack3: 440, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },

@@ -120,6 +120,7 @@ import {
   destroyCharacterModels,
   dissolveCharacterParts,
   freezeCharacterAnimation,
+  poseCharacterAt,
   isCharacterModelReady,
   mountCharacterModel,
   playCharacterAnimation,
@@ -1371,10 +1372,10 @@ export class BattleView {
     const modelStatus = this.playerVisual.model3d ? 'preparing-3d' : 'fallback-2d'
     return `
       <div class="actor you" data-character="player" role="button" tabindex="0" aria-label="${t('playerName', '프롬')}과 도우미 ${t('tokenName', '토큰')} 상세 보기">
-        ${this.isBoss ? '' : `<div class="nameplate glass">
+        <div class="nameplate glass">
           <div class="row"><span class="nm">${t('playerName', '프롬')}</span><span class="hpn"></span></div>
           <div class="hpbar you"><div class="fill"></div><div class="shield"></div></div>
-        </div>`}
+        </div>
         <div class="shadow"></div>
         <div class="mantis-guard-cue" hidden aria-live="polite">
           <span class="mantis-guard-shield" aria-hidden="true">◈</span>
@@ -1606,7 +1607,6 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    if (this.isBoss) return
     const guardLimit = playerGuardLimit(s.playerMax)
     el.querySelector<HTMLElement>('.hpn')!.innerHTML =
       `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
@@ -1824,7 +1824,9 @@ export class BattleView {
     }
     if (e.def.boss) {
       const stage = bossAttackStage(e)
-      add(`stage stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
+      // 클래스 이름을 `stage`로 두면 무대 루트(`.stage`)의 규칙을 그대로 받는다 —
+      // `transform: translate(-50%, -50%)`이 36px 뱃지에 걸려 (-18, -18)만큼 밀렸다.
+      add(`attack-stage attack-stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
     }
     if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
     if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
@@ -4959,17 +4961,21 @@ export class BattleView {
       const animation: BattleAnimation = mantisTelegraph
         ? 'attack3'
         : st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`
-      // 예고는 강공격 클립을 늘려 큰낫이 가장 높은 마디에서 멈춰 세운다. 다음 턴
-      // 내려벨 때까지 그 자세로 버티는 게 예고의 전부다 — 흔들리는 대기 클립을
-      // 쓰면 위협이 아니라 춤으로 읽힌다.
-      const stretch = mantisTelegraph ? MANTIS_TELEGRAPH_WINDUP_MS : undefined
-      playCharacterAnimation(foe ?? null, animation, stretch)
+      // 예고는 **정지 프레임 한 장**이다. 몸을 낮추고 큰낫을 머리 위로 치켜든 마디까지
+      // 클립을 틀고, 그 자리에서 자세를 붙들어 다음 턴 내려벨 때까지 그대로 세워 둔다.
       if (mantisTelegraph) {
+        // 예전에는 타이머로 mixer를 얼렸는데, 그 사이 레일이 다시 그려지면
+        // `updateFoe`가 얼음을 풀어(그쪽은 매 렌더 해제한다) 예고 자세 없이 그냥 서
+        // 있는 판이 생겼다. `poseCharacterAt`은 모델 상태로 박히므로 재렌더에 안 풀린다.
         const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
+        const at = beats?.telegraph ?? beats?.raise ?? 0.2
+        playCharacterAnimation(foe ?? null, animation, MANTIS_TELEGRAPH_WINDUP_MS)
         this.timers.push(window.setTimeout(
-          () => freezeCharacterAnimation(foe ?? null, true),
-          MANTIS_TELEGRAPH_WINDUP_MS * (beats?.raise ?? 0.2),
+          () => poseCharacterAt(foe ?? null, animation, at),
+          MANTIS_TELEGRAPH_WINDUP_MS * at,
         ))
+      } else {
+        playCharacterAnimation(foe ?? null, animation)
       }
       if (!st.telegraphText) GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {

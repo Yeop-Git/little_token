@@ -389,6 +389,8 @@ class BattleCharacterModel {
   private cameraZoom = 1
   private cameraZoomTarget = 1
   private frozen = false
+  /** 정지 프레임으로 붙들고 있는 중인가(`poseAt`). 붙든 동안은 시간이 흐르지 않는다. */
+  private posed = false
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
   private healMaterials: THREE.ShaderMaterial[] = []
@@ -1258,6 +1260,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
    *   강타 연출은 같은 attack 클립을 느리게 늘려 예비 동작을 읽히게 한다.
    */
   play(animation: BattleAnimation, stretchMs?: number): number {
+    this.releasePose()
     this.requestedAnimation = animation
     this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
     this.shell.dataset.modelAnimation = animation
@@ -1305,6 +1308,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   /** 풀에서 재사용할 때 이전 one-shot 자세를 한 프레임도 노출하지 않고 idle로 되돌린다. */
   resetToIdle() {
+    this.releasePose()
     this.requestedAnimation = 'idle'
     this.cameraZoom = 1
     this.cameraZoomTarget = 1
@@ -1431,7 +1435,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     const frameDelta = this.pendingRenderDelta
     this.pendingRenderDelta = 0
     this.lastRenderedAt = now
-    const motionDelta = this.frozen ? 0 : frameDelta
+    const motionDelta = this.frozen || this.posed ? 0 : frameDelta
     this.mixer?.update(motionDelta)
     this.updateModelYawReturn(frameDelta)
     this.updateEffect(frameDelta)
@@ -1491,6 +1495,49 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
   }
 
   /** 타격 프레임 동안 캐릭터 모델의 현재 공격 자세만 고정한다. */
+  /**
+   * 클립의 한 마디를 **정지 프레임으로 붙든다.** 재생이 아니라 자세다.
+   *
+   * 예고를 "클립을 늘려 틀다가 타이머로 얼리기"로 만들면, 재렌더가 얼음을 푸는
+   * 경합이 생겨 어떤 판에서는 그냥 서 있게 된다(실제로 그랬다). 여기서는 믹서를
+   * 그 시각으로 옮겨 두고 시간축을 0으로 만들어 **모델 상태로** 자세를 고정한다.
+   * 다음 `play()`가 오기 전까지 무엇이 다시 그려지든 자세는 그대로다.
+   *
+   * @param at 클립 안의 위치(0~1). 매니페스트 `attackBeats`의 실측 마디를 쓴다.
+   */
+  poseAt(animation: BattleAnimation, at: number): boolean {
+    const action = this.actions[animation]
+    if (!action) return false
+    this.requestedAnimation = animation
+    this.shell.dataset.modelAnimation = animation
+    this.shell.dataset.modelLastAction = animation
+    this.shell.dataset.modelPose = `${animation}@${at.toFixed(2)}`
+    this.stopEffect()
+    // 이전 동작을 완전히 걷어낸다. 크로스페이드가 남아 있으면 자세가 섞여 흐려진다.
+    this.mixer?.stopAllAction()
+    const clip = action.getClip()
+    action.reset()
+    action.enabled = true
+    action.setLoop(THREE.LoopOnce, 1)
+    action.clampWhenFinished = true
+    action.setEffectiveWeight(1)
+    action.play()
+    // 시간축을 멈춘 뒤 원하는 마디로 옮기고 한 번만 평가한다.
+    action.paused = true
+    action.time = clip.duration * Math.max(0, Math.min(1, at))
+    this.mixer?.update(0)
+    this.current = action
+    this.posed = true
+    return true
+  }
+
+  /** 붙들고 있던 자세를 놓는다. 다음 동작이 이어받을 수 있게 표시만 지운다. */
+  releasePose() {
+    if (!this.posed) return
+    this.posed = false
+    delete this.shell.dataset.modelPose
+  }
+
   setFrozen(frozen: boolean) {
     this.frozen = frozen
   }
@@ -1584,6 +1631,17 @@ export function playCharacterAnimation(
   const shell = modelShellFor(actor)
   if (!shell) return 0
   return mountedModels.get(shell)?.play(animation, stretchMs) ?? 0
+}
+
+/**
+ * 클립의 한 마디를 정지 프레임으로 붙든다 — 강공격 예고처럼 "딱 멈춰 선 위협적인
+ * 자세"를 만들 때 쓴다. 재생+타이머 정지와 달리 재렌더에 풀리지 않는다.
+ */
+export function poseCharacterAt(actor: HTMLElement | null, animation: BattleAnimation, at: number): boolean {
+  if (!actor) return false
+  const shell = modelShellFor(actor)
+  if (!shell) return false
+  return mountedModels.get(shell)?.poseAt(animation, at) ?? false
 }
 
 /** 지금 이 배우가 재생 중인 동작. 모델이 아직 없으면 null. */
