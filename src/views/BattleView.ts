@@ -1645,7 +1645,8 @@ export class BattleView {
     if (e.dead || !nextEnemyAttackStep(e)?.shatterGuard) freezeCharacterAnimation(el, false)
     el.dataset.brokenLegs = String(e.parts.filter((part) => part.def.kind === 'leg' && part.broken).length)
     this.updateSummonedAllies(el, e)
-    this.updateEnemyIntel(el, e)
+    const strikesFirst = front && !e.dead && e.initiativePhase === 'first'
+    this.updateEnemyIntel(el, e, strikesFirst)
 
     // 대기 적도 이름과 체력을 즉시 읽을 수 있도록 이름표 투명도를 낮추지 않는다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
@@ -1656,7 +1657,6 @@ export class BattleView {
       const bossHud = this.root.querySelector<HTMLElement>('#boss-health-hud')
       if (bossHud) this.updateFoePlate(bossHud, e, true)
     }
-    const strikesFirst = front && !e.dead && e.initiativePhase === 'first'
     // 일반 적은 캐릭터 옆 경고를, 보스는 상단 체력 HUD에 통합된 표식을 같은 상태값으로 갱신한다.
     el.classList.toggle('strikes-first', strikesFirst)
     if (e.def.boss) {
@@ -1683,8 +1683,15 @@ export class BattleView {
     }, RAIL_ADVANCE_WALK_MS))
   }
 
-  /** 적 모델을 가리지 않는 작은 상태 아이콘. 숫자와 규칙은 호버 툴팁에서만 풀어 쓴다. */
-  private updateEnemyIntel(el: HTMLElement, e: EnemyInst) {
+  /**
+   * 적 모델을 가리지 않는 작은 상태 아이콘. 숫자와 규칙은 호버 툴팁에서만 풀어 쓴다.
+   *
+   * 줄은 두 부분이다. 맨 앞의 접힌 쪽지 하나가 **공략 팁**(이 적을 어떻게 상대하는가)이고,
+   * 그 뒤의 각진 뱃지들이 **적의 특징**(선공·방어·관통처럼 적이 실제로 가진 것)이다.
+   * 팁을 같은 각진 뱃지로 그리면 "이 적은 효과를 두 개 가졌나?"로 읽힌다 — 모양과 자리를
+   * 갈라 두는 것이 이 줄의 계약이다.
+   */
+  private updateEnemyIntel(el: HTMLElement, e: EnemyInst, strikesFirst: boolean) {
     const host = e.def.boss
       ? this.root.querySelector<HTMLElement>('#boss-health-hud .boss-intel')!
       : el.querySelector<HTMLElement>('.enemy-intel')!
@@ -1696,6 +1703,18 @@ export class BattleView {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
     }
 
+    // 공략 쪽지가 줄의 초입에 선다. 뒤따르는 능력 뱃지와 섞이지 않도록 모양·색·라벨이 모두 다르다.
+    const tacticalGuide = tacticalGuideForEnemy(e.def.id)
+    if (tacticalGuide) {
+      const tooltip = tip(tacticalGuide.title, tacticalGuide.tooltip)
+      icons.push(`<span class="enemy-tip-note" role="img" tabindex="0" aria-label="공략 팁 · ${tooltip}" data-tooltip="${tooltip}" data-tip-label="TIP" data-tip-place="above">${icon('note')}<b>TIP</b></span>`)
+    }
+
+    // 선공은 머리 위 경고 표식과 **같은 값**을 쓴다(AGENTS.md 턴 페이즈 계약).
+    // 저쪽은 다른 층(머리 위)에 뜨는 "지금 조심하라"는 경고, 이쪽은 특징 줄에서
+    // 방어·관통과 나란히 읽히는 항목이다. 보스만 예외인데, 보스의 선공 표식은
+    // 애초에 이 줄과 같은 `boss-badge-row` 안에 있어 한 줄에서 두 번 말하게 된다.
+    if (strikesFirst && !e.def.boss) add('initiative', icon('initiative'), tip('선공', '내 문장 직후, 내가 때리기 전에 먼저 때린다'))
     if (attackStep) {
       const detail = attackStep.damageScale === 0
         ? '이번엔 안 때리고 다음 공격을 준비한다'
@@ -1724,8 +1743,6 @@ export class BattleView {
       tip(`거미줄 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards}`, '드러난 다리를 때리거나 약점 감정으로 막고 회복하면 풀린다'),
     )
     if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', tip('그로기', `지금 주는 피해가 ${e.groggyDamageMult.toFixed(1)}배가 되고 예정된 공격을 한 턴 거른다`))
-    const tacticalGuide = tacticalGuideForEnemy(e.def.id)
-    if (tacticalGuide) add('tactic', '<b>✦</b>', tip(tacticalGuide.title, tacticalGuide.tooltip))
 
     host.hidden = icons.length === 0
     host.innerHTML = icons.join('')

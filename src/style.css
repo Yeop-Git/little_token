@@ -1444,6 +1444,22 @@ button {
 }
 .tip-bubble[data-place='above'] { transform: translateY(4px); }
 .tip-bubble.show { opacity: 1; transform: translateY(0); }
+/* 공략 쪽지처럼 성격이 다른 안내는 머리에 라벨 한 칸을 달아 규칙 설명과 구분한다. */
+.tip-bubble-label {
+  display: block;
+  width: max-content;
+  margin-bottom: 7px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #2a1a0c;
+  background: linear-gradient(140deg, #ffdc9a, #f0b45f);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+  font: 900 15px/1.35 Georgia, serif;
+  letter-spacing: .14em;
+  text-shadow: none;
+}
+.tip-bubble-label[hidden] { display: none; }
+.tip-bubble-body { display: block; }
 /* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
 html[data-postprocessing='off'] .tip-bubble {
   -webkit-backdrop-filter: none;
@@ -3368,7 +3384,43 @@ html[data-postprocessing='off'] .tip-bubble {
 .enemy-intel-icon.summon { color: #ffe47d; border-color: rgba(255, 213, 73, .72); }
 .enemy-intel-icon.web { color: #ded4ee; border-color: rgba(210, 198, 231, .58); }
 .enemy-intel-icon.groggy { color: #fff1a6; border-color: rgba(255, 226, 102, .72); }
-.enemy-intel-icon.tactic { color: #f5d88e; border-color: rgba(245, 216, 142, .76); background: rgba(93, 57, 19, .54); }
+.enemy-intel-icon.initiative { color: #ff9a70; border-color: rgba(255, 126, 78, .74); }
+/* 공략 쪽지 — 각진 능력 뱃지와 형태부터 갈라 둔다. 둥근 알약 + 접힌 모서리 + 글자 라벨이라
+   한눈에 "이건 적의 효과가 아니라 조언"으로 읽힌다. 자리도 줄 맨 앞이고 뒤에 칸막이를 세운다. */
+.enemy-tip-note {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  margin-right: 4px;
+  padding: 0 11px 0 8px;
+  border: 1px solid rgba(245, 216, 142, .74);
+  border-radius: 999px 999px 4px 999px;
+  color: #f7dfa4;
+  background: linear-gradient(145deg, rgba(84, 55, 21, .95), rgba(38, 24, 15, .94));
+  box-shadow: 0 4px 11px rgba(0, 0, 0, .56);
+  cursor: help;
+  outline: none;
+  transition: transform .14s ease, filter .14s ease;
+}
+.enemy-tip-note::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: linear-gradient(rgba(255, 221, 165, 0), rgba(255, 221, 165, .5), rgba(255, 221, 165, 0));
+}
+.enemy-tip-note:hover,
+.enemy-tip-note:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
+.enemy-tip-note svg { width: 18px; height: 18px; }
+.enemy-tip-note > b { font: 900 13px/1 Georgia, serif; letter-spacing: .1em; }
+.boss-health-hud .boss-intel .enemy-tip-note { height: 26px; padding: 0 9px 0 7px; }
+.boss-health-hud .boss-intel .enemy-tip-note svg { width: 16px; height: 16px; }
+.boss-health-hud .boss-intel .enemy-tip-note > b { font-size: 11px; }
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
 .actor.foe > .model-shell { cursor: default; }

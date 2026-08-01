@@ -37,6 +37,14 @@ export const icon = (key: string): string => {
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
         <path d="M15 10h18M17 10v7c-4 3-6 7-6 13 0 8 5 12 13 12s13-4 13-12c0-6-2-10-6-13v-7" fill="currentColor" fill-opacity="0.14"/>
         <path d="M16 25c5 3 11-3 16 0M20 32l3 3 6-7"/></svg>`
+    case 'note': // 공략 쪽지 — 모서리를 접은 메모. 적의 능력 뱃지와 형태가 겹치면 안 된다.
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M11 8h18l8 8v24a2 2 0 01-2 2H11a2 2 0 01-2-2V10a2 2 0 012-2z" fill="currentColor" fill-opacity="0.16"/>
+        <path d="M29 8v8h8"/><path d="M16 26h16M16 33h11"/></svg>`
+    case 'initiative': // 선공 — 앞으로 먼저 내달리는 두 겹 화살
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M13 12l12 12-12 12" fill="currentColor" fill-opacity="0.16"/>
+        <path d="M27 12l12 12-12 12" fill="currentColor" fill-opacity="0.16"/></svg>`
     case 'close':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M14 14l20 20M34 14L14 34"/></svg>`
     case 'settings':

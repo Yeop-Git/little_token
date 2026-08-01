@@ -16,6 +16,9 @@ const GAP = 9
 export class TooltipLayer {
   private scene: HTMLElement
   private bubble: HTMLElement
+  /** `data-tip-label`이 붙은 쪽지에만 서는 머리 라벨(예: 공략 팁의 `TIP`). */
+  private label: HTMLElement
+  private body: HTMLElement
   private anchor: HTMLElement | null = null
   private raf = 0
   private destroyed = false
@@ -25,6 +28,11 @@ export class TooltipLayer {
     this.bubble = document.createElement('div')
     this.bubble.className = 'tip-bubble'
     this.bubble.setAttribute('aria-hidden', 'true')
+    this.label = document.createElement('span')
+    this.label.className = 'tip-bubble-label'
+    this.body = document.createElement('span')
+    this.body.className = 'tip-bubble-body'
+    this.bubble.append(this.label, this.body)
     scene.appendChild(this.bubble)
 
     scene.addEventListener('pointerover', this.onOver)
@@ -54,7 +62,10 @@ export class TooltipLayer {
     if (!text) return
     if (host !== this.anchor) {
       this.anchor = host
-      this.bubble.textContent = text
+      const label = host.dataset.tipLabel ?? ''
+      this.label.textContent = label
+      this.label.hidden = !label
+      this.body.textContent = text
       this.bubble.dataset.place = host.dataset.tipPlace === 'above' ? 'above' : 'below'
       this.bubble.classList.add('show')
     }
