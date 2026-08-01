@@ -1559,8 +1559,11 @@ export class BattleView {
       if (this.over) return
       const next = this.bossPatternHint ?? line
       this.showTokenSpeech(next)
-      if (this.bossPatternSolved) this.scheduleBossTokenSpeech(7600)
-      else this.scheduleBossTokenHint(next, 7600)
+      // 예전에는 파훼할 때까지 같은 경고를 7.6초마다 다시 울렸다. 사마귀는 패턴이
+      // 예고↔강타 두 칸뿐이라 매 턴이 경고 대상이고, 거기에 이 되울림까지 겹쳐
+      // 붉은 쪽지가 전투 내내 화면에 박혀 있었다. 경고는 **남아 있되 다시 말하지
+      // 않는다** — 사라지지 않는 것과 계속 떠드는 것은 다르다.
+      this.scheduleBossTokenSpeech(7600)
     }, delay)
     this.timers.push(this.tokenSpeechTimer)
   }
@@ -1586,8 +1589,16 @@ export class BattleView {
     this.token?.clearSpeech()
   }
 
+  /** 이번 전투에서 이미 띄운 경고. 같은 말을 주기마다 붉게 다시 올리지 않는다. */
+  private readonly bossHintsSaid = new Set<string>()
+
   private showBossTokenHint(line: TokenLine) {
     if (!this.isBoss || this.over) return
+    // 두 칸짜리 패턴(예고↔강타)은 매 턴이 경고 대상이라, 같은 경고가 주기마다
+    // 다시 뜨면 화면이 계속 적색 경보로 남는다. 처음 한 번만 경고로 올리고
+    // 그 뒤로는 조용히 지나간다 — 파훼에 실패하면(`mantisPunished`) 그때 다시 말한다.
+    if (line.tone === 'warn' && this.bossHintsSaid.has(line.text)) return
+    this.bossHintsSaid.add(line.text)
     this.bossPatternHint = line
     clearTimeout(this.tokenSpeechTimer)
     this.showTokenSpeech(line)
