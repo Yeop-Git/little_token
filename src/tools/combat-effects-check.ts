@@ -292,8 +292,20 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const strike = enemyTurn(s, () => 0, 'second')[0]
   assert(strike.dealt === 7, 'long-fight pressure raises the elder spider damage limit instead of being swallowed by it')
 }
-assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '2,3', 'mantis data repeats a distinct telegraph then strong attack cycle')
-assert(ENEMIES.mantis.attackPattern?.[0].damageScale === 0 && ENEMIES.mantis.attackPattern[1].shatterGuard, 'mantis data telegraphs before every guard-shattering strike')
+// 사마귀 사이클은 예고(2) → 내려베기(3) → 휘두르기(1) 세 칸이다. 예전에는 앞의 두 칸만
+// 있어 평타가 아예 없었고, 매 턴이 예고 아니면 강타라 방어만 강요됐다. 검사도 그 시절
+// 모양(`2,3`)을 못 박고 있었다 — 지키려는 것은 칸 개수가 아니라 **"방어를 부수는 타격
+// 앞에는 반드시 예고가 온다"**이므로, 그 규칙만 남기고 칸 수는 풀어 준다.
+assert(ENEMIES.mantis.attackPattern?.map((step) => step.animationStage).join(',') === '2,3,1', 'mantis cycles telegraph, strong attack, then a breather swing')
+{
+  const pattern = ENEMIES.mantis.attackPattern ?? []
+  pattern.forEach((step, i) => {
+    if (!step.shatterGuard) return
+    const previous = pattern[(i - 1 + pattern.length) % pattern.length]
+    assert(previous.damageScale === 0 && !!previous.telegraphText, 'mantis data telegraphs before every guard-shattering strike')
+  })
+  assert(pattern.some((step) => !step.shatterGuard && (step.damageScale ?? 1) > 0), 'mantis has a plain attack so the player is not locked into guarding every turn')
+}
 {
   const modifiers = [...EARLY_WORDS.adv, ...REWARD_WORDS.filter((word) => word.slot === 'adv')]
   const orphaned = modifiers.filter((word) => comboLeads(word, makeEarlyTables().combos).length === 0)

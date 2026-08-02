@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.13.13",
+  "version": "0.13.14",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "engines": {

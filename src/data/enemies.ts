@@ -11,8 +11,15 @@ export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중 : 본체 무적'
 export const ENEMIES: Record<string, EnemyDef> = {
   mantis: {
     id: 'mantis', name: '사마귀', boss: true,
-    // 준비 → 내려베기가 2턴 한 사이클이다. 첫 턴부터 파훼법을 보여 주고
-    // 반복강화 고점 덱에도 같은 규칙을 두 번 읽고 대응할 기회를 준다.
+    // 준비 → 내려베기 → 휘두르기가 3턴 한 사이클이다. 첫 두 턴이 곧 파훼 교실이라
+    // 강한 덱도 규칙을 먼저 읽고, 세 번째 턴에 숨을 고른다.
+    //
+    // 예전에는 준비 → 내려베기 2턴뿐이라 **평타가 아예 없었다.** 매 턴이 예고
+    // 아니면 강타여서 플레이어는 방어만 강요받았고, 상단 문장도 경고 두 종류만
+    // 돌아 늘 강공격 직전처럼 읽혔다. 숨 돌릴 한 턴을 넣어 공격·회복 문장을 쓸
+    // 자리를 만들고, 대신 내려베기를 더 무겁게 해 못 막았을 때의 값을 올린다.
+    // 숨 돌리는 턴은 **사이클 끝**에 둔다 — 앞에 두면 예고→내려베기를 두 번 보기
+    // 전에 전투가 끝나 보스가 자기 패턴을 못 보여 주고 죽는다.
     hp: 116, atk: 7, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
@@ -21,14 +28,17 @@ export const ENEMIES: Record<string, EnemyDef> = {
         name: '큰낫 내려베기',
         bonusAtk: 0,
         animationStage: 3,
-        damageScale: 1.2,
+        // 주기가 2턴 → 3턴으로 늘어 강타가 덜 자주 온다. 한 방의 무게를 올려
+        // "막아야 하는 순간"의 값을 유지한다.
+        damageScale: 1.7,
         shatterGuard: true,
         lifeStealRate: 0.5,
         groggyDamageMult: 1.5,
         groggyRequiresGuardShatter: true,
       },
+      { name: '낫 휘두르기', bonusAtk: 0, animationStage: 1, damageScale: 0.75 },
     ],
-    note: '큰낫을 들어 다음 강공격을 예고한 뒤 내려베는 두 턴 패턴을 반복한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 받는 피해가 커지고 예정된 다음 공격을 한 턴 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
+    note: '큰낫을 들어 강공격을 예고하고 내려벤 뒤, 한 턴 숨을 고르며 낫을 휘두르는 세 턴 패턴을 반복한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 받는 피해가 커지고 예정된 다음 공격을 한 턴 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
