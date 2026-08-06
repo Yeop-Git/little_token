@@ -1,15 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import { resolve } from 'path'
 
-// GitHub Pages는 저장소 이름 하위 경로로 서빙된다(github.io/TestGame001/).
-// 액션 배포 시 이 base가 있어야 에셋 경로가 깨지지 않는다.
+// Vercel은 도메인 루트로 서빙하므로 base는 항상 '/'다.
 export default defineConfig(({ mode }) => {
   const envRoot = resolve(__dirname, '.')
   const isDemo = loadEnv(mode, envRoot, '').VITE_APP_EDITION === 'demo'
   return {
   root: 'src',
   envDir: envRoot,
-  base: process.env.GITHUB_PAGES ? '/TestGame001/' : '/',
+  base: '/',
   build: {
     outDir: '../dist',
     emptyOutDir: true,
