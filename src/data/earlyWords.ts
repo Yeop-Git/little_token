@@ -25,6 +25,10 @@ export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, RE
 const QUEEN_BEE_TACTIC: Word = {
   ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
   id: 'queenBeeTactic',
+  // 수치는 「퍼뜨렸다」를 그대로 물려받지만 이름은 갈라 둔다. 원본을 이미 덱에 넣은
+  // 사람에게는 이름도 그림도 같은 두 장이 동사 칸에 나란히 서기 때문이다 —
+  // 무엇이 일벌을 확실히 치우는 카드인지 손패에서 바로 읽혀야 한다.
+  text: '일벌을 퇴치했다',
   effects: { summonExecuteCount: 2 },
   note: '토큰의 공략 단어 · 공격 ×0.9 · 일벌 2마리 퇴치',
   lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
