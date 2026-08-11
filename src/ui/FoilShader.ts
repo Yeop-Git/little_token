@@ -11,6 +11,9 @@ interface FoilSurface {
   pointerY: number
   hovering: boolean
   hoverPulse: number
+  width: number
+  height: number
+  seed: number
 }
 
 const VERTEX_SHADER = `
@@ -215,11 +218,13 @@ class FoilShaderRenderer {
   }
   private readonly surfaces = new Map<HTMLElement, FoilSurface>()
   private readonly observer: MutationObserver
+  private readonly resizeObserver: ResizeObserver
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
   private pointerClientX = -10000
   private pointerClientY = -10000
   private scanQueued = true
   private lastFrame = 0
+  private frameId = 0
 
   constructor() {
     this.source.width = 384
@@ -243,13 +248,25 @@ class FoilShaderRenderer {
     }
     this.prepareGeometry()
 
-    this.observer = new MutationObserver(() => { this.scanQueued = true })
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const surface = this.surfaces.get(entry.target as HTMLElement)
+        if (!surface) continue
+        surface.width = entry.contentRect.width
+        surface.height = entry.contentRect.height
+      }
+    })
+    this.observer = new MutationObserver(() => {
+      this.scanQueued = true
+      this.queueFrame()
+    })
     // 카드의 등급 클래스는 DOM에 붙기 전에 완성된다. 문서 전체의 class 변경까지
     // 감시하면 전투 애니메이션 클래스가 바뀔 때마다 전체 포일 노드를 다시 훑게 된다.
     this.observer.observe(document.documentElement, { childList: true, subtree: true })
     document.addEventListener('pointermove', this.onPointerMove, { passive: true })
+    document.addEventListener('visibilitychange', this.queueFrame)
     document.documentElement.classList.add('foil-shader-ready')
-    requestAnimationFrame(this.frame)
+    this.queueFrame()
   }
 
   private readonly onPointerMove = (event: PointerEvent) => {
@@ -258,12 +275,15 @@ class FoilShaderRenderer {
   }
 
   private readonly frame = (now: number) => {
-    requestAnimationFrame(this.frame)
+    this.frameId = 0
     if (document.hidden) return
     const reduced = this.reducedMotion.matches
     const profile = GraphicsSettings.profile()
     const interval = reduced ? 500 : profile.foilFps > 0 ? 1000 / profile.foilFps : 100
-    if (now - this.lastFrame < interval) return
+    if (now - this.lastFrame < interval) {
+      this.queueFrame()
+      return
+    }
     this.lastFrame = now
     if (this.scanQueued) this.scan()
 
@@ -277,19 +297,20 @@ class FoilShaderRenderer {
         // 자리를 차지하고 새로 그리는 캔버스는 그 아래로 밀려 잘린다 — 포일이
         // 얼어붙은 것처럼 보이던 원인이다.
         surface.canvas.remove()
+        this.resizeObserver.unobserve(host)
         this.surfaces.delete(host)
         continue
       }
       surface.canvas.hidden = lowQuality
       if (lowQuality) continue
       const card = host.closest<HTMLElement>('.word-card, .reward-pick, .deck-hover-card')
-      const rect = host.getBoundingClientRect()
-      if (!card || rect.width < 2 || rect.height < 2) continue
+      if (!card || surface.width < 2 || surface.height < 2) continue
 
       // 사용 고스트는 포인터를 떠나 중앙으로 이동하므로 실제 :hover가 풀린다.
       // 이동·폭발 중에는 강제 호버로 취급해 등급별 반짝임을 끝까지 이어 간다.
       const forcedHover = card.classList.contains('commit-ghost')
       const hovering = forcedHover || card.matches(':hover')
+      const rect = hovering && !forcedHover ? host.getBoundingClientRect() : null
       if (hovering && !surface.hovering) surface.hoverPulse = 1
       surface.hovering = hovering
       // 전설 셀 점등은 영웅 파동보다 2배 길게 보여 각 조각의 색 변화를 읽게 한다.
@@ -298,14 +319,19 @@ class FoilShaderRenderer {
         ? (reduced ? 0.5 : Math.sqrt(0.91))
         : (reduced ? 0.25 : 0.91)
       surface.hoverPulse *= hoverDecay
-      const autoX = Math.sin(time * 0.43 + rect.left * 0.002) * 0.34
-      const autoY = Math.cos(time * 0.37 + rect.top * 0.002) * 0.28
-      const targetX = forcedHover ? 0 : hovering ? Math.max(-1, Math.min(1, ((this.pointerClientX - rect.left) / rect.width - 0.5) * 2)) : autoX
-      const targetY = forcedHover ? 0 : hovering ? Math.max(-1, Math.min(1, ((this.pointerClientY - rect.top) / rect.height - 0.5) * 2)) : autoY
+      const autoX = Math.sin(time * 0.43 + surface.seed) * 0.34
+      const autoY = Math.cos(time * 0.37 + surface.seed * 1.37) * 0.28
+      const targetX = forcedHover ? 0 : rect ? Math.max(-1, Math.min(1, ((this.pointerClientX - rect.left) / rect.width - 0.5) * 2)) : autoX
+      const targetY = forcedHover ? 0 : rect ? Math.max(-1, Math.min(1, ((this.pointerClientY - rect.top) / rect.height - 0.5) * 2)) : autoY
       surface.pointerX += (targetX - surface.pointerX) * (reduced ? 1 : 0.09)
       surface.pointerY += (targetY - surface.pointerY) * (reduced ? 1 : 0.09)
-      this.draw(surface, time, rect.width / rect.height, Math.max(hovering ? 0.16 : 0, surface.hoverPulse))
+      this.draw(surface, time, surface.width / surface.height, Math.max(hovering ? 0.16 : 0, surface.hoverPulse))
     }
+    if (this.surfaces.size || this.scanQueued) this.queueFrame()
+  }
+
+  private readonly queueFrame = () => {
+    if (!this.frameId && !document.hidden) this.frameId = requestAnimationFrame(this.frame)
   }
 
   private scan() {
@@ -334,7 +360,13 @@ class FoilShaderRenderer {
       const context = canvas.getContext('2d', { alpha: true })
       if (!context) return
       host.append(canvas)
-      this.surfaces.set(host, { host, canvas, context, kind, pointerX: 0, pointerY: 0, hovering: false, hoverPulse: 0 })
+      const width = host.clientWidth
+      const height = host.clientHeight
+      this.surfaces.set(host, {
+        host, canvas, context, kind, pointerX: 0, pointerY: 0, hovering: false, hoverPulse: 0,
+        width, height, seed: (this.surfaces.size + 1) * 1.618,
+      })
+      this.resizeObserver.observe(host)
     })
   }
 
@@ -351,8 +383,8 @@ class FoilShaderRenderer {
     gl.uniform2f(this.uniforms.pointer, surface.pointerX, surface.pointerY)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-    const cssWidth = Math.max(1, Math.round(surface.host.clientWidth))
-    const cssHeight = Math.max(1, Math.round(surface.host.clientHeight))
+    const cssWidth = Math.max(1, Math.round(surface.width))
+    const cssHeight = Math.max(1, Math.round(surface.height))
     // The fixed stage is downscaled on touch screens. Rendering foil at desktop
     // DPR there only spends memory on pixels the compositor immediately removes.
     const scale = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1 : 1.5)

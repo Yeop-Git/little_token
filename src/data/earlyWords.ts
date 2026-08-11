@@ -25,13 +25,19 @@ export { EARLY_COMBOS, EARLY_CONFLICTS, EARLY_WORDS, GROW_WORDS, PUNCT_WORDS, RE
 const QUEEN_BEE_TACTIC: Word = {
   ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
   id: 'queenBeeTactic',
-  // 수치는 「퍼뜨렸다」를 그대로 물려받지만 이름은 갈라 둔다. 원본을 이미 덱에 넣은
+  art: '3023',
+  // 그림과 감정 태그만 「퍼뜨렸다」에서 물려받고 전용 전투 수치는 여기서 명시한다.
+  // 원본을 이미 덱에 넣은
   // 사람에게는 이름도 그림도 같은 두 장이 동사 칸에 나란히 서기 때문이다 —
   // 무엇이 일벌을 확실히 치우는 카드인지 손패에서 바로 읽혀야 한다.
   //
   // 목적어는 붙이지 않는다. 동사 칸의 다른 카드가 전부 한 동작만 적는데 여기만
   // 「일벌을」을 달면 앞에 선 주어·수식어와 이어질 때 문장이 겹쳐 읽힌다.
   text: '퇴치했다',
+  stat: 'atk',
+  statMult: 0.9,
+  inkCost: 3,
+  targetCount: 2,
   // 확정 퇴치를 걷고 **일벌에게만 실리는 배수**로 바꿨다. 피해량과 무관하게 지우는
   // 효과는 덱이 약해도 결과가 같아서, 빌려온 한 장이 전투를 대신 풀어 버렸다.
   // 배수는 그 문장이 얼마나 잘 짜였는지를 그대로 반영한다.
@@ -42,20 +48,18 @@ const QUEEN_BEE_TACTIC: Word = {
 
 const ELDER_SPIDER_TACTIC: Word = {
   id: 'elderSpiderTactic',
-  text: '빈틈을 고쳐 찔렀다',
+  text: '빈틈을 찔렀다',
   slot: 'verb',
   tags: ['adapt', 'atk'],
   emotion: 'neutral',
   stat: 'atk',
-  statMult: 1,
+  statMult: 1.5,
   kind: 'attack',
   targetCount: 1,
-  // 한 번에 두 번 찌른다. 다리 하나를 끊은 뒤 남은 한 번이 다음 다리에 그대로 이어져,
-  // 감정을 맞출 수 없는 사람도 순서를 밀어붙일 수 있다.
-  effects: { hitCount: 2 },
-  art: '3009',
+  // 보스전 대여 동사도 연타를 갖지 않고, 높은 공격 계수로 다리 공략을 돕는다.
+  art: '3022',
   rarity: 'common',
-  note: '공격 ×1 · 2연타 · 현재 다리 약점 적용',
+  note: '공격 ×1.5 · 현재 다리 약점 적용',
   lore: '거미가 바꾼 문장을 읽고, 필요한 감정을 여백에 빌려 적었다.',
 }
 
@@ -80,8 +84,7 @@ const MANTIS_TACTIC: Word = {
   kind: 'attack',
   targetCount: 1,
   effects: { heavyTurnMultiplier: 1.5 },
-  // 임시 일러스트. 이 카드 전용 그림이 들어오면 이 한 줄만 바꾼다.
-  art: '1021',
+  art: '3021',
   rarity: 'rare',
   note: '토큰의 공략 단어 · 공격 ×1.5 · 강공격 턴이면 ×1.5',
   lore: '큰낫이 내려오는 자리에서 물러서지 않기로 했다.',

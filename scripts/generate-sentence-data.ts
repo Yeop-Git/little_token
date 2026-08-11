@@ -64,6 +64,11 @@ function parseCsv(source: string, fileName: string): Row[] {
   if (dup.length) throw new Error(`${fileName}: 헤더 열 이름이 중복입니다 — ${dup.join(', ')}`)
 
   return body.map((values, index) => {
+    // card_tactics의 뒤쪽 열은 모두 선택 효과다. 새 키워드 열을 추가해도 기존 카드 행을
+    // 쉼표만으로 일괄 수정하지 않도록, 비어 있는 후행 선택 열만 명시적으로 채운다.
+    if (fileName === 'card_tactics.csv' && values.length < header.length) {
+      values.push(...Array.from({ length: header.length - values.length }, () => ''))
+    }
     if (values.length !== header.length) {
       throw new Error(`${fileName}:${index + 2}: 열 개수가 ${values.length}개입니다. 헤더는 ${header.length}개입니다.`)
     }
@@ -171,7 +176,8 @@ wordRows.forEach((row, index) => {
     castCount: optionalNumber(tacticRow.cast_count, 'card_tactics.csv', tacticLine, 'cast_count'),
     castScale: optionalNumber(tacticRow.cast_scale, 'card_tactics.csv', tacticLine, 'cast_scale'),
     overdrawHitCount: optionalNumber(tacticRow.overdraw_hit_count, 'card_tactics.csv', tacticLine, 'overdraw_hit_count'),
-    counterMultiplier: optionalNumber(tacticRow.counter_multiplier, 'card_tactics.csv', tacticLine, 'counter_multiplier'),
+    counter: optionalBoolean(tacticRow.counter, 'card_tactics.csv', tacticLine, 'counter'),
+    magicShield: optionalNumber(tacticRow.magic_shield, 'card_tactics.csv', tacticLine, 'magic_shield'),
     inkDiscount: optionalNumber(tacticRow.ink_discount, 'card_tactics.csv', tacticLine, 'ink_discount'),
     carryInk: optionalNumber(tacticRow.carry_ink, 'card_tactics.csv', tacticLine, 'carry_ink'),
     attackRank: optionalNumber(tacticRow.attack_rank, 'card_tactics.csv', tacticLine, 'attack_rank'),
@@ -181,6 +187,13 @@ wordRows.forEach((row, index) => {
     guardAttackMultiplier: optionalNumber(tacticRow.guard_attack_multiplier, 'card_tactics.csv', tacticLine, 'guard_attack_multiplier'),
     overhealDamageMultiplier: optionalNumber(tacticRow.overheal_damage_multiplier, 'card_tactics.csv', tacticLine, 'overheal_damage_multiplier'),
     lifeStealRate: optionalNumber(tacticRow.life_steal_rate, 'card_tactics.csv', tacticLine, 'life_steal_rate'),
+    renewalRate: optionalNumber(tacticRow.renewal_rate, 'card_tactics.csv', tacticLine, 'renewal_rate'),
+    damageOverTimeRate: optionalNumber(tacticRow.damage_over_time_rate, 'card_tactics.csv', tacticLine, 'damage_over_time_rate'),
+    damageOverTimeTurns: optionalNumber(tacticRow.damage_over_time_turns, 'card_tactics.csv', tacticLine, 'damage_over_time_turns'),
+    overhealGuardMultiplier: optionalNumber(tacticRow.overheal_guard_multiplier, 'card_tactics.csv', tacticLine, 'overheal_guard_multiplier'),
+    shieldBreakHealRate: optionalNumber(tacticRow.shield_break_heal_rate, 'card_tactics.csv', tacticLine, 'shield_break_heal_rate'),
+    attackGuardRate: optionalNumber(tacticRow.attack_guard_rate, 'card_tactics.csv', tacticLine, 'attack_guard_rate'),
+    guardHealRate: optionalNumber(tacticRow.guard_heal_rate, 'card_tactics.csv', tacticLine, 'guard_heal_rate'),
   })
   const variance = compact({
     p: optionalNumber(row.variance_p, 'words.csv', line, 'variance_p'),

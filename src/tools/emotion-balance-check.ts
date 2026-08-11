@@ -92,7 +92,11 @@ function modifierTactics(word: Word): string[] {
   if ((effects?.hitCount ?? 1) > 1) tactics.push('multi-hit')
   if ((effects?.castCount ?? 1) > 1) tactics.push('repeat-cast')
   if ((effects?.overdrawHitCount ?? 0) > 0) tactics.push('overdraw-fury')
-  if ((effects?.counterMultiplier ?? 0) > 0) tactics.push('counter')
+  if (effects?.counter) tactics.push('counter')
+  if ((effects?.magicShield ?? 0) > 0) tactics.push('magic-shield')
+  if ((effects?.guardAttackMultiplier ?? 0) > 0) tactics.push('guard-convert')
+  if ((effects?.overhealDamageMultiplier ?? 0) > 0) tactics.push('overheal-convert')
+  if ((effects?.lifeStealRate ?? 0) > 0) tactics.push('lifesteal')
   if ((effects?.inkDiscount ?? 0) > 0) tactics.push('ink-discount')
   if ((effects?.carryInk ?? 0) > 0) tactics.push('carry-ink')
   if ((effects?.enemyAttackRank ?? 0) < 0) tactics.push('enemy-weaken')
@@ -112,7 +116,7 @@ function hasEmotionSignature(emotion: CheckedEmotion, modifiers: Word[]): boolea
       && modifiers.some((word) => (word.effects?.castCount ?? 1) > 1)
   }
   if (emotion === 'sorrow') {
-    return modifiers.some((word) => (word.effects?.counterMultiplier ?? 0) > 0 && (word.effects?.enemyAttackRank ?? 0) < 0)
+    return modifiers.some((word) => !!word.effects?.counter && (word.effects?.enemyAttackRank ?? 0) < 0)
       && modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
   }
   if (emotion === 'joy') {

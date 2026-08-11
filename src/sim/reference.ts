@@ -110,7 +110,9 @@ export interface BattleState {
   playerHp: number
   playerMax: number
   guard: number
-  counterMultiplier: number
+  counter: boolean
+  /** 카운터 문장이 방어·회복 행동이어서 받은 피해를 100% 돌려주는가. */
+  counterFull: boolean
   playerAttackRank?: number
   playerGuardRank?: number
   /** 한 겹이 다음 적 공격 한 번을 관통 여부와 무관하게 지운다. */
@@ -287,6 +289,8 @@ export function engageFront(state: BattleState): void {
   const enemy = state.enemies[front]
   if (enemy.engaged) return
   enemy.engaged = true
+  // 뒤에서 기다리던 적은 앞 적이 쓰러진 그 턴에는 공격하지 않는다. 도착 연출과
+  // 대응할 한 문장을 보장하고, 다음 턴부터 자기 주기(일반 적은 매 턴)를 시작한다.
   enemy.nextAttackTurn = state.turn + enemy.def.every
   enemy.initiativePhase = enemy.def.initiative
 }
@@ -345,7 +349,8 @@ export interface PreparationResult {
   guardAttempted: number
   /** 상한 적용 뒤 실제로 늘어난 방어막. */
   guardGain: number
-  counterMultiplier: number
+  counter: boolean
+  counterFull: boolean
   magicShieldGain: number
   attackRankGain: number
   guardRankGain: number
@@ -375,7 +380,10 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
   if (guardGain > 0) state.guard += guardGain
   // 반격은 방어막이 실제로 늘었는지가 아니라 방어 문장을 세웠는지로 걸린다.
   // 상한에 걸려 비축분이 0이어도 그 턴을 방어에 쓴 사실은 같으므로 반격은 살린다.
-  if (guardAttempted > 0) state.counterMultiplier = intent.counterMultiplier
+  // 카운터는 이 문장을 쓴 턴에만 유효하다. 이번 문장에 카운터가 없으면
+  // 직전 턴에 피격되지 않고 남은 값도 여기서 사라진다.
+  state.counter = intent.counter
+  state.counterFull = intent.counter && (intent.kind === 'guard' || intent.kind === 'heal')
   const magicShieldBefore = Math.max(0, state.playerMagicShield ?? 0)
   state.playerMagicShield = intent.magicShield > 0 ? 1 : magicShieldBefore
   const magicShieldGain = state.playerMagicShield - magicShieldBefore
@@ -390,7 +398,8 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
   return {
     guardAttempted,
     guardGain,
-    counterMultiplier: state.counterMultiplier,
+    counter: state.counter,
+    counterFull: state.counterFull,
     magicShieldGain,
     attackRankGain: state.playerAttackRank - attackRankBefore,
     guardRankGain: state.playerGuardRank - guardRankBefore,
@@ -475,7 +484,7 @@ function damageEnemy(
       tensionReduced: 0,
     }
   }
-  if (enemy.magicShield > 0) {
+  if (enemy.magicShield > 0 && !pierceGuard) {
     enemy.magicShield--
     return {
       target,
@@ -1014,8 +1023,9 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     Math.max(0, Math.round(dealt * (attackStep?.lifeStealRate ?? 0))),
   )
   enemy.hp += lifeStolen
-  const counterHit = absorbed > 0 && state.counterMultiplier > 0
-    ? damageEnemy(state, front, Math.round(absorbed * state.counterMultiplier), false, [])
+  const counterBase = magicShieldBroken ? raw : dealt + absorbed
+  const counterHit = counterBase > 0 && state.counter
+    ? damageEnemy(state, front, Math.round(counterBase * (state.counterFull ? 1 : .5)), false, [])
     : null
   const groggyEntered = !!attackStep?.groggyDamageMult
     && (!attackStep.groggyRequiresGuardShatter || guardShattered)
@@ -1061,10 +1071,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   enemy.attacksMade++
   advanceEnemyAttackPattern(enemy, rng)
   state.guard -= absorbed
-  if (state.guard <= 0) {
-    state.guard = 0
-    state.counterMultiplier = 0
-  }
+  if (state.guard <= 0) state.guard = 0
   enemy.nextAttackTurn = state.turn + enemy.def.every
   // 강공격을 완전히 막아 낸 대가는 받는 피해 증가만으로는 체감되지 않았다. 휘청인
   // 적은 예정된 다음 공격을 통째로 한 번 거른다 — 일벌 전멸 그로기와 같은 규칙이다.

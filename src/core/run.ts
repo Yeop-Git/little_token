@@ -89,12 +89,18 @@ export interface PendingReward {
   grade: number
   /** 이번 클리어로 이미 지갑에 적립한 실제 영감. */
   earned: number
-  phase: RewardPhase | 'complete'
+  phase: RewardPhase | 'shop' | 'complete'
   picks: RewardPickRef[]
   /** 이어하기로 현재 진열을 공짜로 바꾸지 못하게 하는 클리어별 난수 씨앗. */
   seed: number
   /** 각 보상 단계에서 영감을 내고 새로고침한 횟수. */
   refreshes: Record<RewardPhase, number>
+  /** 보스 상점의 현재 3×3 재고. null은 이미 구매한 자리다. */
+  shopStock?: Array<RewardPickRef | null>
+  /** 같은 상점에서 재고를 새로 펼친 횟수. 비용 증가의 단일 출처다. */
+  shopRefreshes?: number
+  /** 이번 상점에서 산 상품 수. 상점 머리말과 기록에 쓴다. */
+  shopPurchases?: number
 }
 
 export const DECK_LIMITS: Readonly<Record<string, number>> = { subj: 6, adv: 6, verb: 8 }
@@ -205,7 +211,7 @@ function cloneWord(w: Word): Word {
 // 성장 카드는 늘려 주는 최대 체력이 그 자리다. 여기서 빠뜨리면 그 카드만 단계는 오르고
 // 아무것도 세지지 않는다(도박 주어들이 그랬다 — 화면 문구가 그대로인 이유이기도 했다).
 const REINFORCE_STEP = {
-  power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05, counter: 0.25,
+  power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05,
   castScale: 0.05,
   varianceHi: 0.15, growHp: 1,
 }
@@ -220,9 +226,6 @@ export function reinforceWord(w: Word): void {
   if (w.growHp) w.growHp += REINFORCE_STEP.growHp
   if (w.effects?.guard) w.effects.guard += REINFORCE_STEP.guard
   if (w.effects?.heal) w.effects.heal += REINFORCE_STEP.heal
-  if (w.effects?.counterMultiplier) {
-    w.effects.counterMultiplier = Math.round((w.effects.counterMultiplier + REINFORCE_STEP.counter) * 100) / 100
-  }
   if (w.effects?.castScale != null) {
     w.effects.castScale = Math.min(1, Math.round((w.effects.castScale + REINFORCE_STEP.castScale) * 100) / 100)
   }

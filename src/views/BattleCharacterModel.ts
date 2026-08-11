@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { CharacterVisualDef } from '@data/characters'
 import { currentFieldLight } from '@data/backgrounds'
-import { GraphicsSettings } from '@/ui/GameSettings'
+import { GraphicsSettings, type GraphicsProfile } from '@/ui/GameSettings'
 import { STRICT_RESOURCE_LOADING } from '@/config/edition'
 import { reportResourceFailure } from '@/ui/ResourceFailures'
 
@@ -191,13 +191,10 @@ function runAnimationFrame(now: number) {
   const delta = Math.min(frameMs / 1000, 0.1)
   previousFrame = now
   if (!document.hidden) {
+    const profile = GraphicsSettings.profile()
+    const antialiasingScale = GraphicsSettings.antiAliasingScale()
     const models = [...activeModels]
-    const allowed = new Set(
-      models
-        .filter((model) => model.wantsRender(now))
-        .sort((a, b) => b.renderPriority(now) - a.renderPriority(now))
-    )
-    models.forEach((model) => model.render(delta, now, allowed.has(model)))
+    models.forEach((model) => model.render(delta, now, profile, antialiasingScale))
   }
   animationFrame = activeModels.size ? requestAnimationFrame(runAnimationFrame) : 0
   if (!animationFrame) previousFrame = 0
@@ -1343,44 +1340,32 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     return this.shell.parentElement?.classList.contains('back') ?? false
   }
 
-  private desiredPixelRatio(waitingEnemy = this.isWaitingEnemy()) {
-    const profile = GraphicsSettings.profile()
+  private desiredPixelRatio(
+    waitingEnemy = this.isWaitingEnemy(),
+    profile = GraphicsSettings.profile(),
+    antialiasing = GraphicsSettings.antiAliasingScale(),
+  ) {
     const baseRatio = profile.resolutionScale
     const waitingScale = waitingEnemy && profile.waitingFps < profile.activeFps ? 0.9 : 1
-    const antialiasing = GraphicsSettings.antiAliasingScale()
     return Math.min(2.5, baseRatio * waitingScale * antialiasing) * this.compositedScale
   }
 
-  private targetFps() {
-    const waitingEnemy = this.isWaitingEnemy()
-    const profile = GraphicsSettings.profile()
+  private targetFps(waitingEnemy: boolean, profile: GraphicsProfile) {
     return waitingEnemy ? profile.waitingFps : profile.activeFps
   }
 
-  wantsRender(now: number) {
-    if (this.disposed || !this.active || !this.shell.isConnected) return false
-    if (!this.firstFrameRendered || !this.lastRenderedAt) return true
-    return now - this.lastRenderedAt >= 1000 / this.targetFps()
-  }
-
-  renderPriority(now: number) {
-    if (!this.firstFrameRendered) return 100_000
-    const idle = this.requestedAnimation === 'idle' || this.requestedAnimation === 'idle2'
-    const boss = this.shell.parentElement?.classList.contains('boss') ?? false
-    return (idle ? 0 : 10_000)
-      + (boss ? 5_000 : 0)
-      + (this.isWaitingEnemy() ? 0 : 1_000)
-      + Math.max(0, now - this.lastRenderedAt)
-  }
-
-  private resize(waitingEnemy = this.isWaitingEnemy()) {
+  private resize(
+    waitingEnemy = this.isWaitingEnemy(),
+    profile = GraphicsSettings.profile(),
+    antialiasing = GraphicsSettings.antiAliasingScale(),
+  ) {
     const width = Math.max(1, this.shell.clientWidth)
     const height = Math.max(1, this.shell.clientHeight)
     const rect = this.shell.getBoundingClientRect()
     const scaleX = rect.width > 0 ? rect.width / width : 1
     const scaleY = rect.height > 0 ? rect.height / height : 1
     this.compositedScale = Math.max(0.25, scaleX, scaleY)
-    const pixelRatio = this.desiredPixelRatio(waitingEnemy)
+    const pixelRatio = this.desiredPixelRatio(waitingEnemy, profile, antialiasing)
     this.renderedPixelRatio = pixelRatio
     this.outputCanvas.dataset.pixelRatio = String(pixelRatio)
     const targetWidth = Math.max(1, Math.round(width * pixelRatio))
@@ -1414,23 +1399,24 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.outputContext.drawImage(this.renderer.domElement, 0, 0, width, height, 0, 0, width, height)
   }
 
-  render(delta: number, now: number, allowDraw = true) {
+  render(delta: number, now: number, profile: GraphicsProfile, antialiasingScale: number) {
     if (this.disposed || !this.active || !this.shell.isConnected) return
     if (this.renderer.getContext().isContextLost()) {
       this.useFallbackPortrait()
       return
     }
     this.pendingRenderDelta = Math.min(0.1, this.pendingRenderDelta + delta)
-    if (!allowDraw) return
     const waitingEnemy = this.isWaitingEnemy()
-    const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy)
-    if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy)
 
     // 고급 모드는 idle과 공격을 모두 60fps로 유지한다. 절전 모드만 사용자의 명시적
     // 선택에 따라 24~30fps를 쓰며, 느린 한 구간이 전투 전체 품질을 고정 강등하지 않는다.
-    const targetFps = this.targetFps()
-    this.outputCanvas.dataset.renderFps = String(targetFps)
+    const targetFps = this.targetFps(waitingEnemy, profile)
+    const targetFpsText = String(targetFps)
+    if (this.outputCanvas.dataset.renderFps !== targetFpsText) this.outputCanvas.dataset.renderFps = targetFpsText
     if (this.firstFrameRendered && this.lastRenderedAt && now - this.lastRenderedAt < 1000 / targetFps) return
+
+    const desiredPixelRatio = this.desiredPixelRatio(waitingEnemy, profile, antialiasingScale)
+    if (desiredPixelRatio !== this.renderedPixelRatio) this.resize(waitingEnemy, profile, antialiasingScale)
 
     const frameDelta = this.pendingRenderDelta
     this.pendingRenderDelta = 0

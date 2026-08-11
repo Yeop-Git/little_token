@@ -1,30 +1,32 @@
 import type { Word } from '@core/types'
 
 /**
- * 승리 보상에서만 나오는 전투 규칙 카드. 수치보다 행동 규칙을 바꾸므로 기존
- * 문장 예산표와 분리했고, 각 카드의 결과는 note와 wordValueLines에 그대로 적힌다.
+ * 일반 보상 동사.
  *
- * art는 동사 번호 3009~3020을 아래 배열 순서대로 쓴다(3001~3006 초기 · 3007~3008 보상).
+ * 동사는 `행동 종류(kind) · 같은 행동 스탯(stat) · 계수(statMult)`를 뼈대로 삼고,
+ * 흡혈·방패치기·생명력 폭발처럼
+ * 행동 결과를 다른 행동으로 잇는 부가 동작을 가진다.
+ * 관통은 비율 전환이 없는 문장 전체 전략이므로 수식어가 맡는다.
  */
 export const SPECIAL_REWARD_WORDS: Word[] = [
-  { id: 'focusStrike', text: '집중해서 찍었다', slot: 'verb', tags: ['focus', 'atk'], emotion: 'anger', stat: 'atk', statMult: 1.5, kind: 'attack', targetCount: 1, art: '3009', rarity: 'rare', note: '공격 ×1.5 · 1명', lore: '한 줄에만 진하게 눌러 쓴다.' },
-  { id: 'pierceStrike', text: '파고들었다', slot: 'verb', tags: ['pierce', 'atk'], emotion: 'sorrow', stat: 'atk', statMult: 1.5, kind: 'attack', targetCount: 1, effects: { pierceGuard: true }, art: '3010', rarity: 'rare', note: '공격 ×1.5 · 1명 · 관통', lore: '빈틈을 보면 연필심이 먼저 들어간다.' },
-  { id: 'spreadTwo', text: '퍼뜨렸다', slot: 'verb', tags: ['wide', 'joy'], emotion: 'joy', stat: 'atk', statMult: 0.9, kind: 'attack', targetCount: 2, art: '3011', rarity: 'rare', note: '공격 ×0.9 · 2명(100%·70%)', lore: '웃음이 옆 칸까지 번진다.' },
-  { id: 'splitTwo', text: '갈라냈다', slot: 'verb', tags: ['wide', 'pierce'], emotion: 'pleasure', stat: 'atk', statMult: 0.75, kind: 'attack', targetCount: 2, effects: { pierceGuard: true }, art: '3012', rarity: 'rare', note: '공격 ×0.75 · 2명(100%·70%) · 관통', lore: '종이 틈을 따라 두 줄로 갈라진다.' },
-  { id: 'scatterThree', text: '흩뿌렸다', slot: 'verb', tags: ['wide', 'joy'], emotion: 'joy', stat: 'atk', statMult: 0.9, kind: 'attack', targetCount: 3, art: '3013', rarity: 'epic', note: '공격 ×0.9 · 3명(100%·70%·50%)', lore: '반짝이는 낙서가 세 칸을 덮는다.' },
-  { id: 'pourThree', text: '쏟아냈다', slot: 'verb', tags: ['wide', 'tear'], emotion: 'sorrow', stat: 'atk', statMult: 0.9, kind: 'attack', targetCount: 3, art: '3014', rarity: 'epic', note: '공격 ×0.9 · 3명(100%·70%·50%)', lore: '참았던 잉크가 한꺼번에 쏟아진다.' },
-  { id: 'doubleTap', text: '두드렸다', slot: 'verb', tags: ['hit', 'atk'], emotion: 'anger', stat: 'atk', statMult: 0.5, kind: 'attack', targetCount: 1, effects: { hitCount: 2 }, art: '3015', rarity: 'common', note: '공격 ×0.5 · 2연타', lore: '똑, 똑. 실드가 먼저 금이 간다.' },
-  { id: 'flurry', text: '난타했다', slot: 'verb', tags: ['hit', 'mad'], emotion: 'pleasure', stat: 'atk', statMult: 0.5, kind: 'attack', targetCount: 1, effects: { hitCount: 3 }, art: '3016', rarity: 'rare', note: '공격 ×0.5 · 3연타', lore: '신나는 낙서가 멈추지 않는다.' },
-  { id: 'counterOne', text: '되돌려주었다', slot: 'verb', tags: ['counter', 'mend'], emotion: 'joy', stat: 'guard', statMult: 1, kind: 'guard', effects: { counterMultiplier: 1.5 }, art: '3017', rarity: 'rare', note: '방어 ×1 · 카운터 ×1.50', lore: '받은 만큼 반짝여 돌려준다.' },
-  { id: 'counterTwo', text: '버텨냈다', slot: 'verb', tags: ['counter', 'hold'], emotion: 'pleasure', stat: 'guard', statMult: 1.5, kind: 'guard', effects: { counterMultiplier: 1.5 }, art: '3018', rarity: 'epic', note: '방어 ×1.5 · 카운터 ×1.50', lore: '종이가 구겨져도 되받는 마음은 남는다.' },
-  { id: 'tearMend', text: '울음을 삼켰다', slot: 'verb', tags: ['mend'], emotion: 'sorrow', stat: 'heal', statMult: 1.5, kind: 'heal', art: '3019', rarity: 'rare', note: '회복 ×1.5', lore: '젖은 종이를 꼭 눌러 펴고 다시 쓴다.' },
-  { id: 'riseAgain', text: '이를 악물고 일어섰다', slot: 'verb', tags: ['mend'], emotion: 'anger', stat: 'heal', statMult: 1.5, kind: 'heal', art: '3020', rarity: 'rare', note: '회복 ×1.5', lore: '화난 마음도 다음 줄을 쓸 힘이 된다.' },
-  { id: 'magicVeil', text: '빛의 막을 둘렀다', slot: 'verb', tags: ['guard', 'light'], emotion: 'sorrow', stat: 'guard', statMult: 0.5, kind: 'guard', effects: { magicShield: 1 }, art: '3018', rarity: 'epic', note: '방어 ×0.5 · 매직실드 1겹', lore: '한 줄을 통째로 감싸는 빛은 어떤 틈도 내주지 않는다.' },
-  { id: 'storedResolve', text: '막아서 밀어냈다', slot: 'verb', tags: ['guard', 'atk'], emotion: 'anger', stat: 'guard', statMult: 0.5, kind: 'guard', targetCount: 2, effects: { guardAttackMultiplier: 0.6 }, art: '3009', rarity: 'rare', note: '방어 ×0.5 · 2명(100%·70%) · 방어도 60% 피해', lore: '막아 낸 문장을 방패째 앞으로 밀어 벌레를 물리친다.' },
-  { id: 'overflowingHeart', text: '넘친 마음을 건넸다', slot: 'verb', tags: ['mend', 'joy'], emotion: 'joy', stat: 'heal', statMult: 1.25, kind: 'heal', effects: { overhealDamageMultiplier: 1 }, art: '3019', rarity: 'rare', note: '회복 ×1.25 · 초과 회복량 100% 피해', lore: '내게 다 담지 못한 온기가 벌레를 밀어낸다.' },
-  { id: 'drinkInk', text: '흘린 잉크를 되마셨다', slot: 'verb', tags: ['atk', 'mend'], emotion: 'pleasure', stat: 'atk', statMult: 1, kind: 'attack', effects: { lifeStealRate: 0.5 }, art: '3010', rarity: 'rare', note: '공격 ×1 · 흡혈 50%', lore: '빼앗긴 이야기를 한 방울도 남기지 않고 되찾는다.' },
-  { id: 'stainedTomorrow', text: '내일의 줄을 물들였다', slot: 'verb', tags: ['poison', 'sorrow'], emotion: 'sorrow', stat: 'atk', statMult: 1.5, kind: 'attack', timing: 'delayed', art: '3014', rarity: 'rare', note: '공격 ×1.5 · 다음 턴 발동', lore: '지금 번진 얼룩은 다음 줄에서야 아프게 드러난다.' },
-  { id: 'savedBreath', text: '다음 숨을 모아두었다', slot: 'verb', tags: ['hold', 'calm'], emotion: 'anger', stat: 'guard', statMult: 0.5, kind: 'guard', effects: { carryInk: 2 }, art: '3017', rarity: 'common', note: '방어 ×0.5 · 다음 문장 잉크 +2', lore: '이번 줄을 짧게 맺고 다음 줄에 힘을 남긴다.' },
-  { id: 'dampenMomentum', text: '기세를 눌러 적었다', slot: 'verb', tags: ['debuff', 'hold'], emotion: 'joy', stat: 'atk', statMult: 0.5, kind: 'attack', effects: { enemyAttackRank: -1 }, art: '3012', rarity: 'rare', note: '공격 ×0.5 · 적 공격 1랭크↓', lore: '거칠어진 이야기를 손바닥으로 눌러 적의 공격 태세를 꺾는다.' },
-  { id: 'readAhead', text: '앞줄을 미리 읽었다', slot: 'verb', tags: ['focus', 'calm'], emotion: 'pleasure', stat: 'guard', statMult: 0.75, kind: 'guard', effects: { bonusDraws: 1 }, art: '3011', rarity: 'common', note: '방어 ×0.75 · 다시 뽑기 +1회', lore: '다음에 올 단어를 알아보자 덱에서 한 장 더 꺼낼 여유가 생겼다.' },
+  { id: 'focusStrike', text: '찍었다', slot: 'verb', tags: ['focus', 'atk'], emotion: 'anger', stat: 'atk', statMult: 1.5, kind: 'attack', inkCost: 3, art: '3009', rarity: 'rare', note: '공격 ×1.5', lore: '한 줄에만 진하게 눌러 쓴다.' },
+  { id: 'pierceStrike', text: '파고들었다', slot: 'verb', tags: ['pierce', 'atk'], emotion: 'sorrow', stat: 'atk', statMult: 1.25, kind: 'attack', inkCost: 3, targetCount: 1, art: '3010', rarity: 'rare', note: '공격 ×1.25', lore: '빈틈에 깊은 한 획을 남긴다.' },
+  { id: 'spreadTwo', text: '퍼뜨렸다', slot: 'verb', tags: ['wide', 'joy'], emotion: 'joy', stat: 'atk', statMult: 1, kind: 'attack', inkCost: 3, targetCount: 2, art: '3011', rarity: 'rare', note: '공격 ×1 · 대상 2명', lore: '한 번의 타격을 앞의 두 벌레에게 퍼뜨린다.' },
+  { id: 'splitTwo', text: '갈라냈다', slot: 'verb', tags: ['wide', 'pierce'], emotion: 'pleasure', stat: 'atk', statMult: 1.1, kind: 'attack', inkCost: 4, targetCount: 2, art: '3012', rarity: 'rare', note: '공격 ×1.1 · 대상 2명', lore: '한 획을 두 갈래로 갈라 앞줄에 남긴다.' },
+  { id: 'scatterThree', text: '흩뿌렸다', slot: 'verb', tags: ['wide', 'joy'], emotion: 'joy', stat: 'atk', statMult: 1.15, kind: 'attack', inkCost: 5, targetCount: 3, art: '3013', rarity: 'epic', note: '공격 ×1.15 · 대상 3명', lore: '타격을 페이지 앞줄 세 칸에 흩뿌린다.' },
+  { id: 'pourThree', text: '쏟아냈다', slot: 'verb', tags: ['wide', 'tear'], emotion: 'sorrow', stat: 'atk', statMult: 2, kind: 'attack', inkCost: 4, art: '3014', rarity: 'epic', note: '공격 ×2', lore: '진한 잉크를 한꺼번에 쏟아 강하게 덮친다.' },
+  { id: 'doubleTap', text: '두드렸다', slot: 'verb', tags: ['hit', 'atk'], emotion: 'anger', stat: 'atk', statMult: 1.5, kind: 'attack', inkCost: 3, art: '3015', rarity: 'rare', note: '공격 ×1.5', lore: '단단한 한 번으로 종이 위를 울린다.' },
+  { id: 'flurry', text: '휘갈겼다', slot: 'verb', tags: ['hit', 'mad'], emotion: 'pleasure', stat: 'atk', statMult: 1.5, kind: 'attack', inkCost: 4, effects: { lifeStealRate: .25 }, art: '3016', rarity: 'rare', note: '공격 ×1.5 · 흡혈 25%', lore: '거침없는 한 획으로 체력을 조금 되찾는다.' },
+  { id: 'counterOne', text: '되돌려주었다', slot: 'verb', tags: ['counter', 'mend'], emotion: 'joy', stat: 'guard', statMult: 1.25, kind: 'guard', inkCost: 4, effects: { guardAttackMultiplier: 1 }, art: '3017', rarity: 'rare', note: '방어 ×1.25 · 방패치기 100%', lore: '쌓은 실드의 힘을 피해로 되돌려준다.' },
+  { id: 'counterTwo', text: '버텨냈다', slot: 'verb', tags: ['counter', 'hold'], emotion: 'pleasure', stat: 'guard', statMult: 2, kind: 'guard', inkCost: 6, effects: { guardAttackMultiplier: 1.5 }, art: '3018', rarity: 'epic', note: '방어 ×2 · 방패치기 150%', lore: '굳게 버틴 실드의 힘을 크게 되돌린다.' },
+  { id: 'tearMend', text: '울음을 꿰맸다', slot: 'verb', tags: ['mend'], emotion: 'sorrow', stat: 'heal', statMult: 1.5, kind: 'heal', inkCost: 3, art: '3019', rarity: 'rare', note: '회복 ×1.5', lore: '흐트러진 마음을 꿰매 다시 숨을 고른다.' },
+  { id: 'riseAgain', text: '일어섰다', slot: 'verb', tags: ['mend'], emotion: 'anger', stat: 'heal', statMult: 1.25, kind: 'heal', inkCost: 3, art: '3020', rarity: 'rare', note: '회복 ×1.25', lore: '다시 일어설 만큼 숨을 되찾는다.' },
+  { id: 'magicVeil', text: '막을 둘렀다', slot: 'verb', tags: ['guard', 'light'], emotion: 'sorrow', stat: 'guard', statMult: 2, kind: 'guard', inkCost: 4, art: '3018', rarity: 'epic', note: '방어 ×2', lore: '빛나는 막을 단단히 둘러 버틴다.' },
+  { id: 'storedResolve', text: '밀어냈다', slot: 'verb', tags: ['guard', 'atk'], emotion: 'anger', stat: 'guard', statMult: 1.5, kind: 'guard', inkCost: 4, effects: { guardAttackMultiplier: 1 }, art: '3030', rarity: 'rare', note: '방어 ×1.5 · 방패치기 100%', lore: '쌓인 실드의 힘만큼 적을 밀어낸다.' },
+  { id: 'overflowingHeart', text: '마음을 건넸다', slot: 'verb', tags: ['mend', 'joy'], emotion: 'joy', stat: 'heal', statMult: 1.2, kind: 'heal', inkCost: 5, effects: { overhealDamageMultiplier: 1.25 }, art: '3024', rarity: 'rare', note: '회복 ×1.2 · 생명력 폭발 125%', lore: '다 담지 못한 회복을 피해로 건넨다.' },
+  { id: 'drinkInk', text: '잉크를 되마셨다', slot: 'verb', tags: ['atk', 'mend'], emotion: 'pleasure', stat: 'atk', statMult: 1.2, kind: 'attack', inkCost: 4, effects: { lifeStealRate: .5 }, art: '3029', rarity: 'rare', note: '공격 ×1.2 · 흡혈 50%', lore: '입힌 피해의 절반을 체력으로 되마신다.' },
+  { id: 'stainedTomorrow', text: '물들였다', slot: 'verb', tags: ['poison', 'sorrow'], emotion: 'sorrow', stat: 'atk', statMult: 2, kind: 'attack', inkCost: 4, art: '3026', rarity: 'epic', note: '공격 ×2', lore: '내일의 줄까지 닿을 만큼 짙은 한 획을 남긴다.' },
+  { id: 'savedBreath', text: '숨을 모았다', slot: 'verb', tags: ['hold', 'calm'], emotion: 'anger', stat: 'guard', statMult: 1, kind: 'guard', inkCost: 3, effects: { guardAttackMultiplier: .5 }, art: '3025', rarity: 'common', note: '방어 ×1 · 방패치기 50%', lore: '모은 방어의 절반을 밀어내는 힘으로 쓴다.' },
+  { id: 'dampenMomentum', text: '적었다', slot: 'verb', tags: ['debuff', 'hold'], emotion: 'joy', stat: 'atk', statMult: 1.5, kind: 'attack', inkCost: 3, art: '3027', rarity: 'rare', note: '공격 ×1.5', lore: '기세를 눌러 한 획에 단정히 적는다.' },
+  { id: 'readAhead', text: '읽었다', slot: 'verb', tags: ['focus', 'calm'], emotion: 'pleasure', stat: 'guard', statMult: 1, kind: 'guard', inkCost: 2, art: '3028', rarity: 'common', note: '방어 ×1', lore: '앞줄을 읽고 한발 먼저 버틸 자리를 잡는다.' },
 ]

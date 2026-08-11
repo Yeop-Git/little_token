@@ -10,7 +10,7 @@ import { ALL_REWARD_WORDS, EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesFor
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, bossEliteRarityForDay, eliteRarityForEncounter, enemyDefForEncounter, enemyRarityWeightsForDay } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
-import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardPrice, rewardRarityWeights } from '@data/rewards'
+import { bossRewardRarity, genRewards, REWARD_PRICE, rewardGradeForDay, rewardOfferRng, rewardPrice, rewardRarityWeights, rewardRefreshCost } from '@data/rewards'
 import { ALL_ITEMS, EXCLAIM_RARITY_BONUS, EXCLAIM_SLOTS, ITEM_BLESS_POOL, itemStatBudget, rollExclaimMultipliers } from '@data/items'
 import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import {
@@ -21,6 +21,7 @@ import {
   applyPreparation,
   enemyAttackForecast,
   enemyTurn,
+  engageFront,
   makeEnemy,
   playerGuardLimit,
   spiderWebAtTurnStart,
@@ -36,9 +37,9 @@ const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(mess
 const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', weakEmotion: null, ...extra })
 const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
-  return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
+  return { playerHp: 30, playerMax: 30, guard: 0, counter: false, counterFull: false, turn: 1, enemies, pending: null }
 }
-const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, attackRank: 0, guardRank: 0, enemyAttackRank: 0, bonusDraws: 0, summonDamageMultiplier: 1, heavyTurnMultiplier: 1, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
+const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counter: false, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, attackRank: 0, guardRank: 0, enemyAttackRank: 0, bonusDraws: 0, summonDamageMultiplier: 1, heavyTurnMultiplier: 1, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
@@ -165,6 +166,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(rear.dead && r.overflow === 0, 'rear overkill cannot flow backward through a surviving shielded front enemy')
 }
 { const s = state([makeEnemy(foe('guard', { guard: 8, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].guard === 8, 'pierce guard') }
+{ const s = state([makeEnemy(foe('magic-pierce', { magicShield: 1, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].magicShield === 1, 'pierce bypasses magic shield without consuming it') }
 {
   const shielded = makeEnemy(foe('overkill-shielded', { guard: 99, magicShield: 3, hp: 15 }))
   const s = state([shielded])
@@ -174,9 +176,12 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 { const s = state([makeEnemy(foe('a')), makeEnemy(foe('b')), makeEnemy(foe('c'))]); const r = applyIntent(s, attack({ targetCount: 3 }), 1, 0); assert(r.hits.map((h) => h.dmg).join(',') === '10,7,5', 'three targets') }
 { const s = state([makeEnemy(foe('weak', { weakEmotion: 'joy', hp: 20 }))]); const r = applyIntent(s, attack({ emotions: ['joy'] }), 1, 0); assert(r.hits[0].dmg === 13, 'weak emotion') }
-{ const s = state([makeEnemy(foe('counter'))]); s.guard = 4; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.counterHit?.dmg === 6, 'counter') }
-{ const s = state([makeEnemy(foe('mosquito', { pierceGuard: true }))]); s.guard = 7; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.piercedGuard && r.dealt === 4 && r.absorbed === 0 && s.guard === 7 && !r.counterHit, 'enemy pierces player guard') }
-{ const s = state([makeEnemy(foe('guard-remains'))]); s.guard = 7; s.counterMultiplier = 1.5; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.absorbed === 4 && s.guard === 3 && s.counterMultiplier === 1.5, 'guard remains after absorbing a smaller hit'); applyPreparation(s, attack(), 1); assert(s.guard === 3 && s.counterMultiplier === 1.5, 'non-guard preparation preserves remaining guard') }
+{ const s = state([makeEnemy(foe('counter-no-shield'))]); s.counter = true; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 4 && r.counterHit?.dmg === 2 && s.counter, 'counter returns half of received damage without shield'); applyPreparation(s, attack(), 1); assert(!s.counter, 'counter expires when the next sentence turn begins') }
+{ const s = state([makeEnemy(foe('counter-shield'))]); s.guard = 4; s.counter = true; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.absorbed === 4 && r.counterHit?.dmg === 2, 'an attack-action counter stays at half even when shield absorbs the hit') }
+{ const s = state([makeEnemy(foe('mosquito', { pierceGuard: true }))]); s.guard = 7; s.counter = true; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.piercedGuard && r.dealt === 4 && r.absorbed === 0 && s.guard === 7 && r.counterHit?.dmg === 2, 'shield presence does not change an attack-action counter') }
+{ const s = state([makeEnemy(foe('counter-guard'))]); applyPreparation(s, attack({ kind: 'guard', base: 0, guard: 4, counter: true }), 1); const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.counterHit?.dmg === 4 && s.counterFull, 'guard action returns all received damage regardless of shield') }
+{ const s = state([makeEnemy(foe('counter-heal'))]); applyPreparation(s, attack({ kind: 'heal', base: 0, heal: 2, counter: true }), 1); const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 4 && r.counterHit?.dmg === 4 && s.counterFull, 'heal action returns all received damage without requiring shield') }
+{ const s = state([makeEnemy(foe('guard-remains'))]); s.guard = 7; s.counter = true; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 0 && r.absorbed === 4 && s.guard === 3 && s.counter, 'guard and counter remain through the rest of the current sentence turn'); applyPreparation(s, attack(), 1); assert(s.guard === 3 && !s.counter, 'a sentence without counter clears the previous turn counter') }
 { const s = state([makeEnemy(foe('guard-stacks'))]); s.guard = 3; const r = applyPreparation(s, attack({ guard: 5 }), 1); assert(r.guardGain === 5 && s.guard === 8, 'new guard stacks with remaining guard') }
 {
   const s = state([makeEnemy(foe('magic-piercer', { pierceGuard: true }))])
@@ -204,15 +209,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const s = state([makeEnemy(foe('modifier-guard-engine', { hp: 100 }))])
   applyPreparation(s, intent, intent.multiplier)
   const r = applyIntent(s, intent, intent.multiplier, 0)
-  assert(intent.kind === 'guard' && s.guard > 0 && r.hits[0].dmg > 0, 'guard-conversion modifier lets a guard verb defend and deal damage')
-}
-{
-  const modifier = REWARD_WORDS.find((word) => word.id === 'pogeunhage')!
-  const tables = makeEarlyTables({ subj: [EARLY_WORDS.subj[0]], adv: [modifier], verb: [EARLY_WORDS.verb.find((word) => word.kind === 'heal')!] })
-  const intent = compile({ subj: tables.words.subj[0], adv: modifier, verb: tables.words.verb[0] }, tables, startingPlayer().stats)
-  const s = state([makeEnemy(foe('modifier-heal-engine', { hp: 100 }))])
-  const r = applyIntent(s, intent, intent.multiplier, 0)
-  assert(intent.kind === 'heal' && s.playerHp === s.playerMax && r.convertedDamage! > 0 && r.hits[0].dmg > 0, 'overheal modifier lets a heal verb finish enemies at full health')
+  assert(intent.kind === 'guard' && s.guard > 0 && intent.guardRank === 3 && intent.bonusDraws === 0 && r.hits.length === 0, 'modifier cleanly raises guard by three ranks without adding a verb conversion')
 }
 {
   const s = state([makeEnemy(foe('lifesteal', { hp: 100 }))])
@@ -223,9 +220,10 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 {
   const s = state([makeEnemy(foe('guard-cap'))])
-  s.guard = 28
+  s.guard = 13
   const r = applyPreparation(s, attack({ guard: 10 }), 1)
-  assert(playerGuardLimit(s.playerMax) === 30 && r.guardAttempted === 10 && r.guardGain === 2 && s.guard === 30, 'player guard is capped at max hp and reports the applied gain')
+  assert(playerGuardLimit(s.playerMax) === 15 && r.guardAttempted === 10 && r.guardGain === 2 && s.guard === 15, 'player guard is capped at half max hp and reports the applied gain')
+  assert(playerGuardLimit(31) === 15, 'an odd max hp guard limit rounds down without exceeding half max hp')
 }
 {
   const s = state([makeEnemy(foe('weakened'))])
@@ -255,10 +253,10 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   // 상한에 막혀 비축분이 0이어도 그 턴을 방어에 썼으므로 반격은 걸려 있어야 한다.
   const s = state([makeEnemy(foe('guard-cap-counter'))])
   s.guard = playerGuardLimit(s.playerMax)
-  const r = applyPreparation(s, attack({ guard: 10, counterMultiplier: 1.5 }), 1)
-  assert(r.guardGain === 0 && r.counterMultiplier === 1.5 && s.counterMultiplier === 1.5, 'guard sentence still arms the counter at the guard cap')
+  const r = applyPreparation(s, attack({ kind: 'guard', base: 0, guard: 10, counter: true }), 1)
+  assert(r.guardGain === 0 && r.counter && r.counterFull && s.counter && s.counterFull, 'guard sentence still arms full counter at the guard cap')
 }
-{ const card: Word = { id: 'counter', text: '', slot: 'verb', tags: [], emotion: 'sorrow', kind: 'guard', effects: { counterMultiplier: 1.5 }, note: '' }; reinforceWord(card); assert(card.effects?.counterMultiplier === 1.75, 'counter reinforce') }
+{ const card: Word = { id: 'counter', text: '', slot: 'adv', tags: [], emotion: 'sorrow', effects: { counter: true }, note: '' }; reinforceWord(card); assert(card.effects?.counter, 'counter remains a fixed rule after reinforce') }
 { const card: Word = { id: 'cast', text: '', slot: 'adv', tags: [], emotion: 'anger', effects: { castCount: 2, castScale: .65 }, note: '' }; reinforceWord(card); assert(card.effects?.castScale === .7, 'repeat-cast reinforce') }
 { const card: Word = { id: 'scaled', text: '', slot: 'verb', tags: [], emotion: 'anger', stat: 'atk', statMult: 1, kind: 'attack', note: '' }; reinforceWord(card); assert(card.statMult === 1.15, 'stat-scaled verb reinforce') }
 { const s = state([makeEnemy(foe('delay', { hp: 20 }))]); applyIntent(s, attack({ timing: 'delayed', hitCount: 2, pierceGuard: true, emotions: ['anger'] }), 1, 0); const r = applyPendingAttack(s)!; assert(r.hits.length === 2 && s.enemies[0].hp === 0, 'delayed plan') }
@@ -388,7 +386,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 {
   const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'elderSpider')
   const tactic = tables.words.verb.find((word) => word.id === 'elderSpiderTactic')!
-  assert(tactic.effects?.hitCount === 2 && tactic.tags.includes('adapt'), 'spider tactic strikes twice and always counts as the current weakness')
+  assert(!tactic.effects?.hitCount && tactic.statMult === 1.5 && tactic.tags.includes('adapt'), 'spider tactic uses a strong single hit and always counts as the current weakness')
 }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
 {
@@ -571,6 +569,19 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 
 const regularEnemyIds = ['termite', 'moth', 'flea', 'roach', 'pillbug', 'mosquito']
 assert(Object.keys(ENEMIES).filter((id) => !ENEMIES[id].boss).join(',') === regularEnemyIds.join(','), 'six-enemy regular roster')
+assert(regularEnemyIds.every((id) => ENEMIES[id].every === 1), 'every regular enemy attacks once per turn')
+{
+  const first = makeEnemy(ENEMIES.termite)
+  const arriving = makeEnemy(ENEMIES.moth)
+  const s = state([first, arriving])
+  first.dead = true
+  s.turn = 4
+  engageFront(s)
+  assert(arriving.engaged && arriving.nextAttackTurn === 5, 'an arriving regular enemy waits through its arrival turn')
+  assert(enemyTurn(s, () => 0, 'second').length === 0, 'an arriving regular enemy does not attack immediately')
+  s.turn = 5
+  assert(enemyTurn(s, () => 0, 'second').length === 1, 'an arrived regular enemy starts attacking on the next turn')
+}
 assert(ENEMIES.termite.initiative === 'second' && !ENEMIES.termite.guard && !ENEMIES.termite.magicShield && !ENEMIES.termite.pierceGuard, 'termite has no ability')
 assert(ENEMIES.moth.initiative === 'second' && !ENEMIES.moth.guard && !ENEMIES.moth.magicShield && !ENEMIES.moth.pierceGuard, 'moth has no ability')
 assert(ENEMIES.flea.initiative === 'first', 'flea strikes first')
@@ -659,6 +670,7 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
     'the affordable verb replacement preserves attack, guard, and heal diversity',
   )
   assert(REWARD_PRICE.common < REWARD_PRICE.rare && REWARD_PRICE.rare < REWARD_PRICE.epic && REWARD_PRICE.epic < REWARD_PRICE.legendary, 'reward inspiration prices rise with rarity')
+  assert([0, 1, 2, 8].map(rewardRefreshCost).join(',') === '1,2,3,9', 'consecutive reward refreshes remain an uncapped escalating Inspiration sink')
   const seededA = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
   const seededB = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 0)).map((option) => option.word?.id ?? option.item?.id)
   const refreshed = genRewards(player, 5, 6, 'subject', rewardOfferRng(1234, 'subject', 1)).map((option) => option.word?.id ?? option.item?.id)
@@ -684,8 +696,8 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   }
   for (const day of [3, 4, 5, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 29]) {
     const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
-    const reward = genRewards(player, 5, day, 'verb')
-    assert(reward.some((option) => option.word && tacticalIds.has(option.word.id)), `boss-eve day ${day} offers a matching tactical verb`)
+    const reward = genRewards(player, 5, day, 'subject')
+    assert(reward.some((option) => option.word && tacticalIds.has(option.word.id)), `boss-eve day ${day} offers a matching tactical modifier`)
   }
   assert(genRewards(player, 5, 10, 'item').some((option) => option.kind === 'item' && option.rarity === 'legendary'), 'floor ten guarantees a legendary item each cycle')
   assert(genRewards(player, 5, 25, 'item').some((option) => option.kind === 'item' && option.rarity === 'legendary'), 'endless floor ten repeats the legendary item guarantee')

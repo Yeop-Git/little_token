@@ -6,7 +6,6 @@
  */
 
 import type { Rarity, Word } from './types'
-import { TARGET_FALLOFF } from './combatRules'
 
 export type BudgetRarity = 'common' | 'rare' | 'epic'
 
@@ -27,8 +26,12 @@ export const VERB_COEF_BUDGET: Record<BudgetRarity, number> = {
   epic: 2,
 }
 
-/** 전체 적중(aoe)은 계수를 이만큼 깎아서 산다 — 적이 늘어날수록 총량이 곱으로 커지니까. */
-export const AOE_COEF_FACTOR = 0.7
+/** 다른 행동 스탯을 끌어오는 변환형의 상한. 비용과 참조 스탯에 따라 더 낮은 계수를 쓸 수 있다. */
+export const OFF_STAT_VERB_COEF_BUDGET: Record<BudgetRarity, number> = {
+  common: .75,
+  rare: 1.2,
+  epic: 1.5,
+}
 
 /** 예산 검사 허용 오차. 표기용 반올림(×1.15 · 대성공 10% = 1.2075)까지만 허용한다. */
 export const BUDGET_TOLERANCE = 0.05
@@ -57,6 +60,7 @@ export const hasModifierTactic = (w: Word): boolean => {
     typeof value === 'number' ? value !== 0 : value === true,
   )
   return (w.bonus ?? 0) > 0
+    || (w.crit ?? 0) > 0
     || !!numericEffect
     || w.tags.includes('preempt')
     || w.aoe === 'all'
@@ -64,59 +68,73 @@ export const hasModifierTactic = (w: Word): boolean => {
     || (typeof w.targetCount === 'number' && w.targetCount > 1)
 }
 
-/** 이 등급이 사도 되는 동사 계수(전체 적중이면 깎인다). */
-export const verbCoefBudget = (rarity: BudgetRarity, aoe?: Word['aoe']): number =>
-  VERB_COEF_BUDGET[rarity] * (aoe === 'all' ? AOE_COEF_FACTOR : 1)
-
-/**
- * 규칙 카드의 실전 총량. 다중 대상은 실제 대상 감쇠를, 연타는 타수를 더한다.
- * 카운터는 기본 방어에 되돌려 주는 추가분만 합쳐 공격과 방어를 중복 계산하지 않는다.
- */
-export const tacticalVerbPower = (w: Word): number => {
-  const coefficient = w.statMult ?? 0
-  if (w.kind === 'attack') {
-    const count = typeof w.targetCount === 'number' ? Math.max(1, w.targetCount) : 1
-    const coverage = Array.from({ length: count }, (_, i) =>
-      TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
-    ).reduce((sum, value) => sum + value, 0)
-    const direct = coefficient * coverage * Math.max(1, w.effects?.hitCount ?? 1)
-    return direct
-      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
-      + direct * Math.max(0, w.effects?.lifeStealRate ?? 0)
-      + Math.abs(w.effects?.attackRank ?? 0)
-      + Math.abs(w.effects?.guardRank ?? 0)
-      + Math.abs(w.effects?.enemyAttackRank ?? 0)
-  }
-  if (w.kind === 'guard') {
-    const count = typeof w.targetCount === 'number' ? Math.max(1, w.targetCount) : 1
-    const coverage = Array.from({ length: count }, (_, i) =>
-      TARGET_FALLOFF[i] ?? TARGET_FALLOFF[TARGET_FALLOFF.length - 1],
-    ).reduce((sum, value) => sum + value, 0)
-    return coefficient
-      + Math.max(0, (w.effects?.counterMultiplier ?? 0) - 1)
-      + Math.max(0, w.effects?.guardAttackMultiplier ?? 0) * coverage
-      + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
-      + Math.max(0, w.effects?.carryInk ?? 0) * .25
-      + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
-      + Math.abs(w.effects?.attackRank ?? 0)
-      + Math.abs(w.effects?.guardRank ?? 0)
-      + Math.abs(w.effects?.enemyAttackRank ?? 0)
-  }
-  return coefficient
-    + Math.max(0, w.effects?.magicShield ?? 0) * 1.5
-    + Math.max(0, w.effects?.overhealDamageMultiplier ?? 0) * .25
-    + Math.max(0, w.effects?.carryInk ?? 0) * .25
-    + Math.max(0, w.effects?.bonusDraws ?? 0) * .25
-    + Math.abs(w.effects?.attackRank ?? 0)
-    + Math.abs(w.effects?.guardRank ?? 0)
-    + Math.abs(w.effects?.enemyAttackRank ?? 0)
+/** 수식어에 두지 않는, 행동 결과를 다른 행동으로 잇는 동사 전용 기능. */
+export const hasModifierActionTactic = (w: Word): boolean => {
+  const effects = w.effects
+  return (effects?.guardAttackMultiplier ?? 0) > 0
+    || (effects?.overhealDamageMultiplier ?? 0) > 0
+    || (effects?.lifeStealRate ?? 0) > 0
 }
 
-/** 다중 대상 관통은 방어를 건너뛰는 희소 유틸리티를 총량의 15%로 평가한다. */
-export const tacticalVerbBudget = (w: Word, rarity: BudgetRarity): number => {
-  const multiTargetPierce = w.effects?.pierceGuard && typeof w.targetCount === 'number' && w.targetCount > 1
-  return VERB_COEF_BUDGET[rarity] * (multiTargetPierce ? 0.85 : 1)
+const laneStat = (word: Word): Word['stat'] => word.kind === 'guard' ? 'guard' : word.kind === 'heal' ? 'heal' : 'atk'
+
+/** 일반 동사는 주행동 스탯이면 정규 계수, 다른 스탯을 활용하면 변환 계수를 쓴다. */
+export const verbCoefBudget = (rarity: BudgetRarity, word: Word): number =>
+  word.stat === laneStat(word) ? VERB_COEF_BUDGET[rarity] : OFF_STAT_VERB_COEF_BUDGET[rarity]
+
+/** 일반 동사에 남아 있으면 수식어와 역할이 겹치는 전술 필드. 보스 전용 대여 카드는 별도다. */
+export const hasVerbTactic = (w: Word): boolean => {
+  const effects = w.effects
+  return !!w.timing
+    || w.tags.includes('preempt')
+    || !!effects?.pierceGuard
+    || (effects?.castCount ?? 1) > 1
+    || (effects?.overdrawHitCount ?? 0) > 0
+    || (effects?.inkDiscount ?? 0) > 0
+    || (effects?.carryInk ?? 0) > 0
+    || (effects?.attackRank ?? 0) !== 0
+    || (effects?.guardRank ?? 0) !== 0
+    || (effects?.enemyAttackRank ?? 0) !== 0
+    || (effects?.bonusDraws ?? 0) > 0
+    || !!effects?.counter
 }
+
+/** 수식어에 적힌 서로 다른 기능 키워드 수. 한 기능의 보조값(castScale)은 따로 세지 않는다. */
+export const modifierKeywordCount = (w: Word): number => {
+  const effects = w.effects
+  return [
+    (w.bonus ?? 0) > 0,
+    (w.crit ?? 0) > 0,
+    w.tags.includes('preempt'),
+    w.aoe === 'all' || w.targetCount === 'all' || (typeof w.targetCount === 'number' && w.targetCount > 1),
+    !!effects?.pierceGuard,
+    (effects?.hitCount ?? 1) > 1,
+    (effects?.castCount ?? 1) > 1,
+    (effects?.overdrawHitCount ?? 0) > 0,
+    !!effects?.counter,
+    (effects?.magicShield ?? 0) > 0,
+    (effects?.inkDiscount ?? 0) > 0,
+    (effects?.carryInk ?? 0) > 0,
+    (effects?.attackRank ?? 0) !== 0,
+    (effects?.guardRank ?? 0) !== 0,
+    (effects?.enemyAttackRank ?? 0) !== 0,
+    (effects?.bonusDraws ?? 0) > 0,
+    (effects?.guardAttackMultiplier ?? 0) > 0,
+    (effects?.overhealDamageMultiplier ?? 0) > 0,
+    (effects?.lifeStealRate ?? 0) > 0,
+  ].filter(Boolean).length
+}
+
+/** 3잉크 단일 키워드 수식어가 비용을 설명할 만큼 강한 계수를 가졌는지 판정한다. */
+export const hasStrongModifierScale = (w: Word): boolean =>
+  (w.effects?.lifeStealRate ?? 0) >= .5
+  || !!w.effects?.counter
+  || (w.effects?.guardAttackMultiplier ?? 0) >= 1.2
+  || (w.effects?.overhealDamageMultiplier ?? 0) >= 1.25
+  || (w.effects?.magicShield ?? 0) >= 1
+  || (w.effects?.castCount ?? 1) >= 2
+  || w.targetCount === 'all'
+  || (typeof w.targetCount === 'number' && w.targetCount >= 3)
 
 /** 전설은 규칙 카드(문장부호·무럭무럭·아이템) 전용이라 수치 예산이 없다. */
 export const hasBudget = (rarity: Rarity | undefined): rarity is BudgetRarity =>

@@ -7,7 +7,7 @@ import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import {
   EARLY_BUILD_REWARD_DAY,
   REWARD_PRICE,
-  REWARD_REFRESH_COST,
+  rewardRefreshCost,
   rewardPrice,
   type RewardOption,
 } from '@data/rewards'
@@ -36,8 +36,11 @@ interface Opts {
   deck?: Record<string, Word[]>
   inspiration: number
   earned: number
-  options: RewardOption[]
+  options: Array<RewardOption | null>
   phase: RewardPhase
+  refreshes: number
+  mode?: 'reward' | 'shop'
+  purchases?: number
   onPick: (opt: RewardOption) => void
   onRefresh: () => boolean
   onSkip: () => void
@@ -46,7 +49,7 @@ interface Opts {
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-const PHASE_NO: Record<RewardPhase, number> = { subject: 1, item: 2, verb: 3 }
+const PHASE_NO: Record<RewardPhase, number> = { subject: 1, verb: 2, item: 3 }
 const PHASE_TITLE: Record<RewardPhase, string> = {
   subject: '주어와 수식어를 고르자',
   item: '이야기의 소품을 고르자',
@@ -208,9 +211,6 @@ function reinforceDeltas(w: Word): string {
   if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.effects?.counterMultiplier) {
-    rows.push(`카운터 ×${w.effects.counterMultiplier.toFixed(2)} → <b>×${after.effects!.counterMultiplier!.toFixed(2)}</b>`)
-  }
   if (w.statMult != null) rows.push(`계수 ×${w.statMult} → <b>×${after.statMult}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
   if (w.variance) rows.push(`${gambleText(w.variance)} → <b>${gambleText(after.variance!)}</b>`)
@@ -262,7 +262,14 @@ function bgHtml(opt: RewardOption): string {
   return `<div class="rp-bg noart"><span class="rp-icon">${icon}</span></div>`
 }
 
-function rewardPickHtml(p: RewardOption, i: number): string {
+function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string {
+  if (!p) return `
+    <div class="reward-choice is-sold">
+      <div class="reward-pick reward-sold-card" aria-label="${text('shopSoldAria', '구매 완료된 자리')}">
+        <span aria-hidden="true">✓</span><b>${text('shopSold', '구매 완료')}</b>
+      </div>
+      <div class="reward-kindline"><span class="reward-state">${text('shopRefreshForMore', '새로고침하면 새 상품이 들어온다.')}</span></div>
+    </div>`
   const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
   const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
   const rewardKind = p.reinforce ? 'is-word is-reinforce' : p.kind === 'item' ? 'is-item' : 'is-word is-new'
@@ -277,26 +284,42 @@ function rewardPickHtml(p: RewardOption, i: number): string {
     '{name}, 희귀도 {rarity}, 역할 {role}, 획득 {acquire}, 비용 {currency} {price}',
     { name: p.name, rarity: RARITY_LABEL[p.rarity], role, acquire, currency, price },
   )
-  const ownedLabel = p.reinforce ? '강화 완료!' : p.kind === 'item' ? '내 소품으로 결정!' : '내 단어장에 기록!'
+  const reinforcement = p.word?.level ?? 1
+  const ownedLabel = p.reinforce
+    ? text('rewardSelectedReinforce', '강화 +{amount} 완료!', { amount: reinforcement })
+    : p.kind === 'item'
+      ? text('rewardSelectedItem', '내 소품으로 결정!')
+      : text('rewardSelectedNew', '내 단어장에 기록!')
+  const status = p.reinforce
+    ? `<span class="reward-state is-owned-word"><b>${text('rewardOwnedTag', '보유 중')}</b>${text('rewardReinforcePreview', '선택 시 강화 +{amount}', { amount: reinforcement })}</span>`
+    : `<span class="reward-state is-new-reward"><b>New!</b>${p.kind === 'item'
+      ? text('rewardNewItemHint', '새 소품 획득')
+      : text('rewardNewWordHint', '단어장에 새로 등록')}</span>`
   return `
-    <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="button" tabindex="0" aria-label="${cardLabel}">
-      ${bgHtml(p)}
-      <span class="rp-tint" aria-hidden="true"></span>
-      <span class="rp-veil" aria-hidden="true"></span>
-      <span class="rp-foil" aria-hidden="true"></span>
-      <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
-      ${rewardWordMeta(p)}
-      <span class="rp-unavailable" aria-hidden="true">
-        <b>${text('rewardUnavailable', '구매 불가')}</b>
-        <small>${text('rewardInsufficient', '영감 부족')}</small>
-      </span>
-      <div class="rp-foot">
-        <div class="rp-name">${p.name}</div>
-        ${p.kind === 'word' ? `<div class="rp-slot-label">${typeLabel(p)}</div>` : ''}
-        <div class="rp-effect">${mainEffect(p)}</div>
-        <div class="rp-actions">
-          <span class="rp-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>
+    <div class="reward-choice">
+      <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="button" tabindex="0" aria-label="${cardLabel}">
+        ${bgHtml(p)}
+        <span class="rp-tint" aria-hidden="true"></span>
+        <span class="rp-veil" aria-hidden="true"></span>
+        <span class="rp-foil" aria-hidden="true"></span>
+        <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
+        ${rewardWordMeta(p)}
+        <span class="rp-unavailable" aria-hidden="true">
+          <b>${text('rewardUnavailable', '구매 불가')}</b>
+          <small>${text('rewardInsufficient', '영감 부족')}</small>
+        </span>
+        <div class="rp-foot">
+          <div class="rp-name">${p.name}</div>
+          <div class="rp-effect">${mainEffect(p)}</div>
+          ${shop ? '' : `<div class="rp-actions">
+            <span class="rp-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>
+          </div>`}
         </div>
+      </div>
+      <div class="reward-kindline">
+        <span class="reward-type-label">${typeLabel(p)}</span>
+        ${status}
+        ${shop ? `<span class="reward-kind-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>` : ''}
       </div>
     </div>`
 }
@@ -309,38 +332,39 @@ export class RewardView {
   constructor(root: HTMLElement, opts: Opts) {
     this.root = root
     this.opts = opts
+    const shop = opts.mode === 'shop'
     this.root.innerHTML = `
-      <div class="scene reward-scene" style="background-image:url(${BACKGROUNDS.bg001})">
+      <div class="scene reward-scene${shop ? ' reward-shop-scene' : ''}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
-          <div class="reward-card">
-            <div class="reward-token" aria-hidden="true">
+          <div class="reward-card${shop ? ' reward-shop-card' : ''}">
+            ${shop ? `<img class="reward-shop-art" src="${REWARD_ART.shop}" alt="" aria-hidden="true" />` : `<div class="reward-token" aria-hidden="true">
               <img class="reward-token-shadow" src="${TOKEN_FACES.party}" alt="" />
               <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
-            </div>
+            </div>`}
             <header class="reward-head">
-              <div class="k">${stageProgressLabel(opts.day)} 클리어</div>
-              <div class="t hand">${PHASE_TITLE[opts.phase]}</div>
-              <div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
+              <div class="k">${shop ? text('shopEyebrow', '보스 클리어 · 영감 상점') : `${stageProgressLabel(opts.day)} 클리어`}</div>
+              <div class="t hand">${shop ? text('shopTitle', '모아 둔 영감을 마음껏 쓰자!') : PHASE_TITLE[opts.phase]}</div>
+              ${shop ? `<div class="shop-row-guide">${text('shopRowGuide', '1행 주어·수식어 · 2행 동사 · 3행 아이템')}</div>` : `<div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
-              </div>
-              <div class="reward-wallet" aria-label="런 재화 영감 ${opts.inspiration} 보유, 이번 클리어 획득 ${opts.earned}">
+              </div>`}
+              <div class="reward-wallet" aria-label="${text('rewardWalletOwned', '보유 영감')} ${opts.inspiration}, ${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} ${shop ? opts.purchases ?? 0 : `+${opts.earned}`}">
                 <span class="inspiration-mark" aria-hidden="true">◈</span>
-                <span class="reward-wallet-balance"><small>런 재화 · 보유 영감</small><b>${opts.inspiration}</b></span>
-                <span class="reward-wallet-earned">이번 클리어 <b>+${opts.earned}</b></span>
+                <span class="reward-wallet-balance"><small>${text('rewardWalletOwned', '보유 영감')}</small><b>${opts.inspiration}</b></span>
+                <span class="reward-wallet-earned">${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} <b>${shop ? opts.purchases ?? 0 : `+${opts.earned}`}</b></span>
               </div>
-              ${opts.day === EARLY_BUILD_REWARD_DAY && opts.phase !== 'verb' ? `
+              ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase === 'subject' ? `
                 <div class="reward-build-preview">
                   ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 빌드 서술어 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}
                 </div>` : ''}
             </header>
             <div class="reward-system-message" role="status" aria-live="assertive" hidden></div>
             <div class="reward-grid">
-              ${opts.options.map((p, i) => rewardPickHtml(p, i)).join('')}
+              ${opts.options.map((p, i) => rewardPickHtml(p, i, shop)).join('')}
             </div>
             <div class="reward-controls">
               <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
-              <button class="reward-refresh" type="button"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />다른 발상 떠올리기 <b>◈ ${REWARD_REFRESH_COST}</b></button>
-              <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
+              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${shop ? text('shopRefresh', '상품 새로고침') : text('rewardRefresh', '다른 발상 떠올리기')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
+              <button class="reward-skip" type="button" title="${shop ? text('shopLeaveHint', '구매를 마치고 다음 스테이지로 간다.') : '이번 단계에서 아무것도 기록하지 않고 넘어갑니다'}">${shop ? text('shopLeave', '상점 나가기') : '그냥 넘어가기'}</button>
             </div>
           </div>
           <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
@@ -352,16 +376,18 @@ export class RewardView {
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((el) => {
       const i = Number(el.dataset.i)
       const price = Number(el.dataset.price)
+      const option = opts.options[i]
+      if (!option) return
       if (price > opts.inspiration) {
         el.classList.add('is-unaffordable')
       }
-      el.addEventListener('mouseenter', () => this.showDetail(opts.options[i], el))
-      el.addEventListener('focus', () => this.showDetail(opts.options[i], el))
-      el.addEventListener('click', () => this.take(el, opts.options[i]))
+      el.addEventListener('mouseenter', () => this.showDetail(option, el))
+      el.addEventListener('focus', () => this.showDetail(option, el))
+      el.addEventListener('click', () => this.take(el, option))
       el.addEventListener('keydown', (event) => {
         if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return
         event.preventDefault()
-        this.take(el, opts.options[i])
+        this.take(el, option)
       })
     })
     this.root.querySelector<HTMLButtonElement>('.reward-skip')?.addEventListener('click', (event) => {
@@ -420,9 +446,13 @@ export class RewardView {
     const finishMs = reduceMotion ? 260 : 820
 
     scene?.classList.add('is-buying-reward')
+    el.closest<HTMLElement>('.reward-choice')?.classList.add('is-purchasing')
     el.classList.add('is-purchasing')
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
-      if (pick !== el) pick.classList.add('is-passed-over')
+      if (pick !== el) {
+        pick.classList.add('is-passed-over')
+        pick.closest<HTMLElement>('.reward-choice')?.classList.add('is-passed-over')
+      }
     })
     wallet?.classList.add('is-spending')
     this.flyInspiration(wallet, el, price, flightMs)
@@ -451,7 +481,7 @@ export class RewardView {
     }
     requestAnimationFrame(tick)
     const wallet = target.closest<HTMLElement>('.reward-wallet')
-    wallet?.setAttribute('aria-label', `보유 영감 ${to}, 이번 클리어 획득 ${this.opts.earned}`)
+    wallet?.setAttribute('aria-label', `${text('rewardWalletOwned', '보유 영감')} ${to}, ${this.opts.mode === 'shop' ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} ${this.opts.mode === 'shop' ? this.opts.purchases ?? 0 : `+${this.opts.earned}`}`)
   }
 
   private flyInspiration(wallet: HTMLElement | null, card: HTMLElement, price: number, duration: number) {
@@ -496,7 +526,7 @@ export class RewardView {
 
   private refresh() {
     if (this.locked) return
-    if (this.opts.inspiration < REWARD_REFRESH_COST || !this.opts.onRefresh()) {
+    if (this.opts.inspiration < rewardRefreshCost(this.opts.refreshes) || !this.opts.onRefresh()) {
       this.showSystemMessage('영감이 부족해 다른 발상을 떠올릴 수 없다.')
     }
   }

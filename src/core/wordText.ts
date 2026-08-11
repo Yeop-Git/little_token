@@ -7,6 +7,7 @@ import { TARGET_FALLOFF } from './combatRules'
 import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
 import type { StatBlock, TargetCount, Variance, Word } from './types'
 import { currentLocale } from '@/localization'
+import { wordKeywords } from './wordKeywords'
 
 const L = {
   ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', carryInk:'다음 문장 잉크', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발', magicShield:'매직실드', guardAttack:'현재 방어도 피해', overhealAttack:'초과 회복 피해', lifeSteal:'흡혈' },
@@ -17,20 +18,11 @@ const L = {
   'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', adapt:'套用目前部位弱點', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', casts:'次動詞發動', each:'每次', counter:'反擊', inkDiscount:'句子費用', carryInk:'下句墨水', all:'全部', noMult:'不受倍率影響', pool:'倍率池', safe:'穩妥一手', immediate:'立即發動' },
 }[currentLocale]
 
-const EXTRA_EFFECT_LABEL = {
-  ko: { attackRank: '공격', guardRank: '방어', enemyAttackRank: '적 공격', rank: '랭크', bonusDraws: '다시 뽑기' },
-  en: { attackRank: 'Attack', guardRank: 'Guard', enemyAttackRank: 'Enemy Attack', rank: 'rank', bonusDraws: 'Redraw' },
-  ja: { attackRank: '攻撃', guardRank: '防御', enemyAttackRank: '敵の攻撃', rank: 'ランク', bonusDraws: '引き直し' },
-  ru: { attackRank: 'Атака', guardRank: 'Защита', enemyAttackRank: 'Атака врага', rank: 'ранг', bonusDraws: 'Добор' },
-  'zh-Hans': { attackRank: '攻击', guardRank: '防御', enemyAttackRank: '敌方攻击', rank: '级', bonusDraws: '重抽' },
-  'zh-Hant': { attackRank: '攻擊', guardRank: '防禦', enemyAttackRank: '敵方攻擊', rank: '級', bonusDraws: '重抽' },
-}[currentLocale]
-
-const DRAW_COUNT_UNIT = {
+export const DRAW_COUNT_UNIT = {
   ko: '회', en: '', ja: '回', ru: '', 'zh-Hans': '次', 'zh-Hant': '次',
 }[currentLocale]
 
-const BUILD_EFFECT_LABEL = {
+export const BUILD_EFFECT_LABEL = {
   ko: { magicShield: '매직실드 1겹', guardAttack: '방어도', overhealAttack: '초과 회복량', lifeSteal: '흡혈' },
   en: { magicShield: 'Magic Shield 1 layer', guardAttack: 'Current Guard damage', overhealAttack: 'Overheal damage', lifeSteal: 'Lifesteal' },
   ja: { magicShield: 'マジックシールド1層', guardAttack: '現在の防御ダメージ', overhealAttack: '超過回復ダメージ', lifeSteal: '吸収' },
@@ -54,18 +46,11 @@ const CONDITIONAL_MULT_LABEL = {
 
 const conditionalMultText = (label: string, mult: number): string => `${label} ×${mult}`
 
-const resourceDamageText = (label: string, rate: number): string => currentLocale === 'ko'
+export const resourceDamageText = (label: string, rate: number): string => currentLocale === 'ko'
   ? `${label} ${Math.round(rate * 100)}% 피해`
   : `${label} ${Math.round(rate * 100)}%`
 
-const rankText = (label: string, rank: number): string => {
-  const arrow = rank > 0 ? '↑' : '↓'
-  const value = Math.abs(rank)
-  if (currentLocale === 'en' || currentLocale === 'ru') return `${label} ${EXTRA_EFFECT_LABEL.rank} ${rank > 0 ? '+' : '−'}${value}`
-  return `${label} ${value}${EXTRA_EFFECT_LABEL.rank}${arrow}`
-}
-
-const OVERDRAW_HIT_LABEL = {
+export const OVERDRAW_HIT_LABEL = {
   ko: '잉크 초과 시 공격',
   en: 'Attack hits on Ink overdraw',
   ja: 'インク超過時の攻撃',
@@ -73,7 +58,7 @@ const OVERDRAW_HIT_LABEL = {
   'zh-Hans': '墨水超支时攻击',
   'zh-Hant': '墨水超支時攻擊',
 }[currentLocale]
-const OVERDRAW_HIT_UNIT = {
+export const OVERDRAW_HIT_UNIT = {
   ko: '타', en: ' hits', ja: 'ヒット', ru: ' удара', 'zh-Hans': '次', 'zh-Hant': '次',
 }[currentLocale]
 
@@ -131,33 +116,23 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.effects?.heal) out.push({ text: `${L.heal} +${w.effects.heal}`, cls: 'heal' })
   if (w.bonus) out.push({ text: multText(w.bonus), cls: 'buff' })
   if (w.variance) out.push({ text: gambleText(w.variance), cls: 'gamble' })
-  if (w.crit) out.push({ text: critText(w.crit), cls: 'buff' })
   if (w.growHp) out.push({ text: `${L.hp} +${w.growHp}`, cls: 'heal' })
-  if (w.aoe === 'all') out.push({ text: L.allHit, cls: 'dmg' })
   if (w.timing === 'delayed') out.push({ text: L.next, cls: '' })
   if (w.targetMode === 'both') out.push({ text: L.self, cls: 'self' })
-  if (w.tags.includes(PREEMPT_TAG)) out.push({ text: L.preempt, cls: 'buff' })
   if (w.tags.includes('adapt')) out.push({ text: L.adapt, cls: 'buff' })
-  // 수치가 없는 카드(규칙 카드·차단 안내)는 카드에 적힌 문구를 그대로 쓴다.
-  if ((w.kind === 'attack' || w.targetCount) && w.aoe !== 'all') out.push({ text: `${w.targetCount ?? 1}${L.attack}`, cls: 'dmg' })
-  if (w.effects?.pierceGuard) out.push({ text: L.pierce, cls: 'dmg' })
-  if (w.effects?.hitCount && w.effects.hitCount > 1) out.push({ text: `${w.effects.hitCount}${L.hits}`, cls: 'dmg' })
-  if (w.effects?.castCount && w.effects.castCount > 1) {
-    const scale = w.effects.castScale != null ? ` (${L.each} ${Math.round(w.effects.castScale * 100)}%)` : ''
-    out.push({ text: `${w.effects.castCount}${L.casts}${scale}`, cls: 'buff' })
+  if (w.targetCount && w.targetCount !== 1) {
+    out.push({ text: `대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`, cls: 'dmg' })
   }
-  if (w.effects?.overdrawHitCount) out.push({ text: `${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`, cls: 'dmg' })
-  if (w.effects?.counterMultiplier) out.push({ text: `${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`, cls: 'guard' })
-  if (w.effects?.magicShield) out.push({ text: BUILD_EFFECT_LABEL.magicShield, cls: 'guard' })
-  if (w.effects?.guardAttackMultiplier) out.push({ text: resourceDamageText(BUILD_EFFECT_LABEL.guardAttack, w.effects.guardAttackMultiplier), cls: 'dmg' })
-  if (w.effects?.overhealDamageMultiplier) out.push({ text: resourceDamageText(BUILD_EFFECT_LABEL.overhealAttack, w.effects.overhealDamageMultiplier), cls: 'dmg' })
-  if (w.effects?.lifeStealRate) out.push({ text: `${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`, cls: 'heal' })
-  if (w.effects?.inkDiscount) out.push({ text: `${L.inkDiscount} −${w.effects.inkDiscount}`, cls: 'buff' })
-  if (w.effects?.carryInk) out.push({ text: `${L.carryInk} +${w.effects.carryInk}`, cls: 'buff' })
-  if (w.effects?.attackRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.attackRank, w.effects.attackRank), cls: 'buff' })
-  if (w.effects?.guardRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.guardRank, w.effects.guardRank), cls: 'guard' })
-  if (w.effects?.enemyAttackRank) out.push({ text: rankText(EXTRA_EFFECT_LABEL.enemyAttackRank, w.effects.enemyAttackRank), cls: 'buff' })
-  if (w.effects?.bonusDraws) out.push({ text: `${EXTRA_EFFECT_LABEL.bonusDraws} +${w.effects.bonusDraws}${DRAW_COUNT_UNIT}`, cls: 'buff' })
+  for (const keyword of wordKeywords(w)) {
+    const cls = ['counter', 'magicShield', 'protect'].includes(keyword.id)
+      ? 'guard'
+      : ['lifesteal', 'shatter', 'recuperate'].includes(keyword.id)
+        ? 'heal'
+        : ['pierce', 'multiHit', 'frenzy', 'guardEcho', 'overflow', 'lingering', 'fortify'].includes(keyword.id)
+          ? 'dmg'
+          : 'buff'
+    out.push({ text: keyword.label, cls })
+  }
   if (!out.length) out.push({ text: wordNoteText(w), cls: 'flat' })
   return out
 }
@@ -209,35 +184,15 @@ function noteParts(w: Word): string[] {
   else if (w.bonus) out.push(multText(w.bonus))
   if (w.effects?.guard) out.push(`${L.guard} +${w.effects.guard}`)
   if (w.effects?.heal) out.push(`${L.heal} +${w.effects.heal}`)
-  if (w.crit) out.push(critText(w.crit))
+  if (w.targetCount && w.targetCount !== 1) out.push(`대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`)
   // 연타는 그 자체로 단일 대상이라 대상 수를 겹쳐 적지 않는다.
-  const hits = w.effects?.hitCount ?? 1
-  if (w.targetCount && hits <= 1) out.push(targetCountText(w.targetCount))
-  if (w.effects?.pierceGuard) out.push(currentLocale === 'ko' ? '관통' : L.pierce)
-  if (hits > 1) out.push(`${hits}${L.hits}`)
-  if ((w.effects?.castCount ?? 1) > 1) {
-    const scale = w.effects?.castScale != null ? ` (${L.each} ${Math.round(w.effects.castScale * 100)}%)` : ''
-    out.push(`${w.effects!.castCount}${L.casts}${scale}`)
-  }
-  if (w.effects?.overdrawHitCount) out.push(`${OVERDRAW_HIT_LABEL} +${w.effects.overdrawHitCount}${OVERDRAW_HIT_UNIT}`)
-  if (w.effects?.counterMultiplier) out.push(`${L.counter} ×${w.effects.counterMultiplier.toFixed(2)}`)
-  if (w.effects?.magicShield) out.push(BUILD_EFFECT_LABEL.magicShield)
-  if (w.effects?.guardAttackMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.guardAttack, w.effects.guardAttackMultiplier))
-  if (w.effects?.overhealDamageMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.overhealAttack, w.effects.overhealDamageMultiplier))
-  if (w.effects?.lifeStealRate) out.push(`${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`)
+  out.push(...wordKeywords(w).map((keyword) => keyword.label))
   if ((w.effects?.summonDamageMultiplier ?? 1) > 1) {
     out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.summon, w.effects!.summonDamageMultiplier!))
   }
   if ((w.effects?.heavyTurnMultiplier ?? 1) > 1) {
     out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.heavyTurn, w.effects!.heavyTurnMultiplier!))
   }
-  if (w.effects?.inkDiscount) out.push(`${L.inkDiscount} −${w.effects.inkDiscount}`)
-  if (w.effects?.carryInk) out.push(`${L.carryInk} +${w.effects.carryInk}`)
-  if (w.effects?.attackRank) out.push(rankText(EXTRA_EFFECT_LABEL.attackRank, w.effects.attackRank))
-  if (w.effects?.guardRank) out.push(rankText(EXTRA_EFFECT_LABEL.guardRank, w.effects.guardRank))
-  if (w.effects?.enemyAttackRank) out.push(rankText(EXTRA_EFFECT_LABEL.enemyAttackRank, w.effects.enemyAttackRank))
-  if (w.effects?.bonusDraws) out.push(`${EXTRA_EFFECT_LABEL.bonusDraws} +${w.effects.bonusDraws}${DRAW_COUNT_UNIT}`)
-  if (w.tags.includes(PREEMPT_TAG)) out.push(L.preempt)
   if (w.tags.includes('adapt')) out.push(L.adapt)
   if (w.aoe === 'all') out.push(w.slot === 'adv' && currentLocale === 'ko' ? '전체 적중' : w.slot === 'adv' ? L.allHit : L.all)
   if (w.timing === 'delayed') out.push(L.next)

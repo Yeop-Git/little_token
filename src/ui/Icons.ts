@@ -63,6 +63,14 @@ export const icon = (key: string): string => {
     case 'heart':
       return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
         <path d="M24 40S8 30 8 18a8 8 0 0116-4 8 8 0 0116 4c0 12-16 22-16 22z" fill="currentColor" fill-opacity="0.18"/></svg>`
+    case 'skull':
+      return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M10 23C10 14.7 16.3 8 24 8s14 6.7 14 15c0 5.1-2.4 9.6-6.1 12.3V41H16.1v-5.7C12.4 32.6 10 28.1 10 23z" fill="currentColor" fill-opacity="0.16"/>
+        <circle cx="18.5" cy="23" r="3.5" fill="currentColor" stroke="none"/>
+        <circle cx="29.5" cy="23" r="3.5" fill="currentColor" stroke="none"/>
+        <path d="M24 28l-2.5 4h5z" fill="currentColor" stroke="none"/>
+        <path d="M20 36v5M24 36v5M28 36v5"/>
+      </svg>`
     case 'cross': // 회복
       return bakedStatIcon(statHeal)
     case 'clover': // 행운

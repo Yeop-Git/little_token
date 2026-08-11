@@ -17,6 +17,7 @@ import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
 import rewardRefresh from './ui/reward_refresh.svg'
+import rewardShop from './illustrations/token-shop-chest.webp'
 import inkBottle from './ui/ink_bottle.webp'
 import inkBarFrame from './ui/ink_bar_frame.webp'
 import inkCostBadge from './ui/ink_cost_badge.webp'
@@ -73,7 +74,6 @@ import skill1017 from './sprites/skills/skill_1017.webp'
 import skill1018 from './sprites/skills/skill_1018.webp'
 import skill1019 from './sprites/skills/skill_1019.webp'
 import skill1020 from './sprites/skills/skill_1020.webp'
-import skill1021 from './sprites/skills/skill_1021.webp'
 import skill2001 from './sprites/skills/skill_2001.webp'
 import skill2002 from './sprites/skills/skill_2002.webp'
 import skill2003 from './sprites/skills/skill_2003.webp'
@@ -114,6 +114,16 @@ import skill3017 from './sprites/skills/skill_3017.webp'
 import skill3018 from './sprites/skills/skill_3018.webp'
 import skill3019 from './sprites/skills/skill_3019.webp'
 import skill3020 from './sprites/skills/skill_3020.webp'
+import skill3021 from './sprites/skills/skill_3021.webp'
+import skill3022 from './sprites/skills/skill_3022.webp'
+import skill3023 from './sprites/skills/skill_3023.webp'
+import skill3024 from './sprites/skills/skill_3024.webp'
+import skill3025 from './sprites/skills/skill_3025.webp'
+import skill3026 from './sprites/skills/skill_3026.webp'
+import skill3027 from './sprites/skills/skill_3027.webp'
+import skill3028 from './sprites/skills/skill_3028.webp'
+import skill3029 from './sprites/skills/skill_3029.webp'
+import skill3030 from './sprites/skills/skill_3030.webp'
 import skill7001 from './sprites/skills/skill_7001.webp'
 import skill7002 from './sprites/skills/skill_7002.webp'
 import skill7003 from './sprites/skills/skill_7003.webp'
@@ -212,6 +222,7 @@ export const REWARD_ART = {
   verb: rewardVerb,
   clear: rewardClear,
   refresh: rewardRefresh,
+  shop: rewardShop,
 }
 
 /** 잉크 HUD 전용 에셋. 교체할 때 소비 View 대신 이 매니페스트만 바꾼다. */
@@ -300,8 +311,6 @@ export const SKILL_ART: Record<string, string> = {
   '1018': skill1018,
   '1019': skill1019,
   '1020': skill1020,
-  // 사마귀 전용 공략 「희생을 각오했다」의 임시 그림. 전용 일러스트가 들어오면 이 줄만 바꾼다.
-  '1021': skill1021,
   '2001': skill2001,
   '2002': skill2002,
   '2003': skill2003,
@@ -347,6 +356,17 @@ export const SKILL_ART: Record<string, string> = {
   '3018': skill3018,
   '3019': skill3019,
   '3020': skill3020,
+  // 재사용 그림을 걷어 낸 특수 동사·보스 공략 카드 전용 일러스트.
+  '3021': skill3021, // 희생을 각오했다
+  '3022': skill3022, // 빈틈을 찔렀다
+  '3023': skill3023, // 퇴치했다
+  '3024': skill3024, // 마음을 건넸다
+  '3025': skill3025, // 숨을 모았다
+  '3026': skill3026, // 물들였다
+  '3027': skill3027, // 적었다
+  '3028': skill3028, // 읽었다
+  '3029': skill3029, // 잉크를 되마셨다
+  '3030': skill3030, // 밀어냈다
   // 문장부호(올림프의 당근) — 7001 느낌표 · 7002 온점 · 7003 물음표
   '7001': skill7001,
   '7002': skill7002,

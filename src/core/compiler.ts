@@ -317,7 +317,7 @@ export function compile(
     castCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.castCount ?? 1)),
     castScale: Math.min(1, ...order.map((key) => sel[key]?.effects?.castScale ?? 1)),
     overdrawHitCount: Math.max(0, ...order.map((key) => sel[key]?.effects?.overdrawHitCount ?? 0)),
-    counterMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.counterMultiplier ?? 0)),
+    counter: order.some((key) => !!sel[key]?.effects?.counter),
     magicShield: Math.max(0, ...order.map((key) => sel[key]?.effects?.magicShield ?? 0)),
     guardAttackMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.guardAttackMultiplier ?? 0)),
     overhealDamageMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.overhealDamageMultiplier ?? 0)),

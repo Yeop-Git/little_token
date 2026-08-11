@@ -1,11 +1,11 @@
 /**
- * 적 기믹과 특수 동사를 연결하는 공용 안내 데이터다.
- * 보스 직전 동사 보상도 이 목록을 사용하므로, 화면 설명과 실제로 제안되는 대응책이 어긋나지 않는다.
+ * 적 기믹과 수식어를 연결하는 공용 안내 데이터다.
+ * 보스 직전 수식어 보상도 이 목록을 사용하므로, 화면 설명과 실제 제안이 어긋나지 않는다.
  */
 export interface TacticalCardGuide {
   id: string
   enemyId: string
-  /** 이 층의 동사 보상을 고르면 다음 층에서 해당 기믹을 만난다. 엔드리스에서도 반복한다. */
+  /** 이 층의 수식어 보상을 고르면 다음 층에서 해당 기믹을 만난다. 엔드리스에서도 반복한다. */
   rewardFloors?: readonly number[]
   title: string
   /**
@@ -22,70 +22,70 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'termite',
     rewardFloors: [2],
     title: '버틴 힘',
-    tooltip: '방어를 쌓은 뒤 「막아서 밀어냈다」로 현재 방어도의 60%를 두 대상까지 밀어낸다. 방어도는 소모하지 않는다.',
-    cardIds: ['storedResolve'],
+    tooltip: '방어 동사에 「들썩이며」를 붙이면 현재 방어도의 120%를 피해로 바꾼다. 방어도는 소모하지 않는다.',
+    cardIds: ['dandanhi'],
   },
   {
     id: 'pierce',
     enemyId: 'roach',
-    title: '관통 동사',
-    tooltip: '단단한 방어에는 관통 동사(뚫고나갔다·갈라냈다)가 체력을 바로 노린다.',
-    cardIds: ['pierceStrike', 'splitTwo'],
+    title: '관통 수식어',
+    tooltip: '단단한 방어에는 「힘껏」·「이판사판」 같은 관통 수식어를 공격 동사에 붙여 체력을 바로 노린다.',
+    cardIds: ['himkkeot', 'ipan', 'bangeopge'],
   },
   {
     id: 'multihit',
     enemyId: 'pillbug',
     rewardFloors: [3],
-    title: '연타 동사',
-    tooltip: '마력실드는 타격 횟수만큼 먼저 막는다. 연타 동사(두드렸다·휘몰아쳤다)로 바로 벗길 수 있다.',
-    cardIds: ['doubleTap', 'flurry'],
+    title: '반복 수식어',
+    tooltip: '매직실드는 타격마다 한 겹을 막는다. 「미친듯이」로 동사를 두 번 발동해 빠르게 벗긴다.',
+    cardIds: ['michin'],
   },
   {
     id: 'magic-shield',
     enemyId: 'mosquito',
     rewardFloors: [5],
     title: '매직실드',
-    tooltip: '모기의 침은 방어를 건너뛴다. 「빛의 막을 둘렀다」의 매직실드는 관통 공격 한 번을 완전히 막는다.',
-    cardIds: ['magicVeil'],
+    tooltip: '모기의 침은 방어를 건너뛴다. 「꾹 참고」를 방어 동사에 붙여 얻는 매직실드는 공격 한 번을 완전히 막는다.',
+    cardIds: ['kkuk'],
   },
   {
     id: 'mantis-counter',
     enemyId: 'mantis',
     rewardFloors: [4],
     title: '카운터 방어',
-    tooltip: '사마귀의 큰 베기는 카운터 방어(되돌려주었다·버텨냈다)로 막으면 그로기에 빠뜨릴 수 있다.',
-    cardIds: ['counterOne', 'counterTwo'],
+    tooltip: '사마귀의 큰 베기는 「다정히」·「못 이기는 척」 같은 카운터 수식어를 붙인 방어로 막으면 그로기에 빠뜨릴 수 있다.',
+    cardIds: ['dandanhi', 'motdohage', 'sseulsseulhi'],
   },
   {
     id: 'queen-area',
     enemyId: 'queenBee',
     rewardFloors: [9],
-    title: '범위·분노 집중',
-    tooltip: '범위 동사로 일벌을 함께 정리해 그로기를 열거나, 분노 단일 공격으로 한 마리씩 노려 본체 반동 피해를 2배로 준다.',
-    cardIds: ['spreadTwo', 'scatterThree', 'pourThree', 'splitTwo'],
+    title: '범위 수식어·분노 집중',
+    tooltip: '「웃으며」·「거칠게」·「신나게」로 일벌을 함께 정리하거나, 분노 단일 공격으로 한 마리씩 노려 본체 반동 피해를 2배로 준다.',
+    cardIds: ['useumyeo', 'geochilge', 'sinnage'],
   },
   {
     id: 'spider-pierce',
     enemyId: 'elderSpider',
     rewardFloors: [14],
-    title: '연타·관통 동사',
-    tooltip: '장로거미의 마력실드는 연타로 벗기고, 두꺼운 방어는 관통으로 넘긴다. 다리 약점 감정도 함께 맞춘다.',
-    cardIds: ['doubleTap', 'flurry', 'pierceStrike', 'splitTwo'],
+    title: '반복·관통 수식어',
+    tooltip: '장로거미의 매직실드는 「미친듯이」로 벗기고, 두꺼운 방어는 관통 수식어로 넘긴다. 다리 약점 감정도 함께 맞춘다.',
+    cardIds: ['michin', 'himkkeot', 'ipan', 'bangeopge'],
   },
   {
     id: 'elite-warded', enemyId: '*', rewardFloors: [10], title: '겹실드 정예',
-    tooltip: '희귀 이상 겹실드 정예는 추가 매직실드를 두른다. 연타 동사로 겹을 먼저 벗긴다.',
-    cardIds: ['doubleTap', 'flurry'],
+    tooltip: '희귀 이상 겹실드 정예는 추가 매직실드를 두른다. 「미친듯이」로 동사를 반복해 겹을 먼저 벗긴다.',
+    cardIds: ['michin'],
   },
   {
     id: 'elite-leeching', enemyId: '*', rewardFloors: [11], title: '흡묵 정예',
-    tooltip: '흡묵 정예는 체력에 준 피해 일부를 회복한다. 매직실드로 한 번 완전히 막아 흡혈도 끊는다.',
-    cardIds: ['magicVeil'],
+    tooltip: '흡묵 정예는 체력에 준 피해 일부를 회복한다. 「꾹 참고」의 매직실드로 한 번 완전히 막아 흡혈도 끊는다.',
+    cardIds: ['kkuk'],
   },
   {
     id: 'elite-raging', enemyId: '*', rewardFloors: [12, 13], title: '격문 정예',
     tooltip: '격문 정예는 약한 견제와 강한 돌진을 번갈아 쓴다. 기세를 낮춰 큰 공격을 누른다.',
-    cardIds: ['dampenMomentum'],
+    cardIds: ['aesseo', 'motdohage'],
   },
 ]
 

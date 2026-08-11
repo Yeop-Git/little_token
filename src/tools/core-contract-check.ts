@@ -15,7 +15,7 @@ import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 import { availableCombos } from '@core/deckInsights'
 import { floorsForEdition, isEditionFinalFloor, strictResourceError } from '@/config/edition'
 import { clearRewardValue, gradeFloor, gradeForElapsedTurns, startGrade } from '@core/grade'
-import { EARLY_BUILD_CARD_IDS, EARLY_BUILD_MODIFIER_IDS, EARLY_BUILD_REWARD_DAY, genRewards } from '@data/rewards'
+import { EARLY_BUILD_MODIFIER_IDS, EARLY_BUILD_REWARD_DAY, EARLY_STAT_VERB_IDS, genRewards } from '@data/rewards'
 
 const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(3, elapsed))
 assert.deepEqual(speedGrades, [5, 5, 5, 4, 4, 4, 3], 'reward grade falls once per three completed sentences until the luck floor')
@@ -84,25 +84,25 @@ assert.equal(inkOverdraw(6, 6), 0, 'base six ink must be safe')
 assert.equal(inkOverdraw(7, 6), 1, 'the first ink above the available pool costs one health')
 assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even beyond the selectable limit')
 assert.equal(inkExceedsLimit(9, 6), true, 'more than two overdraw is not selectable')
-assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost == null), 'special reward verbs must use the shared value-based Ink formula')
+assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost != null), 'reward verbs expose Ink cost as part of their identity')
 const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word) => word.id === id)!)
-assert.equal(specialCost('magicVeil'), 5, 'one-hit magic shield is valued as a maximum-cost epic verb')
-assert.equal(specialCost('storedResolve'), 5, 'two-target current-guard damage is a maximum-cost rare build engine')
-assert.equal(specialCost('overflowingHeart'), 4, 'overheal conversion is priced for healing and damage flexibility')
-assert.equal(specialCost('drinkInk'), 3, 'lifesteal pays one Ink above the rare tier base')
-const earlyBuildOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'verb', () => 0.5)
-assert.deepEqual(
-  new Set(earlyBuildOffers.map((option) => option.word?.id)),
-  new Set(EARLY_BUILD_CARD_IDS),
-  'the second-floor verb reward must offer all three early build engines',
-)
+assert.equal(specialCost('magicVeil'), 6, 'high-ratio guard-to-heal conversion reaches the verb cost ceiling')
+assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
+assert.equal(specialCost('overflowingHeart'), 5, 'overheal-to-damage pays for its conversion coefficient')
+assert.equal(specialCost('drinkInk'), 4, 'lifesteal pays by its healing ratio')
 const earlyModifierOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'subject', () => 0.5)
 assert.deepEqual(
   new Set(earlyModifierOffers.map((option) => option.word?.id)),
   new Set(EARLY_BUILD_MODIFIER_IDS),
   'the second-floor modifier reward must expose guard, heal, and flow tactics side by side',
 )
-const inkState = { playerHp: 9, playerMax: 9, guard: 4, counterMultiplier: 0, turn: 1, enemies: [], pending: null } satisfies BattleState
+const earlyStatVerbOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'verb', () => 0.5)
+assert.deepEqual(
+  new Set(earlyStatVerbOffers.map((option) => option.word?.id)),
+  new Set(EARLY_STAT_VERB_IDS),
+  'the second-floor verb reward must expose guard, heal, and luck attack outlets',
+)
+const inkState = { playerHp: 9, playerMax: 9, guard: 4, counter: false, counterFull: false, turn: 1, enemies: [], pending: null } satisfies BattleState
 assert.equal(applyInkOverdraw(inkState, 9, 6), 3, 'overdraw must report its exact damage')
 assert.equal(inkState.playerHp, 6, 'overdraw must spend health')
 assert.equal(inkState.guard, 4, 'overdraw must bypass guard')

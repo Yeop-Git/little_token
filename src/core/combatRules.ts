@@ -69,7 +69,9 @@ export function bossTurnPressureMultiplier(
   )
 }
 
-/** 방어막은 최대 체력 한 줄까지만 비축할 수 있다. */
+/** 방어막은 이월분을 포함해 최대 체력의 절반까지만 비축할 수 있다. */
+export const PLAYER_GUARD_LIMIT_RATIO = 0.5
+
 export function playerGuardLimit(playerMax: number): number {
-  return Math.max(0, Math.round(playerMax))
+  return Math.max(0, Math.floor(playerMax * PLAYER_GUARD_LIMIT_RATIO))
 }

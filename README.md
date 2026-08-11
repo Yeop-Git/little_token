@@ -132,6 +132,23 @@ npm.cmd run build                 # 정식 빌드 → dist/
 npm.cmd run build:demo            # 5층 데모 빌드 → dist-demo/
 ```
 
+### 웹 납품 준비
+
+이 프로젝트는 Unity가 아니라 Vite 기반 웹 프로젝트다. Unity WebGL의 `Compression
+Format` 설정 대신 빌드 결과에 서버 측 해제가 필요한 `.br`/`.gz` 파일을 만들지
+않으며, `dist/index.html`을 진입점으로 사용한다. 납품할 때는 다음 순서로 확인한다.
+
+```powershell
+npm.cmd run build                 # 실제 납품 시에만 실행
+npm.cmd run web:check             # index.html 위치와 사전 압축 부재 검사
+npm.cmd run web:serve             # http://localhost:8000 에서 직접 플레이 확인
+npm.cmd run web:package           # artifacts/little-token-web.zip 생성
+```
+
+`web:package`는 빌드를 자동 실행하지 않는다. 현재 `dist/`를 다시 검사한 뒤 그 안의
+내용만 압축하므로, ZIP을 풀면 폴더를 한 번 더 들어가지 않고 곧바로 `index.html`이
+보인다. 로컬 확인을 마친 최신 빌드인지 확인한 다음 패키징한다.
+
 출시 전 전체 검사는 아래 명령으로 돌립니다. 실제 출시는 현재 버전의 annotated 태그가
 HEAD를 가리키고 작업 트리가 깨끗해야 통과합니다. 커밋 전 같은 검사를 미리 돌릴 때만
 `--allow-dirty`를 붙입니다.

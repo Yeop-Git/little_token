@@ -469,7 +469,8 @@ export class BattleView {
       playerHp: Math.max(0, Math.min(maxHp, savedHp)),
       playerMax: maxHp,
       guard: Math.max(0, Math.min(playerGuardLimit(maxHp), savedGuard)),
-      counterMultiplier: 0,
+      counter: false,
+      counterFull: false,
       playerMagicShield: 0,
       playerAttackRank: 0,
       playerGuardRank: 0,
@@ -604,7 +605,10 @@ export class BattleView {
       if (!restore) return
       if (this.pointerDown) return this.scheduleDockRestore(120)
       // 리렌더로 엘리먼트만 갈렸을 뿐 커서는 아직 무언가 위에 있다면 그대로 둔다.
-      if (this.root.querySelector('.word-card:hover, .actor:hover')) return
+      // 적 배우의 바깥 사각형은 투명 렌더 여백까지 포함한다. 상세 콜라이더를 벗어난
+      // 뒤에도 actor:hover만 보고 있으면 빈 공간에서 정보창이 계속 남으므로, 실제로
+      // 상세를 여는 입력 면만 복원 보류 대상으로 삼는다.
+      if (this.root.querySelector('.word-card:hover, .actor-detail-hitbox:hover, .actor.you > .model-shell:hover')) return
       this.dockRestore = null
       restore()
     }, delay)
@@ -913,23 +917,28 @@ export class BattleView {
       : cycle
     const progress = Math.min(100, Math.max(0, (floor / DISPLAY_FLOORS) * 100))
     const bossMarks = bossFloors
-      .map((bossFloor) => `<i class="stage-progress-boss${floor >= bossFloor ? ' passed' : ''}" style="--boss-at:${(bossFloor / DISPLAY_FLOORS) * 100}%" aria-hidden="true"></i>`)
-      .join('')
-    const bossList = bossFloors
-      .map((bossFloor) => `<span><b>${isEndless ? endlessCycle * DISPLAY_FLOORS + bossFloor : bossFloor}</b>${ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')}</span>`)
+      .map((bossFloor, index) => {
+        const displayFloor = isEndless ? endlessCycle * DISPLAY_FLOORS + bossFloor : bossFloor
+        const bossLabel = ENEMIES[BOSS_BY_FLOOR[bossFloor]]?.name ?? t('hudBoss', '보스')
+        return `<span class="stage-progress-boss-point${index === bossFloors.length - 1 ? ' is-last' : ''}" style="--boss-at:${(bossFloor / DISPLAY_FLOORS) * 100}%" aria-hidden="true">
+          <i class="stage-progress-boss${floor >= bossFloor ? ' passed' : ''}">${icon('skull')}</i>
+          <span class="stage-progress-boss-label"><b>${displayFloor}</b> ${bossLabel}</span>
+        </span>`
+      })
       .join('')
     return `
-      <section class="stage-progress glass${isEndless ? ' is-endless' : ''}" role="img" tabindex="0" aria-label="${aria}">
-        <span class="stage-progress-summary"><i aria-hidden="true">${isEndless ? '∞' : '✦'}</i><b>${summary}</b></span>
-        <span class="stage-progress-detail" aria-hidden="true">
-          <span class="stage-progress-copy"><small>${detailLead}</small><b>${next}</b></span>
-          <span class="stage-progress-track">
-            <i class="stage-progress-fill" style="width:${progress}%"></i>
-            ${bossMarks}
+      <div class="stage-progress-slot${isEndless ? ' is-endless' : ''}">
+        <section class="stage-progress glass${isEndless ? ' is-endless' : ''}" role="img" tabindex="0" aria-label="${aria}">
+          <span class="stage-progress-summary"><i aria-hidden="true">${isEndless ? '∞' : '✦'}</i><b>${summary}</b></span>
+          <span class="stage-progress-detail" aria-hidden="true">
+            <span class="stage-progress-copy"><small>${detailLead}</small><b>${next}</b></span>
+            <span class="stage-progress-track">
+              <i class="stage-progress-fill" style="width:${progress}%"></i>
+              <span class="stage-progress-boss-layer">${bossMarks}</span>
+            </span>
           </span>
-          <span class="stage-progress-boss-list">${bossList}</span>
-        </span>
-      </section>`
+        </section>
+      </div>`
   }
 
   private setHelpOpen(open: boolean, restoreFocus = false) {
@@ -1018,7 +1027,7 @@ export class BattleView {
     this.timers.push(start)
   }
 
-  private renderActors() {
+  private renderActors(full = true) {
     const host = this.q('#actors')
     const s = this.state
     const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
@@ -1028,28 +1037,30 @@ export class BattleView {
     const hiddenWaiting = alive.length - visible.length
     const visibleSet = new Set(visible)
 
-    let you = host.querySelector<HTMLElement>('.actor.you')
-    if (!you) {
-      host.insertAdjacentHTML('beforeend', this.playerHtml())
-      you = host.querySelector<HTMLElement>('.actor.you')!
-      this.bindActor(you)
+    if (full) {
+      let you = host.querySelector<HTMLElement>('.actor.you')
+      if (!you) {
+        host.insertAdjacentHTML('beforeend', this.playerHtml())
+        you = host.querySelector<HTMLElement>('.actor.you')!
+        this.bindActor(you)
+      }
+      this.updatePlayer(you)
+      mountCharacterModel(you, this.playerVisual)
+      // 토큰은 배우 레일에 속하지 않는다 — 한 번 띄워 두고 프롬이 다시 그려질 때마다
+      // 맴돌 대상만 새 요소로 바꿔 준다.
+      const stage = this.root.querySelector<HTMLElement>('.stage-area')
+      if (stage && !this.token) this.token = new TokenActor(stage)
+      this.token?.attachTo(you)
+      this.token?.observeBattle({
+        hpRatio: this.state.playerMax > 0 ? this.state.playerHp / this.state.playerMax : 1,
+        enemyCount: alive.length,
+        // 한 전투가 대략 열 턴 안팎이라 그걸 1로 본다. 길어지면 그냥 1에서 머문다.
+        turnProgress: Math.min(1, this.state.turn / 10),
+      })
     }
-    this.updatePlayer(you)
-    mountCharacterModel(you, this.playerVisual)
-    // 토큰은 배우 레일에 속하지 않는다 — 한 번 띄워 두고 프롬이 다시 그려질 때마다
-    // 맴돌 대상만 새 요소로 바꿔 준다.
-    const stage = this.root.querySelector<HTMLElement>('.stage-area')
-    if (stage && !this.token) this.token = new TokenActor(stage)
-    this.token?.attachTo(you)
-    this.token?.observeBattle({
-      hpRatio: this.state.playerMax > 0 ? this.state.playerHp / this.state.playerMax : 1,
-      enemyCount: this.state.enemies.filter((e) => e.hp > 0).length,
-      // 한 전투가 대략 열 턴 안팎이라 그걸 1로 본다. 길어지면 그냥 1에서 머문다.
-      turnProgress: Math.min(1, this.state.turn / 10),
-    })
 
     host.querySelectorAll<HTMLElement>('.actor.foe').forEach((el) => {
-      if (!visibleSet.has(Number(el.dataset.i))) this.releaseFoe(el)
+      if (!visibleSet.has(Number(el.dataset.i)) && !el.classList.contains('dying')) this.releaseFoe(el)
     })
     visible.forEach((i, rank) => {
       const e = s.enemies[i]
@@ -1072,6 +1083,7 @@ export class BattleView {
     this.actorsInitialized = true
     this.queueWaitingEnemyModels(alive.slice(MAX_VISIBLE_ENEMIES))
     this.renderEnemyOverflow(host, hiddenWaiting)
+    if (!full) return
     this.renderStats()
     this.renderActionOrder()
     this.syncMantisGuardCue()
@@ -1235,6 +1247,8 @@ export class BattleView {
     el.dataset.poolKey = key
     el.dataset.enemyRarity = enemy.def.elite?.rarity ?? 'common'
     el.dataset.enemyTrait = enemy.def.elite?.trait ?? ''
+    el.setAttribute('role', 'button')
+    el.tabIndex = 0
     el.setAttribute('aria-label', `${enemy.def.name} 상세 보기`)
     el.querySelector<HTMLElement>('.nm')!.textContent = enemy.def.name
     const image = el.querySelector<HTMLImageElement>(':scope > .model-shell > .battle-sprite')!
@@ -1245,6 +1259,7 @@ export class BattleView {
     if (!visual.model3d) modelShell.dataset.modelStatus = 'fallback-2d'
     if (this.isBoss) this.queueDeferredCharacterModel(el, visual, 0)
     else mountCharacterModel(el, visual)
+    this.bindActor(el)
     return el
   }
 
@@ -1294,9 +1309,10 @@ export class BattleView {
     }
 
     if (enemy && enemyReady && enemy.initiativePhase === 'first' && this.playerPreempting) {
-      playerEntry.active = true
       entries.push(playerEntry)
-      entries.push(enemyEntry('displaced', '선공 빼앗김'))
+      entries.push(enemy.def.boss
+        ? enemyEntry('displaced', '선공 빼앗김')
+        : enemyEntry('first', '선공', enemyActive))
     } else if (enemy && enemyReady && enemy.initiativePhase === 'first') {
       entries.push(enemyEntry('first', '선공', enemyActive))
       entries.push(playerEntry)
@@ -1380,7 +1396,10 @@ export class BattleView {
           <span class="mantis-guard-shield" aria-hidden="true">◈</span>
           <span><b>방어 필수</b><em></em></span>
         </div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="${t('playerName', '프롬')}"></div>
+        <div class="model-shell" data-model-status="${modelStatus}">
+          <img class="battle-sprite" src="${this.playerVisual.portrait2d}" alt="${t('playerName', '프롬')}">
+          <span class="actor-detail-hitbox" aria-hidden="true"></span>
+        </div>
       </div>`
   }
 
@@ -1619,7 +1638,7 @@ export class BattleView {
     const s = this.state
     const guardLimit = playerGuardLimit(s.playerMax)
     el.querySelector<HTMLElement>('.hpn')!.innerHTML =
-      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력과 같음">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
+      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력의 50%">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
     this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
@@ -1659,7 +1678,7 @@ export class BattleView {
         </div>`
       : ''
     return `
-      <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}">
+      <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}" role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
         <div class="nameplate glass">
           <div class="row">
             <span class="nm">${e.def.name}</span>
@@ -1680,7 +1699,10 @@ export class BattleView {
         </span>
         ${summonedAllies}
         <div class="shadow"></div>
-        <div class="model-shell" data-model-status="${modelStatus}"><img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}"></div>
+        <div class="model-shell" data-model-status="${modelStatus}">
+          <img class="battle-sprite" src="${visual.portrait2d}" alt="${e.def.name}">
+          <span class="actor-detail-hitbox" aria-hidden="true"></span>
+        </div>
       </div>`
   }
 
@@ -1934,22 +1956,31 @@ export class BattleView {
   }
 
   private bindActor(actor: HTMLElement) {
+    // 적 배우는 사망·대기열 프리워밍을 위해 DOM 풀에서 재사용된다. 다시 꺼낼 때마다
+    // 리스너를 더하면 한 번의 호버가 여러 번 렌더되므로 배우당 한 번만 연결한다.
+    if (actor.dataset.detailBound === 'true') return
+    actor.dataset.detailBound = 'true'
     const show = () => {
       this.keepDock()
       const id = actor.dataset.character as CharacterVisualDef['id']
       this.renderCharacterDetail(id, actor.dataset.i == null ? null : Number(actor.dataset.i))
     }
     const leave = () => this.fadeDock(() => this.clearDetailDock())
-    // 체력바뿐 아니라 캐릭터 본체도 각각 명시적인 상세보기 호버 영역으로 사용한다.
-    // 포인터 히트박스는 실제 캐릭터가 그려지는 모델 셸로 통일한다.
-    actor.querySelectorAll<HTMLElement>('.model-shell').forEach((target) => {
+    // 프롬과 적 모두 투명 여백을 걷어 낸 실루엣형 콜라이더만 상세보기 영역으로 쓴다.
+    // 3D 캔버스와 2D 대체 스프라이트가 같은 콜라이더를 공유해 리소스 준비 상태에 따라
+    // 호버 범위가 바뀌지 않고, 보스전에서 프롬의 큰 전경 셸이 보스 입력을 가로채지 않는다.
+    const detailTargets = actor.querySelectorAll<HTMLElement>('.actor-detail-hitbox')
+    const targets = detailTargets.length > 0
+      ? detailTargets
+      : actor.querySelectorAll<HTMLElement>(':scope > .model-shell')
+    targets.forEach((target) => {
       target.addEventListener('mouseenter', show)
       target.addEventListener('mouseleave', leave)
     })
     actor.addEventListener('focus', show)
     actor.addEventListener('blur', leave)
     actor.addEventListener('click', (event) => {
-      if ((event.target as HTMLElement).closest('.model-shell')) show()
+      if ((event.target as HTMLElement).closest('.actor-detail-hitbox, .actor.you > .model-shell')) show()
     })
     actor.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -1981,6 +2012,8 @@ export class BattleView {
   private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
     const visual = CHARACTER_VISUALS[id]
     const host = this.q('#detail')
+    const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
+    const displayName = enemy?.def.name ?? visual.name
     let stats: string
     if (id === 'player') {
       const p = this.combatStats()
@@ -1994,7 +2027,6 @@ export class BattleView {
         ['운', String(p.luck)],
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
     } else {
-      const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
       const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
       const attackStage = enemy ? bossAttackStage(enemy) : 1
       const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
@@ -2029,11 +2061,11 @@ export class BattleView {
     }
     host.className = 'info-dock glass character-dock'
     host.innerHTML = `
-      <article aria-label="${visual.name} 상세 정보">
-        <div class="character-portrait"><img src="${visual.portrait2d}" alt="${visual.name} 2D 스프라이트"></div>
+      <article aria-label="${displayName} 상세 정보">
+        <div class="character-portrait"><img src="${visual.portrait2d}" alt="${displayName} 2D 스프라이트"></div>
         <div class="character-copy">
           <div class="character-kicker">CHARACTER DETAIL</div>
-          <h2>${visual.name}</h2>
+          <h2>${displayName}</h2>
           <h3>${visual.title}</h3>
           <p>${visual.description}</p>
           <div class="character-stats">${stats}</div>
@@ -2289,7 +2321,7 @@ export class BattleView {
           Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
             * intent.overhealDamageMultiplier,
         )
-        const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+        const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
         const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
         const damageValue = Math.round(
           (effectiveBase(intent) * normalMult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount,
@@ -2536,13 +2568,15 @@ export class BattleView {
     const intent = compile(sel, this.t, this.combatStats(sel), this.mods())
     const m = resolveMultiplier(intent, this.multCtx(intent, sel), 0.5).mult
     const castPower = intent.castCount * intent.castScale
-    const guard = Math.round(intent.guard * m * castPower)
-    const heal = Math.round(intent.heal * m * castPower)
+    const baseGuard = Math.round(intent.guard * m * castPower)
+    const baseHeal = Math.round(intent.heal * m * castPower)
     const missingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
-    const overhealDamage = Math.round(Math.max(0, heal - missingHp) * intent.overhealDamageMultiplier)
-    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guard)
+    const overhealDamage = Math.round(Math.max(0, baseHeal - missingHp) * intent.overhealDamageMultiplier)
+    const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + baseGuard)
     const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     const dmg = Math.round((effectiveBase(intent) * m * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
+    const guard = baseGuard
+    const heal = baseHeal
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
     return { dmg, heal, guard, self: intent.recoil, multiplier: m }
   }
@@ -3518,10 +3552,10 @@ export class BattleView {
       this.doubtRolls(intent),
     )
     const mult = resolved.mult
-    const healPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
-    const overhealDamage = Math.round(Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
+    const baseHealPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
+    const overhealDamage = Math.round(Math.max(0, baseHealPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
     const guardPreview = Math.round(intent.guard * mult * intent.castScale * intent.castCount)
-    const projectedGuard = Math.min(this.state.playerMax, this.state.guard + guardPreview)
+    const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
     const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     const dmg = Math.round((effectiveBase(intent) * mult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
 
@@ -3588,7 +3622,7 @@ export class BattleView {
     }
     if (prep.guardAttempted > prep.guardGain) {
       this.popPlayer(`실드 한도 ${playerGuardLimit(this.state.playerMax)}`, 'guard')
-      this.log(`방어막은 최대 체력만큼만 비축한다 — ${this.state.guard}/${playerGuardLimit(this.state.playerMax)}`)
+      this.log(`방어막은 최대 체력의 50%까지만 비축한다 — ${this.state.guard}/${playerGuardLimit(this.state.playerMax)}`)
     }
     if (prep.magicShieldGain > 0) {
       GameAudio.play('shield')
@@ -3599,9 +3633,9 @@ export class BattleView {
     }
     this.renderActors()
 
-    // 6) 선공 상대 행동 — 이번 문장의 준비 효과를 받은 뒤 공격한다.
-    //    문장부호 '!'가 붙었으면 이 페이즈를 건너뛴다. 선공 적은 이번 턴에 못 때리고,
-    //    쿨다운도 소모하지 않으므로 다음 턴에 그대로 돌아온다(미루기지 없애기가 아니다).
+    // 6) 선공 행동 — 일반전의 선공 문장은 이 자리에서 적보다 먼저 움직인다. 선공 적의
+    //    공격을 지우지는 않고, 플레이어 본행동 직후 같은 선공 묶음 안에서 이어 받는다.
+    //    보스전은 고유 패턴 규칙을 유지해 기존처럼 선공 페이즈를 빼앗는다.
     if (intent.preempt) {
       this.playerPreempting = true
       this.setPhase('선수 · 먼저 움직였다')
@@ -3676,6 +3710,9 @@ export class BattleView {
     )
     // 검기가 뒷줄로 날아갈 판이면 여기서 레일을 당기지 않는다. 미리 당기면 다음 적이
     // 이미 앞자리에 와 있어서, 검기가 출발점 위로 날아가는 꼴이 된다(실측으로 그랬다).
+    // 새 선두의 도착 턴 대기를 먼저 예약한 뒤 행동 순서를 그린다. 렌더가 앞서면
+    // 기본 nextAttackTurn(1)을 읽어 이번 후공에 공격할 것처럼 잠깐 잘못 표시된다.
+    if (res.killed.length > 0) engageFront(this.state)
     if (!(heavy && res.overflow > 0)) this.renderActors()
 
     // 초과 피해(오버플로우): 앞 적을 넘겼으면 활활 타오르다 다음 적이 당겨오면 꽂힌다.
@@ -3709,6 +3746,18 @@ export class BattleView {
       return
     }
 
+    // 일반전에서는 선공 문장 뒤에도 선공 적이 자기 차례를 잃지 않는다. 플레이어가 이미
+    // 행동했으므로 `선공 아군 → 선공 적`이 되고, 일반 아군 페이즈는 다시 실행하지 않는다.
+    if (intent.preempt && !this.isBoss) {
+      this.setPhase('선공 상대 행동')
+      await this.enemyPhase('first')
+      this.clearNormalTokenWarning()
+      if (this.state.playerHp <= 0) {
+        await this.lose()
+        return
+      }
+    }
+
     // 8) 후공 상대 행동 — 플레이어 본행동이 끝난 뒤 행동한다.
     this.setPhase('후공 상대 행동')
     await this.enemyPhase('second')
@@ -3735,8 +3784,8 @@ export class BattleView {
         this.log(result.text)
         await sleep(300)
         for (const k of result.killed) await this.playDeath(k, 1)
-        this.renderActors()
         if (result.killed.length > 0) engageFront(this.state)
+        this.renderActors()
       }
     }
 
@@ -3845,6 +3894,7 @@ export class BattleView {
       this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
     this.log(`${intent.sentence} → 메아리 · ${res.text.split('→ ').pop() ?? ''}`)
+    if (res.killed.length > 0) engageFront(this.state)
     this.renderActors()
 
     let kills = res.killed.length
@@ -4144,7 +4194,15 @@ export class BattleView {
     el.classList.add('dying')
     if (fast) el.classList.add('fast')
     this.spawnSparks(el, 8 + combo * 5)
-    await sleep(fast ? 190 : 560)
+    const gateMs = fast ? 190 : 560
+    const visualMs = fast ? 250 : 610
+    await sleep(gateMs)
+    if (!enemy?.def.boss) {
+      const release = window.setTimeout(() => {
+        if (el.isConnected && el.classList.contains('dying')) this.releaseFoe(el)
+      }, visualMs - gateMs)
+      this.timers.push(release)
+    }
   }
 
   /** 보스 사망 판정보다 먼저 상단 체력바가 실제 0에 도착하도록 동기화한다. */
@@ -4507,7 +4565,7 @@ export class BattleView {
       // 검기는 레일 **뒤로** 뻗는 한 줄기다. 그래서 당겨오기 전, 적이 아직 자기 자리에
       // 서 있는 동안 그 자리로 날아가 꽂힌다. 예전 흐름(당겨온 뒤에 꽂기)에서는 궤적이
       // 오히려 플레이어 쪽으로 되돌아와서 "뒤로 관통한다"가 거꾸로 읽혔다.
-      if (!heavy) this.renderActors() // 다음 적이 최전방으로 당겨온다
+      if (!heavy) this.renderActors(false) // 다음 적이 최전방으로 당겨온다
       const el = this.q<HTMLElement>(`#actors .actor.foe[data-i="${front}"]`)
       const ember = this.showEmber(overflow, combo)
       const power = this.encounterHp > 0 ? overflow / this.encounterHp : 0
@@ -4540,8 +4598,6 @@ export class BattleView {
       if (!heavy) this.shakeStage(Math.min(1, combo / 5))
       this.popAt(front, `${overflow}`, 'dmg big')
       this.timers.push(window.setTimeout(() => ember.remove(), 220))
-      // 맞은 다음에 레일이 움직인다 — 검기가 꽂힌 자리에서 쓰러지고, 그 뒤에 당겨온다.
-      if (heavy) this.renderActors()
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
       if (transfer.killed) {
         killedCount++
@@ -4553,12 +4609,17 @@ export class BattleView {
         } else {
           await this.playDeath(front, combo, sweep)
         }
+        // 죽는 배우는 CSS 사망 동작이 끝날 때까지 남겨 두고, 살아 있는 레일만 당긴다.
+        // 전체 HUD는 연쇄가 끝난 뒤 한 번만 갱신해 타격 중 동기 레이아웃을 피한다.
+        this.renderActors(false)
         overflow = transfer.overflow
       } else {
         overflow = 0
+        this.renderActors(false)
         await sleep(sweep ? 160 : heavy ? 90 : 320)
       }
     }
+    engageFront(this.state)
     this.renderActors()
     // 다 훑은 검기는 멈추지 않고 레일 뒤 화면 밖으로 주르륵 빠져나간다.
     if (heavy) this.launchSlashBeam(lastHit, null, 0.4)
@@ -5030,22 +5091,22 @@ export class BattleView {
           await this.breakMantisGuardCue()
           this.popPlayer('실드 파괴 · 강공격 취소!', 'guard big')
         }
-        if (st.counterHit) {
-          if (st.counterHit.magicShieldBroken) {
-            await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining)
-          }
-          else if (st.counterHit.dmg > 0) {
-            this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
-            if (foe) this.hitOne(foe)
-          }
-          if (this.state.enemies[st.counterHit.target]?.dead) await this.playDeath(st.counterHit.target)
-        }
       } else {
         const you = this.q<HTMLElement>('.actor.you')
         SquareBurst.playOn(you, 'damage', { spread: 100 })
         this.hitOne(you)
         this.popPlayer(`${st.dealt}`, 'dmg big')
         this.log(st.text)
+      }
+      if (st.counterHit) {
+        if (st.counterHit.magicShieldBroken) {
+          await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining)
+        }
+        else if (st.counterHit.dmg > 0) {
+          this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
+          if (foe) this.hitOne(foe)
+        }
+        if (this.state.enemies[st.counterHit.target]?.dead) await this.playDeath(st.counterHit.target)
       }
       if (st.lifeStolen > 0) {
         this.renderActors()

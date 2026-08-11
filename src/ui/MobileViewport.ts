@@ -83,10 +83,19 @@ export function installMobileViewport(stage: HTMLElement): void {
     gate.hidden = !(touch && layout.phonePortrait)
   }
 
-  window.addEventListener('resize', fit, { passive: true })
-  window.addEventListener('orientationchange', fit, { passive: true })
-  window.visualViewport?.addEventListener('resize', fit, { passive: true })
-  window.visualViewport?.addEventListener('scroll', fit, { passive: true })
-  coarse.addEventListener('change', fit)
+  let fitFrame = 0
+  const scheduleFit = () => {
+    if (fitFrame) return
+    fitFrame = requestAnimationFrame(() => {
+      fitFrame = 0
+      fit()
+    })
+  }
+
+  window.addEventListener('resize', scheduleFit, { passive: true })
+  window.addEventListener('orientationchange', scheduleFit, { passive: true })
+  window.visualViewport?.addEventListener('resize', scheduleFit, { passive: true })
+  window.visualViewport?.addEventListener('scroll', scheduleFit, { passive: true })
+  coarse.addEventListener('change', scheduleFit)
   fit()
 }

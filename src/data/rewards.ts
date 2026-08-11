@@ -35,6 +35,14 @@ export const REWARD_PRICE: Readonly<Record<Rarity, number>> = {
 }
 export const REWARD_REFRESH_COST = 1
 
+/**
+ * 같은 진열을 계속 바꿀수록 더 많은 영감을 한 번에 흘려보낸다.
+ * 전투 수치를 직접 사는 대신 선택 폭을 넓히는 무제한 소모처라 상한을 두지 않는다.
+ */
+export function rewardRefreshCost(refreshes: number): number {
+  return REWARD_REFRESH_COST + Math.max(0, Math.floor(refreshes))
+}
+
 export function rewardPrice(option: RewardOption): number {
   return REWARD_PRICE[option.rarity]
 }
@@ -74,9 +82,9 @@ export const GUARANTEED_LEGENDARY_ITEM_FLOOR = 10
 export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
 export const EARLY_BUILD_REWARD_DAY = 2
 /** 2층에서 수식어로 먼저 고르는 방어·회복·순환 전술의 방향. */
-export const EARLY_BUILD_MODIFIER_IDS = ['deulsseogimyeo', 'pogeunhage', 'gyeongkwaehage'] as const
-/** 같은 보상의 동사 단계에서 각 전술을 실제 승리 엔진으로 완성한다. */
-export const EARLY_BUILD_CARD_IDS = ['storedResolve', 'overflowingHeart', 'drinkInk'] as const
+export const EARLY_BUILD_MODIFIER_IDS = ['dandanhi', 'pogeunhage', 'gyeongkwaehage'] as const
+/** 같은 층 동사 보상은 방어·회복·운 스탯을 공격으로 쓰는 출구를 하나씩 보여 준다. */
+export const EARLY_STAT_VERB_IDS = ['pierceStrike', 'drinkInk', 'spreadTwo'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -230,14 +238,20 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     if (picks.length === 3) return shuffle(picks, rng)
   }
 
-  // 첫 보스 전에 방어 전환·초과 회복·흡혈 중 하나를 직접 고르게 한다. 핵심 빌드가
-  // 무작위 보상에 묻히면 스탯만 올리고 그 스탯을 쓸 문장을 끝내 못 얻을 수 있다.
   if (phase === 'verb' && day === EARLY_BUILD_REWARD_DAY) {
-    for (const id of EARLY_BUILD_CARD_IDS) {
+    for (const id of EARLY_STAT_VERB_IDS) {
       const option = pickOne(all.filter((entry) => entry.word?.id === id), grade, day, used, rng)
       if (option) picks.push(option)
     }
     if (picks.length === 3) return shuffle(picks, rng)
+  }
+
+  // 다음 적의 규칙을 푸는 기능은 동사가 아니라 수식어 보상에서 보장한다.
+  // 이미 가진 수식어도 반복강화 후보가 되므로 공략 선택이 헛돌지 않는다.
+  if (phase === 'subject') {
+    const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
+    const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
+    if (option) picks.push(option)
   }
 
   // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
@@ -246,7 +260,8 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     const option = pickOne(all, grade, day, used, rng, bossRarity)
     if (option) picks.push(option)
   }
-  if (picks.length < 3 && !picks.some((entry) => entry.word?.emotion === emotionProfile.support)) {
+  const subjectSlotStillNeeded = phase === 'subject' && !picks.some((entry) => entry.word?.slot === 'subj')
+  if (picks.length < 3 && !subjectSlotStillNeeded && !picks.some((entry) => entry.word?.emotion === emotionProfile.support)) {
     const option = pickOne(all.filter((entry) => entry.word?.emotion === emotionProfile.support), grade, day, used, rng)
     if (option) picks.push(option)
   }
@@ -261,13 +276,6 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
       const option = pickOne(alignedPool.length ? alignedPool : slotPool, grade, day, used, rng)
       if (option) picks.push(option)
     }
-  }
-  // A boss-eve verb reward always includes one card that interacts with the next boss's rule.
-  // Already-owned cards remain useful here because the reward becomes a reinforcement.
-  if (phase === 'verb') {
-    const tacticalIds = new Set(tacticalCardIdsForRewardDay(day))
-    const option = pickOne(all.filter((entry) => entry.word && tacticalIds.has(entry.word.id)), grade, day, used, rng)
-    if (option) picks.push(option)
   }
   // 동사 보상은 공격 카드만 셋 겹쳐 나오지 않게 한다. 이미 보장 카드가 들어왔다면
   // 남은 칸부터 비어 있는 행동 축을 채워 공격·방어·회복 빌드를 화면에서 함께 읽힌다.

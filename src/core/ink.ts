@@ -1,17 +1,10 @@
-import type { Rarity, Selection, Word } from './types'
+import type { Selection, Word } from './types'
 
 export const SENTENCE_BASE_INK = 6
 export const SENTENCE_CARRY_LIMIT = 2
 export const SENTENCE_OVERDRAW_LIMIT = 2
 export const SENTENCE_MAX_INK = SENTENCE_BASE_INK + SENTENCE_CARRY_LIMIT + SENTENCE_OVERDRAW_LIMIT
 export const SENTENCE_INK = SENTENCE_BASE_INK + SENTENCE_CARRY_LIMIT
-
-const RARITY_STEP: Record<Rarity, number> = {
-  common: 0,
-  rare: 1,
-  epic: 2,
-  legendary: 3,
-}
 
 export function expectedMultiplier(word: Word): number {
   const variance = word.variance
@@ -20,11 +13,13 @@ export function expectedMultiplier(word: Word): number {
   return (1 + Math.max(0, word.bonus ?? 0)) * variance * (1 + 0.5 * Math.max(0, word.crit ?? 0))
 }
 
-export function wordInkCost(word: Word): number {
-  if (word.inkCost != null) return Math.max(0, Math.floor(word.inkCost))
+/**
+ * 카드 기능을 잉크로 환산하는 단일 정본.
+ * 동사는 본행동 계수에 부가 동작의 세기만큼 더한다. 같은 키워드라도 계수가 높으면
+ * 더 비싸며, 명시 비용은 `check-tables`에서 이 값과 정확히 일치해야 한다.
+ */
+export function recommendedWordInkCost(word: Word): number {
   if (word.growHp) return 3
-
-  const rarity = RARITY_STEP[word.rarity ?? 'common']
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
     const expected = expectedMultiplier(word)
@@ -33,45 +28,51 @@ export function wordInkCost(word: Word): number {
   }
 
   if (word.slot === 'verb' || word.slot === 'verb2') {
-    // Rarity already carries the tier's base coefficient budget; charging two base Ink
-    // would count that strength twice once coefficient and tactical effects are added.
-    let cost = 1 + rarity
-    cost += Math.max(0, Math.ceil(((word.statMult ?? 1) - 1) / 0.5))
-    if (word.aoe === 'all') cost += 1
-    else if (word.targetCount === 'all') cost += 1
-    else if ((word.targetCount ?? 1) > 1) cost += 1
-    if ((word.effects?.hitCount ?? 1) > 1) cost += 1
+    const effects = word.effects
+    let cost = Math.max(1, Math.ceil(Math.max(0, word.statMult ?? 1) * 2 - 1e-6))
+    if (word.aoe === 'all' || word.targetCount === 'all') cost += 2
+    else if ((word.targetCount ?? 1) > 1) cost += Math.max(1, (word.targetCount as number) - 1)
+    cost += Math.ceil(Math.max(0, (effects?.hitCount ?? 1) - 1) * .5)
     if (word.effects?.pierceGuard) cost += 1
-    if ((word.effects?.counterMultiplier ?? 0) > 0) cost += 1
-    if ((word.effects?.magicShield ?? 0) > 0) cost += 3
-    cost += Math.ceil(Math.max(0, word.effects?.guardAttackMultiplier ?? 0) * 2)
-    cost += Math.ceil(Math.max(0, word.effects?.overhealDamageMultiplier ?? 0))
-    cost += Math.ceil(Math.max(0, word.effects?.lifeStealRate ?? 0) * 2)
-    cost += Math.abs(word.effects?.attackRank ?? 0)
-    cost += Math.abs(word.effects?.guardRank ?? 0)
-    cost += Math.abs(word.effects?.enemyAttackRank ?? 0)
-    cost += Math.max(0, word.effects?.carryInk ?? 0)
-    cost += Math.max(0, word.effects?.bonusDraws ?? 0)
-    return Math.max(1, Math.min(5, cost))
+    if (effects?.counter) cost += 1
+    cost += Math.max(0, effects?.magicShield ?? 0) * 2
+    cost += Math.ceil(Math.max(0, effects?.guardAttackMultiplier ?? 0))
+    cost += Math.ceil(Math.max(0, effects?.overhealDamageMultiplier ?? 0))
+    cost += Math.ceil(Math.max(0, effects?.lifeStealRate ?? 0) / .5)
+    return Math.max(1, Math.min(6, cost))
   }
 
-  let power = rarity
-  power += Math.max(0, word.bonus ?? 0) * 2
-  power += Math.max(0, word.crit ?? 0) * 2
+  let power = 0
+  power += Math.ceil(Math.max(0, word.bonus ?? 0) / .2 - 1e-6)
+  power += Math.ceil(Math.max(0, word.crit ?? 0) / .25 - 1e-6)
   if (word.variance) {
     const expectedBonus = word.variance.p * (word.variance.hi - 1)
       + (1 - word.variance.p) * (word.variance.lo - 1)
     power += Math.max(0, expectedBonus)
   }
-  if (word.aoe === 'all') power += 1.5
-  else if (word.targetCount === 'all') power += 1.5
-  else if ((word.targetCount ?? 1) > 1) power += ((word.targetCount as number) - 1) * 0.65
-  power += Math.max(0, (word.effects?.hitCount ?? 1) - 1) * 0.45
-  power += Math.max(0, (word.effects?.castCount ?? 1) * (word.effects?.castScale ?? 1) - 1)
-  if (word.effects?.pierceGuard) power += 0.6
-  if ((word.effects?.counterMultiplier ?? 0) > 0) power += 0.6
+  const effects = word.effects
+  if (word.tags.includes('preempt')) power += 1
+  if (word.aoe === 'all' || word.targetCount === 'all') power += 2
+  else if ((word.targetCount ?? 1) > 1) power += Math.max(1, (word.targetCount as number) - 1)
+  if (effects?.pierceGuard) power += 1
+  if (effects?.counter) power += 1
+  power += Math.ceil(Math.max(0, (effects?.hitCount ?? 1) - 1) * .5)
+  power += Math.max(0, (effects?.castCount ?? 1) - 1) * 2
+  power += Math.max(0, effects?.overdrawHitCount ?? 0)
+  power += Math.max(0, effects?.magicShield ?? 0) * 4
+  power += Math.abs(effects?.attackRank ?? 0)
+  power += Math.abs(effects?.guardRank ?? 0)
+  power += Math.abs(effects?.enemyAttackRank ?? 0)
+  power += Math.max(0, effects?.bonusDraws ?? 0)
+  power += Math.max(0, effects?.carryInk ?? 0)
+  power -= Math.max(0, effects?.inkDiscount ?? 0)
 
   return Math.max(0, Math.min(4, Math.floor(power + 1e-6)))
+}
+
+export function wordInkCost(word: Word): number {
+  if (word.inkCost != null) return Math.max(0, Math.floor(word.inkCost))
+  return recommendedWordInkCost(word)
 }
 
 export function selectionInkCost(selection: Selection): number {

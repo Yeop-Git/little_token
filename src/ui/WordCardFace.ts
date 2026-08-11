@@ -12,6 +12,7 @@ import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
+import { wordKeywords } from '@core/wordKeywords'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -91,8 +92,22 @@ export function wordActionInline(word: Word): string {
 
 function wordCardNoteHtml(word: Word, note: string): string {
   const action = wordActionInline(word)
-  const displayNote = wordCardDisplayNote(word, note)
-  return `<span class="card-note${action ? ' has-action' : ''}">${action}<span class="card-note-text">${displayNote}</span></span>`
+  const keywords = wordKeywords(word)
+  const displayNote = keywords.length
+    ? word.statMult != null
+      ? `×${word.statMult}`
+      : word.variance
+        ? wordCardDisplayNote(word, note).split(' · ')[0]
+        : word.bonus
+          ? `×${(1 + word.bonus).toFixed(2)}`
+          : ''
+    : wordCardDisplayNote(word, note)
+  const escape = (value: string) => value
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const keywordHtml = keywords.length
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" tabindex="0" role="definition" aria-label="${escape(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escape(`${keyword.label} — ${keyword.detail}`)}">${keyword.label}</span>`).join('')}</span>`
+    : ''
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
 }
 
 export interface WordCardFaceOpts {

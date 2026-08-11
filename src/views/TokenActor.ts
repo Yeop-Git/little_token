@@ -214,6 +214,11 @@ export class TokenActor {
   private actorsEl: HTMLElement | null = null
 
   private playerEl: HTMLElement | null = null
+  private readonly playerAnchorCache: Vec = { x: 420, y: 380 }
+  private playerAnchorDirty = true
+  private anchorRefreshFrame = 0
+  private readonly anchorResizeObserver = new ResizeObserver(() => this.invalidatePlayerAnchor())
+  private readonly onViewportChange = () => this.invalidatePlayerAnchor()
   private frame = 0
   private lastFrameAt = 0
   private speechHideTimer = 0
@@ -255,6 +260,10 @@ export class TokenActor {
     // 만질 수 있는 건 몸통뿐이다(CSS에서 .token-body에만 pointer-events를 연다).
     // 상자 전체를 열면 320px짜리 투명 사각형이 손패 클릭을 가로챈다.
     this.body.addEventListener('pointerdown', this.onPointerDown)
+    this.anchorResizeObserver.observe(this.host)
+    window.addEventListener('resize', this.onViewportChange, { passive: true })
+    window.visualViewport?.addEventListener('resize', this.onViewportChange, { passive: true })
+    window.visualViewport?.addEventListener('scroll', this.onViewportChange, { passive: true })
     mountCharacterModel(this.body, visual)
     this.applyMood()
     this.enter('orbit')
@@ -275,7 +284,11 @@ export class TokenActor {
 
   /** 맴돌 대상. 프롬이 다시 그려지면 새 요소로 갈아 끼운다. */
   attachTo(playerEl: HTMLElement | null) {
+    if (this.playerEl === playerEl) return
+    if (this.playerEl) this.anchorResizeObserver.unobserve(this.playerEl)
     this.playerEl = playerEl
+    if (playerEl) this.anchorResizeObserver.observe(playerEl)
+    this.invalidatePlayerAnchor()
   }
 
   /**
@@ -403,10 +416,13 @@ export class TokenActor {
       `<span class="token-speech-text">${line.text}</span>`
     this.bubble.dataset.tone = line.tone
     this.el.dataset.tone = line.tone
-    this.bubble.classList.remove('is-speaking')
-    // 연속 대사도 말풍선의 손글씨 팝업을 첫 프레임부터 다시 재생한다.
-    void this.bubble.offsetWidth
     this.bubble.classList.add('is-speaking')
+    // 연속 대사도 같은 CSS 연출을 첫 프레임부터 다시 재생하되, 레이아웃 강제 확정은 하지 않는다.
+    // CSSAnimation 자체를 되감으면 모양·시간은 그대로이고 전투 DOM 전체 reflow만 사라진다.
+    this.bubble.getAnimations().forEach((animation) => {
+      animation.cancel()
+      animation.play()
+    })
 
     this.holdingSpeech = hold
     // 용건이 생기면 변덕을 접고 프롬에게 온다. 경고는 바짝 붙고(alert), 팁은 앞에 선다(attend).
@@ -443,7 +459,13 @@ export class TokenActor {
     this.disposed = true
     this.releaseGrab()
     this.body.removeEventListener('pointerdown', this.onPointerDown)
+    this.anchorResizeObserver.disconnect()
+    window.removeEventListener('resize', this.onViewportChange)
+    window.visualViewport?.removeEventListener('resize', this.onViewportChange)
+    window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
     window.clearTimeout(this.speechHideTimer)
+    if (this.anchorRefreshFrame) cancelAnimationFrame(this.anchorRefreshFrame)
+    this.anchorRefreshFrame = 0
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = 0
     destroyCharacterModels(this.el)
@@ -850,17 +872,38 @@ export class TokenActor {
 
   /** 무대 좌표로 환산한 프롬의 머리 언저리. 프롬이 없으면 무대 왼쪽 위를 기본으로 쓴다. */
   private playerAnchor(): Vec {
+    this.scheduleAnchorRefresh()
+    return this.playerAnchorCache
+  }
+
+  private scheduleAnchorRefresh() {
+    if (this.disposed || !this.playerAnchorDirty || this.anchorRefreshFrame) return
+    this.anchorRefreshFrame = requestAnimationFrame(() => {
+      this.anchorRefreshFrame = 0
+      this.refreshPlayerAnchor()
+    })
+  }
+
+  private invalidatePlayerAnchor() {
+    this.playerAnchorDirty = true
+    this.scheduleAnchorRefresh()
+  }
+
+  private refreshPlayerAnchor() {
+    this.playerAnchorDirty = false
     const player = this.playerEl
-    if (!player || !player.isConnected) return { x: 420, y: 380 }
+    if (!player || !player.isConnected) {
+      this.playerAnchorCache.x = 420
+      this.playerAnchorCache.y = 380
+      return
+    }
     const hostRect = this.host.getBoundingClientRect()
     const rect = player.getBoundingClientRect()
     // 무대는 통째로 scale()되므로 화면 px을 무대 px으로 되돌린다. --scale을 읽는 대신
     // 호스트 자신의 비율을 쓰면 스케일러 구현이 바뀌어도 따라온다.
     const scale = hostRect.width / (this.host.offsetWidth || 1) || 1
-    return {
-      x: (rect.left + rect.width / 2 - hostRect.left) / scale - 96,
-      y: (rect.top - hostRect.top) / scale + 96,
-    }
+    this.playerAnchorCache.x = (rect.left + rect.width / 2 - hostRect.left) / scale - 96
+    this.playerAnchorCache.y = (rect.top - hostRect.top) / scale + 96
   }
 
   private pickInspectPoint(): Vec {

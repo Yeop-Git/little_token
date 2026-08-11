@@ -16,7 +16,7 @@ import { conflictReason } from '@core/validator'
 import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { clearRewardValue, decayGrade, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
-import { rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
+import { playerGuardLimit, rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
 import type { Intent, Rarity, Selection, Word } from '@core/types'
 import type { PlayerState, PlayerStats } from '@core/player'
 import { applyItemReward, registerWord, startingPlayer } from '@core/run'
@@ -28,18 +28,20 @@ import {
   selectionInkCost,
   sentenceInkAvailable,
 } from '@core/ink'
-import { makeEarlyTables, SPECIAL_REWARD_WORDS, tablesForEncounter } from '@data/earlyWords'
+import { makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { enemyDefForEncounter } from '@data/enemies'
 import { STORY_FLOORS, stageFor } from '@data/stages'
 import {
   EARLY_BUILD_REWARD_DAY,
   EARLY_BUILD_MODIFIER_IDS,
-  REWARD_PRICE,
+  EARLY_STAT_VERB_IDS,
   genRewards,
+  REWARD_PRICE,
+  rewardRefreshCost,
   rewardPrice,
   type RewardOption,
 } from '@data/rewards'
-import { isBossTacticalRewardDay, tacticalCardIdsForRewardDay } from '@data/tacticalCards'
+import { tacticalCardIdsForRewardDay } from '@data/tacticalCards'
 import { EXCLAIM_SLOTS, ITEM_BLESS_CHANCE_PER_GRADE, ITEM_BLESS_POOL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers, type StatKey } from '@data/items'
 import { SUPPORTED_LOCALES, type LocaleCode } from '@/localization'
 import {
@@ -172,7 +174,7 @@ function deckScore(player: PlayerState, focus: BuildFocus, locale: LocaleCode): 
       const dmg = directDamage + resourceDamage
       const guard = intent.guard * m * intent.castCount * intent.castScale
       const heal = intent.heal * m * intent.castCount * intent.castScale
-      const counter = intent.counterMultiplier * guard
+      const counter = intent.counter ? 2 : 0
       if (dmg > 0) dmgs.push(dmg + directDamage * intent.lifeStealRate * .5)
       if (guard > 0 || intent.magicShield > 0) guards.push(guard + intent.magicShield * player.stats.hp * .25)
       if (heal > 0) heals.push(heal)
@@ -301,24 +303,19 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
         : focus === 'combo' || focus === 'attack' ? EARLY_BUILD_MODIFIER_IDS[2]
           : null
     : null
-  const plannedEngineId = day === EARLY_BUILD_REWARD_DAY
-    ? focus === 'guard' ? 'storedResolve' : focus === 'heal' ? 'overflowingHeart' : focus === 'attack' ? 'drinkInk' : null
+  const plannedVerbId = day === EARLY_BUILD_REWARD_DAY
+    ? focus === 'guard' ? EARLY_STAT_VERB_IDS[0]
+      : focus === 'heal' ? EARLY_STAT_VERB_IDS[1]
+        : EARLY_STAT_VERB_IDS[2]
     : null
-  const plannedEngine = plannedEngineId
-    ? SPECIAL_REWARD_WORDS.find((word) => word.id === plannedEngineId)
-    : null
-  const tacticalReserve = isBossTacticalRewardDay(day) ? Math.max(0, ...tacticalCardIdsForRewardDay(day)
-    .map((id) => SPECIAL_REWARD_WORDS.find((word) => word.id === id))
-    .filter((word): word is Word => !!word)
-    .map((word) => REWARD_PRICE[word.rarity ?? 'common'])) : 0
-  const engineReserve = Math.max(plannedEngine ? REWARD_PRICE[plannedEngine.rarity ?? 'common'] : 0, tacticalReserve)
-  for (const phase of ['subject', 'item', 'verb'] as const) {
-    const spendable = phase === 'verb' ? wallet.inspiration : Math.max(0, wallet.inspiration - engineReserve)
+  const plannedVerb = plannedVerbId ? REWARD_PRICE.rare : 0
+  for (const phase of ['subject', 'verb', 'item'] as const) {
+    const spendable = phase === 'verb' ? wallet.inspiration : Math.max(0, wallet.inspiration - plannedVerb)
     const options = genRewards(player, grade, day, phase, rng).filter((option) => rewardPrice(option) <= spendable)
     if (!options.length) continue
     let chosen = options[Math.floor(rng() * options.length)]
     if (skill !== 'random') {
-      const tacticalIds = isBossTacticalRewardDay(day) && phase === 'verb'
+      const tacticalIds = phase === 'subject'
         ? new Set(tacticalCardIdsForRewardDay(day))
         : new Set<string>()
       const tacticalOptions = options.filter((option) => option.word && tacticalIds.has(option.word.id))
@@ -343,17 +340,49 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
           return deckScore(trialB, focus, locale) - deckScore(trialA, focus, locale)
         })[0]
       }
-      const plannedOption = phase === 'verb'
-        ? options.find((option) => option.word?.id === plannedEngineId)
-        : phase === 'subject'
-          ? options.find((option) => option.word?.id === plannedModifierId)
+      const plannedOption = phase === 'subject'
+        ? options.find((option) => option.word?.id === plannedModifierId)
+        : phase === 'verb'
+          ? options.find((option) => option.word?.id === plannedVerbId)
           : null
       if (plannedOption) chosen = plannedOption
-      // ok는 최선을 늘 알아보지는 못한다 — 10%는 아무거나 고른다.
-      if (skill === 'ok' && rng() < 0.1) chosen = options[Math.floor(rng() * options.length)]
+      // ok는 최선을 늘 알아보지는 못하지만, 바로 다음 적의 공개 공략 수식어까지
+      // 무작위로 버리지는 않는다. 그 선택은 실수가 아니라 규칙을 읽지 않은 플레이가 된다.
+      if (skill === 'ok' && !tacticalOptions.length && rng() < 0.1) chosen = options[Math.floor(rng() * options.length)]
     }
     wallet.inspiration -= rewardPrice(chosen)
     applyOption(player, chosen, grade, skill, focus, rng)
+  }
+}
+
+/** 보스 뒤 3×3 상점 — 아끼는 기량일수록 남긴 영감을 추가 성장으로 적극 환전한다. */
+function takeBossShop(player: PlayerState, grade: number, unusedDraws: number, day: number, skill: RewardSkill, focus: BuildFocus, rng: () => number, wallet: { inspiration: number }): void {
+  wallet.inspiration += clearRewardValue(grade, unusedDraws)
+  let refreshes = 0
+  let bought = 0
+  while (refreshes < 8 && wallet.inspiration > 0) {
+    const stock = (['subject', 'verb', 'item'] as const).flatMap((phase) =>
+      genRewards(player, grade, day, phase, rng).filter((option) => rewardPrice(option) <= wallet.inspiration),
+    )
+    if (!stock.length) break
+    while (stock.length && wallet.inspiration > 0) {
+      const affordable = stock.filter((option) => rewardPrice(option) <= wallet.inspiration)
+      if (!affordable.length) break
+      if (skill === 'random' && bought > 0 && rng() < 0.28) return
+      if (skill === 'ok' && wallet.inspiration <= 2) return
+      let chosen = affordable[Math.floor(rng() * affordable.length)]
+      if (skill !== 'random') {
+        chosen = [...affordable].sort((a, b) => rewardPrice(b) - rewardPrice(a))[0]
+      }
+      wallet.inspiration -= rewardPrice(chosen)
+      applyOption(player, chosen, grade, skill, focus, rng)
+      stock.splice(stock.indexOf(chosen), 1)
+      bought++
+    }
+    const refreshCost = rewardRefreshCost(refreshes)
+    if (wallet.inspiration < refreshCost) break
+    wallet.inspiration -= refreshCost
+    refreshes++
   }
 }
 
@@ -469,7 +498,7 @@ function railValue(c: Candidate, state: BattleState): number {
 
 function candidateDamage(c: Candidate, state: BattleState): number {
   const missingHp = Math.max(0, state.playerMax - state.playerHp)
-  const projectedGuard = Math.min(state.playerMax, state.guard + c.guard)
+  const projectedGuard = Math.min(playerGuardLimit(state.playerMax), state.guard + c.guard)
   return c.dmg
     + Math.round(projectedGuard * c.intent.guardAttackMultiplier)
     + Math.round(Math.max(0, c.heal - missingHp) * c.intent.overhealDamageMultiplier)
@@ -482,7 +511,7 @@ function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): nu
     + ((state.playerAttackRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.attackRank) * 7 : 0)
     + ((state.playerGuardRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.guardRank) * 7 : 0)
     + c.intent.bonusDraws * 2
-    + c.intent.counterMultiplier * 2
+    + (c.intent.counter ? 2 : 0)
     + c.intent.magicShield * state.playerMax * .3
     + attack * c.intent.lifeStealRate * .5
     + selectionCarryInk(c.sel) * 1.5
@@ -532,8 +561,9 @@ function fightStage(
   const state: BattleState = {
     playerHp: Math.max(0, Math.min(maxHp, carried.hp)),
     playerMax: maxHp,
-    guard: Math.max(0, Math.min(maxHp, carried.guard)),
-    counterMultiplier: 0,
+    guard: Math.max(0, Math.min(playerGuardLimit(maxHp), carried.guard)),
+    counter: false,
+    counterFull: false,
     turn: 1,
     enemies,
     pending: null,
@@ -552,6 +582,7 @@ function fightStage(
   while (turn < MAX_TURNS_PER_STAGE && state.playerHp > 0 && !allDead(state)) {
     turn++
     state.turn = turn
+    if (allDead(state)) break
     if (turn > 1) summonAtTurnStart(state)
     const boss = state.enemies[Math.max(0, frontIdx(state))]
     const web = spiderWebAtTurnStart(state)
@@ -568,25 +599,25 @@ function fightStage(
       }
     }
 
-    const verbIndex = tables.template.slots.findIndex((slot) => slot.key.startsWith('verb'))
-    const engineId = focus === 'guard' ? 'storedResolve' : focus === 'heal' ? 'overflowingHeart' : null
+    const modifierIndex = tables.template.slots.findIndex((slot) => slot.key === 'adv')
+    const engineId = focus === 'guard' ? 'deulsseogimyeo' : focus === 'heal' ? 'pogeunhage' : null
     const engineReady = focus === 'guard'
       ? state.guard >= state.playerMax * 0.25
       : focus === 'heal' && state.playerHp >= state.playerMax * 0.8
-    const engineOwned = engineId && verbIndex >= 0
-      && [...hands[verbIndex], ...piles[verbIndex]].some((word) => word.id === engineId)
+    const engineOwned = engineId && modifierIndex >= 0
+      && [...hands[modifierIndex], ...piles[modifierIndex]].some((word) => word.id === engineId)
     while (
       skill !== 'greedy'
       && stage.isBoss
       && engineReady
       && engineOwned
-      && verbIndex >= 0
+      && modifierIndex >= 0
       && drawsLeft > 0
-      && hands[verbIndex].length < 6
-      && piles[verbIndex].length > 0
-      && !hands[verbIndex].some((word) => word.id === engineId && !sealed.has(word.id))
+      && hands[modifierIndex].length < 6
+      && piles[modifierIndex].length > 0
+      && !hands[modifierIndex].some((word) => word.id === engineId && !sealed.has(word.id))
     ) {
-      hands[verbIndex].push(piles[verbIndex].shift()!)
+      hands[modifierIndex].push(piles[modifierIndex].shift()!)
       drawsLeft--
     }
 
@@ -624,7 +655,7 @@ function fightStage(
       const focused = [...hand].sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
       if (focus === 'attack') pick = bestAttack ?? focused
       else if (focus === 'guard' && state.turn <= boss.groggyUntilTurn) pick = bestAttack ?? focused
-      else if (focus === 'guard' && !guardIgnored && state.guard < state.playerMax * 0.65 && bestGuard) pick = bestGuard
+      else if (focus === 'guard' && !guardIgnored && state.guard < playerGuardLimit(state.playerMax) * 0.65 && bestGuard) pick = bestGuard
       else if (focus === 'guard' && bestGuardEngine) pick = bestGuardEngine
       else if (focus === 'guard') {
         const guardOffense = hand
@@ -819,6 +850,8 @@ interface RunResult {
   finalStats: PlayerStats
   log: string[]
   actions: ActionStats
+  /** 사망 또는 15층 종료 시점의 영감 잔액 — 보상 경제가 쌓이기만 하는지 확인한다. */
+  finalInspiration: number
 }
 
 function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: BuildFocus, verbose: boolean, locale: LocaleCode = 'ko'): RunResult {
@@ -841,13 +874,14 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
         log.push(`  ${String(day).padStart(2)}층 ${result.won ? '승' : '패'} · ${result.turns}턴 · HP ${hpBefore}→${result.hp}/${result.maxHp}`)
       }
       if (!result.won) {
-        return { reachedFloor: day - 1, diedOn: day, killedBy: result.killedBy, hpTrace, finalStats: { ...player.stats }, log, actions }
+        return { reachedFloor: day - 1, diedOn: day, killedBy: result.killedBy, hpTrace, finalStats: { ...player.stats }, log, actions, finalInspiration: wallet.inspiration }
       }
       carried.hp = result.hp
       carried.guard = result.guard
-      takeRewards(player, result.grade, result.unusedDraws, day, reward, focus, locale, rng, wallet)
+      if (stageFor(day).isBoss) takeBossShop(player, result.grade, result.unusedDraws, day, reward, focus, rng, wallet)
+      else takeRewards(player, result.grade, result.unusedDraws, day, reward, focus, locale, rng, wallet)
     }
-    return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions }
+    return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions, finalInspiration: wallet.inspiration }
   } finally {
     Math.random = realRandom
   }
@@ -857,6 +891,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
 
 const verbose = process.argv.includes('--verbose')
 const check = process.argv.includes('--check')
+const economyOnly = process.argv.includes('--economy-only')
 const traceBuildArg = process.argv.find((argument) => argument.startsWith('--trace-build='))
 const traceBuild = traceBuildArg?.split('=')[1] as BuildFocus | undefined
 const runsArg = process.argv.find((a) => a.startsWith('--runs='))
@@ -895,6 +930,10 @@ for (const profile of SKILL_PROFILES) {
   const reach5 = runs.filter((r) => r.reachedFloor >= 5).length
   const clear5 = runs.filter((r) => r.diedOn === null || r.diedOn > 5).length
   const avgFloor = runs.reduce((s, r) => s + r.reachedFloor, 0) / runs.length
+  const clearedWallets = runs.filter((r) => r.diedOn === null).map((r) => r.finalInspiration)
+  const avgFinalInspiration = clearedWallets.length
+    ? clearedWallets.reduce((sum, value) => sum + value, 0) / clearedWallets.length
+    : 0
 
   console.log(`■ ${profile.label}`)
   console.log(
@@ -902,7 +941,8 @@ for (const profile of SKILL_PROFILES) {
     + ` · 10층 도달 ${pct(reach10, RUNS)}`
     + ` · 5층 도달 ${pct(reach5, RUNS)}`
     + ` · 5층 클리어 ${pct(clear5, RUNS)}`
-    + ` · 평균 도달 ${avgFloor.toFixed(1)}층`,
+    + ` · 평균 도달 ${avgFloor.toFixed(1)}층`
+    + ` · 클리어 잔여 영감 ${avgFinalInspiration.toFixed(1)}`,
   )
 
   // 층별 사망 분포와 "그 층에 도전한 런 중 몇 %가 여기서 죽었나"(조건부 사망률)
@@ -951,6 +991,8 @@ for (const profile of SKILL_PROFILES) {
   })
   if (verbose) sample.log.forEach((l) => console.log(l))
 }
+
+if (economyOnly) process.exit(0)
 
 interface BuildMetrics {
   focus: Exclude<BuildFocus, 'balanced'>

@@ -38,7 +38,7 @@ import {
   type Selection,
   type Word,
 } from '@core/types'
-import { ALL_REWARD_WORDS, EARLY_WORDS, makeEarlyTables, SPECIAL_REWARD_WORDS } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, EARLY_WORDS, makeEarlyTables } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { EXCLAIM_RARITY_BONUS, EXCLAIM_SLOTS } from '@data/items'
 import { BOSS_BY_FLOOR, bossHealthBarsForFloor, MAX_ENCOUNTER, STORY_FLOORS } from '@data/stages'
@@ -75,8 +75,8 @@ function slotWord(slot: string, id?: string): Word | null {
   return (id ? pool.find((w) => w.id === id) : null) ?? pool[0] ?? null
 }
 
-function specialWord(id: string): Word | null {
-  return SPECIAL_REWARD_WORDS.find((w) => w.id === id) ?? null
+function rewardWord(id: string): Word | null {
+  return ALL_REWARD_WORDS.find((w) => w.id === id) ?? null
 }
 
 /** 태그 하나를 실제로 들고 있는 카드 이름 — 관용구 조건을 카드 말로 옮긴다. */
@@ -199,9 +199,10 @@ export class CombatGuideView {
     const phases: [string, string, string][] = [
       ['1', '단어 고르기', `${slots.map((s) => s.label).join(' → ')} 순서로 카드를 한 장씩 확정한다`],
       ['2', '준비 효과', '방어처럼 맞기 전에 의미가 있는 효과를 먼저 세운다'],
-      ['3', '선공 상대 행동', '선공 표식이 달린 적이 내 문장보다 먼저 때린다'],
-      ['4', '본인 캐릭터 행동', '완성한 문장이 공격·회복으로 실제로 꽂힌다'],
-      ['5', '후공 상대 행동', '남은 적이 마지막으로 움직이고 다음 턴이 열린다'],
+      ['3', '선공 아군 행동', '선공 문장이면 이 자리에서 한 번 행동한다'],
+      ['4', '선공 상대 행동', '선공 표식이 달린 적이 이어서 공격한다'],
+      ['5', '본인 일반 행동', '선공이 아닌 문장이면 이 자리에서 한 번 행동한다'],
+      ['6', '후공 상대 행동', '후공 적이 마지막으로 움직이고 다음 턴이 열린다'],
     ]
 
     const stats = STAT_META.map((meta) => `
@@ -215,12 +216,12 @@ export class CombatGuideView {
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
       <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · 기본 ${SENTENCE_BASE_INK}, 남은 잉크 이월 최대 ${SENTENCE_CARRY_LIMIT}, 체력 초과 집필 최대 ${SENTENCE_OVERDRAW_LIMIT}로 한 문장은 최대 ${SENTENCE_MAX_INK}까지 쓴다.</p>
 
-      <h3 class="g-h3">한 턴의 순서</h3>
+      <h3 class="g-h3">일반전 한 턴의 순서</h3>
       <ol class="g-flow">
         ${phases.map(([n, title, desc]) => `<li><i>${n}</i><b>${title}</b><span>${desc}</span></li>`).join('')}
       </ol>
       <p class="g-note">방어는 <b>2단계</b>에서 먼저 세워지므로 선공 적의 공격도 막아 낸다.
-        문장부호 <b>!</b>가 붙은 문장은 3단계를 통째로 건너뛰어 선공 적보다 먼저 움직인다.</p>
+        문장부호 <b>!</b>가 붙은 문장은 일반전에서 선공 적보다 먼저 행동하지만, 그 적의 공격을 없애지는 않는다.</p>
 
       <div class="g-split">
         <section class="g-panel">
@@ -246,7 +247,7 @@ export class CombatGuideView {
   private pageCard(): string {
     const subject = slotWord('subj', 'eoje')
     const verb = slotWord('verb', 'ttaeryeot')
-    const special = specialWord('spreadTwo')
+    const special = rewardWord('useumyeo')
 
     const parts: [string, string][] = [
       ['왼쪽 위 · 감정', `기쁨·분노·슬픔·즐거움 중 하나. 같은 감정을 모으면 공명 배율이 붙는다.`],
@@ -261,10 +262,10 @@ export class CombatGuideView {
       ['배율 ×1.20', '주어가 문장에 보태는 배율. 주어의 안정성·고점에 따라 비용이 달라진다.'],
       ['공격 ×1', '동사가 스탯에서 뽑아내는 깡수치. 공격 스탯이 5면 5가 된다.'],
       ['75% 확률로 배율 ×1.80', '도박 카드. 확률로 높은 배율과 낮은 배율 중 하나가 정해진다.'],
-      ['2회 동사 발동 (각 65%)', '동사의 행동을 두 번 발동한다. 각 발동을 낮춰 총 위력이 두 배가 되지는 않는다.'],
+      ['연타 2', '동사의 본행동이 같은 적에게 두 번 이어진다. 이런 직접 행동 키워드는 동사에만 붙는다.'],
       ['다시 뽑기 +1회', '덱에서 카드를 한 번 더 뽑을 수 있다.'],
       ['공격 1랭크↑', `공격·방어 태세는 1랭크마다 25% 변하고 최대 ±${STAT_RANK_LIMIT}랭크까지 쌓인다.`],
-      ['공격 ×0.9 · 2명(100%·70%)', '여러 적을 때리는 카드. 뒷줄일수록 피해가 줄어든다.'],
+      ['대상 2명', '대상 수치가 2인 동사는 앞의 두 적에게 이어진다. 뒷줄일수록 피해가 줄어든다.'],
     ]
 
     return `
@@ -275,7 +276,7 @@ export class CombatGuideView {
         <div class="g-cardrow g-cardrow-tight">
           ${cardSlot(subject, '<b>주어</b><span>도박 배율</span>')}
           ${cardSlot(verb, '<b>동사</b><span>스탯 비례</span>')}
-          ${cardSlot(special, '<b>동사</b><span>다중 대상</span>')}
+          ${cardSlot(special, '<b>수식어</b><span>다중 대상</span>')}
         </div>
         <ul class="g-legend">
           ${parts.map(([label, desc]) => `<li><b>${label}</b><span>${desc}</span></li>`).join('')}
@@ -415,21 +416,20 @@ export class CombatGuideView {
 
   private pageCombat(): string {
     const falloff = TARGET_FALLOFF.map((v) => pct(v)).join(' · ')
-    const spread = specialWord('scatterThree')
-    const flurry = specialWord('flurry')
-    const pierce = specialWord('pierceStrike')
-    const counter = specialWord('counterOne')
-    const counterMult = counter?.effects?.counterMultiplier ?? 0
+    const preempt = rewardWord('sinnage')
+    const flurry = rewardWord('michin')
+    const pierce = rewardWord('himkkeot')
+    const counter = rewardWord('dandanhi')
     const roach = ENEMIES.roach
     const pillbug = ENEMIES.pillbug
     const mosquito = ENEMIES.mosquito
 
     return `
       <div class="g-cardrow g-cardrow-tight">
-        ${cardSlot(spread, '<b>범위</b><span>여러 명을 한 번에</span>')}
-        ${cardSlot(flurry, '<b>연타</b><span>한 명을 여러 번</span>')}
+        ${cardSlot(preempt, '<b>선공</b><span>상대보다 먼저</span>')}
+        ${cardSlot(flurry, '<b>연타</b><span>동사 행동을 다시</span>')}
         ${cardSlot(pierce, '<b>관통</b><span>방어를 지나쳐</span>')}
-        ${cardSlot(counter, '<b>카운터</b><span>막은 만큼 되돌려</span>')}
+        ${cardSlot(counter, '<b>카운터</b><span>해당 턴 피해를 되돌려</span>')}
       </div>
 
       <div class="g-split">
@@ -439,7 +439,7 @@ export class CombatGuideView {
             <li><b>2명·3명</b> — 앞줄부터 <b>${falloff}</b>로 피해가 줄어든다.</li>
             <li><b>전체</b> — 살아 있는 모든 적을 같은 위력으로 때린다.</li>
             <li><b>2연타·3연타</b> — 최전방 하나만 여러 번 때린다. 쓰러지면 남은 타격은 다음 적으로 넘어가지 않는다.</li>
-            <li><b>관통</b> — 적의 방어막을 지나쳐 체력에 직접 꽂히고, 방어막을 깎지도 않는다.</li>
+            <li><b>관통</b> — 적의 방어막과 매직실드를 지나쳐 체력에 직접 꽂히고, 둘을 깎지도 않는다.</li>
             <li><b>다음 턴 발동</b> — 타격 수·범위·관통·감정까지 그대로 보존해 다음 턴에 실행한다.</li>
             <li>단일 공격이 적을 넘겨 죽이면 <b>초과 피해가 뒷줄로 관통</b>한다.</li>
           </ul>
@@ -448,7 +448,7 @@ export class CombatGuideView {
           <h3 class="g-h3">적이 두르는 것</h3>
           <ul class="g-bullets">
             <li><b>방어막</b> — 피해를 먼저 받아 낸다. ${roach ? `${josa(roach.name, '은', '는')} 방어 ${roach.guard}짜리 껍질을 두르고 나온다.` : ''}</li>
-            <li><b>매직실드</b> — 한 타격을 통째로 막고 1겹이 사라진다. 관통도 넘지 못하니 <b>연타</b>로 먼저 벗긴다.
+            <li><b>매직실드</b> — 한 타격을 통째로 막고 1겹이 사라진다. <b>관통</b>은 이를 우회하고, 일반 공격은 <b>연타</b>로 벗길 수 있다.
               ${pillbug ? `${josa(pillbug.name, '이', '가')} 1겹을 들고 나온다.` : ''}</li>
             <li><b>관통하는 적</b> — ${mosquito ? `${mosquito.name}처럼` : '일부 적은'} 내 방어막을 소모시키지 않고 체력에 직접 꽂는다.</li>
             <li>보스는 저마다 방어를 무력화하는 수단을 하나씩 갖는다. 대신 반드시 미리 읽히게 예고하고,
@@ -462,16 +462,16 @@ export class CombatGuideView {
           <h3 class="g-h3">내 방어막</h3>
           <ul class="g-bullets">
             <li>피해를 <b>흡수한 만큼만</b> 줄어들고 남은 양은 그대로 유지된다.</li>
-            <li>새 방어는 기존 방어에 <b>합산</b>되며, <b>최대 체력만큼</b>까지 비축할 수 있다.</li>
+            <li>새 방어는 기존 방어에 <b>합산</b>되며, 이월분을 포함해 <b>최대 체력의 50%</b>까지 비축할 수 있다.</li>
             <li>체력과 방어막은 <b>다음 스테이지에도 그대로 이어진다.</b> 스테이지가 바뀐다고 회복되지 않는다.</li>
           </ul>
         </section>
         <section class="g-panel">
           <h3 class="g-h3">카운터</h3>
-          <p>방어 문장에 카운터가 붙어 있으면, 방어막이 <b>실제로 흡수한 피해</b>에 계수를 곱해
-            즉시 최전방 적에게 되돌린다.</p>
-          ${counterMult ? `<p class="g-example">방어로 <b>4</b>를 막고 카운터 ${mult(counterMult)} → <b>${Math.round(4 * counterMult)}</b> 피해</p>` : ''}
-          <p class="g-note g-tight">방어막이 상한에 걸려 비축량이 0이어도, 그 턴을 방어에 썼다면 카운터는 살아 있다.</p>
+          <p>카운터 수식어는 공격 행동 중에는 받은 피해의 <b>50%</b>를, 방어 또는 회복 행동 중에는
+            받은 피해의 <b>100%</b>를 즉시 최전방 적에게 되돌린다.</p>
+          <p class="g-example">받은 피해 <b>4</b> → 공격 행동 <b>2</b> 반격 · 방어/회복 행동 <b>4</b> 반격</p>
+          <p class="g-note g-tight">실드 유무는 카운터 비율에 영향을 주지 않으며, 해당 문장을 쓴 턴에만 유효하다.</p>
         </section>
       </div>`
   }

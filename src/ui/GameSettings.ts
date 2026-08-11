@@ -145,6 +145,7 @@ export const GraphicsSettings = {
     }) ?? null
   },
   profile(): GraphicsProfile {
+    const graphics = activeChoice('graphics', GRAPHICS_QUALITIES, savedQuality)
     const resolution = activeChoice('resolution', RESOLUTION_SCALES, savedResolution)
     const fps = activeChoice('fps', FRAME_RATE_LIMITS, savedFps)
     const effects = activeChoice('effects', EFFECTS_QUALITIES, savedEffects)
@@ -152,7 +153,11 @@ export const GraphicsSettings = {
     return {
       resolutionScale: Number(resolution) / 100,
       activeFps,
-      waitingFps: activeFps <= 30 ? 24 : activeFps <= 45 ? 30 : activeFps <= 60 ? 45 : 60,
+      // 울트라는 품질 최상 계약이다. 화면 뒤쪽 배우라는 이유만으로 숨은 FPS·해상도
+      // 강등을 걸지 않고, 사용자가 직접 고른 전체 프레임 제한을 그대로 지킨다.
+      waitingFps: graphics === 'ultra'
+        ? activeFps
+        : activeFps <= 30 ? 24 : activeFps <= 45 ? 30 : activeFps <= 60 ? 45 : 60,
       foilFps: effects === 'low' ? 0 : Math.min(activeFps, effects === 'medium' ? 30 : 60),
       effectScale: EFFECT_SCALE[effects],
     }

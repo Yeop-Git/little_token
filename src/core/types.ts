@@ -72,8 +72,8 @@ export interface WordEffects {
   castScale?: number
   /** Adds attack hits only when the sentence actually pays health for Ink overdraw. */
   overdrawHitCount?: number
-  /** 막아 낸 피해에 곱할 즉시 반격 계수. */
-  counterMultiplier?: number
+  /** 해당 문장을 쓴 턴에 피격되면 고정 카운터 규칙을 적용한다. */
+  counter?: boolean
   /** 다음 적 공격 한 번을 통째로 막는 플레이어 매직실드. 한 겹만 유지한다. */
   magicShield?: number
   /** 현재 방어도의 일부를 소모 없이 공격 피해로 사용한다. */
@@ -202,7 +202,7 @@ export interface Intent {
   castCount: number
   castScale: number
   overdrawHitCount: number
-  counterMultiplier: number
+  counter: boolean
   magicShield: number
   guardAttackMultiplier: number
   overhealDamageMultiplier: number

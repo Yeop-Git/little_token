@@ -15,6 +15,7 @@ import { ALL_ITEMS } from '@data/items'
 import type { Word } from './types'
 import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerStats } from './player'
 import { IS_DEMO } from '@/config/edition'
+import { playerGuardLimit } from './combatRules'
 /**
  * 이 게임이 브라우저에 남기는 모든 진행도의 접두사. 기록 초기화는 키를 하나씩
  * 지우는 게 아니라 이 접두사를 통째로 쓸어 낸다 — 하나씩 지우면 새로 늘어난 키가
@@ -171,7 +172,7 @@ function normalizePlayerStats(run: RunState): boolean {
   return changed
 }
 
-const REWARD_PHASES = new Set<PendingReward['phase']>(['subject', 'item', 'verb', 'complete'])
+const REWARD_PHASES = new Set<PendingReward['phase']>(['subject', 'item', 'verb', 'shop', 'complete'])
 const REWARD_PICK_KINDS = new Set<RewardPickRef['kind']>(['word', 'item'])
 
 function normalizePendingReward(run: RunState): boolean {
@@ -202,6 +203,22 @@ function normalizePendingReward(run: RunState): boolean {
       picks.push({ kind, id, ...(pick.reinforce === true ? { reinforce: true } : {}) })
     }
   }
+  const shopStock: Array<RewardPickRef | null> = []
+  if (Array.isArray(source.shopStock)) {
+    for (const value of source.shopStock.slice(0, 9)) {
+      if (value == null) {
+        shopStock.push(null)
+        continue
+      }
+      if (typeof value !== 'object') continue
+      const pick = value as Record<string, unknown>
+      if (!REWARD_PICK_KINDS.has(pick.kind as RewardPickRef['kind']) || typeof pick.id !== 'string') continue
+      const kind = pick.kind as RewardPickRef['kind']
+      const id = kind === 'word' ? CARD_REPLACEMENTS[pick.id] ?? pick.id : pick.id
+      if (kind === 'word' ? !CURRENT_CARD_BY_ID.has(id) : !ALL_ITEMS[id]) continue
+      shopStock.push({ kind, id, ...(pick.reinforce === true ? { reinforce: true } : {}) })
+    }
+  }
   const refreshSource = source.refreshes && typeof source.refreshes === 'object'
     ? source.refreshes as Partial<Record<RewardPhase, unknown>>
     : {}
@@ -219,6 +236,13 @@ function normalizePendingReward(run: RunState): boolean {
     picks,
     seed: typeof source.seed === 'number' && Number.isFinite(source.seed) ? Math.floor(source.seed) : 0,
     refreshes,
+    ...(phase === 'shop' || source.shopStock !== undefined || source.shopRefreshes !== undefined || source.shopPurchases !== undefined ? {
+      shopStock,
+      shopRefreshes: typeof source.shopRefreshes === 'number' && Number.isFinite(source.shopRefreshes)
+        ? Math.max(0, Math.floor(source.shopRefreshes)) : 0,
+      shopPurchases: typeof source.shopPurchases === 'number' && Number.isFinite(source.shopPurchases)
+        ? Math.max(0, Math.floor(source.shopPurchases)) : 0,
+    } : {}),
   }
   return JSON.stringify(run.reward) !== before
 }
@@ -342,7 +366,7 @@ export function deserializeRun(raw: string): RunState | null {
       migrated = true
     } else {
       const hp = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.hp))
-      const guard = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.guard))
+      const guard = Math.max(0, Math.min(playerGuardLimit(parsed.player.stats.hp), parsed.combat.guard))
       if (hp !== parsed.combat.hp || guard !== parsed.combat.guard) {
         parsed.combat = { hp, guard }
         migrated = true

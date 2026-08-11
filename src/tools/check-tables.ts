@@ -19,15 +19,27 @@ import {
   expectedMult,
   hasBudget,
   hasModifierTactic,
-  tacticalVerbBudget,
-  tacticalVerbPower,
+  hasModifierActionTactic,
+  hasStrongModifierScale,
+  hasVerbTactic,
+  modifierKeywordCount,
   verbCoefBudget,
 } from '@core/budget'
 import { numericNoteParts, wordNoteText } from '@core/wordText'
+import { recommendedWordInkCost } from '@core/ink'
 import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
 import { RARITY_LABEL, type Tables, type Word } from '@core/types'
-import { EARLY_WORDS, GROW_WORDS, LEGENDARY_REWARD_WORDS, makeEarlyTables, PUNCT_WORDS, REWARD_WORDS } from '@data/earlyWords'
+import {
+  EARLY_WORDS,
+  GROW_WORDS,
+  isLentWord,
+  LEGENDARY_REWARD_WORDS,
+  makeEarlyTables,
+  PUNCT_WORDS,
+  REWARD_WORDS,
+  tablesForEncounter,
+} from '@data/earlyWords'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { TABLES } from '@data/tables'
 
@@ -71,14 +83,18 @@ function checkArt(): string[] {
   const src = readFileSync(new URL('../assets/index.ts', import.meta.url), 'utf8')
   const block = src.slice(src.indexOf('export const SKILL_ART'), src.indexOf('export const FONT_URL'))
   const keys = new Set([...block.matchAll(/'(\d+)':/g)].map((m) => m[1]))
-  // 전투 규칙 카드(SPECIAL_REWARD_WORDS)도 보상으로 실제 나오는 카드다. 예전엔 여기서
-  // 빠져 있어서 동사 열두 장이 일러스트 없이 도는 걸 이 검사가 못 잡았다.
+  const lentWords = ['mantis', 'queenBee', 'elderSpider']
+    .flatMap((enemyId) => tablesForEncounter(makeEarlyTables(), enemyId).words.verb ?? [])
+    .filter(isLentWord)
+  // 전투 규칙 카드와 보스 대여 카드도 실제 화면에 나온다. CSV 바깥에서 정의되므로
+  // 여기서 명시적으로 합쳐 새 전용 일러스트의 누락을 함께 잡는다.
   const words = [
     ...Object.values(EARLY_WORDS).flat(),
     ...REWARD_WORDS,
     ...SPECIAL_REWARD_WORDS,
     ...PUNCT_WORDS,
     ...GROW_WORDS,
+    ...lentWords,
   ]
 
   const broken = words.filter((w) => w.art && !keys.has(w.art))
@@ -94,11 +110,35 @@ function checkArt(): string[] {
   return broken.map((w) => `${w.slot}/${w.text}`)
 }
 
+/** 일반 런 동사는 서술어 하나, 뜻이 흐려질 때만 목적어 하나까지 허용한다. */
+function checkVerbWording(): string[] {
+  const lentWords = ['mantis', 'queenBee', 'elderSpider']
+    .flatMap((enemyId) => tablesForEncounter(makeEarlyTables(), enemyId).words.verb ?? [])
+    .filter(isLentWord)
+  const seen = new Set<string>()
+  const verbs = [
+    ...(EARLY_WORDS.verb ?? []),
+    ...REWARD_WORDS.filter((word) => word.slot === 'verb'),
+    ...SPECIAL_REWARD_WORDS.filter((word) => word.slot === 'verb'),
+    ...LEGENDARY_REWARD_WORDS.filter((word) => word.slot === 'verb'),
+    ...lentWords,
+  ].filter((word) => {
+    if (seen.has(word.id)) return false
+    seen.add(word.id)
+    return true
+  })
+  const verbose = verbs.filter((word) => word.text.trim().split(/\s+/).length > 2)
+  console.log(`\n동사 문구 — 서술어 단독 또는 목적어+서술어 ${verbs.length - verbose.length}/${verbs.length}장`)
+  for (const word of verbose) console.log(`  위반  ${word.id} → 「${word.text}」`)
+  if (!verbose.length) console.log('  통과  불필요한 부사·연결절이 붙은 동사 없음')
+  return verbose.map((word) => word.id)
+}
+
 /**
  * 등급 예산 검사 — 등급은 상한이 아니라 **예산**이라는 계약(`src/core/budget.ts`)을
  * 실제 데이터로 검증한다. 셋을 본다.
- *   ① 주어 배율은 등급 예산 ±오차, 수식어는 배율·대성공 없이 전술 기능만 가진다.
- *   ② 동사 칸: 스탯 계수가 등급 계수(전체 적중이면 깎인 값)와 같다.
+ *   ① 주어 배율은 등급 예산 ±오차, 수식어는 공개 전술만 가지며 고비용은 강계수·복합형이다.
+ *   ② 일반 동사는 행동 종류·참조 스탯·등급 계수·잉크 비용만 가진다.
  *   ③ 초기 덱의 노멀 정원(주어 1 · 수식 3 · 동사 3) — 노멀 쌍둥이 방지.
  * 여기에 카드 문구(`note`)가 실제 수치를 빠뜨리지 않았는지도 함께 본다.
  * 5슬롯 확장 데이터는 고정 위력 등 옛 규칙이 남아 있어 대상에서 뺀다(보존 자료).
@@ -130,9 +170,24 @@ function checkBudget(): string[] {
 
   for (const { slot, w, pool } of [...early, ...reward, ...special]) {
     const rarity = w.rarity ?? 'common'
+    if (w.inkCost != null) {
+      const recommendedCost = recommendedWordInkCost(w)
+      if (w.inkCost !== recommendedCost) {
+        out.push(`${pool}/${w.text}: ink cost ${w.inkCost}, formula requires ${recommendedCost}`)
+        console.log(`  위반  ${pool} · ${w.text} — 잉크 ${w.inkCost}, 기능 공식은 ${recommendedCost}`)
+      }
+    }
+    if (slot === 'adv') {
+      const keywordCount = modifierKeywordCount(w)
+      const required = rarity === 'common' || rarity === 'rare' ? 1 : 2
+      if (keywordCount !== required) {
+        out.push(`${pool}/${w.text}: ${rarity} modifier has ${keywordCount} functions, requires ${required}`)
+        console.log(`  위반  ${pool} · ${w.text} — ${RARITY_LABEL[rarity]} 수식어는 기능 ${required}개여야 하지만 ${keywordCount}개다`)
+      }
+    }
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
     if (slot === 'adv') {
-      const staleStats = w.crit != null || w.stat != null
+      const staleStats = w.stat != null
       if (staleStats) {
         out.push(`${pool}/${w.text}: 수식어에 대성공·룰렛 스탯이 남아 있다`)
         console.log(`  위반  ${pool} · ${w.text} — 수식어는 대성공·룰렛 스탯을 가질 수 없다`)
@@ -140,6 +195,10 @@ function checkBudget(): string[] {
       if (!hasModifierTactic(w)) {
         out.push(`${pool}/${w.text}: 공개 전술 기능이 없다`)
         console.log(`  위반  ${pool} · ${w.text} — 수식어에는 전술 기능이 최소 하나 필요하다`)
+      }
+      if (hasModifierActionTactic(w)) {
+        out.push(`${pool}/${w.text}: modifier contains a verb-only action keyword`)
+        console.log(`  위반  ${pool} · ${w.text} — 직접 행동 키워드는 동사에만 둘 수 있다`)
       }
       if ((w.effects?.guard ?? 0) > 0 || (w.effects?.heal ?? 0) > 0) {
         out.push(`${pool}/${w.text}: 수식어가 방어·회복 수치를 직접 만든다`)
@@ -149,14 +208,42 @@ function checkBudget(): string[] {
         out.push(`${pool}/${w.text}: 명시 잉크 비용이 없다`)
         console.log(`  위반  ${pool} · ${w.text} — 수식어 전술에는 명시 잉크 비용이 필요하다`)
       }
+      if ((w.inkCost ?? 0) >= 3 && modifierKeywordCount(w) < 2 && !hasStrongModifierScale(w)) {
+        out.push(`${pool}/${w.text}: 고비용인데 복합 키워드나 높은 계수가 없다`)
+        console.log(`  위반  ${pool} · ${w.text} — 3잉크 수식어는 복합 키워드 또는 높은 계수가 필요하다`)
+      }
+      if (modifierKeywordCount(w) > 2) {
+        out.push(`${pool}/${w.text}: modifier has more than two functions`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — modifiers may have at most two functions`)
+      }
+      if ((w.effects?.magicShield ?? 0) > 0 && (w.inkCost ?? 0) < 4) {
+        out.push(`${pool}/${w.text}: magic shield modifier costs less than 4 ink`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — magic shield modifiers cost at least 4 ink`)
+      }
+      if ((w.effects?.inkDiscount ?? 0) > 0 && (w.inkCost ?? 0) >= (w.effects?.inkDiscount ?? 0)) {
+        out.push(`${pool}/${w.text}: ink discount does not exceed its own cost`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — ink discount must exceed its own ink cost`)
+      }
       continue
     }
     if (slot === 'verb' || slot === 'verb2') {
       if (w.statMult == null) continue
-      const isTactical = pool === '규칙'
-      const got = isTactical ? tacticalVerbPower(w) : w.statMult
-      const want = isTactical ? tacticalVerbBudget(w, rarity) : verbCoefBudget(rarity, w.aoe)
-      const off = Math.abs(got - want)
+      if (hasVerbTactic(w)) {
+        out.push(`${pool}/${w.text}: 일반 동사에 수식어 전술 기능이 남아 있다`)
+        console.log(`  위반  ${pool} · ${w.text} — 일반 동사는 행동·스탯·계수·비용만 가져야 한다`)
+      }
+      if (!w.stat || !w.kind || w.inkCost == null) {
+        out.push(`${pool}/${w.text}: 동사 정체성 필드가 빠졌다`)
+        console.log(`  위반  ${pool} · ${w.text} — stat · kind · inkCost를 모두 명시해야 한다`)
+      }
+      const got = w.statMult
+      const want = verbCoefBudget(rarity, w)
+      const canonicalStat = w.kind === 'guard' ? 'guard' : w.kind === 'heal' ? 'heal' : 'atk'
+      if (w.stat !== canonicalStat) {
+        out.push(`${pool}/${w.text}: verb uses ${String(w.stat)} instead of ${canonicalStat}`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — ${w.kind} verbs must use ${canonicalStat}`)
+      }
+      const off = Math.max(0, got - want)
       if (off > BUDGET_TOLERANCE) {
         out.push(`${pool}/${w.text}: 실전 총량 ×${got.toFixed(3)} ≠ ${RARITY_LABEL[rarity]} 예산 ×${want}`)
         console.log(`  위반  ${pool} · ${w.text} — 실전 총량 ×${got.toFixed(3)}, ${RARITY_LABEL[rarity]} 예산은 ×${want}`)
@@ -244,12 +331,14 @@ const violations = [
   ...checkTables('전체', TABLES),
 ]
 const brokenArt = checkArt()
+const verboseVerbs = checkVerbWording()
 const budget = checkBudget()
 const grow = checkGrowthRules()
 
-if (violations.length || brokenArt.length || budget.length || grow.length) {
+if (violations.length || brokenArt.length || verboseVerbs.length || budget.length || grow.length) {
   if (violations.length) console.log(`\n위반 ${violations.length}건 — 해당 슬롯에 태그 없는 중립 단어를 추가하라.`)
   if (brokenArt.length) console.log(`일러스트 위반 ${brokenArt.length}건 — assets/index.ts의 SKILL_ART에 키를 등록하라.`)
+  if (verboseVerbs.length) console.log(`동사 문구 위반 ${verboseVerbs.length}건 — 서술어 하나 또는 목적어+서술어로 줄여라.`)
   if (budget.length) console.log(`예산 위반 ${budget.length}건 — words.csv의 수치나 rarity를 고쳐라(기준: src/core/budget.ts).`)
   if (grow.length) console.log(`무럭무럭 위반 ${grow.length}건 — 하늘나물 패시브와 보상 카드 분리를 확인하라.`)
   process.exit(1)
