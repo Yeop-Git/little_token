@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
 import { roleReason } from '@core/validator'
 import {
   BUDGET_TOLERANCE,
-  COMMON_QUOTA,
+  CARD_POOL_RARITY_QUOTA,
   MULT_BUDGET,
   expectedMult,
   hasBudget,
@@ -26,6 +26,7 @@ import {
   verbCoefBudget,
 } from '@core/budget'
 import { numericNoteParts, wordNoteText } from '@core/wordText'
+import { wordKeywords } from '@core/wordKeywords'
 import { recommendedWordInkCost } from '@core/ink'
 import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
@@ -179,10 +180,11 @@ function checkBudget(): string[] {
     }
     if (slot === 'adv') {
       const keywordCount = modifierKeywordCount(w)
-      const required = rarity === 'common' || rarity === 'rare' ? 1 : 2
-      if (keywordCount !== required) {
-        out.push(`${pool}/${w.text}: ${rarity} modifier has ${keywordCount} functions, requires ${required}`)
-        console.log(`  위반  ${pool} · ${w.text} — ${RARITY_LABEL[rarity]} 수식어는 기능 ${required}개여야 하지만 ${keywordCount}개다`)
+      const minRequired = rarity === 'common' ? 1 : rarity === 'rare' ? 1 : 2
+      const maxAllowed = rarity === 'common' ? 1 : 2
+      if (keywordCount < minRequired || keywordCount > maxAllowed) {
+        out.push(`${pool}/${w.text}: ${rarity} modifier has ${keywordCount} functions, requires ${minRequired}-${maxAllowed}`)
+        console.log(`  위반  ${pool} · ${w.text} — ${RARITY_LABEL[rarity]} 수식어는 기능 ${minRequired}~${maxAllowed}개여야 하지만 ${keywordCount}개다`)
       }
     }
     if (!hasBudget(rarity)) continue // 전설 = 규칙 카드. 수치 예산이 없다.
@@ -259,12 +261,58 @@ function checkBudget(): string[] {
     }
   }
 
-  // ③ 노멀 정원 — 초기 덱에 노멀이 정원보다 많으면 수치가 같은 쌍둥이가 생긴다.
-  for (const [slot, quota] of Object.entries(COMMON_QUOTA)) {
-    const commons = (EARLY_WORDS[slot] ?? []).filter((w) => (w.rarity ?? 'common') === 'common')
-    const mark = commons.length === quota ? '통과' : '위반'
-    console.log(`  ${mark}  초기 · ${slot} 노멀 ${commons.length}/${quota}장 (${commons.map((w) => w.text).join(' · ') || '없음'})`)
-    if (commons.length !== quota) out.push(`초기/${slot}: 노멀 ${commons.length}장 (정원 ${quota}장)`)
+  // 성장·대여 카드를 빼고 실제 보상에 쓰는 풀의 등급 비율을 4:3:2:1 근사로 고정한다.
+  const catalog = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
+  for (const [slot, quota] of Object.entries(CARD_POOL_RARITY_QUOTA)) {
+    const slotWords = catalog.filter((word) => word.slot === slot)
+    for (const rarity of ['common', 'rare', 'epic', 'legendary'] as const) {
+      const count = slotWords.filter((word) => (word.rarity ?? 'common') === rarity).length
+      const mark = count === quota[rarity] ? '통과' : '위반'
+      console.log(`  ${mark}  카드풀 · ${slot} ${RARITY_LABEL[rarity]} ${count}/${quota[rarity]}장`)
+      if (count !== quota[rarity]) out.push(`카드풀/${slot}: ${rarity} ${count}장 (목표 ${quota[rarity]}장)`)
+    }
+  }
+
+  const emotions = ['joy', 'anger', 'sorrow', 'pleasure'] as const
+  for (const slot of ['subj', 'adv', 'verb'] as const) {
+    const slotWords = catalog.filter((word) => word.slot === slot)
+    const counts = emotions.map((emotion) => slotWords.filter((word) => word.emotion === emotion).length)
+    const balanced = Math.max(...counts) - Math.min(...counts) <= 1
+    console.log(`  ${balanced ? '통과' : '위반'}  카드풀 · ${slot} 감정 ${emotions.map((emotion, i) => `${emotion} ${counts[i]}`).join(' · ')}`)
+    if (!balanced) out.push(`카드풀/${slot}: 감정 분포 ${counts.join('/')}`)
+  }
+
+  const verbs = catalog.filter((word) => word.slot === 'verb')
+  const actionKinds = ['attack', 'guard', 'heal'] as const
+  const actionCounts = actionKinds.map((kind) => verbs.filter((word) => word.kind === kind).length)
+  if (Math.max(...actionCounts) - Math.min(...actionCounts) > 1) {
+    out.push(`카드풀/verb: 행동 분포 ${actionCounts.join('/')}`)
+  }
+  console.log(`  ${Math.max(...actionCounts) - Math.min(...actionCounts) <= 1 ? '통과' : '위반'}  동사 행동 · ${actionKinds.map((kind, i) => `${kind} ${actionCounts[i]}`).join(' · ')}`)
+  for (const kind of actionKinds) {
+    const counts = emotions.map((emotion) => verbs.filter((word) => word.kind === kind && word.emotion === emotion).length)
+    const balanced = Math.min(...counts) > 0 && Math.max(...counts) - Math.min(...counts) <= 1
+    console.log(`  ${balanced ? '통과' : '위반'}  ${kind} 감정 · ${emotions.map((emotion, i) => `${emotion} ${counts[i]}`).join(' · ')}`)
+    if (!balanced) out.push(`카드풀/${kind}: 감정 분포 ${counts.join('/')}`)
+  }
+
+  const keywordCounts = new Map<string, number>()
+  for (const word of catalog) {
+    for (const keyword of wordKeywords(word)) keywordCounts.set(keyword.id, (keywordCounts.get(keyword.id) ?? 0) + 1)
+  }
+  const singletonKeywords = [...keywordCounts].filter(([, count]) => count < 2).map(([keyword]) => keyword)
+  console.log(`  ${singletonKeywords.length ? '위반' : '통과'}  기능 키워드 재사용 · ${[...keywordCounts].map(([keyword, count]) => `${keyword} ${count}`).join(' · ')}`)
+  if (singletonKeywords.length) out.push(`카드풀: 한 번만 쓰인 기능 키워드 ${singletonKeywords.join(', ')}`)
+
+  for (const word of catalog.filter((entry) => entry.rarity === 'epic' || entry.rarity === 'legendary')) {
+    const distinctive = word.slot === 'subj'
+      ? !!word.variance || wordKeywords(word).length > 0
+      : word.slot === 'adv'
+        ? modifierKeywordCount(word) >= 2
+        : wordKeywords(word).length > 0
+          || (word.targetCount !== undefined && word.targetCount !== 1)
+          || (word.statMult ?? 0) >= 3
+    if (!distinctive) out.push(`카드풀/${word.text}: ${word.rarity} 카드에 고유 규칙이 없다`)
   }
 
   // 카드 문구가 수치를 빠뜨리면 화면과 실제가 어긋난다 — 표기도 계약이다.

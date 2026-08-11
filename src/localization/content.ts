@@ -118,6 +118,29 @@ const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
   },
 }
 
+const UPDATED_LORE_IDS = [
+  'focusStrike', 'pourThree', 'doubleTap', 'magicVeil', 'overflowingHeart', 'drinkInk', 'stainedTomorrow',
+  'dampenMomentum', 'kkuk', 'ipan', 'pogeunhage', 'bangeopge', 'gyeongkwaehage', 'geochilge',
+] as const
+
+const EXTRA_WORD_LORE: Record<ForeignLocale, Record<(typeof UPDATED_LORE_IDS)[number], string>> = {
+  en: {
+    focusStrike:'Anger drives every drop of Ink into one decisive point.', pourThree:'Poured-out tears wash the wound and raise a veil against the next hit.', doubleTap:'A rough tap forces the faltering heart to beat again.', magicVeil:'A bright veil braces the body and erases the next hit.', overflowingHeart:'Healing that cannot fit becomes damage and reaches the enemy.', drinkInk:'Drinking the Ink back turns overflowing life into a lively counterblow.', stainedTomorrow:'The stain reaches tomorrow’s line and draws life back.', dampenMomentum:'Writing the scattered feeling down restores its calm.', kkuk:'It blocks one painful hit and saves the remaining breath for the next sentence.', ipan:'Only a sentence paid with life gains these fierce extra hits.', pogeunhage:'Warmth steadies the guard and carries breath into the next sentence.', bangeopge:'A welcome story opens across three foes and opens the next choices too.', gyeongkwaehage:'A light rhythm restores both Ink and choices for a flowing chain.', geochilge:'A fierce rhythm repeats the verb and raises the attack stance.',
+  },
+  ja: {
+    focusStrike:'怒りで全てのインクを一点へ叩き込む決め技。', pourThree:'こらえた涙で傷を洗い、次の一撃を消す幕を張る。', doubleTap:'止まりかけた心を荒く叩き、もう一度動かす。', magicVeil:'光の幕で身を固め、次の一撃を消し去る。', overflowingHeart:'収まりきらない回復をダメージに変えて敵へ渡す。', drinkInk:'インクを飲み戻し、あふれた命を楽しい反撃に変える。', stainedTomorrow:'明日の行まで染めた跡から命を取り戻す。', dampenMomentum:'乱れた気持ちを日記に書き、静かに整える。', kkuk:'痛い一撃を防ぎ、残った息を次の文へためる。', ipan:'体力をインクにした文だけに激しい追加打撃を乗せる。', pogeunhage:'温もりで守りながら、残った息を次の文へつなぐ。', bangeopge:'懐かしい物語を三体へ広げ、次の選択も開く。', gyeongkwaehage:'軽いリズムがインクと選択肢を戻し、連鎖を始める。', geochilge:'荒い勢いで動詞をもう一度繰り返し、攻撃態勢を上げる。',
+  },
+  ru: {
+    focusStrike:'Гнев вбивает всю силу и чернила в одну решающую точку.', pourThree:'Пролитые слёзы смывают рану и ставят завесу от следующего удара.', doubleTap:'Грубый толчок заставляет замирающее сердце биться вновь.', magicVeil:'Светлая завеса укрепляет тело и стирает следующий удар.', overflowingHeart:'Лишнее лечение превращается в урон и достигает врага.', drinkInk:'Возвращённые чернила превращают избыток жизни в весёлый ответный удар.', stainedTomorrow:'След на завтрашней строке возвращает часть жизни.', dampenMomentum:'Записанное в дневнике смятение снова становится спокойным.', kkuk:'Блокирует болезненный удар и бережёт дыхание для следующей фразы.', ipan:'Лишь фраза, оплаченная здоровьем, получает эти яростные удары.', pogeunhage:'Тепло укрепляет защиту и переносит дыхание в следующую фразу.', bangeopge:'Знакомая история раскрывается на трёх врагов и открывает новые варианты.', gyeongkwaehage:'Лёгкий ритм возвращает чернила и выбор для непрерывной цепочки.', geochilge:'Яростный ритм повторяет глагол и усиливает атакующую стойку.',
+  },
+  'zh-Hans': {
+    focusStrike:'将愤怒与全部墨水压进一点的决胜一击。', pourThree:'倾泻泪水洗净伤口，并升起抵挡下一击的光幕。', doubleTap:'用力敲击将停的心，让它再次跳动。', magicVeil:'披上明亮光幕，稳住身体并抹去下一击。', overflowingHeart:'把容不下的恢复化成伤害送向敌人。', drinkInk:'饮回墨水，把溢出的生命化为欢快反击。', stainedTomorrow:'从染到明日一行的墨痕中取回生命。', dampenMomentum:'把纷乱心绪写进日记，重新平静下来。', kkuk:'挡住痛苦一击，把剩余气息留到下一句。', ipan:'只有以生命支付墨水的句子才会获得猛烈追加攻击。', pogeunhage:'温暖稳住防御，也把余力带到下一句。', bangeopge:'把重逢的故事铺向三名敌人，也打开下一次选择。', gyeongkwaehage:'轻快节奏同时补回墨水与选择，开启连写。', geochilge:'猛烈节奏让动词再发动一次，并抬高攻击态势。',
+  },
+  'zh-Hant': {
+    focusStrike:'將憤怒與全部墨水壓進一點的決勝一擊。', pourThree:'傾瀉淚水洗淨傷口，並升起抵擋下一擊的光幕。', doubleTap:'用力敲擊將停的心，讓它再次跳動。', magicVeil:'披上明亮光幕，穩住身體並抹去下一擊。', overflowingHeart:'把容不下的恢復化成傷害送向敵人。', drinkInk:'飲回墨水，把溢出的生命化為歡快反擊。', stainedTomorrow:'從染到明日一行的墨痕中取回生命。', dampenMomentum:'把紛亂心緒寫進日記，重新平靜下來。', kkuk:'擋住痛苦一擊，把剩餘氣息留到下一句。', ipan:'只有以生命支付墨水的句子才會獲得猛烈追加攻擊。', pogeunhage:'溫暖穩住防禦，也把餘力帶到下一句。', bangeopge:'把重逢的故事鋪向三名敵人，也打開下一次選擇。', gyeongkwaehage:'輕快節奏同時補回墨水與選擇，開啟連寫。', geochilge:'猛烈節奏讓動詞再發動一次，並抬高攻擊態勢。',
+  },
+}
+
 const COMBO_IDS = [...Array.from({ length: 31 }, (_, i) => `ec${i + 1}`), ...Array.from({ length: 6 }, (_, i) => `c${i + 1}`)]
 const COMBO_NAMES: Record<ForeignLocale, string[]> = {
   en: ['Head-on Charge','Iron Wall','Together','Standing Alone','Today’s Resolve','Pain’s Price','Echo','Leave Yesterday Behind','A Careful Touch','One Step Through Grit','Unstoppable','Gritted Teeth','Drying Tears','Turn and Sway','Joyful Flame','Rise Again','Warm Embrace','In a Blink','Frenzied Blow','No Way Back','Bright Mending','Welcome Touch','Mending with a Smile','Angry Blow','Lonely Shield','Struggling Up','Dancing Attack','Lively Recovery','Shine and Spread','Joyful Barrage','Mischief Wave','Lone Warrior','Flame Frenzy','Perfect Silence','Rite of Forgetting','Mutual Ruin','Monsoon Rain'],
@@ -176,6 +199,7 @@ export function localizationCoverageErrors(): string[] {
   ].map((word) => word.id))
   for (const locale of ['en','ja','ru','zh-Hans','zh-Hant'] as ForeignLocale[]) {
     for (const id of sourceWordIds) if (!EXTRA_WORD_TEXT[locale][id] && !WORD_TEXT[locale][id] && !(id.startsWith('gr_') && WORD_TEXT[locale].gr)) errors.push(`${locale}: word ${id} missing`)
+    for (const id of UPDATED_LORE_IDS) if (!EXTRA_WORD_LORE[locale][id]) errors.push(`${locale}: lore ${id} missing`)
     if (COMBO_NAMES[locale].length !== COMBO_IDS.length) errors.push(`${locale}: combo count mismatch`)
     if (ITEM_NAMES[locale].length !== ITEM_IDS.length) errors.push(`${locale}: item count mismatch`)
     for (const slot of EXCLAIM_SLOTS) for (const word of slot.words) {
@@ -196,6 +220,8 @@ export function applyContentLocalization(): void {
   for (const word of allWords) {
     const text = EXTRA_WORD_TEXT[locale][word.id] ?? texts[word.id] ?? (word.id.startsWith('gr_') ? texts.gr : undefined)
     if (text) word.text = text
+    const lore = EXTRA_WORD_LORE[locale][word.id as (typeof UPDATED_LORE_IDS)[number]]
+    if (lore) word.lore = lore
   }
 
   const comboNames = Object.fromEntries(COMBO_IDS.map((id, index) => [id, COMBO_NAMES[locale][index]]))

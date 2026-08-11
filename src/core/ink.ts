@@ -23,7 +23,11 @@ export function recommendedWordInkCost(word: Word): number {
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
     const expected = expectedMultiplier(word)
-    const cost = Math.ceil((expected - 1.2) / 0.3) + (word.aoe === 'all' ? 1 : 0)
+    const effects = word.effects
+    const cost = Math.ceil((expected - 1.2) / 0.3)
+      + (word.aoe === 'all' ? 1 : 0)
+      + Math.max(0, effects?.bonusDraws ?? 0)
+      + Math.max(0, effects?.overdrawHitCount ?? 0)
     return Math.max(0, Math.min(4, cost))
   }
 

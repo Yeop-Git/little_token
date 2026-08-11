@@ -21,7 +21,10 @@ export const ENEMIES: Record<string, EnemyDef> = {
     // 자리를 만들고, 대신 내려베기를 더 무겁게 해 못 막았을 때의 값을 올린다.
     // 숨 돌리는 턴은 **사이클 끝**에 둔다 — 앞에 두면 예고→내려베기를 두 번 보기
     // 전에 전투가 끝나 보스가 자기 패턴을 못 보여 주고 죽는다.
-    hp: 116, atk: 7, every: 1, initiative: 'first',
+    // 카드풀 확장 뒤 강한 초반 문장의 상한이 올라 두 번째 예고 직전에 끝나는 경우가
+    // 생겼다. 두 번째 강타까지 닿는 160으로 보강하고, 길어진 전투가 초보를 처형하지
+    // 않도록 공격력은 한 단계 낮춘다. 난점은 생존 수치가 아니라 예고 대응이다.
+    hp: 160, atk: 6, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
       { name: '강공격 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },

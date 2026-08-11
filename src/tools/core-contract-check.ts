@@ -89,7 +89,7 @@ const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word)
 assert.equal(specialCost('magicVeil'), 6, 'high-ratio guard-to-heal conversion reaches the verb cost ceiling')
 assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('overflowingHeart'), 5, 'overheal-to-damage pays for its conversion coefficient')
-assert.equal(specialCost('drinkInk'), 4, 'lifesteal pays by its healing ratio')
+assert.equal(specialCost('stainedTomorrow'), 5, 'high-ratio lifesteal pays by its healing ratio')
 const earlyModifierOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'subject', () => 0.5)
 assert.deepEqual(
   new Set(earlyModifierOffers.map((option) => option.word?.id)),

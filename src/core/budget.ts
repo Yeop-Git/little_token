@@ -36,14 +36,12 @@ export const OFF_STAT_VERB_COEF_BUDGET: Record<BudgetRarity, number> = {
 /** 예산 검사 허용 오차. 표기용 반올림(×1.15 · 대성공 10% = 1.2075)까지만 허용한다. */
 export const BUDGET_TOLERANCE = 0.05
 
-/**
- * 초기 덱의 노멀 정원 — 슬롯마다 "가장 단순한 기준 카드" 몫만 노멀로 둔다.
- * 노멀을 여러 장 두면 수치가 같은 쌍둥이가 생기고(어제의 나는 = 나도 = ×1.20),
- * 그 순간 등급 표기가 예산을 설명하지 못한다. 나머지는 예산이 큰 등급으로 올린다.
- *
- * 노멀 = 수식은 서로 다른 기본 전술 세 장, 동사는 행동마다 한 장, 주어는 "나는" 한 장.
- */
-export const COMMON_QUOTA: Record<string, number> = { subj: 1, adv: 3, verb: 3 }
+/** 성장·보스 대여 카드를 제외한 3슬롯 실전 카드풀의 4:3:2:1 정수 근사. */
+export const CARD_POOL_RARITY_QUOTA: Record<'subj' | 'adv' | 'verb', Record<Rarity, number>> = {
+  subj: { common: 8, rare: 6, epic: 4, legendary: 2 },
+  adv: { common: 8, rare: 6, epic: 4, legendary: 2 },
+  verb: { common: 11, rare: 8, epic: 6, legendary: 3 },
+}
 
 /** 도박 기댓값 — 컴파일러의 굴림과 같은 정의(p로 hi, 나머지는 lo). */
 export const gambleExpectation = (w: Word): number =>

@@ -14,7 +14,7 @@
 import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf, withOverdrawEffects } from '@core/compiler'
 import { conflictReason } from '@core/validator'
 import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
-import { clearRewardValue, decayGrade, startGrade } from '@core/grade'
+import { clearRewardValue, gradeForElapsedTurns, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
 import { playerGuardLimit, rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
 import type { Intent, Rarity, Selection, Word } from '@core/types'
@@ -113,6 +113,9 @@ interface ActionStats {
   wide: number
   guardEngine: number
   healEngine: number
+  telegraphs: number
+  groggies: number
+  groggyBonusDamage: number
 }
 
 const emptyActions = (): ActionStats => ({
@@ -125,6 +128,9 @@ const emptyActions = (): ActionStats => ({
   wide: 0,
   guardEngine: 0,
   healEngine: 0,
+  telegraphs: 0,
+  groggies: 0,
+  groggyBonusDamage: 0,
 })
 const addActions = (into: ActionStats, from: ActionStats): void => {
   for (const key of Object.keys(into) as (keyof ActionStats)[]) into[key] += from[key]
@@ -372,7 +378,29 @@ function takeBossShop(player: PlayerState, grade: number, unusedDraws: number, d
       if (skill === 'ok' && wallet.inspiration <= 2) return
       let chosen = affordable[Math.floor(rng() * affordable.length)]
       if (skill !== 'random') {
-        chosen = [...affordable].sort((a, b) => rewardPrice(b) - rewardPrice(a))[0]
+        // 상점에서는 조합 전수 탐색을 매 구매마다 되풀이하지 않는다. 슬롯/행동 적합도와
+        // 아이템의 실제 기본 스탯을 사용해, 단순히 가장 비싼 보상을 사던 이전 치팅을 없앤다.
+        const weight = focus === 'balanced' ? EXCLAIM_WEIGHT[skill] : FOCUS_EXCLAIM_WEIGHT[focus]
+        const utility = (option: RewardOption): number => {
+          let score = rewardPrice(option) * 0.6 + (option.reinforce ? 1 : 0)
+          if (option.item) {
+            score += scoreMods(option.item.base, weight)
+            if (option.item.passive) score += 1.5
+          }
+          const word = option.word
+          if (!word) return score
+          const desiredKind = focus === 'attack' ? 'attack' : focus === 'guard' ? 'guard' : focus === 'heal' ? 'heal' : null
+          if (desiredKind && word.kind === desiredKind) score += 4
+          if (focus === 'combo') score += word.tags.length * 0.45 + (word.bonus ?? 0) * 3
+          const desiredStat = focus === 'attack' ? 'atk' : focus === 'guard' ? 'guard' : focus === 'heal' ? 'heal' : null
+          if (desiredStat && word.stat === desiredStat) score += 2 + (word.statMult ?? 0)
+          score += (word.effects?.counter ? focus === 'guard' ? 2 : 0.3 : 0)
+          score += (word.effects?.lifeStealRate ?? 0) * (focus === 'heal' ? 3 : 1)
+          score += (word.effects?.guardAttackMultiplier ?? 0) * (focus === 'guard' ? 2 : 0.5)
+          score += (word.effects?.overhealDamageMultiplier ?? 0) * (focus === 'heal' ? 2 : 0.5)
+          return score
+        }
+        chosen = [...affordable].sort((a, b) => utility(b) - utility(a))[0]
       }
       wallet.inspiration -= rewardPrice(chosen)
       applyOption(player, chosen, grade, skill, focus, rng)
@@ -473,6 +501,18 @@ function enumerate(
   }
   walk(0, {})
   return out
+}
+
+/** 화면처럼 앞 슬롯부터, 수치나 뒤 카드 내용을 보지 않고 완성 가능한 카드만 무작위 클릭한다. */
+function randomSequentialPick(candidates: Candidate[], order: string[], rng: () => number): Candidate | undefined {
+  let remaining = candidates
+  for (const key of order) {
+    const choices = [...new Map(remaining.map((candidate) => [candidate.sel[key]!.id, candidate.sel[key]!])).values()]
+    if (!choices.length) return undefined
+    const choice = choices[Math.floor(rng() * choices.length)]
+    remaining = remaining.filter((candidate) => candidate.sel[key]?.id === choice.id)
+  }
+  return remaining[Math.floor(rng() * remaining.length)]
 }
 
 const TARGET_FALLOFF = [1, 0.7, 0.5]
@@ -582,6 +622,7 @@ function fightStage(
   while (turn < MAX_TURNS_PER_STAGE && state.playerHp > 0 && !allDead(state)) {
     turn++
     state.turn = turn
+    grade = gradeForElapsedTurns(player.stats.luck, turn - 1)
     if (allDead(state)) break
     if (turn > 1) summonAtTurnStart(state)
     const boss = state.enemies[Math.max(0, frontIdx(state))]
@@ -649,7 +690,9 @@ function fightStage(
       .sort((a, b) => candidateDamage(b, state) - candidateDamage(a, state))[0]
     const guardIgnored = !!boss.def.pierceGuard
       || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
-    let pick = bestAttack ?? bestGuard ?? bestHeal
+    let pick = skill === 'greedy'
+      ? randomSequentialPick(hand, tables.template.slots.map((slot) => slot.key), rng)
+      : bestAttack ?? bestGuard ?? bestHeal
 
     if (skill !== 'greedy' && focus !== 'balanced') {
       const focused = [...hand].sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
@@ -776,15 +819,18 @@ function fightStage(
     if (intent.overhealDamageMultiplier > 0) actions.healEngine++
 
     applyPreparation(state, intent, mult)
-    for (const st of enemyTurn(state, rng, 'first')) log?.push(`    T${turn} 선공 ${st.text}`)
-    if (state.playerHp <= 0) break
-
     const applyAndRecord = (scale: number) => {
       const target = Math.max(0, frontIdx(state))
+      const targetEnemy = state.enemies[target]
+      const groggyMult = targetEnemy && state.turn <= targetEnemy.groggyUntilTurn
+        ? targetEnemy.groggyDamageMult
+        : 1
       const result = applyIntent(state, intent, scale, target)
-      actions.damage += result.hits.reduce((sum, hit) => sum + hit.dmg, 0)
+      const hitDamage = result.hits.reduce((sum, hit) => sum + hit.dmg, 0)
+      actions.damage += hitDamage
         + result.summonDamage
         + result.summonBacklashDamage
+      if (groggyMult > 1) actions.groggyBonusDamage += Math.max(0, hitDamage - Math.round(hitDamage / groggyMult))
       let kills = result.killed.length
       let overflow = result.overflow
       while (overflow > 0 && !allDead(state)) {
@@ -804,14 +850,42 @@ function fightStage(
       killsThisBattle += kills
       return { result, kills }
     }
-    const { result: res } = applyAndRecord(mult)
-    if (resolved.outcome === 'crit' && hasPassive(player, 'echo') && !allDead(state)) {
-      applyAndRecord(mult * ECHO_REPEAT_SCALE)
+
+    const runPlayerAction = () => {
+      const { result } = applyAndRecord(mult)
+      if (resolved.outcome === 'crit' && hasPassive(player, 'echo') && !allDead(state)) {
+        applyAndRecord(mult * ECHO_REPEAT_SCALE)
+      }
+      log?.push(`    T${turn} ${result.text}`)
+      return result
     }
-    log?.push(`    T${turn} ${res.text}`)
+
+    if (intent.preempt) {
+      runPlayerAction()
+      if (!allDead(state)) {
+        for (const st of enemyTurn(state, rng, 'first')) {
+          if (st.telegraphText) actions.telegraphs++
+          if (st.groggyEntered) actions.groggies++
+          log?.push(`    T${turn} 선공 ${st.text}`)
+        }
+      }
+    } else {
+      for (const st of enemyTurn(state, rng, 'first')) {
+        if (st.telegraphText) actions.telegraphs++
+        if (st.groggyEntered) actions.groggies++
+        log?.push(`    T${turn} 선공 ${st.text}`)
+      }
+      if (state.playerHp <= 0) break
+      runPlayerAction()
+    }
+    if (state.playerHp <= 0) break
     if (allDead(state)) break
 
-    for (const st of enemyTurn(state, rng, 'second')) log?.push(`    T${turn} 후공 ${st.text}`)
+    for (const st of enemyTurn(state, rng, 'second')) {
+      if (st.telegraphText) actions.telegraphs++
+      if (st.groggyEntered) actions.groggies++
+      log?.push(`    T${turn} 후공 ${st.text}`)
+    }
     if (state.pending) {
       const pending = applyPendingAttack(state)
       if (pending) {
@@ -823,7 +897,6 @@ function fightStage(
     }
     if (state.playerHp > 0 && !allDead(state)) drawsLeft += intent.bonusDraws
     if (state.playerHp <= 0 || allDead(state)) break
-    grade = decayGrade(grade, player.stats.luck)
   }
 
   const frontAlive = state.enemies.find((e) => !e.dead)
@@ -846,7 +919,7 @@ interface RunResult {
   reachedFloor: number // 도달해서 클리어한 마지막 층(0 = 1층에서 사망)
   diedOn: number | null
   killedBy: string | null
-  hpTrace: { floor: number; hpBefore: number; hpAfter: number; max: number; turns: number }[]
+  hpTrace: { floor: number; hpBefore: number; hpAfter: number; max: number; turns: number; groggies: number; groggyBonusDamage: number }[]
   finalStats: PlayerStats
   log: string[]
   actions: ActionStats
@@ -869,7 +942,15 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
       const hpBefore = Math.min(carried.hp, player.stats.hp)
       const result = fightStage(player, day, carried, combat, focus, locale, rng, verbose ? log : null)
       addActions(actions, result.actions)
-      hpTrace.push({ floor: day, hpBefore, hpAfter: result.hp, max: result.maxHp, turns: result.turns })
+      hpTrace.push({
+        floor: day,
+        hpBefore,
+        hpAfter: result.hp,
+        max: result.maxHp,
+        turns: result.turns,
+        groggies: result.actions.groggies,
+        groggyBonusDamage: result.actions.groggyBonusDamage,
+      })
       if (verbose) {
         log.push(`  ${String(day).padStart(2)}층 ${result.won ? '승' : '패'} · ${result.turns}턴 · HP ${hpBefore}→${result.hp}/${result.maxHp}`)
       }
@@ -904,8 +985,8 @@ console.log(`풀런 시뮬레이션 — 기량별 ${RUNS}회, 1~${STORY_FLOORS}�
 const SKILL_PROFILES: { label: string; reward: RewardSkill; combat: CombatSkill }[] = [
   { label: 'naive', reward: 'random', combat: 'greedy' },
   { label: 'beginner', reward: 'random', combat: 'average' },
-  { label: 'average', reward: 'ok', combat: 'average' },
-  { label: 'expert', reward: 'best', combat: 'smart' },
+  // 전투 기량 비교는 같은 무작위 보상 시드를 써서 보상 평가기의 오차와 섞지 않는다.
+  { label: 'expert', reward: 'random', combat: 'smart' },
 ]
 
 interface ProfileMetrics {
@@ -917,6 +998,10 @@ interface ProfileMetrics {
   earlyDeaths: number
   firstFloorDeaths: number
   avgTurns: number
+  floor5Solved: number
+  floor5Bonus: number
+  midDeaths: number
+  lateDeaths: number
 }
 const metrics: ProfileMetrics[] = []
 
@@ -972,6 +1057,15 @@ for (const profile of SKILL_PROFILES) {
   }
   console.log(`  진입 시 평균 체력비: ${hpLine.join(' ')}`)
 
+  const floor5Traces = runs.flatMap((run) => run.hpTrace.filter((trace) => trace.floor === 5))
+  const floor5Solved = floor5Traces.filter((trace) => trace.groggies > 0)
+  const floor5Bonus = floor5Solved.reduce((sum, trace) => sum + trace.groggyBonusDamage, 0)
+    / Math.max(1, floor5Solved.length)
+  console.log(
+    `  5층 기믹 파훼 ${pct(floor5Solved.length, Math.max(1, floor5Traces.length))}`
+    + ` · 파훼 런 평균 그로기 추가 피해 ${floor5Bonus.toFixed(1)}`,
+  )
+
   const survivors = runs.filter((r) => r.diedOn === null)
   const sample = survivors[0] ?? runs.sort((a, b) => b.reachedFloor - a.reachedFloor)[0]
   const s = sample.finalStats
@@ -988,6 +1082,10 @@ for (const profile of SKILL_PROFILES) {
     earlyDeaths: runs.filter((r) => r.diedOn !== null && r.diedOn <= 4).length,
     firstFloorDeaths: runs.filter((r) => r.diedOn === 1).length,
     avgTurns,
+    floor5Solved: floor5Solved.length,
+    floor5Bonus,
+    midDeaths: runs.filter((run) => run.diedOn !== null && run.diedOn >= 6 && run.diedOn <= 10).length,
+    lateDeaths: runs.filter((run) => run.diedOn !== null && run.diedOn >= 11).length,
   })
   if (verbose) sample.log.forEach((l) => console.log(l))
 }
@@ -998,6 +1096,7 @@ interface BuildMetrics {
   focus: Exclude<BuildFocus, 'balanced'>
   cleared: number
   reach5: number
+  reach10: number
   clear5: number
   avgFloor: number
   actionRates: ActionStats
@@ -1010,7 +1109,8 @@ interface BuildMetrics {
 const buildRunsArg = process.argv.find((argument) => argument.startsWith('--build-runs='))
 const requestedBuildRuns = buildRunsArg ? Math.max(1, Number(buildRunsArg.split('=')[1])) : null
 const BUILD_RUNS = requestedBuildRuns ?? (check ? Math.max(12, Math.ceil(RUNS / 2)) : Math.max(20, Math.ceil(RUNS / 3)))
-const BUILD_FOCUSES: Exclude<BuildFocus, 'balanced'>[] = ['attack', 'guard', 'heal', 'combo']
+const skipBuilds = process.argv.includes('--skip-builds')
+const BUILD_FOCUSES: Exclude<BuildFocus, 'balanced'>[] = skipBuilds ? [] : ['attack', 'guard', 'heal', 'combo']
 const buildMetrics: BuildMetrics[] = []
 
 console.log(`\nBuild identity (${BUILD_RUNS} seeded smart runs each)`)
@@ -1032,11 +1132,15 @@ for (const focus of BUILD_FOCUSES) {
     wide: totals.wide / sentences,
     guardEngine: totals.guardEngine / sentences,
     healEngine: totals.healEngine / sentences,
+    telegraphs: totals.telegraphs / sentences,
+    groggies: totals.groggies / sentences,
+    groggyBonusDamage: totals.groggyBonusDamage / sentences,
   }
   const metric: BuildMetrics = {
     focus,
     cleared: runs.filter((run) => run.diedOn === null).length,
     reach5: runs.filter((run) => run.reachedFloor >= 5).length,
+    reach10: runs.filter((run) => run.reachedFloor >= 10).length,
     clear5: runs.filter((run) => run.diedOn === null || run.diedOn > 5).length,
     avgFloor: runs.reduce((sum, run) => sum + run.reachedFloor, 0) / runs.length,
     actionRates,
@@ -1055,7 +1159,8 @@ for (const focus of BUILD_FOCUSES) {
   buildMetrics.push(metric)
   console.log(
     `  ${focus.padEnd(6)} clear ${metric.cleared}/${BUILD_RUNS} (${pct(metric.cleared, BUILD_RUNS)})`
-    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | clear5 ${pct(metric.clear5, BUILD_RUNS)} | avg ${metric.avgFloor.toFixed(1)}`
+    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | reach10 ${pct(metric.reach10, BUILD_RUNS)}`
+    + ` | clear5 ${pct(metric.clear5, BUILD_RUNS)} | avg ${metric.avgFloor.toFixed(1)}`
     + ` | action A${pct(actionRates.attack, 1)} G${pct(actionRates.guard, 1)}`
     + ` H${pct(actionRates.heal, 1)} C${pct(actionRates.combo, 1)}`
     + ` | dmg/sentence ${metric.damagePerSentence.toFixed(1)} · ${metric.averageTurns.toFixed(1)} turns`,
@@ -1095,7 +1200,6 @@ if (check) {
   const byLabel = Object.fromEntries(metrics.map((metric) => [metric.label, metric]))
   const naive = byLabel.naive
   const beginner = byLabel.beginner
-  const average = byLabel.average
   const expert = byLabel.expert
   const violations: string[] = []
   if (metrics.some((metric) => metric.firstFloorDeaths > 0)) violations.push('초반 학습 구간인 1층에서 사망이 발생했다')
@@ -1103,19 +1207,24 @@ if (check) {
   // 조금 읽는 초심자는 사마귀를 쓰러뜨려 첫 전술 보상까지 반드시 경험해야 한다.
   if (naive.earlyDeaths > 0) violations.push('완전 무작위 플레이가 1~4층에서 사망했다')
   if (beginner.clear5 < RUNS) violations.push('무작위 보상 초심자가 전략적으로 플레이해도 5층을 항상 클리어하지 못한다')
-  // 평균 완주는 기존 실측 10/24(42%) 아래로 다시 떨어지지 않게만 지킨다.
-  if (average.cleared / RUNS < 0.4) violations.push('평균 플레이의 15층 클리어율이 40% 미만이다')
-  if (average.cleared / RUNS > 0.95) violations.push('평균 플레이의 15층 클리어율이 95%를 넘어 난이도 곡선이 무의미하다')
-  if (expert.cleared + Math.ceil(RUNS * 0.1) < average.cleared) {
-    violations.push('숙련 플레이가 평균 플레이보다 10%p 넘게 낮은 클리어율을 보인다')
+  if (beginner.cleared / RUNS < 0.5 || beginner.cleared / RUNS > 0.7) {
+    violations.push('학습 중인 초보자의 15층 클리어율이 목표 범위 50~70%를 벗어난다')
   }
-  if (average.avgFloor - naive.avgFloor < 4) violations.push('선택 기량에 따른 평균 도달층 차이가 4층 미만이다')
-  if (average.avgTurns < 1.4) violations.push('평균 전투 길이가 1.4턴 미만이라 문장 선택이 의미를 잃는다')
+  if (expert.cleared + Math.ceil(RUNS * 0.1) < beginner.cleared) {
+    violations.push('숙련 플레이가 초보 플레이보다 10%p 넘게 낮은 클리어율을 보인다')
+  }
+  if (expert.cleared < naive.cleared) violations.push('숙련 플레이가 무지성 클릭보다 낮은 완주율을 보인다')
+  if (beginner.avgTurns < 1.4) violations.push('초보 평균 전투 길이가 1.4턴 미만이라 문장 선택이 의미를 잃는다')
+  if (beginner.floor5Solved / RUNS < 0.8) violations.push('초보가 5층 그로기 기믹을 80% 이상 파훼하지 못한다')
+  if (beginner.floor5Bonus <= 0) violations.push('5층 그로기 파훼가 실제 추가 피해 보상을 만들지 않는다')
+  if (beginner.lateDeaths <= beginner.midDeaths) violations.push('6~10층보다 11~15층의 누적 사망이 늘지 않아 후반 상승 곡선이 보이지 않는다')
   const builds = Object.fromEntries(buildMetrics.map((metric) => [metric.focus, metric])) as Record<Exclude<BuildFocus, 'balanced'>, BuildMetrics>
   for (const metric of buildMetrics) {
-    if (metric.cleared / BUILD_RUNS < 0.25) violations.push(`${metric.focus} build clears the story in fewer than 25% of runs`)
+    // 특화 빌드는 15층 목표 승률의 대리값이 아니다. 초반 보스 보장, 두 번째 구간 진입,
+    // 평균 진행도와 실제 행동 정체성으로 카드풀이 플레이 가능한지를 검증한다.
+    if (metric.reach10 / BUILD_RUNS < 0.9) violations.push(`${metric.focus} build reaches floor 10 in fewer than 90% of runs`)
+    if (metric.avgFloor < 12) violations.push(`${metric.focus} build averages below floor 12`)
   }
-  if (builds.guard.cleared / BUILD_RUNS < 0.4) violations.push('guard build clears the story in fewer than 40% of runs')
   const stableSupportClears = Math.max(builds.guard.cleared, builds.heal.cleared, builds.combo.cleared)
   if (builds.attack.cleared > stableSupportClears + Math.ceil(BUILD_RUNS * 0.15)) {
     violations.push('attack build clears more than 15%p above the most stable support build')

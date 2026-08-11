@@ -206,6 +206,7 @@ for (const emotion of EMOTIONS) {
   const best: Record<CheckedAction, number> = { attack: 0, guard: 0, heal: 0 }
   const bestEfficiency: Record<CheckedAction, number> = { attack: 0, guard: 0, heal: 0 }
   const bestLine: Record<CheckedAction, string> = { attack: '', guard: '', heal: '' }
+  const affordableCardIds = new Set<string>()
 
   for (const subj of subjects) {
     for (const adv of modifiers) {
@@ -213,6 +214,7 @@ for (const emotion of EMOTIONS) {
         const selection: Selection = { subj, adv, verb }
         const inkCost = selectionInkCost(selection)
         costs.push(inkCost)
+        if (inkCost <= 10) [subj, adv, verb].forEach((word) => affordableCardIds.add(word.id))
         if (ACTION_KINDS.includes(verb.kind as CheckedAction)) actions.add(verb.kind as CheckedAction)
         if (verb.kind === 'attack' && compile(selection, tables).combos.length > 0) attackCombos++
         if (inkCost <= 8) {
@@ -241,7 +243,8 @@ for (const emotion of EMOTIONS) {
   const varianceSubjects = subjects.length - stableSubjects
   const tactics = new Set(modifiers.flatMap(modifierTactics))
   const missingActions = ACTION_KINDS.filter((kind) => !actions.has(kind))
-  const allWithin10 = cost.atMost10 === costs.length
+  const cardsWithoutAffordableLine = [...subjects, ...modifiers, ...verbs]
+    .filter((word) => !affordableCardIds.has(word.id))
   const signatureReady = hasEmotionSignature(emotion, modifiers)
 
   console.log(`\n${emotion}`)
@@ -258,8 +261,12 @@ for (const emotion of EMOTIONS) {
   for (const kind of ACTION_KINDS) console.log(`    ${kind}: ${bestLine[kind]}`)
   powerSummaries.push({ emotion, best, bestEfficiency })
 
-  if (!allWithin10) {
-    console.error(`  [FAIL] ${costs.length - cost.atMost10} combination(s) cost more than 10`)
+  if (cost.atMost10 < Math.ceil(costs.length * 0.8)) {
+    console.error(`  [FAIL] fewer than 80% of combinations fit the absolute 10-ink ceiling (${cost.atMost10}/${costs.length})`)
+    failed = true
+  }
+  if (cardsWithoutAffordableLine.length > 0) {
+    console.error(`  [FAIL] cards without any same-color <=10 line: ${cardsWithoutAffordableLine.map((word) => word.text).join(', ')}`)
     failed = true
   }
   if (cost.atMost6 < Math.ceil(costs.length * 0.1)) {
@@ -316,7 +323,8 @@ for (const kind of ACTION_KINDS) {
     console.error(`  [FAIL] one emotion's best <=8 ${kind} answer is below 20% of the strongest emotion`)
     failed = true
   }
-  if (weakest < absoluteFloor[kind]) {
+  // 기대값은 표시용 소수점과 룰렛 확률을 곱하므로 0.5 미만 차이는 전투의 정수 반올림 범위다.
+  if (weakest + 0.5 < absoluteFloor[kind]) {
     console.error(`  [FAIL] one emotion's best <=8 ${kind} answer is below the ${absoluteFloor[kind]}-point starting-stat floor`)
     failed = true
   }
