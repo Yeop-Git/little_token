@@ -5634,6 +5634,8 @@ html[data-postprocessing='off'] .tip-bubble {
   will-change: transform;
 }
 .card-lift {
+  /* 빌려온 카드의 후광(.word-card.lent .card-lift::after)이 이 상자를 기준으로 선다. */
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -6031,6 +6033,94 @@ html[data-postprocessing='off'] .tip-bubble {
   44% { opacity: 1; transform: translateY(10px) scale(.92) rotate(3deg); }
   68% { transform: translateY(-4px) scale(1.04) rotate(-1deg); }
   100% { opacity: 1; transform: none; }
+}
+/* ── 토큰이 빌려준 카드 ──
+   보스를 만난 순간 손패에 끼어드는 공략 단어다. 덱에서 온 게 아니라서 다른 카드와 똑같이
+   생기면 그냥 지나친다. 그래서 둘을 준다 — 어디서 왔는지 말하는 표식, 지금 이걸 보라고
+   부르는 반짝임. 등급 발광과 겹치지 않게 색은 토큰의 금빛으로 고정한다. */
+.word-card.lent .card-front {
+  box-shadow:
+    0 14px 28px rgba(0,0,0,.58),
+    inset 0 0 0 2px rgba(255, 236, 168, .92),
+    inset 0 0 0 5px rgba(214, 154, 46, .55),
+    0 0 22px rgba(255, 214, 110, .5);
+  animation: lent-breathe 2.4s ease-in-out infinite;
+}
+@keyframes lent-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.09) saturate(1.06); }
+}
+/* 표식 자체는 카드 위쪽에 걸치는 작은 리본이다. 앞면은 overflow: hidden이라 안쪽에 둔다. */
+.card-lent-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  height: 19px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 224, 138, .96), rgba(233, 176, 64, .88));
+  box-shadow: 0 2px 7px rgba(120, 74, 12, .45);
+}
+.card-lent-mark b {
+  color: #4a3210;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-shadow: 0 1px 0 rgba(255, 245, 214, .6);
+}
+/* 삥! — 표식에서 한 번씩 퍼져 나가는 고리. 계속 울리되 사이를 길게 둬서
+   "여기 있다"는 신호가 소음이 되지 않게 한다. */
+.card-lent-mark i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid rgba(255, 246, 214, .95);
+  border-radius: 50%;
+  /* 속을 비운 고리라야 「삥!」으로 읽힌다. 꽉 찬 점은 리본 위에서 그냥 번짐이 된다. */
+  box-shadow: 0 0 12px rgba(255, 226, 132, .9), inset 0 0 8px rgba(255, 226, 132, .8);
+  animation: lent-ping 2.6s cubic-bezier(.15,.72,.3,1) infinite;
+}
+@keyframes lent-ping {
+  0% { opacity: 0; transform: scale(.3); }
+  6% { opacity: 1; transform: scale(1); }
+  38% { opacity: 0; transform: scale(7); }
+  100% { opacity: 0; transform: scale(7); }
+}
+/* 카드 전체에서도 한 번씩 빛이 훑고 지나간다 — 손패가 붐빌 때 리본만으로는 안 보인다. */
+.word-card.lent .card-lift::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  z-index: 20;
+  border-radius: 21px;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(255, 226, 140, .9), 0 0 26px rgba(255, 206, 92, .75);
+  opacity: 0;
+  animation: lent-halo 2.6s ease-out infinite;
+}
+@keyframes lent-halo {
+  0% { opacity: 0; transform: scale(.94); }
+  10% { opacity: .95; transform: scale(1); }
+  40% { opacity: 0; transform: scale(1.07); }
+  100% { opacity: 0; transform: scale(1.07); }
+}
+/* 봉인·충돌로 못 고르는 카드에서는 부른 적 없는 것으로 친다. */
+.word-card.lent.blocked .card-lent-mark i,
+.word-card.lent.sealed .card-lent-mark i,
+.word-card.lent.blocked .card-lift::after,
+.word-card.lent.sealed .card-lift::after { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .word-card.lent .card-front,
+  .card-lent-mark i,
+  .word-card.lent .card-lift::after { animation: none; }
+  /* 움직임을 줄여도 "여기 있다"는 사실은 남긴다 — 고리를 끄는 대신 켜 둔다. */
+  .word-card.lent .card-lift::after { opacity: .85; }
 }
 .word-card.drawing { pointer-events: none; }
 /* 사용 중에는 중앙 폭발이 끝날 때까지 다음 카드와 덱 입력을 잠근다. */

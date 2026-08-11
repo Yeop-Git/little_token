@@ -53,6 +53,17 @@ const ELDER_SPIDER_TACTIC: Word = {
   lore: '거미가 바꾼 문장을 읽고, 필요한 감정을 여백에 빌려 적었다.',
 }
 
+/**
+ * 토큰이 그 전투에만 빌려주는 단어들. 덱에서 온 카드가 아니므로 손패에서 다르게 보여야
+ * 한다 — 어디서 왔는지 모르는 카드가 조용히 섞여 있으면 공략이 아니라 사고로 읽힌다.
+ */
+const LENT_WORD_IDS = new Set([QUEEN_BEE_TACTIC.id, ELDER_SPIDER_TACTIC.id])
+
+/** 이 카드는 토큰이 이번 전투에만 빌려준 것인가. 손패의 전용 표시가 이 판정을 쓴다. */
+export function isLentWord(word: Pick<Word, 'id'>): boolean {
+  return LENT_WORD_IDS.has(word.id)
+}
+
 /** 덱에 범위 단어가 없어도 여왕벌의 일벌 퇴치가 운에 막히지 않게 해 주는 전투 한정 단어. */
 export function tablesForEncounter(tables: Tables, enemyId?: string): Tables {
   if (enemyId === 'elderSpider') {

@@ -5,6 +5,7 @@ import { wordCardDisplayNote, wordCardFrontHtml, wordMood } from '@/ui/WordCardF
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
+import { isLentWord } from '@data/earlyWords'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
@@ -127,6 +128,19 @@ interface CardHandOptions {
 }
 
 type ConflictResolver = (word: Word) => string | null
+
+/**
+ * 토큰이 이번 전투에만 빌려준 카드에 붙는 표식.
+ *
+ * 이 카드는 덱에서 온 게 아니라 보스를 만난 순간 손패에 끼어든 것이라, 다른 카드와 똑같이
+ * 생기면 "이런 게 있었나?"로 지나간다. 그래서 표식 하나(어디서 왔는지)와 반짝임 하나
+ * (지금 이걸 보라)를 함께 준다 — 반짝임 자체는 CSS가 맡고 여기서는 자리만 만든다.
+ * 보조기기에는 `cardAriaLabel`이 같은 사실을 말로 전하므로 이 겹은 숨긴다.
+ */
+function lentMarkHtml(lent: boolean): string {
+  if (!lent) return ''
+  return `<span class="card-lent-mark" aria-hidden="true"><i></i><b>토큰의 공략</b></span>`
+}
 
 export class CardHand {
   private readonly states = new Map<string, SlotHandState>()
@@ -545,7 +559,9 @@ export class CardHand {
       const drawing = this.drawingId === card.instanceId
       const rarity = card.word.rarity ?? 'common'
       const emotionKey = emotionOrNeutral(card.word.emotion)
-      button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}`
+      // 빌려온 카드 표시는 앞면 안에 있고 카드 풀은 단어 id로 나뉘므로, 재사용할 때는
+      // 클래스만 다시 붙이면 된다 — 표시가 다른 단어로 새어 갈 길이 없다.
+      button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}${isLentWord(card.word) ? ' lent' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !this.inputEnabled || !!unavailable
       button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : this.cardAriaLabel(card.word))
@@ -585,13 +601,14 @@ export class CardHand {
     const emotion = emotionOrNeutral(card.word.emotion)
     // 임시 CSS 거미줄. 최종 스프라이트는 이 전용 훅의 배경만 교체한다.
     const webOverlay = `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>`
+    const lent = isLentWord(card.word)
     // 앞면은 손패 밖 화면과 같은 함수로 그린다(ui/WordCardFace.ts).
     const front = wordCardFrontHtml(card.word, {
       note: unavailable ?? wordNoteText(card.word),
-      footer: sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : 'WORD CARD',
-      overlay: webOverlay,
+      footer: sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : lent ? "TOKEN'S HINT" : 'WORD CARD',
+      overlay: webOverlay + lentMarkHtml(lent),
     })
-    return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}"
+    return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}${lent ? ' lent' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${!this.inputEnabled || unavailable ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
@@ -605,7 +622,9 @@ export class CardHand {
   private cardAriaLabel(word: Word): string {
     const rarity = RARITY_LABEL[word.rarity ?? 'common']
     const level = word.level ?? 1
-    return `${word.text}, ${rarity}${level > 1 ? `, Lv.${level}` : ''}, 잉크 ${wordInkCost(word)}, ${wordNoteText(word)}`
+    // 빌려준 카드라는 사실은 화면에서 반짝임으로 전하므로, 읽어 주는 쪽에도 먼저 말한다.
+    const lent = isLentWord(word) ? '토큰의 공략 단어, ' : ''
+    return `${lent}${word.text}, ${rarity}${level > 1 ? `, Lv.${level}` : ''}, 잉크 ${wordInkCost(word)}, ${wordNoteText(word)}`
   }
 
   // 카드를 문장에 넣는 단 하나의 경로 — 클릭과 키보드 입력이 여기로 모인다.
