@@ -19,7 +19,7 @@ const WORD_IDS = [
   'neo', 'geu', 'holo', 'joy', 'mad', 'slow', 'neolli', 'war', 'fir', 'sil', 'mem', 'bit',
   'jin', 'hoi', 'jum', 'mang', 'hui', 'e1', 'e2', 'e3', 'e4', 'pt_bang', 'pt_dot', 'pt_q', 'gr',
   'focusStrike', 'pierceStrike', 'spreadTwo', 'splitTwo', 'scatterThree', 'pourThree', 'doubleTap', 'flurry',
-  'counterOne', 'counterTwo', 'tearMend', 'riseAgain', 'queenBeeTactic', 'elderSpiderTactic',
+  'counterOne', 'counterTwo', 'tearMend', 'riseAgain', 'queenBeeTactic', 'elderSpiderTactic', 'mantisTactic',
 ] as const
 
 function mapValues(values: readonly string[]): Record<string, string> {
@@ -37,7 +37,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'You', 'That child', 'alone', 'quietly', 'madly', 'slowly', 'far and wide', 'the battle', 'the flame', 'the silence', 'the memory', 'the rain',
     'advanced', 'evaded', 'ignited', 'forgot', 'swept away', 'did it', 'tried to do it', 'did I do it?', 'ended up doing it!', '!', '.', '?', 'growing',
     'focused and struck', 'pierced through', 'spread it', 'split it', 'scattered it', 'poured it out', 'tapped twice', 'unleashed a flurry',
-    'gave it back', 'held firm', 'swallowed my tears', 'rose with gritted teeth', 'drove them off', 'corrected the opening and struck',
+    'gave it back', 'held firm', 'swallowed my tears', 'rose with gritted teeth', 'drove them off', 'corrected the opening and struck', 'braced for sacrifice',
   ]),
   ja: mapValues([
     'ぼくは', '昨日のぼくは', 'ぼくも', '今日のぼくは', '歯を食いしばったぼくは', '奮い立つぼくは', '傷ついたぼくは', 'ぼくたちは', '明るく笑うぼくは', 'あたたかなぼくたちは',
@@ -48,7 +48,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'きみは', 'あの子は', 'ひとりで', '静かに', '狂ったように', 'ゆっくり', '広く', '戦い', '炎', '沈黙', '記憶', '雨',
     '進めた', 'かわした', '灯した', '忘れた', 'なぎ払った', 'した', 'しようとした', 'したっけ？', 'してしまった！', '！', '。', '？', 'すくすく',
     '狙いすまして打った', '貫いた', '広げた', '切り裂いた', 'まき散らした', '浴びせた', '二度たたいた', '乱打した',
-    '返した', '耐え抜いた', '涙を飲みこんだ', '歯を食いしばって立った', '倒した', '隙を書き直して突いた',
+    '返した', '耐え抜いた', '涙を飲みこんだ', '歯を食いしばって立った', '倒した', '隙を書き直して突いた', '犠牲を覚悟した',
   ]),
   ru: mapValues([
     'Я', 'Вчера я', 'Я тоже', 'Сегодня я', 'Стиснув зубы, я', 'Встав во весь рост, я', 'Раненый, я', 'Мы', 'Сияя улыбкой, я', 'Согретые теплом, мы',
@@ -59,7 +59,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'Ты', 'Тот ребёнок', 'в одиночку', 'тихо', 'безумно', 'медленно', 'широко', 'битву', 'пламя', 'тишину', 'память', 'дождь',
     'продолжил', 'уклонился', 'зажёг', 'забыл', 'смёл', 'сделал это', 'попытался сделать', 'я сделал это?', 'всё-таки сделал!', '!', '.', '?', 'всё выше',
     'прицельно ударил', 'пронзил', 'распространил', 'рассёк', 'рассеял', 'обрушил', 'ударил дважды', 'нанёс град ударов',
-    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал, стиснув зубы', 'истребил', 'исправил брешь и ударил',
+    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал, стиснув зубы', 'истребил', 'исправил брешь и ударил', 'принял удар на себя',
   ]),
   'zh-Hans': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬紧牙关的我', '挺身而出的我', '受伤的我', '我们', '灿烂笑着的我', '温暖的我们',
@@ -70,7 +70,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那个孩子', '独自', '安静地', '疯狂地', '慢慢地', '广泛地', '战斗', '火焰', '沉默', '记忆', '雨水',
     '推进了', '回避了', '点燃了', '忘却了', '横扫了', '做了', '本想去做', '做过吗？', '终究还是做了！', '！', '。', '？', '茁壮成长',
     '瞄准重击了', '钻了进去', '扩散开了', '劈开了', '挥洒开了', '倾泻而出了', '敲了两下', '连续猛击了',
-    '还了回去', '坚持住了', '咽下了眼泪', '咬紧牙关站了起来', '击退了', '改写破绽后刺了过去',
+    '还了回去', '坚持住了', '咽下了眼泪', '咬紧牙关站了起来', '击退了', '改写破绽后刺了过去', '做好了牺牲的觉悟',
   ]),
   'zh-Hant': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬緊牙關的我', '挺身而出的我', '受傷的我', '我們', '燦爛笑著的我', '溫暖的我們',
@@ -81,7 +81,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那個孩子', '獨自', '安靜地', '瘋狂地', '慢慢地', '廣泛地', '戰鬥', '火焰', '沉默', '記憶', '雨水',
     '推進了', '迴避了', '點燃了', '忘卻了', '橫掃了', '做了', '本想去做', '做過嗎？', '終究還是做了！', '！', '。', '？', '茁壯成長',
     '瞄準重擊了', '鑽了進去', '擴散開了', '劈開了', '揮灑開了', '傾瀉而出了', '敲了兩下', '連續猛擊了',
-    '還了回去', '堅持住了', '嚥下了眼淚', '咬緊牙關站了起來', '擊退了', '改寫破綻後刺了過去',
+    '還了回去', '堅持住了', '嚥下了眼淚', '咬緊牙關站了起來', '擊退了', '改寫破綻後刺了過去', '做好了犧牲的覺悟',
   ]),
 }
 

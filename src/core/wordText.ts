@@ -39,6 +39,21 @@ const BUILD_EFFECT_LABEL = {
   'zh-Hant': { magicShield: '魔法盾1層', guardAttack: '目前防禦傷害', overhealAttack: '過量治療傷害', lifeSteal: '吸血' },
 }[currentLocale]
 
+/**
+ * 보스 전용 카드의 조건부 배수. 「언제 커지는가」가 곧 그 카드의 정체라 값만 적지 않고
+ * 조건을 함께 적는다 — 화면에 조건이 없으면 플레이어는 그 배수를 영영 못 만난다.
+ */
+const CONDITIONAL_MULT_LABEL = {
+  ko: { summon: '일벌에게', heavyTurn: '강공격 턴이면' },
+  en: { summon: 'vs workers', heavyTurn: 'on heavy-attack turn' },
+  ja: { summon: '働き蜂に', heavyTurn: '強攻撃のターンなら' },
+  ru: { summon: 'по рабочим', heavyTurn: 'в ход мощной атаки' },
+  'zh-Hans': { summon: '对工蜂', heavyTurn: '强攻回合时' },
+  'zh-Hant': { summon: '對工蜂', heavyTurn: '強攻回合時' },
+}[currentLocale]
+
+const conditionalMultText = (label: string, mult: number): string => `${label} ×${mult}`
+
 const resourceDamageText = (label: string, rate: number): string => currentLocale === 'ko'
   ? `${label} ${Math.round(rate * 100)}% 피해`
   : `${label} ${Math.round(rate * 100)}%`
@@ -210,6 +225,12 @@ function noteParts(w: Word): string[] {
   if (w.effects?.guardAttackMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.guardAttack, w.effects.guardAttackMultiplier))
   if (w.effects?.overhealDamageMultiplier) out.push(resourceDamageText(BUILD_EFFECT_LABEL.overhealAttack, w.effects.overhealDamageMultiplier))
   if (w.effects?.lifeStealRate) out.push(`${BUILD_EFFECT_LABEL.lifeSteal} ${Math.round(w.effects.lifeStealRate * 100)}%`)
+  if ((w.effects?.summonDamageMultiplier ?? 1) > 1) {
+    out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.summon, w.effects!.summonDamageMultiplier!))
+  }
+  if ((w.effects?.heavyTurnMultiplier ?? 1) > 1) {
+    out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.heavyTurn, w.effects!.heavyTurnMultiplier!))
+  }
   if (w.effects?.inkDiscount) out.push(`${L.inkDiscount} −${w.effects.inkDiscount}`)
   if (w.effects?.carryInk) out.push(`${L.carryInk} +${w.effects.carryInk}`)
   if (w.effects?.attackRank) out.push(rankText(EXTRA_EFFECT_LABEL.attackRank, w.effects.attackRank))

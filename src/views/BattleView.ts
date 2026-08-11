@@ -2247,16 +2247,14 @@ export class BattleView {
     // 회복은 체력이 가득 차도 숨기지 않는다. 초과 회복 전환과 회복 기반 관용구는
     // 만피에서 시작하는 빌드이므로 드로우 단계가 임의로 전략을 지우면 안 된다.
     const words = slotWords
-    const front = this.state.enemies[frontIdx(this.state)]
-    const needsQueenAnswer = front?.def.id === 'queenBee'
-      && summonCount(front) > 0
-      && (key === 'verb' || key === 'verb2')
+    // 첫 손패에 답을 끌어올려 주지 않는다. 보스가 빌려주는 전용 단어는 뽑기 후보 한 장이
+    // 늘 뿐이고, 운이 좋아야 만난다 — 확정으로 쥐여 주면 보스의 규칙을 읽는 대신 그 한
+    // 장을 기다리게 되고, 세 보스가 전부 같은 모양의 전투가 된다.
     this.cardHand.showSlot(
       key,
       words,
       this.sel[key],
       (word) => this.unavailableReason(word),
-      needsQueenAnswer ? (word) => word.kind === 'attack' && (!!word.effects?.pierceGuard || word.targetCount === 'all' || (word.targetCount ?? 1) >= 2) : undefined,
     )
     this.castPendingSpiderWeb(key)
     this.renderDetail(null)

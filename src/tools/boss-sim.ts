@@ -210,11 +210,12 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
       const threat = boss.def.atk * boss.atkMult * (incoming ? 1.2 : 1)
       const escorts = summonCount(boss)
       const workerClearCount = (candidate: Candidate) => {
-        if (candidate.intent.summonExecuteCount > 0) return Math.min(escorts, candidate.intent.summonExecuteCount)
         const reachable = candidate.intent.pierceGuard || candidate.intent.targetCount === 'all'
           ? escorts
           : Math.min(escorts, candidate.intent.targetCount)
-        return Math.min(reachable, Math.floor(candidate.dmg / (boss.def.summonPattern?.hp ?? 1)))
+        // 일벌 전용 배수는 실제 판정과 같은 자리에서 곱해야 정책이 그 카드를 알아본다.
+        const perWorker = candidate.dmg * candidate.intent.summonDamageMultiplier
+        return Math.min(reachable, Math.floor(perWorker / (boss.def.summonPattern?.hp ?? 1)))
       }
       const queenAnswer = boss.def.id === 'queenBee' && escorts > 0
         ? hand.filter((c) => c.dmg > 0)

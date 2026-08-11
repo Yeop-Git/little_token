@@ -676,11 +676,11 @@ function fightStage(
         || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
       const threat = boss.def.atk * boss.atkMult * (incoming ? 1.2 : 1)
       const workerClear = (c: Candidate) => {
-        if (c.intent.summonExecuteCount > 0) return Math.min(escorts, c.intent.summonExecuteCount)
         const reachable = c.intent.pierceGuard || c.intent.targetCount === 'all'
           ? escorts
           : Math.min(escorts, c.intent.targetCount as number)
-        return Math.min(reachable, Math.floor(candidateDamage(c, state) / (boss.def.summonPattern?.hp ?? 1)))
+        const perWorker = candidateDamage(c, state) * c.intent.summonDamageMultiplier
+        return Math.min(reachable, Math.floor(perWorker / (boss.def.summonPattern?.hp ?? 1)))
       }
       const queenAnswer = boss.def.summonPattern && escorts > 0
         ? hand

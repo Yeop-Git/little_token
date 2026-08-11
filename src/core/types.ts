@@ -94,8 +94,13 @@ export interface WordEffects {
   enemyAttackRank?: number
   /** 이번 전투에서 덱 버튼으로 무료 카드를 뽑을 수 있는 횟수를 더한다. */
   bonusDraws?: number
-  /** 여왕벌 전용 공략처럼 피해량과 무관하게 앞쪽 소환물을 확정 퇴치하는 수. */
-  summonExecuteCount?: number
+  /** 소환물(일벌)에게만 곱하는 피해 배수. 본체와 일반 적에게는 적용하지 않는다. */
+  summonDamageMultiplier?: number
+  /**
+   * 적이 방어를 부수는 강공격을 준비한 턴에만 곱하는 피해 배수.
+   * 맞서 싸우는 카드의 값은 "언제 쓰는가"에 걸려 있어야 하므로 상시 배율로 두지 않는다.
+   */
+  heavyTurnMultiplier?: number
 }
 
 // 문장이 기대는 플레이어 스탯 — 현재 일반 런에서는 동사의 깡수치가 여기서 나온다.
@@ -206,7 +211,8 @@ export interface Intent {
   guardRank: number
   enemyAttackRank: number
   bonusDraws: number
-  summonExecuteCount: number
+  summonDamageMultiplier: number
+  heavyTurnMultiplier: number
   emotions: Emotion[]
   emotionResonance: number
   tags: string[]

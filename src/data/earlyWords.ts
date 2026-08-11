@@ -32,8 +32,11 @@ const QUEEN_BEE_TACTIC: Word = {
   // 목적어는 붙이지 않는다. 동사 칸의 다른 카드가 전부 한 동작만 적는데 여기만
   // 「일벌을」을 달면 앞에 선 주어·수식어와 이어질 때 문장이 겹쳐 읽힌다.
   text: '퇴치했다',
-  effects: { summonExecuteCount: 2 },
-  note: '토큰의 공략 단어 · 공격 ×0.9 · 일벌 2마리 퇴치',
+  // 확정 퇴치를 걷고 **일벌에게만 실리는 배수**로 바꿨다. 피해량과 무관하게 지우는
+  // 효과는 덱이 약해도 결과가 같아서, 빌려온 한 장이 전투를 대신 풀어 버렸다.
+  // 배수는 그 문장이 얼마나 잘 짜였는지를 그대로 반영한다.
+  effects: { summonDamageMultiplier: 1.5 },
+  note: '토큰의 공략 단어 · 공격 ×0.9 · 2명(100%·70%) · 일벌에게 ×1.5',
   lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
 }
 
@@ -47,37 +50,74 @@ const ELDER_SPIDER_TACTIC: Word = {
   statMult: 1,
   kind: 'attack',
   targetCount: 1,
+  // 한 번에 두 번 찌른다. 다리 하나를 끊은 뒤 남은 한 번이 다음 다리에 그대로 이어져,
+  // 감정을 맞출 수 없는 사람도 순서를 밀어붙일 수 있다.
+  effects: { hitCount: 2 },
   art: '3009',
   rarity: 'common',
-  note: '공격 ×1 · 1명 · 현재 다리 약점 적용',
+  note: '공격 ×1 · 2연타 · 현재 다리 약점 적용',
   lore: '거미가 바꾼 문장을 읽고, 필요한 감정을 여백에 빌려 적었다.',
+}
+
+/**
+ * 사마귀 전용 맞딜 카드.
+ *
+ * 사마귀는 「방어 15를 한 문장에 세울 수 있는가」만 묻는 보스라, 방어 빌드가 아니면
+ * 답이 없었다. 이 카드는 다른 종류의 답을 준다 — 막는 대신 마주 선다. 그래서 값이
+ * **큰낫이 내려오는 턴**에만 커진다. 상시 배율로 두면 그냥 센 공격 카드가 되고,
+ * 보스의 패턴을 읽을 이유가 사라진다.
+ */
+const MANTIS_TACTIC: Word = {
+  id: 'mantisTactic',
+  text: '희생을 각오하다',
+  slot: 'verb',
+  tags: ['brace', 'atk'],
+  emotion: 'neutral',
+  stat: 'atk',
+  statMult: 1.5,
+  kind: 'attack',
+  targetCount: 1,
+  effects: { heavyTurnMultiplier: 1.5 },
+  // 임시 일러스트. 이 카드 전용 그림이 들어오면 이 한 줄만 바꾼다.
+  art: '1021',
+  rarity: 'rare',
+  note: '토큰의 공략 단어 · 공격 ×1.5 · 강공격 턴이면 ×1.5',
+  lore: '큰낫이 내려오는 자리에서 물러서지 않기로 했다.',
 }
 
 /**
  * 토큰이 그 전투에만 빌려주는 단어들. 덱에서 온 카드가 아니므로 손패에서 다르게 보여야
  * 한다 — 어디서 왔는지 모르는 카드가 조용히 섞여 있으면 공략이 아니라 사고로 읽힌다.
+ *
+ * 이 셋은 어느 보상 목록(`ALL_REWARD_WORDS`)에도 들어가지 않는다. 보스를 만나야만
+ * 손에 들어오는 전용 카드이며, 그 전투가 끝나면 덱에 남지 않는다.
  */
-const LENT_WORD_IDS = new Set([QUEEN_BEE_TACTIC.id, ELDER_SPIDER_TACTIC.id])
+const LENT_WORD_IDS = new Set([QUEEN_BEE_TACTIC.id, ELDER_SPIDER_TACTIC.id, MANTIS_TACTIC.id])
 
 /** 이 카드는 토큰이 이번 전투에만 빌려준 것인가. 손패의 전용 표시가 이 판정을 쓴다. */
 export function isLentWord(word: Pick<Word, 'id'>): boolean {
   return LENT_WORD_IDS.has(word.id)
 }
 
-/** 덱에 범위 단어가 없어도 여왕벌의 일벌 퇴치가 운에 막히지 않게 해 주는 전투 한정 단어. */
+/** 보스별로 토큰이 빌려주는 전용 단어 한 장. 여기 없는 적에게는 아무것도 끼워 넣지 않는다. */
+const TACTIC_BY_BOSS: Record<string, Word> = {
+  mantis: MANTIS_TACTIC,
+  queenBee: QUEEN_BEE_TACTIC,
+  elderSpider: ELDER_SPIDER_TACTIC,
+}
+
+/**
+ * 그 보스를 만난 전투에만 전용 단어 한 장을 동사 단어장에 끼워 넣는다.
+ *
+ * 손패까지 보장하지는 않는다. 뽑기 후보 한 장이 늘 뿐이라 운이 좋아야 만나고, 만나면
+ * 그 판의 답이 된다 — 확정으로 쥐여 주면 보스의 규칙을 읽는 대신 이 한 장을 기다리게 된다.
+ */
 export function tablesForEncounter(tables: Tables, enemyId?: string): Tables {
-  if (enemyId === 'elderSpider') {
-    const verbs = tables.words.verb ?? []
-    if (verbs.some((word) => word.id === ELDER_SPIDER_TACTIC.id)) return tables
-    return { ...tables, words: { ...tables.words, verb: [...verbs, ELDER_SPIDER_TACTIC] } }
-  }
-  if (enemyId !== 'queenBee') return tables
+  const tactic = enemyId ? TACTIC_BY_BOSS[enemyId] : undefined
+  if (!tactic) return tables
   const verbs = tables.words.verb ?? []
-  if (verbs.some((word) => word.id === QUEEN_BEE_TACTIC.id)) return tables
-  return {
-    ...tables,
-    words: { ...tables.words, verb: [...verbs, QUEEN_BEE_TACTIC] },
-  }
+  if (verbs.some((word) => word.id === tactic.id)) return tables
+  return { ...tables, words: { ...tables.words, verb: [...verbs, tactic] } }
 }
 
 export const EARLY_TEMPLATE = ['subj', 'adv', 'verb']

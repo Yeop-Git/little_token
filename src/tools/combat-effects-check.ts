@@ -6,7 +6,7 @@ import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
 import type { EnemyDef, Intent, Word } from '@core/types'
 import { wordValueLines } from '@core/wordText'
-import { EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, bossEliteRarityForDay, eliteRarityForEncounter, enemyDefForEncounter, enemyRarityWeightsForDay } from '@data/enemies'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { endlessCycleFor, floorInCycle, stageFor } from '@data/stages'
@@ -38,7 +38,7 @@ const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
   return { playerHp: 30, playerMax: 30, guard: 0, counterMultiplier: 0, turn: 1, enemies, pending: null }
 }
-const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, attackRank: 0, guardRank: 0, enemyAttackRank: 0, bonusDraws: 0, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
+const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', targetMode: 'enemy', aoe: 'single', targetCount: 1, kind: 'attack', preempt: false, base: 10, multiplier: 1, variance: null, timing: 'immediate', guard: 0, heal: 0, recoil: 0, evade: 0, pierceGuard: false, hitCount: 1, castCount: 1, castScale: 1, overdrawHitCount: 0, counterMultiplier: 0, magicShield: 0, guardAttackMultiplier: 0, overhealDamageMultiplier: 0, lifeStealRate: 0, attackRank: 0, guardRank: 0, enemyAttackRank: 0, bonusDraws: 0, summonDamageMultiplier: 1, heavyTurnMultiplier: 1, emotions: [], emotionResonance: 1, tags: [], combos: [], coherence: 1, penalties: [], critP: 0, failP: 0, statKey: null, growHp: 0, doubtCount: 0, breakdown: { flats: [], mults: [] }, ...extra } as Intent);
 
 { const player = startingPlayer(); assert(player.stats.hp === 52 && player.stats.guard === 3, 'new run starts at hp 52 and guard 3') }
 { const run = newRun(); assert(run.combat.hp === run.player.stats.hp && run.combat.guard === 0, 'new run starts with full current hp and no carried guard') }
@@ -331,8 +331,58 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); const r = applyIntent(s, attack({ base: 17 }), 1, 0); assert(r.summonDamage === 17 && r.summonsDispersed === 0 && queen.summonHpRight[queen.summonHpRight.length - 1] === 13 && summonCount(queen) === 4, 'partial damage remains on the front worker and keeps its health bar visible') }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 2 && r.summonDamage === 60 && r.summonBacklashDamage === 4 && r.hits.length === 1 && r.hits[0].summonShieldBlocked && queen.hp === hp - 4 && !r.summonGroggyTriggered && queen.summonsDefeated === 2, 'single-target pierce reaches exactly two workers and the surviving escort blocks its remaining damage'); assert(queen.nextAttackTurn === 1 && queen.groggyUntilTurn === 0 && queen.summonRespawnTurn === 1, 'a partial piercing clear does not open queen recovery') }
-{ const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); assert(t.words.verb.some((word) => word.id === 'queenBeeTactic' && word.targetCount === 2), 'queen encounter lends a two-target tactic even when the deck has no range answer') }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); const tactic = tables.words.verb.find((word) => word.id === 'queenBeeTactic')!; const subject = tables.words.subj[0]; const modifier = tables.words.adv[0]; const intent = compile({ subj: subject, adv: modifier, verb: tactic }, tables, { atk: 1, guard: 1, heal: 1, luck: 0 }); const r = applyIntent(s, intent, 1, 0); assert(r.summonsDispersed === 2, 'queen encounter tactic defeats two workers even for a low-attack build') }
+{ const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); assert(t.words.verb.some((word) => word.id === 'queenBeeTactic' && word.targetCount === 2), 'queen encounter lends a two-target tactic') }
+// ── 보스 전용 공략 단어 세 장 ──
+// 전용이라는 말은 두 가지를 뜻한다. 그 보스에서만 손에 들어오고, 어떤 보상으로도
+// 덱에 남지 않는다. 값은 전부 조건부라 "언제 쓰는가"를 읽어야 커진다.
+{
+  const tactics = ['mantisTactic', 'queenBeeTactic', 'elderSpiderTactic']
+  for (const [enemyId, id] of [['mantis', 'mantisTactic'], ['queenBee', 'queenBeeTactic'], ['elderSpider', 'elderSpiderTactic']] as const) {
+    const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), enemyId)
+    const lent = t.words.verb.filter((word) => tactics.includes(word.id))
+    assert(lent.length === 1 && lent[0].id === id, `${enemyId} lends exactly its own tactic word`)
+  }
+  const plain = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'roach')
+  assert(!plain.words.verb.some((word) => tactics.includes(word.id)), 'ordinary encounters lend nothing')
+  assert(!ALL_REWARD_WORDS.some((word) => tactics.includes(word.id)), 'boss tactic words never enter the reward pool')
+}
+{
+  const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee')
+  const tactic = tables.words.verb.find((word) => word.id === 'queenBeeTactic')!
+  const intent = compile({ subj: tables.words.subj[0], adv: tables.words.adv[0], verb: tactic }, tables, { atk: 1, guard: 1, heal: 1, luck: 0 })
+  assert(intent.summonDamageMultiplier === 1.5, 'queen tactic carries a worker-only multiplier')
+  const summonDamage = (mult: number) => {
+    const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s)
+    return applyIntent(s, { ...intent, summonDamageMultiplier: mult }, 1, 0).summonDamage
+  }
+  assert(summonDamage(1.5) > summonDamage(1), 'the queen tactic hits workers harder than the same sentence without it')
+  // 배수는 일벌에게만 실린다 — 호위가 없으면 본체 피해는 그대로다.
+  const bodyDamage = (mult: number) => {
+    const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen])
+    return applyIntent(s, { ...intent, summonDamageMultiplier: mult }, 1, 0).hits.reduce((sum, hit) => sum + hit.dmg, 0)
+  }
+  assert(bodyDamage(1.5) === bodyDamage(1), 'the worker multiplier never reaches the queen herself')
+}
+{
+  const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'mantis')
+  const tactic = tables.words.verb.find((word) => word.id === 'mantisTactic')!
+  assert(tactic.statMult === 1.5 && tactic.effects?.heavyTurnMultiplier === 1.5, 'mantis tactic is 1.5 base with a 1.5 heavy-turn multiplier')
+  const damageOnStep = (index: number) => {
+    const mantis = makeEnemy(ENEMIES.mantis); const s = state([mantis])
+    mantis.attackPatternIndex = index
+    return applyIntent(s, attack({ base: 20, heavyTurnMultiplier: 1.5 }), 1, 0).hits.reduce((sum, hit) => sum + hit.dmg, 0)
+  }
+  const heavy = ENEMIES.mantis.attackPattern!.findIndex((step) => step.shatterGuard)
+  const calm = ENEMIES.mantis.attackPattern!.findIndex((step) => !step.shatterGuard && (step.damageScale ?? 1) > 0)
+  assert(heavy >= 0 && calm >= 0, 'mantis has both a heavy step and an ordinary one')
+  // 사마귀의 방어도(8)가 두 경우에서 똑같이 깎이므로, 차이는 곧 배수가 얹은 몫이다.
+  assert(damageOnStep(heavy) - damageOnStep(calm) === 10, 'bracing pays only on the turn the great scythe comes down')
+}
+{
+  const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'elderSpider')
+  const tactic = tables.words.verb.find((word) => word.id === 'elderSpiderTactic')!
+  assert(tactic.effects?.hitCount === 2 && tactic.tags.includes('adapt'), 'spider tactic strikes twice and always counts as the current weakness')
+}
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
 {
   const queen = makeEnemy(ENEMIES.queenBee)
