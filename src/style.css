@@ -2626,7 +2626,9 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 /* 토큰은 무대를 자유롭게 나는 배우다. 자리는 CSS가 아니라 TokenActor의 비행
    컨트롤러가 매 프레임 transform으로 정한다 — 여기서는 좌표를 잡지 않는다.
-   .stage-area(z-index 3) 안에 살기 때문에 HUD와 손패 뒤로 지나간다. */
+   .stage-area(z-index 3) 안에 살기 때문에 HUD와 손패 뒤로 지나간다.
+   여기 적힌 z-index는 첫 프레임의 값일 뿐이고, 그 뒤로는 비행의 깊이가 앞 겹(57)과
+   뒤 겹(20)을 오간다 — 배우 대역(38~40)의 위아래다. 판정은 TokenActor.updateLayer가 쥔다. */
 .token-actor {
   position: absolute;
   left: 0;
@@ -2657,6 +2659,9 @@ html[data-postprocessing='off'] .tip-bubble {
   animation: token-fret .86s ease-in-out infinite alternate;
 }
 .token-actor .battle-sprite { object-position: center; }
+/* 배우 뒤로 넘어간 동안은 몸을 한 겹 죽인다. 발광은 상태 규칙들이 filter로 쥐고 있어
+   여기서 건드리면 서로 덮어쓰므로, 그 위에 곱해지는 불투명도만 낮춘다. */
+.token-actor[data-layer='behind'] .token-body { opacity: .88; }
 /* 가로지르는 중에는 잔상처럼 꼬리를 남기고, 들여다보는 중에는 빛을 키워 시선을 끈다. */
 .token-actor[data-behavior='wander'] .token-body { filter: drop-shadow(0 0 22px rgba(255, 230, 140, .68)); }
 .token-actor[data-behavior='peer'] .token-body { filter: drop-shadow(0 0 26px rgba(255, 236, 160, .72)); }
@@ -2935,6 +2940,10 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 프롬은 배경이 바뀌어도 늘 이 자리에서 오른쪽을 본다(data/backgrounds.ts 참고).
      화면 끝에 붙여 두면 잘려 나온 것처럼 보여서 왼쪽에 한 뼘 여백을 남긴다. */
   left: var(--player-left, 290px);
+  /* 적 레일(40부터 뒷줄로 내려감)과 같은 대역에 프롬도 명시적으로 세운다. 예전엔 auto라
+     겹칠 일이 없어 비워 두었지만, auto는 어떤 양수보다도 아래라서 토큰이 아무리 깊이
+     들어가도 프롬 앞을 지나갔다. 토큰의 뒤 겹(20)이 성립하려면 프롬에게도 숫자가 필요하다. */
+  z-index: 39;
 }
 .actor > .model-shell {
   position: relative;

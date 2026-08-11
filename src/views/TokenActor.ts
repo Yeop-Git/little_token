@@ -52,7 +52,7 @@ const FLIGHT: Record<TokenBehavior, { speed: number; accel: number; slow: number
   // 가속만은 넉넉히 준다 — 가로지르기에서 돌아올 때 제동이 약하면 800px씩 흘러가 버린다.
   orbit: { speed: 300, accel: 2000, slow: 130, scale: 0.6, depth: 0 },
   // 가로지르기만 유일하게 빠르다. "슈우웅"은 속도가 아니라 **다른 결과의 대비**에서 나온다.
-  // 뒤로 물러나며 가로지르므로 무대 안쪽으로 들어가는 것처럼 보인다.
+  // 뒤로 물러나며 가로지르므로 실제로 배우들 뒤를 지난다(updateLayer의 뒤 겹).
   wander: { speed: 980, accel: 3000, slow: 240, scale: 0.52, depth: -0.7 },
   inspect: { speed: 420, accel: 1700, slow: 96, scale: 0.72, depth: -0.25 },
   // 화면 너머를 보러 올 때가 가장 가깝다. 유리에 얼굴을 붙이는 거리다.
@@ -120,6 +120,33 @@ const DEPTH_SCALE = 0.34
 const DEPTH_BLUR_PX = 1.6
 const DEPTH_FADE = 0.22
 
+/**
+ * 겹 — 깊이가 실제 가림으로 넘어가는 지점.
+ *
+ * 토큰과 배우는 `.stage-area` 하나의 스태킹 컨텍스트에 같이 산다. 배우는 적 앞줄부터
+ * 40·39·38을 쓰고 프롬은 39다. 그래서 뒤 겹은 그 아래, 앞 겹은 그 위 한 칸씩이면 된다.
+ *
+ * 깊이 축은 지금까지 축척과 흐림만 굴렸다. 그 결과 「무대 안쪽으로 들어가는」 가로지르기가
+ * 작아지고 흐려지기만 할 뿐 프롬 앞을 지나가서, 멀어지는 게 아니라 줄어드는 것으로 읽혔다.
+ * 앞뒤는 크기가 아니라 **무엇이 무엇을 가리는가**로 읽힌다 — 그 한 칸을 여기서 잇는다.
+ */
+const Z_FRONT = 57
+const Z_BEHIND = 20
+/**
+ * 이 선보다 안쪽에 서는 결은 배우 뒤로 넘어간다 — 가로지르기(-0.7)와 들여다보기(-0.25)가
+ * 여기 걸리고 맴돌기(0)는 걸리지 않는다.
+ *
+ * 판정은 **결의 목표 깊이**로 하고 지금 깊이로는 하지 않는다. 지금 깊이에는 숨(breath,
+ * ±0.09)이 얹혀 있어서, 그걸로 문턱을 재면 들여다보기처럼 문턱 언저리에 서는 결이 매번
+ * 다른 겹에서 시작한다. 결이 정해지면 겹도 정해져야 한다. 지금 깊이는 아래에서 **언제
+ * 바꿀지**에만 쓴다 — 같은 선을 실제로 넘어가는 순간에 바꿔야 전환이 이동에 묻힌다.
+ */
+const BEHIND_DEPTH = -0.15
+/** 배우와 겹친 채로 겹을 바꾸면 툭 튄다. 비켜날 때까지 미루되 이보다 오래는 안 미룬다(ms). */
+const LAYER_SWAP_WAIT_MS = 240
+/** 겹침 판정에 쓰는 토큰의 실효 반경(상자 한 변 대비). 상자는 여백이 넓어 그대로 쓰면 늘 겹친다. */
+const TOKEN_HIT_RATIO = 0.42
+
 /** 이보다 오래 누르고 있으면 붙잡은 것으로 친다(ms). */
 const GRAB_HOLD_MS = 320
 /** 톡 건드렸을 때 화면 앞으로 나와 갸웃하는 시간(ms). */
@@ -179,6 +206,12 @@ export class TokenActor {
   private grabPointer: number | null = null
   private readonly grabAt: Vec = { x: 0, y: 0 }
   private grabTimer = 0
+
+  /** 지금 배우 뒤에 있는가. 깊이가 문턱을 넘을 때만 뒤집힌다. */
+  private behind = false
+  /** 겹을 바꾸고 싶은데 배우와 겹쳐 있어 미루기 시작한 시각. 0이면 미루는 중이 아니다. */
+  private layerPendingSince = 0
+  private actorsEl: HTMLElement | null = null
 
   private playerEl: HTMLElement | null = null
   private frame = 0
@@ -449,7 +482,7 @@ export class TokenActor {
     }
     this.aim(delta)
     this.steer(delta)
-    this.paint()
+    this.paint(now)
   }
 
   /** 지금 결에 맞는 목표점을 갱신한다. 결마다 "어디를 보고 있는가"가 다르다. */
@@ -591,7 +624,7 @@ export class TokenActor {
     setCharacterModelYaw(this.body, this.yaw)
   }
 
-  private paint() {
+  private paint(now = performance.now()) {
     // 상시 부유. 비행 좌표와 따로 얹어야 멈춰 선 순간에도 숨을 쉰다.
     const bob = this.reducedMotion
       ? 0
@@ -607,6 +640,76 @@ export class TokenActor {
     this.bubble.dataset.side = this.pos.x > 1180 ? 'left' : 'right'
     // 갸웃 표시는 톡 건드렸을 때만. 붙잡힌 동안은 그럴 겨를이 없다.
     this.el.classList.toggle('is-wondering', this.behavior === 'poke')
+    this.updateLayer(now)
+  }
+
+  /**
+   * 깊이를 겹침 순서로 옮긴다. 여기서 비로소 토큰이 프롬과 벌레들의 **뒤로** 지나간다.
+   *
+   * 두 경우에는 문턱을 보지 않고 앞에 세운다.
+   * - 바깥이 부른 결(경고·팁·손장난): 가려지는 경고는 경고가 아니다.
+   * - 슬로모와 강타 예비동작: 그동안 `#actors`가 transform으로 제 스태킹 컨텍스트를
+   *   만들어 배우 전체가 한 겹으로 묶인다. 겹 비교 자체가 성립하지 않으므로 앞에 둔다.
+   */
+  private updateLayer(now: number) {
+    const called =
+      this.behavior === 'attend' || this.behavior === 'alert' ||
+      this.behavior === 'poke' || this.behavior === 'grab'
+    const front = called || this.stageIsZooming()
+    const want = !front && FLIGHT[this.behavior].depth < BEHIND_DEPTH
+    if (want === this.behind) {
+      this.layerPendingSince = 0
+      return
+    }
+    // 결이 바뀐 순간이 아니라 깊이가 실제로 움직인 뒤에 바꾼다 — 그래야 겹이 넘어가는
+    // 순간이 물러나는 동작에 묻힌다. 들어갈 때는 목표 깊이의 절반까지 갔을 때로 잡는다.
+    // 문턱(-0.15)을 그대로 쓰면 들여다보기(-0.25)가 숨 폭 안에서 그 선에 걸터앉는다.
+    // 나올 때는 문턱 하나면 된다 — 앞 겹의 결들은 목표가 전부 0 이상이라 곧 넘어선다.
+    const gate = want ? FLIGHT[this.behavior].depth * 0.5 : BEHIND_DEPTH
+    if (!front && (want ? this.depth > gate : this.depth < gate)) return
+    // 겹친 채로 바꾸면 배우가 한 프레임 만에 토큰을 삼키거나 뱉는다. 비켜날 때까지 기다리되,
+    // 계속 겹쳐 있는 결(맴돌기가 프롬 위를 도는 동안)에 갇히지 않도록 대기에 상한을 둔다.
+    if (!front && this.overlapsActor()) {
+      if (!this.layerPendingSince) this.layerPendingSince = now
+      if (now - this.layerPendingSince < LAYER_SWAP_WAIT_MS) return
+    }
+    this.layerPendingSince = 0
+    this.behind = want
+    this.el.style.zIndex = String(want ? Z_BEHIND : Z_FRONT)
+    // 뒤에 있는 동안은 CSS가 몸을 한 겹 죽인다 — 가려진 몸에서 빛만 그대로 새어 나오면
+    // 뒤로 간 게 아니라 배우가 반투명해진 것처럼 보인다.
+    this.el.dataset.layer = want ? 'behind' : 'front'
+  }
+
+  /** 무대가 통째로 확대되는 중인가. 그동안은 배우들이 한 겹으로 묶여 앞뒤가 성립하지 않는다. */
+  private stageIsZooming(): boolean {
+    if (!this.actorsEl?.isConnected) this.actorsEl = this.host.querySelector<HTMLElement>('#actors')
+    if (this.actorsEl?.classList.contains('slowmo')) return true
+    return this.host.closest('.scene')?.classList.contains('heavy-windup') ?? false
+  }
+
+  /**
+   * 토큰의 실루엣이 지금 어느 배우와 겹쳐 있는가. 겹을 바꿀지 정할 때만 물어본다.
+   * 모델 예열 무대(`.model-prewarm-stage`)의 허수아비는 세지 않으므로 `#actors` 안만 본다.
+   */
+  private overlapsActor(): boolean {
+    const hostRect = this.host.getBoundingClientRect()
+    const scale = hostRect.width / (this.host.offsetWidth || 1) || 1
+    const half = (BOX * this.scale * TOKEN_HIT_RATIO) / 2
+    const actors = (this.actorsEl ?? this.host).querySelectorAll<HTMLElement>('.actor')
+    for (const actor of actors) {
+      const rect = actor.getBoundingClientRect()
+      if (!rect.width || !rect.height) continue
+      const left = (rect.left - hostRect.left) / scale
+      const top = (rect.top - hostRect.top) / scale
+      if (
+        this.pos.x + half > left && this.pos.x - half < left + rect.width / scale &&
+        this.pos.y + half > top && this.pos.y - half < top + rect.height / scale
+      ) {
+        return true
+      }
+    }
+    return false
   }
 
   // ── 결 고르기 ─────────────────────────────────────────────────────────────
