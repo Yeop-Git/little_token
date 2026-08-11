@@ -69,7 +69,9 @@ const ELDER_SPIDER_TACTIC: Word = {
  */
 const MANTIS_TACTIC: Word = {
   id: 'mantisTactic',
-  text: '희생을 각오하다',
+  // 동사 칸은 전부 과거형이다(때렸다·막았다·감쌌다). 여기만 기본형이면
+  // 「나는 힘껏 희생을 각오하다」로 문장이 끊긴다.
+  text: '희생을 각오했다',
   slot: 'verb',
   tags: ['brace', 'atk'],
   emotion: 'neutral',

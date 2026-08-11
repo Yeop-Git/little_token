@@ -373,23 +373,16 @@ function ensureVerbRoles(words: Word[], initialCount: number): Word[] {
   ]
 }
 
-function ensurePreferredInHand(words: Word[], initialCount: number, predicate: (word: Word) => boolean): Word[] {
-  if (words.slice(0, initialCount).some(predicate)) return words
-  const index = words.findIndex((word, wordIndex) => wordIndex >= initialCount && predicate(word))
-  if (index < 0) return words
-  const ordered = [...words]
-  ;[ordered[initialCount - 1], ordered[index]] = [ordered[index], ordered[initialCount - 1]]
-  return ordered
-}
-
 function drawHands(
   player: PlayerState,
   enemyId: string | undefined,
   locale: LocaleCode,
   rng: () => number,
   sealed: Set<string>,
-  preferWide: boolean,
 ): { hands: Word[][]; piles: Word[][]; tables: ReturnType<typeof makeEarlyTables> } {
+  // 보스 전용 단어는 **후보에 넣되 손패에 보장하지 않는다.** 실제 게임과 같은 조건이다 —
+  // 그 판에 존재하고, 뽑히면 쓴다. boss-sim이 전용 카드를 아예 빼는 것과 다른 이유는 재는
+  // 것이 다르기 때문이다. 저기는 보스 자신의 속도를, 여기는 한 판이 끝까지 굴러가는지를 잰다.
   const t = tablesForEncounter(makeEarlyTables(player.deck, player, locale), enemyId)
   const order = t.template.slots.map((s) => s.key)
   const piles: Word[][] = []
@@ -401,11 +394,6 @@ function drawHands(
     }
     const size = key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE
     if (key.startsWith('verb')) pool = ensureVerbRoles(pool, size)
-    if (preferWide && key.startsWith('verb')) {
-      pool = ensurePreferredInHand(pool, size, (word) =>
-        word.kind === 'attack'
-        && (!!word.effects?.pierceGuard || word.targetCount === 'all' || (word.targetCount ?? 1) >= 2))
-    }
     const hand = pool.slice(0, size)
     piles.push(pool.slice(size))
     if (hand.every((w) => sealed.has(w.id))) {
@@ -569,8 +557,7 @@ function fightStage(
     const web = spiderWebAtTurnStart(state)
 
     const escorts = summonCount(boss)
-    const preferWide = !!boss.def.summonPattern && escorts > 0
-    const { hands, piles, tables } = drawHands(player, stage.encounter[0], locale, rng, sealed, preferWide)
+    const { hands, piles, tables } = drawHands(player, stage.encounter[0], locale, rng, sealed)
     if (web) {
       const slotKey = spiderSealSlotForTurn(tables.template.slots.map((s) => s.key), turn)
       const idx = tables.template.slots.findIndex((s) => s.key === slotKey)

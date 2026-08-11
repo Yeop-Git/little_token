@@ -124,14 +124,18 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
   const badges = resourceBadge
   if (artUrl) {
+    // 이름과 효과는 한 덩이로 아래에 붙인다. 둘을 따로 바닥에 못 박아 두면 효과가 세 줄로
+    // 늘어난 카드에서 글자가 이름 위로 올라타 서로를 지운다.
     return `<span class="card-face card-front art">
           <img class="card-illus" src="${artUrl}" alt="" aria-hidden="true" />
           <span class="card-tint" aria-hidden="true"></span>
           <span class="card-veil" aria-hidden="true"></span>
           <span class="card-foil" aria-hidden="true"></span>
           ${badges}
-          <strong class="card-title" ${cardTitleStyle(word.text, true)}>${word.text}</strong>
-          ${wordCardNoteHtml(word, note)}
+          <span class="card-caption">
+            <strong class="card-title" ${cardTitleStyle(word.text, true)}>${word.text}</strong>
+            ${wordCardNoteHtml(word, note)}
+          </span>
           ${overlay}
         </span>`
   }

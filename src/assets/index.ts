@@ -73,6 +73,7 @@ import skill1017 from './sprites/skills/skill_1017.webp'
 import skill1018 from './sprites/skills/skill_1018.webp'
 import skill1019 from './sprites/skills/skill_1019.webp'
 import skill1020 from './sprites/skills/skill_1020.webp'
+import skill1021 from './sprites/skills/skill_1021.webp'
 import skill2001 from './sprites/skills/skill_2001.webp'
 import skill2002 from './sprites/skills/skill_2002.webp'
 import skill2003 from './sprites/skills/skill_2003.webp'
@@ -299,6 +300,8 @@ export const SKILL_ART: Record<string, string> = {
   '1018': skill1018,
   '1019': skill1019,
   '1020': skill1020,
+  // 사마귀 전용 공략 「희생을 각오했다」의 임시 그림. 전용 일러스트가 들어오면 이 줄만 바꾼다.
+  '1021': skill1021,
   '2001': skill2001,
   '2002': skill2002,
   '2003': skill2003,
@@ -357,7 +360,7 @@ export const SKILL_ART: Record<string, string> = {
  * 여기 등록하지 않으면 빌드에서 빠지므로 두어도 용량에 영향이 없다.
  * 뜻이 맞는 카드가 생기면 그때 번호를 그대로 등록하면 된다.
  *
- *   1021 · 1022   주어 — 요정에게 손 뻗기 / 멀리 가리키기
+ *   1022   주어 — 멀리 가리키기
  *
  * 반대로 그림이 없어 비어 있는 단어(art 미지정)는 `npm run check`가 매번 알려준다.
  * 동사 번호는 3001~3006 초기 · 3007~3008 보상 · 3009~3020 전투 규칙 카드로 꽉 차 있다.

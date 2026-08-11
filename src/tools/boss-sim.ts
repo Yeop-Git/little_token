@@ -18,7 +18,7 @@ import type { Intent, Selection, Word } from '@core/types'
 import { startingPlayer, applyItemReward } from '@core/run'
 import { ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { registerWord } from '@core/run'
-import { makeEarlyTables, ALL_REWARD_WORDS, tablesForEncounter } from '@data/earlyWords'
+import { makeEarlyTables, ALL_REWARD_WORDS } from '@data/earlyWords'
 import { ENEMIES } from '@data/enemies'
 import { stageFor } from '@data/stages'
 import { ITEMS, ITEM_STAT_PER_POINT, PASSIVE_ITEMS, type StatKey } from '@data/items'
@@ -94,11 +94,15 @@ function candidates(
   sealedWordIds: Set<string> = new Set(),
   sealSlotKey: string | null = null,
   maxSealed = 0,
-  enemyId?: string,
-  preferWide = false,
   battleState?: BattleState,
 ): Candidate[] {
-  const t = tablesForEncounter(makeEarlyTables(player.deck, player), enemyId)
+  // 토큰이 빌려주는 보스 전용 단어는 여기 넣지 않는다.
+  //
+  // 이 시뮬이 지키는 계약은 「보스가 자기 패턴을 보여 주기 전에 죽지 않는가」다. 전용
+  // 카드는 그 패턴 앞에서 막힌 사람을 위한 구제 카드이므로, 그 한 장을 쥔 판으로 보스의
+  // 기본 체력을 재면 보스가 실제보다 약하게 잡힌다. 카드 자체의 동작과 전용 조건은
+  // `combat-effects-check`가 따로 못 박는다.
+  const t = makeEarlyTables(player.deck, player)
   const order = t.template.slots.map((s) => s.key)
   const draw = (pool: Word[]) => {
     if (!rng) return pool
@@ -115,17 +119,6 @@ function candidates(
     return hand
   }
   const hands = order.map((key) => draw((t.words[key] ?? []) as Word[]))
-  if (preferWide) {
-    const verbIndex = order.findIndex((key) => key === 'verb' || key === 'verb2')
-    const wide = verbIndex >= 0
-      ? (t.words[order[verbIndex]] ?? []).find((word) =>
-        word.kind === 'attack' && (!!word.effects?.pierceGuard || word.targetCount === 'all' || (word.targetCount ?? 1) >= 2),
-      )
-      : undefined
-    if (verbIndex >= 0 && wide && !hands[verbIndex].some((word) => word.id === wide.id)) {
-      hands[verbIndex][hands[verbIndex].length - 1] = wide
-    }
-  }
   if (rng && sealSlotKey && sealedWordIds.size < maxSealed) {
     const sealIndex = order.indexOf(sealSlotKey)
     const sealable = sealIndex < 0 ? [] : hands[sealIndex].filter((word) => !sealedWordIds.has(word.id))
@@ -169,8 +162,8 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
   const stage = stageFor(day)
   const player = playerAtDay(day, build)
   const boss = makeEnemy(ENEMIES[stage.encounter[0]], stage.atkMult, stage.hpMult, stage.bossHealthBars)
-  const t = tablesForEncounter(makeEarlyTables(player.deck, player), boss.def.id)
-  const ceiling = candidates(player, null, new Set(), null, 0, boss.def.id)
+  const t = makeEarlyTables(player.deck, player)
+  const ceiling = candidates(player, null, new Set(), null, 0)
   const state: BattleState = {
     playerHp: player.stats.hp, playerMax: player.stats.hp, guard: 0, counterMultiplier: 0,
     turn: 1, enemies: [boss], pending: null,
@@ -196,8 +189,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
     // 예고 다음 턴이 강공격이므로, 예고를 본 턴에 방어를 올려 둔다.
     const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
     const sealSlotKey = web ? spiderSealSlotForTurn(t.template.slots.map((slot) => slot.key), turn) : null
-    const needsWide = boss.def.id === 'queenBee' && summonCount(boss) > 0
-    const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, boss.def.id, needsWide, state)
+    const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, state)
     const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => b.dmg - a.dmg)[0]
     const bestGuard = hand
       .filter((c) => c.guard > 0 || c.intent.magicShield > 0)
@@ -405,7 +397,13 @@ for (const day of [5, 10, 15]) {
     // 20~22에서 안 움직이고 일반 플레이만 늘어졌다) 전투가 지루해진다.
     // 그래서 사마귀는 1.5회(= 예고를 한 번은 반드시 보고, 절반은 두 번 본다)를 바닥으로
     // 둔다. "패턴을 못 보여 주고 죽는 보스"를 막는다는 계약의 목적은 그대로다.
-    const requiredPerRun = day === 15 ? 4 : day === 5 ? 1.5 : 2
+    //
+    // 10층 여왕벌도 같은 이유로 1.5회다. 웨이브는 일벌 넷을 **모두** 치웠을 때만 다시
+    // 서는데(refillOnlyWhenEmpty), 예전에는 첫 손패에 범위 답 한 장을 끼워 넣어 주고
+    // 있어서 강한 빌드가 매번 웨이브를 갈아치웠다. 그 보장을 걷은 지금은 범위 카드를
+    // 손에 쥔 판에서만 두 번째 웨이브가 선다 — 실측 1.92회. 요구치를 2로 두면 없어진
+    // 규칙을 계약이 계속 요구하게 된다.
+    const requiredPerRun = day === 15 ? 4 : 1.5
     console.log(`day ${day} ${build.padEnd(10)} 평균 ${avgTurns.toFixed(1)}턴 · 패턴 ${patternCount}/${runs.length} · 승 ${runs.filter((run) => run.won).length}/${runs.length}`)
     if (patternCount < runs.length * requiredPerRun) {
       failures.push(`${day}층 ${build}: 강한 빌드에서 핵심 패턴이 런당 ${requiredPerRun}회 미만입니다 (${patternCount}/${runs.length}).`)
