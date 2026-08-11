@@ -31,7 +31,7 @@ const KOREAN = {
   spiderOpeningWeak: '첫 공격은 마력실드가 막아! 연타로 벗긴 뒤 「{weakness}」 감정으로 첫째 다리를 노려 — 거미줄은 방패도 넘어 와!!',
   spiderOpeningGeneric: '거미줄은 방패를 넘어 와! 지금 드러난 약점을 노려야 뚫려!!',
   spiderShieldBroken: '마력실드가 깨졌어! 이제 「{weakness}」 감정으로 현재 다리를 노려!!',
-  queenOpportunity: '지금이 빈틈이에요!!',
+  queenOpportunity: '지금이 빈틈이야!!',
   // 회상 — 지난 런의 사실만 말한다. 없는 일을 지어내지 않는다.
   recallDefeatBy: '지난번엔 {day}층에서 {cause}한테 멈췄어. 이번엔 더 멀리 가자!',
   recallDefeatPlain: '지난번엔 {day}층까지였지. 오늘은 그 너머를 보고 싶어.',

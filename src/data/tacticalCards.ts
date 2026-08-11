@@ -22,7 +22,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'termite',
     rewardFloors: [2],
     title: '버틴 힘',
-    tooltip: '방어를 쌓은 뒤 「버틴 힘을 내질렀다」로 현재 방어도의 90%를 두 대상까지 밀어낸다. 방어도는 소모하지 않는다.',
+    tooltip: '방어를 쌓은 뒤 「막아서 밀어냈다」로 현재 방어도의 60%를 두 대상까지 밀어낸다. 방어도는 소모하지 않는다.',
     cardIds: ['storedResolve'],
   },
   {

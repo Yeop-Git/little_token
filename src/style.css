@@ -10459,3 +10459,43 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   .token-actor.is-wondering .token-wonder { animation: none; opacity: 1; transform: none; }
   .token-actor[data-behavior='grab'] .model-shell { animation-duration: 1.2s; }
 }
+
+/* 앱 수준 마지막 복구선. 씬 생성 중 예외가 나도 빈 무대 대신 저장된 진행으로 돌아갈 길을 남긴다. */
+.runtime-error-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 80px;
+  background: rgba(17, 12, 24, .86);
+  backdrop-filter: blur(12px);
+}
+.runtime-error-paper {
+  width: min(760px, 88%);
+  padding: 54px 62px 50px;
+  color: #30251f;
+  text-align: center;
+  background: #f3e4c6;
+  border: 3px solid #72533d;
+  border-radius: 12px 17px 10px 15px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .52), inset 0 0 50px rgba(126, 87, 53, .12);
+  transform: rotate(-.35deg);
+}
+.runtime-error-eyebrow { margin: 0 0 12px; color: #a44a3f; font-size: 24px; font-weight: 900; }
+.runtime-error-paper h1 { margin: 0; font-size: 42px; line-height: 1.25; }
+.runtime-error-paper > p:not(.runtime-error-eyebrow) { margin: 22px auto 30px; max-width: 620px; font-size: 22px; line-height: 1.65; }
+.runtime-error-reload {
+  min-width: 220px;
+  min-height: 62px;
+  padding: 12px 28px;
+  color: #fff8e8;
+  font: inherit;
+  font-size: 21px;
+  font-weight: 900;
+  background: #6e4a36;
+  border: 3px solid #3c2920;
+  border-radius: 9px 12px 8px 11px;
+}
+.runtime-error-reload:hover,
+.runtime-error-reload:focus-visible { background: #875b40; }

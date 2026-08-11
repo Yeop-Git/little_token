@@ -19,6 +19,7 @@ const EARLY_STORY_ATK_MULT = 0.92
 const EARLY_STORY_BOSS_HP_MULT = 0.9
 const EARLY_STORY_BOSS_ATK_MULT = 0.75
 const EARLY_STORY_QUEEN_ATK_MULT = 0.69
+const FIRST_STORY_MANTIS_ATK_MULT = 0.55
 const FIRST_STORY_SPIDER_HP_MULT = 1.06
 const FIRST_STORY_SPIDER_ATK_MULT = 0.12
 
@@ -80,7 +81,9 @@ export function stageFor(day: number): Stage {
   const firstStorySpider = endlessCycle === 0 && boss === 'elderSpider'
   const earlyBossAtkMult = boss === 'queenBee'
     ? EARLY_STORY_QUEEN_ATK_MULT
-    : EARLY_STORY_BOSS_ATK_MULT
+    : boss === 'mantis'
+      ? FIRST_STORY_MANTIS_ATK_MULT
+      : EARLY_STORY_BOSS_ATK_MULT
   const hpMult = (1 + (day - 1) * 0.26)
     * (earlyStory ? EARLY_STORY_HP_MULT : 1)
     * (earlyBoss ? EARLY_STORY_BOSS_HP_MULT : 1)

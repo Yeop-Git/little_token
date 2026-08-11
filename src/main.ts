@@ -43,6 +43,7 @@ import { DEMO_FLOORS, FEEDBACK_URL, IS_DEMO, STRICT_RESOURCE_LOADING, isEditionF
 import { installResourceFailureMonitor } from '@/ui/ResourceFailures'
 import { pickFieldBackground, type FieldBackground } from '@data/backgrounds'
 import { installMobileViewport } from '@/ui/MobileViewport'
+import { installRuntimeErrorBoundary } from '@/ui/RuntimeErrorBoundary'
 
 /** 시네마틱이 걷힌 뒤 제목·메뉴를 올리기까지 두는 시간. */
 const TITLE_UI_HOLD_MS = 850
@@ -58,6 +59,7 @@ const STAGE_TRANSITION_REVEAL_MS = 520
 const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
 const stage = document.getElementById('stage') as HTMLElement
+installRuntimeErrorBoundary(stage, currentLocale)
 let devCheatCleanup: (() => void) | null = null
 let cinematicCleanup: (() => void) | null = null
 let battleRequest = 0

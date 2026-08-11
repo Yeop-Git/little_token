@@ -75,9 +75,10 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 {
   const player = startingPlayer()
   const item = { id: 'duplicate-contract', name: '중복 검사', rarity: 'common' as const, art: '', line: '', stats: { atk: 0.5 } }
+  const attackBefore = player.stats.atk
   applyItemReward(player, item)
   applyItemReward(player, item)
-  assert(player.items.filter((owned) => owned.id === item.id).length === 1 && player.stats.atk === 5.5, 'item acquisition boundary rejects duplicate stats and entries')
+  assert(player.items.filter((owned) => owned.id === item.id).length === 1 && player.stats.atk === attackBefore + 0.5, 'item acquisition boundary rejects duplicate stats and entries')
 }
 {
   const player = startingPlayer()
