@@ -33,6 +33,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
         damageScale: 1.7,
         shatterGuard: true,
         lifeStealRate: 0.5,
+        // 첫 몇 번의 실패는 버틸 수 있지만, 예고를 읽고 완전히 막은 순간에는
+        // 피해 증가와 다음 공격 스킵을 함께 줘 전투의 흐름을 크게 뒤집는다.
         groggyDamageMult: 1.5,
         groggyRequiresGuardShatter: true,
       },

@@ -868,6 +868,7 @@ console.log(`풀런 시뮬레이션 — 기량별 ${RUNS}회, 1~${STORY_FLOORS}�
 
 const SKILL_PROFILES: { label: string; reward: RewardSkill; combat: CombatSkill }[] = [
   { label: 'naive', reward: 'random', combat: 'greedy' },
+  { label: 'beginner', reward: 'random', combat: 'average' },
   { label: 'average', reward: 'ok', combat: 'average' },
   { label: 'expert', reward: 'best', combat: 'smart' },
 ]
@@ -876,7 +877,9 @@ interface ProfileMetrics {
   label: string
   cleared: number
   reach5: number
+  clear5: number
   avgFloor: number
+  earlyDeaths: number
   firstFloorDeaths: number
   avgTurns: number
 }
@@ -890,6 +893,7 @@ for (const profile of SKILL_PROFILES) {
   const cleared = runs.filter((r) => r.diedOn === null).length
   const reach10 = runs.filter((r) => r.reachedFloor >= 10).length
   const reach5 = runs.filter((r) => r.reachedFloor >= 5).length
+  const clear5 = runs.filter((r) => r.diedOn === null || r.diedOn > 5).length
   const avgFloor = runs.reduce((s, r) => s + r.reachedFloor, 0) / runs.length
 
   console.log(`■ ${profile.label}`)
@@ -897,6 +901,7 @@ for (const profile of SKILL_PROFILES) {
     `  15층 클리어 ${cleared}/${RUNS} (${pct(cleared, RUNS)})`
     + ` · 10층 도달 ${pct(reach10, RUNS)}`
     + ` · 5층 도달 ${pct(reach5, RUNS)}`
+    + ` · 5층 클리어 ${pct(clear5, RUNS)}`
     + ` · 평균 도달 ${avgFloor.toFixed(1)}층`,
   )
 
@@ -938,7 +943,9 @@ for (const profile of SKILL_PROFILES) {
     label: profile.label,
     cleared,
     reach5,
+    clear5,
     avgFloor,
+    earlyDeaths: runs.filter((r) => r.diedOn !== null && r.diedOn <= 4).length,
     firstFloorDeaths: runs.filter((r) => r.diedOn === 1).length,
     avgTurns,
   })
@@ -949,6 +956,7 @@ interface BuildMetrics {
   focus: Exclude<BuildFocus, 'balanced'>
   cleared: number
   reach5: number
+  clear5: number
   avgFloor: number
   actionRates: ActionStats
   damagePerSentence: number
@@ -987,6 +995,7 @@ for (const focus of BUILD_FOCUSES) {
     focus,
     cleared: runs.filter((run) => run.diedOn === null).length,
     reach5: runs.filter((run) => run.reachedFloor >= 5).length,
+    clear5: runs.filter((run) => run.diedOn === null || run.diedOn > 5).length,
     avgFloor: runs.reduce((sum, run) => sum + run.reachedFloor, 0) / runs.length,
     actionRates,
     damagePerSentence: totals.damage / sentences,
@@ -1004,7 +1013,7 @@ for (const focus of BUILD_FOCUSES) {
   buildMetrics.push(metric)
   console.log(
     `  ${focus.padEnd(6)} clear ${metric.cleared}/${BUILD_RUNS} (${pct(metric.cleared, BUILD_RUNS)})`
-    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | avg ${metric.avgFloor.toFixed(1)}`
+    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | clear5 ${pct(metric.clear5, BUILD_RUNS)} | avg ${metric.avgFloor.toFixed(1)}`
     + ` | action A${pct(actionRates.attack, 1)} G${pct(actionRates.guard, 1)}`
     + ` H${pct(actionRates.heal, 1)} C${pct(actionRates.combo, 1)}`
     + ` | dmg/sentence ${metric.damagePerSentence.toFixed(1)} · ${metric.averageTurns.toFixed(1)} turns`,
@@ -1034,21 +1043,24 @@ const localeMetrics = (skipLocales ? [] : SUPPORTED_LOCALES).map((locale) => {
   )
   const cleared = runs.filter((run) => run.diedOn === null).length
   const reach5 = runs.filter((run) => run.reachedFloor >= 5).length
+  const clear5 = runs.filter((run) => run.diedOn === null || run.diedOn > 5).length
   const avgFloor = runs.reduce((sum, run) => sum + run.reachedFloor, 0) / runs.length
-  console.log(`  locale ${locale.padEnd(7)} clear ${pct(cleared, LOCALE_RUNS)} | reach5 ${pct(reach5, LOCALE_RUNS)} | avg ${avgFloor.toFixed(1)}`)
-  return { locale, cleared, reach5, avgFloor, firstFloorDeaths: runs.filter((run) => run.diedOn === 1).length }
+  console.log(`  locale ${locale.padEnd(7)} clear ${pct(cleared, LOCALE_RUNS)} | reach5 ${pct(reach5, LOCALE_RUNS)} | clear5 ${pct(clear5, LOCALE_RUNS)} | avg ${avgFloor.toFixed(1)}`)
+  return { locale, cleared, reach5, clear5, avgFloor, firstFloorDeaths: runs.filter((run) => run.diedOn === 1).length }
 })
 
 if (check) {
   const byLabel = Object.fromEntries(metrics.map((metric) => [metric.label, metric]))
   const naive = byLabel.naive
+  const beginner = byLabel.beginner
   const average = byLabel.average
   const expert = byLabel.expert
   const violations: string[] = []
   if (metrics.some((metric) => metric.firstFloorDeaths > 0)) violations.push('초반 학습 구간인 1층에서 사망이 발생했다')
-  // 초심자도 첫 전술 보상과 사마귀 패턴까지 충분히 경험해야 한다. 완주율 숫자를 억지로
-  // 맞추기보다 무작위 플레이의 절반 이상이 첫 보스에 도달하는지를 출시 회귀선으로 삼는다.
-  if (naive.reach5 / RUNS < 0.5) violations.push('무작위 보상 플레이의 5층 도달률이 50% 미만이다')
+  // 완전 무작위 입력도 첫 네 층에서는 죽지 않는다. 보상을 무작위로 골랐더라도 전투 상황을
+  // 조금 읽는 초심자는 사마귀를 쓰러뜨려 첫 전술 보상까지 반드시 경험해야 한다.
+  if (naive.earlyDeaths > 0) violations.push('완전 무작위 플레이가 1~4층에서 사망했다')
+  if (beginner.clear5 < RUNS) violations.push('무작위 보상 초심자가 전략적으로 플레이해도 5층을 항상 클리어하지 못한다')
   // 평균 완주는 기존 실측 10/24(42%) 아래로 다시 떨어지지 않게만 지킨다.
   if (average.cleared / RUNS < 0.4) violations.push('평균 플레이의 15층 클리어율이 40% 미만이다')
   if (average.cleared / RUNS > 0.95) violations.push('평균 플레이의 15층 클리어율이 95%를 넘어 난이도 곡선이 무의미하다')
@@ -1067,7 +1079,7 @@ if (check) {
     violations.push('attack build clears more than 15%p above the most stable support build')
   }
   for (const metric of buildMetrics) {
-    if (metric.reach5 / BUILD_RUNS < 0.5) violations.push(`${metric.focus} build reaches floor 5 in fewer than 50% of runs`)
+    if (metric.clear5 < BUILD_RUNS) violations.push(`${metric.focus} build does not always clear floor 5 with strategic play`)
   }
   if (builds.guard.actionRates.guard <= builds.attack.actionRates.guard + 0.03) violations.push('guard build does not use meaningfully more guard sentences than attack build')
   if (builds.heal.actionRates.heal < builds.attack.actionRates.heal + 0.03) violations.push('heal build does not use meaningfully more heal sentences than attack build')
@@ -1087,7 +1099,7 @@ if (check) {
   if (builds.attack.averageTurns < 3) violations.push('attack build averages fewer than 3 turns per encounter')
   for (const metric of localeMetrics) {
     if (metric.firstFloorDeaths > 0) violations.push(`${metric.locale} locale has a first-floor death`)
-    if (metric.reach5 / LOCALE_RUNS < 0.25) violations.push(`${metric.locale} locale reaches floor 5 in fewer than 25% of runs`)
+    if (metric.clear5 < LOCALE_RUNS) violations.push(`${metric.locale} locale does not always clear floor 5 with average play`)
   }
   const localeFloors = localeMetrics.map((metric) => metric.avgFloor)
   if (Math.max(...localeFloors) - Math.min(...localeFloors) > 3) violations.push('locale-specific idioms create more than a 3-floor average progression gap')

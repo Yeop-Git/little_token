@@ -114,6 +114,12 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const stage = stageFor(5)
   const baseHit = Math.round(ENEMIES.mantis.atk * stage.atkMult)
   assert(startingPlayer().stats.hp > baseHit * 4, 'base hp survives four day-5 mantis baseline strikes')
+  const heavy = ENEMIES.mantis.attackPattern!.find((step) => step.shatterGuard)!
+  const plain = ENEMIES.mantis.attackPattern!.find((step) => !step.shatterGuard && (step.damageScale ?? 1) > 0)!
+  const threeFailedCycles = Math.round(baseHit * (heavy.damageScale ?? 1)) * 3
+    + Math.round(baseHit * (plain.damageScale ?? 1)) * 2
+  assert(startingPlayer().stats.hp > threeFailedCycles, 'base hp survives three failed first-mantis gimmick cycles')
+  assert(heavy.groggyDamageMult === 1.5, 'solving the first-mantis guard gimmick boosts damage and opens the scheduled attack skip')
 }
 
 { const s = state([makeEnemy(foe('shield', { magicShield: 2, hp: 20 }))]); const r = applyIntent(s, attack({ hitCount: 3 }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].magicShieldRemaining === 1 && r.hits[1].magicShieldRemaining === 0 && r.hits[2].dmg === 10 && s.enemies[0].hp === 10, 'layered magic shield and multihit') }
