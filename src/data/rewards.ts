@@ -84,7 +84,7 @@ export const EARLY_BUILD_REWARD_DAY = 2
 /** 2층에서 수식어로 먼저 고르는 방어·회복·순환 전술의 방향. */
 export const EARLY_BUILD_MODIFIER_IDS = ['kkuk', 'pogeunhage', 'gyeongkwaehage'] as const
 /** 같은 층 동사 보상은 방어·회복·운 스탯을 공격으로 쓰는 출구를 하나씩 보여 준다. */
-export const EARLY_STAT_VERB_IDS = ['pierceStrike', 'drinkInk', 'spreadTwo'] as const
+export const EARLY_STAT_VERB_IDS = ['storedResolve', 'drinkInk', 'spreadTwo'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
