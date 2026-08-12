@@ -9,7 +9,6 @@ import type { BattleView as BattleViewType } from '@views/BattleView'
 import { DeckDiscardView } from '@views/DeckDiscardView'
 import { ItemExclaimView } from '@views/ItemExclaimView'
 import { TitleView } from '@views/TitleView'
-import { CombatGuideView } from '@views/CombatGuideView'
 import { RunResultView, type RunOutcome } from '@views/RunResultView'
 import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
@@ -521,10 +520,12 @@ function goTitle(withIntro: unknown = false) {
   }
 }
 
-function goCombatGuide() {
-  battleRequest++
+async function goCombatGuide() {
+  const request = ++battleRequest
   reset()
   stage.setAttribute('data-theme', 'day')
+  const { CombatGuideView } = await import('@views/CombatGuideView')
+  if (request !== battleRequest) return
   // 클릭 이벤트가 인자로 새어 들어가면 로비로 돌아올 때마다 오프닝이 다시 돈다.
   current = new CombatGuideView(stage, { onBack: () => goTitle() })
   mountMeta('guide')

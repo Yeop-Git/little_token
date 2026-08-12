@@ -7,6 +7,8 @@
  * 설명서가 같이 바뀌고, 설명과 결과가 어긋날 자리를 남기지 않는다.
  */
 
+import './combat-guide.css'
+
 import {
   CRIT_CAP,
   CRIT_STAT_K,

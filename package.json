@@ -48,6 +48,7 @@
     "@types/howler": "^2.2.13",
     "@types/node": "^26.1.1",
     "@types/three": "^0.179.0",
+    "lightningcss": "^1.33.0",
     "playwright-core": "^1.61.1",
     "sharp": "^0.34.5",
     "tsx": "^4.7.0",
