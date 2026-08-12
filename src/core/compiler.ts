@@ -316,7 +316,6 @@ export function compile(
     hitCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.hitCount ?? 1)),
     castCount: Math.max(1, ...order.map((key) => sel[key]?.effects?.castCount ?? 1)),
     castScale: Math.min(1, ...order.map((key) => sel[key]?.effects?.castScale ?? 1)),
-    overdrawHitCount: Math.max(0, ...order.map((key) => sel[key]?.effects?.overdrawHitCount ?? 0)),
     counter: order.some((key) => !!sel[key]?.effects?.counter),
     magicShield: Math.max(0, ...order.map((key) => sel[key]?.effects?.magicShield ?? 0)),
     guardAttackMultiplier: Math.max(0, ...order.map((key) => sel[key]?.effects?.guardAttackMultiplier ?? 0)),
@@ -324,8 +323,6 @@ export function compile(
     lifeStealRate: Math.max(0, ...order.map((key) => sel[key]?.effects?.lifeStealRate ?? 0)),
     attackRank: sumEffect('attackRank'),
     guardRank: sumEffect('guardRank'),
-    enemyAttackRank: sumEffect('enemyAttackRank'),
-    bonusDraws: sumEffect('bonusDraws'),
     summonDamageMultiplier: Math.max(1, ...order.map((key) => sel[key]?.effects?.summonDamageMultiplier ?? 1)),
     heavyTurnMultiplier: Math.max(1, ...order.map((key) => sel[key]?.effects?.heavyTurnMultiplier ?? 1)),
     emotions,
@@ -342,12 +339,6 @@ export function compile(
     doubtCount: doubting ? 1 : 0,
     breakdown: { flats, mults },
   }
-}
-
-/** Activates the explicitly disclosed reward for paying health through Ink overdraw. */
-export function withOverdrawEffects(intent: Intent, healthPaid: number): Intent {
-  if (healthPaid <= 0 || intent.overdrawHitCount <= 0 || intent.base <= 0) return intent
-  return { ...intent, hitCount: intent.hitCount + intent.overdrawHitCount }
 }
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.

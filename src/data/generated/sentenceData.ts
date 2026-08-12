@@ -351,16 +351,16 @@ export const REWARD_WORDS: Word[] = [
       "calm"
     ],
     "emotion": "joy",
-    "inkCost": 3,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0.6,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1011",
-    "note": "배율 ×1.60 · 재뽑기 1",
-    "lore": "끝난 줄을 보며 가볍게 숨을 쉰다.",
+    "note": "배율 ×1.60 · 매직실드 1",
+    "lore": "안도의 숨이 다음 공격을 지우는 빛의 막이 된다.",
     "effects": {
-      "bonusDraws": 1
+      "magicShield": 1
     }
   },
   {
@@ -408,16 +408,17 @@ export const REWARD_WORDS: Word[] = [
       "grit"
     ],
     "emotion": "anger",
-    "inkCost": 4,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0.6,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1014",
-    "note": "배율 ×1.60 · 초과타 2회",
-    "lore": "마지막 한 줄까지 지우지 않는다.",
+    "note": "배율 ×1.60 · 매직실드 1 · 방어 +2랭크",
+    "lore": "마지막 한 줄까지 버틴 집념이 빛의 막과 단단한 방어 태세가 된다.",
     "effects": {
-      "overdrawHitCount": 2
+      "magicShield": 1,
+      "guardRank": 2
     }
   },
   {
@@ -555,11 +556,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 4,
     "rarity": "rare",
     "art": "2005",
-    "note": "매직실드 1 · 다음 문장 잉크 +1",
-    "lore": "아픈 한 번을 막아 내고 남은 숨을 다음 문장까지 모은다.",
+    "note": "매직실드 1 · 방어 +1랭크",
+    "lore": "아픈 한 번을 막아 내며 방어 태세를 단단히 다진다.",
     "effects": {
       "magicShield": 1,
-      "carryInk": 1
+      "guardRank": 1
     }
   },
   {
@@ -644,11 +645,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "epic",
     "art": "2008",
-    "note": "카운터 · 상대 공격 -1랭크",
-    "lore": "빈틈을 보인 척 적의 기세를 꺾고 받은 충격을 되돌린다.",
+    "note": "카운터 · 방어 +1랭크",
+    "lore": "빈틈을 보인 척 충격을 받아 내며 방어 태세를 끌어올린다.",
     "effects": {
       "counter": true,
-      "enemyAttackRank": -1
+      "guardRank": 1
     }
   },
   {
@@ -698,7 +699,7 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 3,
     "rarity": "epic",
     "art": "2009",
-    "note": "연타 2회·67% · 자신 공격 +1랭크",
+    "note": "연타 2회·67% · 공격 +1랭크",
     "lore": "종이가 타는 냄새. 멈출 수 없다.",
     "effects": {
       "castCount": 2,
@@ -714,14 +715,14 @@ export const REWARD_WORDS: Word[] = [
       "reckless"
     ],
     "emotion": "anger",
-    "inkCost": 3,
+    "inkCost": 2,
     "rarity": "epic",
     "art": "2010",
-    "note": "관통 · 초과타 2회",
-    "lore": "체력까지 잉크로 바꾼 문장에만 거센 추가타를 싣는다.",
+    "note": "관통 · 카운터",
+    "lore": "끝까지 밀어붙여 방어를 뚫고, 받은 충격까지 되돌려준다.",
     "effects": {
       "pierceGuard": true,
-      "overdrawHitCount": 2
+      "counter": true
     }
   },
   {
@@ -748,13 +749,13 @@ export const REWARD_WORDS: Word[] = [
       "warm"
     ],
     "emotion": "joy",
-    "inkCost": 2,
+    "inkCost": 4,
     "rarity": "rare",
     "art": "2012",
-    "note": "다음 문장 잉크 +1 · 자신 방어 +1랭크",
-    "lore": "포근한 온기로 버티며 남은 숨을 다음 문장까지 이어 준다.",
+    "note": "매직실드 1 · 방어 +1랭크",
+    "lore": "포근한 온기로 다음 공격을 막고 방어 태세를 단단하게 만든다.",
     "effects": {
-      "carryInk": 1,
+      "magicShield": 1,
       "guardRank": 1
     }
   },
@@ -767,14 +768,12 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "joy",
     "inkCost": 4,
+    "crit": 0.3,
     "targetCount": 3,
     "rarity": "legendary",
     "art": "2013",
-    "note": "대상 3명 · 재뽑기 2",
-    "lore": "반가운 이야기를 앞줄 셋에게 펼치고 다음 선택까지 활짝 연다.",
-    "effects": {
-      "bonusDraws": 2
-    }
+    "note": "대상 3명 · 대성공 30%",
+    "lore": "반가운 이야기를 앞줄 셋에게 환한 결정타로 펼친다."
   },
   {
     "id": "useumyeo",
@@ -802,7 +801,7 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 3,
     "rarity": "rare",
     "art": "2015",
-    "note": "연타 2회·50% · 자신 공격 +1랭크",
+    "note": "연타 2회·50% · 공격 +1랭크",
     "lore": "거친 기세로 동사의 행동을 한 번 더 휘몰아치며 공격 태세를 끌어올린다.",
     "effects": {
       "castCount": 2,
@@ -838,10 +837,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 1,
     "rarity": "common",
     "art": "2017",
-    "note": "상대 공격 -1랭크",
-    "lore": "거칠어진 상대의 공격 태세를 눌러 둔다.",
+    "note": "방어 +1랭크",
+    "lore": "이를 악물고 버티며 방어 태세를 끌어올린다.",
     "effects": {
-      "enemyAttackRank": -1
+      "guardRank": 1
     }
   },
   {
@@ -870,7 +869,7 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 4,
     "rarity": "legendary",
     "art": "2019",
-    "note": "카운터 · 자신 방어 +3랭크",
+    "note": "카운터 · 방어 +3랭크",
     "lore": "되튀는 박자가 방어 태세를 극한까지 끌어올리고 충격을 되돌린다.",
     "effects": {
       "counter": true,
@@ -882,17 +881,17 @@ export const REWARD_WORDS: Word[] = [
     "text": "경쾌하게",
     "slot": "adv",
     "tags": [
-      "lively"
+      "lively",
+      "preempt"
     ],
     "emotion": "pleasure",
     "inkCost": 0,
     "rarity": "epic",
     "art": "2020",
-    "note": "리필 2 · 재뽑기 2",
-    "lore": "가벼운 박자가 잉크와 선택지를 함께 되돌려 연쇄 집필을 연다.",
+    "note": "선공 · 리필 2",
+    "lore": "가벼운 박자로 잉크를 아끼며 상대보다 먼저 움직인다.",
     "effects": {
-      "inkDiscount": 2,
-      "bonusDraws": 2
+      "inkDiscount": 2
     }
   }
 ]

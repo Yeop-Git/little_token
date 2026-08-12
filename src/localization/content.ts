@@ -141,6 +141,24 @@ const EXTRA_WORD_LORE: Record<ForeignLocale, Record<(typeof UPDATED_LORE_IDS)[nu
   },
 }
 
+const REVISED_RANK_LORE: Record<ForeignLocale, Record<string, string>> = {
+  en: {
+    andohan:'A relieved breath becomes a veil that erases the next hit.', kkeutkkaji:'Resolve held to the final line raises the attack stance.', kkuk:'It blocks one painful hit and firmly raises the guard stance.', motdohage:'A feigned opening receives the impact, then raises the guard stance.', ipan:'Relentless momentum pierces guard and raises the attack stance.', pogeunhage:'Warmth settles into a firmer guard stance.', bangeopge:'A welcome story spreads across three foes with a bright decisive stroke.', aesseo:'Gritting through the strain raises the guard stance.', gyeongkwaehage:'A light rhythm saves Ink and moves before the enemy.',
+  },
+  ja: {
+    andohan:'安堵の息が次の一撃を消す光の幕になる。', kkeutkkaji:'最後の一行まで残った意志が攻撃態勢を高める。', kkuk:'痛い一撃を防ぎ、防御態勢をしっかり高める。', motdohage:'隙を見せたふりで衝撃を受け、防御態勢を高める。', ipan:'止まらない勢いで防御を貫き、攻撃態勢を高める。', pogeunhage:'温もりが防御態勢をしっかり整える。', bangeopge:'懐かしい物語を三体へ明るい決め手として広げる。', aesseo:'歯を食いしばって耐え、防御態勢を高める。', gyeongkwaehage:'軽いリズムでインクを節約し、敵より先に動く。',
+  },
+  ru: {
+    andohan:'Облегчённый вздох становится завесой, стирающей следующий удар.', kkeutkkaji:'Решимость дойти до последней строки повышает ранг атаки.', kkuk:'Блокирует болезненный удар и укрепляет ранг защиты.', motdohage:'Ложная слабость принимает удар и повышает ранг защиты.', ipan:'Неудержимый напор пробивает защиту и повышает ранг атаки.', pogeunhage:'Тепло укрепляет защитную стойку.', bangeopge:'Радостная история ярким решающим штрихом охватывает трёх врагов.', aesseo:'Упрямое сопротивление повышает ранг защиты.', gyeongkwaehage:'Лёгкий ритм экономит чернила и позволяет действовать первым.',
+  },
+  'zh-Hans': {
+    andohan:'安心的呼吸化作抹去下一击的光幕。', kkeutkkaji:'坚持到最后一行的决心提高攻击阶级。', kkuk:'挡住痛苦一击，并稳稳提高防御阶级。', motdohage:'故意露出破绽承受冲击，同时提高防御阶级。', ipan:'一往无前的气势贯穿防御并提高攻击阶级。', pogeunhage:'温暖让防御架势更加稳固。', bangeopge:'把重逢的故事化作明亮决胜一笔，铺向三名敌人。', aesseo:'咬牙坚持，提高防御阶级。', gyeongkwaehage:'轻快节奏节省墨水，并抢先于敌人行动。',
+  },
+  'zh-Hant': {
+    andohan:'安心的呼吸化作抹去下一擊的光幕。', kkeutkkaji:'堅持到最後一行的決心提高攻擊階級。', kkuk:'擋住痛苦一擊，並穩穩提高防禦階級。', motdohage:'故意露出破綻承受衝擊，同時提高防禦階級。', ipan:'一往無前的氣勢貫穿防禦並提高攻擊階級。', pogeunhage:'溫暖讓防禦架勢更加穩固。', bangeopge:'把重逢的故事化作明亮決勝一筆，鋪向三名敵人。', aesseo:'咬牙堅持，提高防禦階級。', gyeongkwaehage:'輕快節奏節省墨水，並搶先於敵人行動。',
+  },
+}
+
 const COMBO_IDS = [...Array.from({ length: 31 }, (_, i) => `ec${i + 1}`), ...Array.from({ length: 6 }, (_, i) => `c${i + 1}`)]
 const COMBO_NAMES: Record<ForeignLocale, string[]> = {
   en: ['Head-on Charge','Iron Wall','Together','Standing Alone','Today’s Resolve','Pain’s Price','Echo','Leave Yesterday Behind','A Careful Touch','One Step Through Grit','Unstoppable','Gritted Teeth','Drying Tears','Turn and Sway','Joyful Flame','Rise Again','Warm Embrace','In a Blink','Frenzied Blow','No Way Back','Bright Mending','Welcome Touch','Mending with a Smile','Angry Blow','Lonely Shield','Struggling Up','Dancing Attack','Lively Recovery','Shine and Spread','Joyful Barrage','Mischief Wave','Lone Warrior','Flame Frenzy','Perfect Silence','Rite of Forgetting','Mutual Ruin','Monsoon Rain'],
@@ -220,7 +238,8 @@ export function applyContentLocalization(): void {
   for (const word of allWords) {
     const text = EXTRA_WORD_TEXT[locale][word.id] ?? texts[word.id] ?? (word.id.startsWith('gr_') ? texts.gr : undefined)
     if (text) word.text = text
-    const lore = EXTRA_WORD_LORE[locale][word.id as (typeof UPDATED_LORE_IDS)[number]]
+    const lore = REVISED_RANK_LORE[locale][word.id]
+      ?? EXTRA_WORD_LORE[locale][word.id as (typeof UPDATED_LORE_IDS)[number]]
     if (lore) word.lore = lore
   }
 

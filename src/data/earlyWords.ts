@@ -180,7 +180,6 @@ function secondaryVerb(word: Word): Word {
     delete effects.hitCount
     delete effects.castCount
     delete effects.castScale
-    delete effects.overdrawHitCount
   }
   return {
     ...word,

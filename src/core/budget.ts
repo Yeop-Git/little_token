@@ -87,13 +87,9 @@ export const hasVerbTactic = (w: Word): boolean => {
     || w.tags.includes('preempt')
     || !!effects?.pierceGuard
     || (effects?.castCount ?? 1) > 1
-    || (effects?.overdrawHitCount ?? 0) > 0
     || (effects?.inkDiscount ?? 0) > 0
-    || (effects?.carryInk ?? 0) > 0
     || (effects?.attackRank ?? 0) !== 0
     || (effects?.guardRank ?? 0) !== 0
-    || (effects?.enemyAttackRank ?? 0) !== 0
-    || (effects?.bonusDraws ?? 0) > 0
     || !!effects?.counter
 }
 
@@ -108,15 +104,11 @@ export const modifierKeywordCount = (w: Word): number => {
     !!effects?.pierceGuard,
     (effects?.hitCount ?? 1) > 1,
     (effects?.castCount ?? 1) > 1,
-    (effects?.overdrawHitCount ?? 0) > 0,
     !!effects?.counter,
     (effects?.magicShield ?? 0) > 0,
     (effects?.inkDiscount ?? 0) > 0,
-    (effects?.carryInk ?? 0) > 0,
     (effects?.attackRank ?? 0) !== 0,
     (effects?.guardRank ?? 0) !== 0,
-    (effects?.enemyAttackRank ?? 0) !== 0,
-    (effects?.bonusDraws ?? 0) > 0,
     (effects?.guardAttackMultiplier ?? 0) > 0,
     (effects?.overhealDamageMultiplier ?? 0) > 0,
     (effects?.lifeStealRate ?? 0) > 0,

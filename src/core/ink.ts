@@ -23,11 +23,8 @@ export function recommendedWordInkCost(word: Word): number {
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
     const expected = expectedMultiplier(word)
-    const effects = word.effects
     const cost = Math.ceil((expected - 1.2) / 0.3)
       + (word.aoe === 'all' ? 1 : 0)
-      + Math.max(0, effects?.bonusDraws ?? 0)
-      + Math.max(0, effects?.overdrawHitCount ?? 0)
     return Math.max(0, Math.min(4, cost))
   }
 
@@ -62,13 +59,9 @@ export function recommendedWordInkCost(word: Word): number {
   if (effects?.counter) power += 1
   power += Math.ceil(Math.max(0, (effects?.hitCount ?? 1) - 1) * .5)
   power += Math.max(0, (effects?.castCount ?? 1) - 1) * 2
-  power += Math.max(0, effects?.overdrawHitCount ?? 0)
   power += Math.max(0, effects?.magicShield ?? 0) * 4
   power += Math.abs(effects?.attackRank ?? 0)
   power += Math.abs(effects?.guardRank ?? 0)
-  power += Math.abs(effects?.enemyAttackRank ?? 0)
-  power += Math.max(0, effects?.bonusDraws ?? 0)
-  power += Math.max(0, effects?.carryInk ?? 0)
   power -= Math.max(0, effects?.inkDiscount ?? 0)
 
   return Math.max(0, Math.min(4, Math.floor(power + 1e-6)))
@@ -91,13 +84,6 @@ export function selectionInkCost(selection: Selection): number {
   return Math.max(0, listed - discount)
 }
 
-export function selectionCarryInk(selection: Selection): number {
-  return Object.values(selection).reduce(
-    (sum, word) => sum + Math.max(0, word?.effects?.carryInk ?? 0),
-    0,
-  )
-}
-
 export function sentenceInkAvailable(carry = 0): number {
   return SENTENCE_BASE_INK + Math.min(SENTENCE_CARRY_LIMIT, Math.max(0, Math.floor(carry)))
 }
@@ -110,10 +96,9 @@ export function inkExceedsLimit(cost: number, available = SENTENCE_INK): boolean
   return Math.floor(cost) > Math.max(0, Math.floor(available)) + SENTENCE_OVERDRAW_LIMIT
 }
 
-export function carryInkAfterSpend(cost: number, available = SENTENCE_INK, carryBonus = 0): number {
-  const earnedBonus = cost <= available ? Math.max(0, Math.floor(carryBonus)) : 0
+export function carryInkAfterSpend(cost: number, available = SENTENCE_INK): number {
   return Math.min(
     SENTENCE_CARRY_LIMIT,
-    Math.max(0, Math.floor(available) - Math.floor(cost)) + earnedBonus,
+    Math.max(0, Math.floor(available) - Math.floor(cost)),
   )
 }

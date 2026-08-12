@@ -70,8 +70,6 @@ export interface WordEffects {
   castCount?: number
   /** 반복 발동 한 번마다 적용할 깡수치 비율. 미지정은 1이다. */
   castScale?: number
-  /** Adds attack hits only when the sentence actually pays health for Ink overdraw. */
-  overdrawHitCount?: number
   /** 해당 문장을 쓴 턴에 피격되면 고정 카운터 규칙을 적용한다. */
   counter?: boolean
   /** 다음 적 공격 한 번을 통째로 막는 플레이어 매직실드. 한 겹만 유지한다. */
@@ -84,16 +82,10 @@ export interface WordEffects {
   lifeStealRate?: number
   /** 이 문장을 완성할 때 지불하는 총 잉크를 줄인다. 카드 자체 비용 표기와 별도로 공개한다. */
   inkDiscount?: number
-  /** 정산 뒤 다음 문장으로 넘기는 잉크를 추가한다(이월 상한 2 적용). */
-  carryInk?: number
-  /** 전투 중 플레이어 공격 랭크 변화. */
+  /** 현재 스테이지 중 플레이어 공격 랭크 변화. */
   attackRank?: number
-  /** 전투 중 플레이어 방어 랭크 변화. */
+  /** 현재 스테이지 중 플레이어 방어 랭크 변화. */
   guardRank?: number
-  /** 현재 적의 공격 랭크 변화. 디버프는 음수다. */
-  enemyAttackRank?: number
-  /** 이번 전투에서 덱 버튼으로 무료 카드를 뽑을 수 있는 횟수를 더한다. */
-  bonusDraws?: number
   /** 소환물(일벌)에게만 곱하는 피해 배수. 본체와 일반 적에게는 적용하지 않는다. */
   summonDamageMultiplier?: number
   /**
@@ -201,7 +193,6 @@ export interface Intent {
   hitCount: number
   castCount: number
   castScale: number
-  overdrawHitCount: number
   counter: boolean
   magicShield: number
   guardAttackMultiplier: number
@@ -209,8 +200,6 @@ export interface Intent {
   lifeStealRate: number
   attackRank: number
   guardRank: number
-  enemyAttackRank: number
-  bonusDraws: number
   summonDamageMultiplier: number
   heavyTurnMultiplier: number
   emotions: Emotion[]

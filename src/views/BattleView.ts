@@ -16,7 +16,6 @@ import {
   resolveMultiplier,
   sentenceTokens,
   statBiasOf,
-  withOverdrawEffects,
   type ResolvedMult,
 } from '@core/compiler'
 import { wordNoteText, wordValueLines } from '@core/wordText'
@@ -25,7 +24,6 @@ import {
   inkExceedsLimit,
   inkOverdraw,
   selectionInkCost,
-  selectionCarryInk,
   SENTENCE_OVERDRAW_LIMIT,
   sentenceInkAvailable,
   wordInkCost,
@@ -2309,7 +2307,6 @@ export class BattleView {
         || (intent.guardAttackMultiplier > 0 && this.state.guard > 0)
         || intent.attackRank !== 0
         || intent.guardRank !== 0
-        || intent.enemyAttackRank !== 0
         || intent.magicShield > 0
       if (!actionReady) {
         sentenceValue = bossText('forecastProgress', { current: chosenCount, total: this.order().length })
@@ -3540,8 +3537,7 @@ export class BattleView {
         return
       }
     }
-    intent = withOverdrawEffects(intent, overdraw)
-    this.carriedInk = carryInkAfterSpend(inkCost, availableInk, selectionCarryInk(this.sel))
+    this.carriedInk = carryInkAfterSpend(inkCost, availableInk)
     const dealsDamage = isDamageIntent(intent) && intent.base > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
@@ -3610,7 +3606,7 @@ export class BattleView {
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
-    if (prep.attackRankGain || prep.guardRankGain || prep.enemyAttackRankChange) this.renderStats()
+    if (prep.attackRankGain || prep.guardRankGain) this.renderStats()
     if (prep.guardGain > 0) {
       GameAudio.play('shield')
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
@@ -3803,7 +3799,6 @@ export class BattleView {
     this.endSlowmo()
     this.sel = {}
     this.clearNormalTokenWarning()
-    this.cardHand.grantDraws(intent.bonusDraws)
     this.slotIndex = 0
     this.playerPreempting = false
     this.state.turn++

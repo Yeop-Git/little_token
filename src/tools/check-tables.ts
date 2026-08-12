@@ -298,7 +298,17 @@ function checkBudget(): string[] {
 
   const keywordCounts = new Map<string, number>()
   for (const word of catalog) {
-    for (const keyword of wordKeywords(word)) keywordCounts.set(keyword.id, (keywordCounts.get(keyword.id) ?? 0) + 1)
+    const keywords = wordKeywords(word)
+    for (const keyword of keywords) keywordCounts.set(keyword.id, (keywordCounts.get(keyword.id) ?? 0) + 1)
+    const effects = word.effects as Record<string, unknown> | undefined
+    for (const removed of ['bonusDraws', 'overdrawHitCount', 'carryInk', 'enemyAttackRank']) {
+      if (effects?.[removed] != null) out.push(`카드풀/${word.text}: 폐지된 효과 ${removed}가 남아 있다`)
+    }
+    for (const keyword of keywords.filter((entry) => entry.id === 'empower' || entry.id === 'guardEmpower')) {
+      if (!keyword.detail.includes('현재 스테이지 동안')) {
+        out.push(`카드풀/${word.text}: 랭크 툴팁에 현재 스테이지 지속 범위가 없다`)
+      }
+    }
   }
   const singletonKeywords = [...keywordCounts].filter(([, count]) => count < 2).map(([keyword]) => keyword)
   console.log(`  ${singletonKeywords.length ? '위반' : '통과'}  기능 키워드 재사용 · ${[...keywordCounts].map(([keyword, count]) => `${keyword} ${count}`).join(' · ')}`)

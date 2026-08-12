@@ -91,18 +91,14 @@ function modifierTactics(word: Word): string[] {
   if (effects?.pierceGuard) tactics.push('pierce-guard')
   if ((effects?.hitCount ?? 1) > 1) tactics.push('multi-hit')
   if ((effects?.castCount ?? 1) > 1) tactics.push('repeat-cast')
-  if ((effects?.overdrawHitCount ?? 0) > 0) tactics.push('overdraw-fury')
   if (effects?.counter) tactics.push('counter')
   if ((effects?.magicShield ?? 0) > 0) tactics.push('magic-shield')
   if ((effects?.guardAttackMultiplier ?? 0) > 0) tactics.push('guard-convert')
   if ((effects?.overhealDamageMultiplier ?? 0) > 0) tactics.push('overheal-convert')
   if ((effects?.lifeStealRate ?? 0) > 0) tactics.push('lifesteal')
   if ((effects?.inkDiscount ?? 0) > 0) tactics.push('ink-discount')
-  if ((effects?.carryInk ?? 0) > 0) tactics.push('carry-ink')
-  if ((effects?.enemyAttackRank ?? 0) < 0) tactics.push('enemy-weaken')
   if ((effects?.attackRank ?? 0) > 0) tactics.push('attack-rank')
   if ((effects?.guardRank ?? 0) > 0) tactics.push('guard-rank')
-  if ((effects?.bonusDraws ?? 0) > 0) tactics.push('bonus-draw')
   if (word.aoe === 'all' || word.targetCount === 'all' || (word.targetCount ?? 1) > 1) {
     tactics.push('multi-target')
   }
@@ -112,19 +108,20 @@ function modifierTactics(word: Word): string[] {
 
 function hasEmotionSignature(emotion: CheckedEmotion, modifiers: Word[]): boolean {
   if (emotion === 'anger') {
-    return modifiers.some((word) => (word.effects?.overdrawHitCount ?? 0) > 0)
+    return modifiers.some((word) => (word.effects?.attackRank ?? 0) > 0)
       && modifiers.some((word) => (word.effects?.castCount ?? 1) > 1)
+      && modifiers.some((word) => !!word.effects?.pierceGuard && !!word.effects?.counter)
   }
   if (emotion === 'sorrow') {
-    return modifiers.some((word) => !!word.effects?.counter && (word.effects?.enemyAttackRank ?? 0) < 0)
-      && modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
+    return modifiers.some((word) => !!word.effects?.counter && (word.effects?.guardRank ?? 0) > 0)
+      && modifiers.some((word) => (word.effects?.magicShield ?? 0) > 0)
   }
   if (emotion === 'joy') {
-    return modifiers.some((word) => (word.effects?.carryInk ?? 0) > 0)
-      && modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.effects?.bonusDraws ?? 0) > 0)
+    return modifiers.some((word) => (word.targetCount ?? 1) !== 1 && (word.crit ?? 0) > 0)
+      && modifiers.some((word) => !!word.effects?.counter)
   }
-  return modifiers.some((word) => (word.effects?.bonusDraws ?? 0) > 0 && (word.effects?.inkDiscount ?? 0) > 0)
-    && modifiers.some((word) => word.tags.includes('preempt'))
+  return modifiers.some((word) => (word.effects?.inkDiscount ?? 0) > 0 && word.tags.includes('preempt'))
+    && modifiers.some((word) => (word.effects?.guardRank ?? 0) >= 3)
 }
 
 const baselineStats = startingPlayer().stats

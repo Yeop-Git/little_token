@@ -354,7 +354,6 @@ export interface PreparationResult {
   magicShieldGain: number
   attackRankGain: number
   guardRankGain: number
-  enemyAttackRankChange: number
 }
 
 export interface OverkillTransferResult {
@@ -391,10 +390,6 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
   const guardRankBefore = state.playerGuardRank ?? 0
   state.playerAttackRank = clampStatRank(attackRankBefore + intent.attackRank)
   state.playerGuardRank = clampStatRank(guardRankBefore + intent.guardRank)
-  const enemy = state.enemies.find((candidate) => !candidate.dead && candidate.engaged)
-    ?? state.enemies.find((candidate) => !candidate.dead)
-  const enemyRankBefore = enemy?.attackRank ?? 0
-  if (enemy) enemy.attackRank = clampStatRank(enemyRankBefore + intent.enemyAttackRank)
   return {
     guardAttempted,
     guardGain,
@@ -403,7 +398,6 @@ export function applyPreparation(state: BattleState, intent: Intent, mult = 1): 
     magicShieldGain,
     attackRankGain: state.playerAttackRank - attackRankBefore,
     guardRankGain: state.playerGuardRank - guardRankBefore,
-    enemyAttackRankChange: (enemy?.attackRank ?? enemyRankBefore) - enemyRankBefore,
   }
 }
 

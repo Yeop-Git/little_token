@@ -11,7 +11,7 @@
  *
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
  */
-import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf, withOverdrawEffects } from '@core/compiler'
+import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf } from '@core/compiler'
 import { conflictReason } from '@core/validator'
 import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { clearRewardValue, gradeForElapsedTurns, startGrade } from '@core/grade'
@@ -24,7 +24,6 @@ import {
   carryInkAfterSpend,
   inkExceedsLimit,
   inkOverdraw,
-  selectionCarryInk,
   selectionInkCost,
   sentenceInkAvailable,
 } from '@core/ink'
@@ -480,7 +479,7 @@ function enumerate(
       if (inkExceedsLimit(inkCost, availableInk)) return
       const overdraw = inkOverdraw(inkCost, availableInk)
       const stats = rankedCombatStats(player, state, sel)
-      const intent = withOverdrawEffects(compile(sel, tables, stats, mods), overdraw)
+      const intent = compile(sel, tables, stats, mods)
       const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
       out.push({
         sel,
@@ -546,15 +545,11 @@ function candidateDamage(c: Candidate, state: BattleState): number {
 
 function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): number {
   const attack = railValue(c, state)
-  const front = state.enemies[frontIdx(state)]
-  const utility = (front && front.attackRank > -STAT_RANK_LIMIT ? Math.max(0, -c.intent.enemyAttackRank) * 9 : 0)
-    + ((state.playerAttackRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.attackRank) * 7 : 0)
+  const utility = ((state.playerAttackRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.attackRank) * 7 : 0)
     + ((state.playerGuardRank ?? 0) < STAT_RANK_LIMIT ? Math.max(0, c.intent.guardRank) * 7 : 0)
-    + c.intent.bonusDraws * 2
     + (c.intent.counter ? 2 : 0)
     + c.intent.magicShield * state.playerMax * .3
     + attack * c.intent.lifeStealRate * .5
-    + selectionCarryInk(c.sel) * 1.5
   const combo = c.intent.combos.length * 18
   const scores: Record<BuildFocus, number> = {
     balanced: attack + c.guard * 0.55 + c.heal * 0.7 + utility,
@@ -780,14 +775,11 @@ function fightStage(
     if (!pick) break
 
     applyInkOverdraw(state, pick.inkCost, availableInk)
-    carriedInk = carryInkAfterSpend(pick.inkCost, availableInk, selectionCarryInk(pick.sel))
+    carriedInk = carryInkAfterSpend(pick.inkCost, availableInk)
     if (state.playerHp <= 0) break
 
     const rankedStats = rankedCombatStats(player, state, pick.sel)
-    const intent = withOverdrawEffects(
-      compile(pick.sel, tables, rankedStats, modsFor(player, killsThisBattle)),
-      pick.overdraw,
-    )
+    const intent = compile(pick.sel, tables, rankedStats, modsFor(player, killsThisBattle))
     const firstRouletteRoll = rng()
     const rouletteRoll = hasPassive(player, 'retry') ? Math.min(firstRouletteRoll, rng()) : firstRouletteRoll
     const resolved = resolveMultiplier(
@@ -895,7 +887,6 @@ function fightStage(
         if (pending.killed.length) engageFront(state)
       }
     }
-    if (state.playerHp > 0 && !allDead(state)) drawsLeft += intent.bonusDraws
     if (state.playerHp <= 0 || allDead(state)) break
   }
 
