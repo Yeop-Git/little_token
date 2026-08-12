@@ -42,6 +42,7 @@ interface Opts {
   refreshes: number
   mode?: 'reward' | 'shop'
   purchases?: number
+  playEntrance?: boolean
   onPick: (opt: RewardOption) => void
   onRefresh: () => boolean
   onSkip: () => void
@@ -184,7 +185,7 @@ function rewardFactsHtml(opt: RewardOption): string {
   const price = rewardPrice(opt)
   const currency = text('rewardCurrencyInspiration', '영감')
   return `<div class="rd-facts">
-    <span><small>${text('rewardFactRarity', '희귀도')}</small><b class="rarity-${opt.rarity}">${RARITY_LABEL[opt.rarity]}</b></span>
+    <span><small>${text('rewardFactRarity', '등급')}</small><b class="rarity-${opt.rarity}">${RARITY_LABEL[opt.rarity]}</b></span>
     <span><small>${text('rewardFactRole', '역할')}</small><span class="rd-fact-value">${roleHtml(opt)}</span></span>
     <span><small>${text('rewardFactAcquire', '획득')}</small><b>${acquireLabel(opt)}</b></span>
     <span><small>${text('rewardFactCost', '비용')}</small><b>${currency} ${price}</b></span>
@@ -250,7 +251,9 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
       <div class="id-art">${itemArt(item.art)}</div>`
   }
   const word = opt.word!
-  const values = wordValueLines(word)
+  // 고유 수치와 키워드 설명을 나눈다. 아래 keyword detail이 이름과 규칙을 보여 주므로
+  // 수치 칩에 같은 「흡혈」 등을 한 번 더 반복하지 않는다.
+  const values = wordValueLines(word, undefined, false)
   return `
     <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(word.emotion), 'wd-emotion')}<div class="wd-name">${word.text}</div></div>
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${word.level ?? 1}` : ' · 새 단어'}</div>
@@ -281,7 +284,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
       <div class="reward-pick reward-sold-card" aria-label="${text('shopSoldAria', '구매 완료된 자리')}">
         <span aria-hidden="true">✓</span><b>${text('shopSold', '구매 완료')}</b>
       </div>
-      <div class="reward-kindline"><span class="reward-state">${text('shopRefreshForMore', '새로고침하면 새 상품이 들어온다.')}</span></div>
+      <div class="reward-kindline"><span class="reward-state">${text('shopRefreshForMore', '새로고침하면 새 상품이 들어와요.')}</span></div>
     </div>`
   const mood = p.kind === 'item' ? 'buff' : `mood-${moodOf(p.word!)}`
   const emotion = p.kind === 'word' && p.word ? ` emotion-${emotionOrNeutral(p.word.emotion)}` : ''
@@ -294,7 +297,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
   const currency = text('rewardCurrencyInspiration', '영감')
   const cardLabel = text(
     'rewardCardAria',
-    '{name}, 희귀도 {rarity}, 역할 {role}, 획득 {acquire}, 비용 {currency} {price}',
+    '{name}, 등급 {rarity}, 역할 {role}, 획득 {acquire}, 비용 {currency} {price}',
     { name: p.name, rarity: RARITY_LABEL[p.rarity], role, acquire, currency, price },
   )
   const reinforcement = p.word?.level ?? 1
@@ -304,7 +307,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
       ? text('rewardSelectedItem', '내 소품으로 결정!')
       : text('rewardSelectedNew', '내 단어장에 기록!')
   const sticker = p.reinforce
-    ? text('rewardReinforceSticker', '+{amount} 강화', { amount: 1 })
+    ? text('rewardReinforceSticker', '강화 +{amount}', { amount: 1 })
     : 'New!'
   return `
     <div class="reward-choice">
@@ -329,7 +332,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
           </div>`}
         </div>
       </div>
-      <div class="reward-kindline">
+      <div class="reward-kindline rarity-${p.rarity}">
         <span class="reward-rarity-label rarity-${p.rarity}"><i aria-hidden="true">◆</i>${RARITY_LABEL[p.rarity]}</span>
         <span class="reward-type-label">${typeLabel(p)}</span>
         ${shop ? `<span class="reward-kind-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>` : ''}
@@ -352,7 +355,7 @@ export class RewardView {
     this.root.innerHTML = `
       <div class="scene reward-scene${shop ? ' reward-shop-scene' : ''}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
-          <div class="reward-card${shop ? ' reward-shop-card' : ''}">
+          <div class="reward-card${shop ? ' reward-shop-card' : ''}${opts.playEntrance === false ? ' skip-entrance' : ''}">
             ${shop ? `<img class="reward-shop-art" src="${REWARD_ART.shop}" alt="" aria-hidden="true" />` : `<div class="reward-token" aria-hidden="true">
               <img class="reward-token-shadow" src="${TOKEN_FACES.party}" alt="" />
               <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
@@ -370,7 +373,7 @@ export class RewardView {
               </div>
               ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase === 'subject' ? `
                 <div class="reward-build-preview">
-                  ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 빌드 서술어 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}
+                  ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 희귀 빌드 동사 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}
                 </div>` : ''}
             </header>
             <div class="reward-system-message" role="status" aria-live="assertive" hidden></div>

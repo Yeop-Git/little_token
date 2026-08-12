@@ -89,13 +89,13 @@ function mantisSentence(state: BattleState, enemy: EnemyInst, eventText?: string
   }
 
   const step = nextEnemyAttackStep(enemy)
-  if (step?.damageScale === 0) {
+  if (step?.telegraphText) {
     return {
       key: `mantis-ready-${enemy.attackPatternIndex}`,
       label: tx('preparesSentence'),
       tone: 'warn',
       tokens: tokens(['subject', tx('mantisSubject')], ['modifier', tx('mantisGather')], ['verb', tx('mantisRaise')]),
-      meta: [tx('noDamageThisAction'), tx('nextScythe')],
+      meta: [timingText(state, enemy), damageMeta(state, enemy), tx('nextScythe')],
       eventText,
     }
   }

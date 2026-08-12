@@ -12,6 +12,8 @@
 
 const EDGE_PAD = 16
 const GAP = 9
+const CARD_SELECTOR = '.word-card, .reward-pick'
+const KEYWORD_SELECTOR = '[data-tip-kind="keyword"][data-tooltip]'
 
 export class TooltipLayer {
   private scene: HTMLElement
@@ -21,7 +23,10 @@ export class TooltipLayer {
   private label: HTMLElement
   private title: HTMLElement
   private body: HTMLElement
+  /** 카드에서는 키워드를 낱장으로 띄우지 않고 카드 옆 한 묶음으로 세운다. */
+  private keywordTray: HTMLElement
   private anchor: HTMLElement | null = null
+  private keywordAnchor: HTMLElement | null = null
   private raf = 0
   private destroyed = false
 
@@ -40,7 +45,11 @@ export class TooltipLayer {
     this.body.className = 'tip-bubble-body'
     this.head.append(this.label, this.title)
     this.bubble.append(this.head, this.body)
+    this.keywordTray = document.createElement('div')
+    this.keywordTray.className = 'tip-keyword-tray'
+    this.keywordTray.setAttribute('aria-hidden', 'true')
     scene.appendChild(this.bubble)
+    scene.appendChild(this.keywordTray)
 
     scene.addEventListener('pointerover', this.onOver)
     scene.addEventListener('pointerleave', this.onLeave)
@@ -49,17 +58,31 @@ export class TooltipLayer {
     // 카드를 집는 순간 아이콘이 사라져도 포인터는 그 자리에 그대로다 — 그때는
     // pointerover가 다시 오지 않으므로 눌린 시점에 한 번 정리한다.
     scene.addEventListener('pointerdown', this.onLeave, true)
+    scene.addEventListener('pointerup', this.onPointerUp, true)
   }
 
   private onOver = (event: PointerEvent) => {
-    const host = (event.target as Element | null)?.closest<HTMLElement>('[data-tooltip]') ?? null
+    const target = event.target as Element | null
+    const card = target?.closest<HTMLElement>(CARD_SELECTOR) ?? null
+    if (card && this.showCardKeywords(card)) return
+    const host = target?.closest<HTMLElement>('[data-tooltip]') ?? null
     if (host) this.show(host)
     else this.hide()
   }
 
   private onFocusIn = (event: FocusEvent) => {
-    const host = (event.target as Element | null)?.closest<HTMLElement>('[data-tooltip]')
+    const target = event.target as Element | null
+    const card = target?.closest<HTMLElement>(CARD_SELECTOR) ?? null
+    if (card && this.showCardKeywords(card)) return
+    const host = target?.closest<HTMLElement>('[data-tooltip]')
     if (host) this.show(host)
+  }
+
+  /** 터치 첫 탭은 선택 로직이 미리보기로 남겨 두므로 손을 뗄 때 설명도 함께 연다. */
+  private onPointerUp = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') return
+    const card = (event.target as Element | null)?.closest<HTMLElement>(CARD_SELECTOR)
+    if (card) this.showCardKeywords(card)
   }
 
   private onLeave = () => this.hide()
@@ -67,6 +90,8 @@ export class TooltipLayer {
   private show(host: HTMLElement) {
     const text = host.dataset.tooltip
     if (!text) return
+    this.keywordAnchor = null
+    this.keywordTray.classList.remove('show')
     if (host !== this.anchor) {
       this.anchor = host
       const label = host.dataset.tipLabel ?? ''
@@ -89,10 +114,37 @@ export class TooltipLayer {
     if (!this.raf) this.raf = requestAnimationFrame(this.follow)
   }
 
-  private hide() {
-    if (!this.anchor) return
+  private showCardKeywords(card: HTMLElement): boolean {
+    const keywordHosts = [...card.querySelectorAll<HTMLElement>(KEYWORD_SELECTOR)]
+    if (!keywordHosts.length) return false
+
     this.anchor = null
     this.bubble.classList.remove('show')
+    if (card !== this.keywordAnchor) {
+      this.keywordAnchor = card
+      this.keywordTray.replaceChildren(...keywordHosts.map((host) => {
+        const item = document.createElement('section')
+        item.className = 'tip-keyword-card'
+        const title = document.createElement('strong')
+        title.textContent = host.dataset.tipTitle ?? host.textContent?.trim() ?? ''
+        const body = document.createElement('span')
+        body.textContent = host.dataset.tooltip ?? ''
+        item.append(title, body)
+        return item
+      }))
+      this.keywordTray.classList.add('show')
+    }
+    this.place()
+    if (!this.raf) this.raf = requestAnimationFrame(this.follow)
+    return true
+  }
+
+  private hide() {
+    if (!this.anchor && !this.keywordAnchor) return
+    this.anchor = null
+    this.keywordAnchor = null
+    this.bubble.classList.remove('show')
+    this.keywordTray.classList.remove('show')
     if (this.raf) {
       cancelAnimationFrame(this.raf)
       this.raf = 0
@@ -103,7 +155,7 @@ export class TooltipLayer {
   private follow = () => {
     this.raf = 0
     if (this.destroyed) return
-    const host = this.anchor
+    const host = this.keywordAnchor ?? this.anchor
     if (!host || !host.isConnected || !host.offsetParent) {
       this.hide()
       return
@@ -113,7 +165,7 @@ export class TooltipLayer {
   }
 
   private place() {
-    const host = this.anchor
+    const host = this.keywordAnchor ?? this.anchor
     if (!host) return
     const sceneRect = this.scene.getBoundingClientRect()
     const stageW = this.scene.offsetWidth
@@ -121,6 +173,31 @@ export class TooltipLayer {
     // 무대는 뷰포트에 맞춰 통째로 축소돼 있다. 화면 픽셀을 무대 픽셀로 되돌린다.
     const scale = sceneRect.width / Math.max(1, stageW) || 1
     const rect = host.getBoundingClientRect()
+    if (this.keywordAnchor) {
+      const left = (rect.left - sceneRect.left) / scale
+      const right = (rect.right - sceneRect.left) / scale
+      const top = (rect.top - sceneRect.top) / scale
+      const bottom = (rect.bottom - sceneRect.top) / scale
+      const roomLeft = left - EDGE_PAD - GAP
+      const roomRight = stageW - EDGE_PAD - right - GAP
+      const side = roomRight >= roomLeft ? 'right' : 'left'
+      const room = Math.max(roomLeft, roomRight)
+      const width = Math.max(180, Math.min(330, room))
+      this.keywordTray.style.width = `${Math.round(width)}px`
+      const trayHeight = this.keywordTray.offsetHeight
+      const cardCenterY = (top + bottom) / 2
+      const y = Math.min(
+        Math.max(cardCenterY - trayHeight / 2, EDGE_PAD),
+        Math.max(EDGE_PAD, stageH - EDGE_PAD - trayHeight),
+      )
+      const x = side === 'right' ? right + GAP : left - GAP - width
+      this.keywordTray.dataset.side = side
+      const nextLeft = `${Math.round(Math.max(EDGE_PAD, x))}px`
+      const nextTop = `${Math.round(y)}px`
+      if (this.keywordTray.style.left !== nextLeft) this.keywordTray.style.left = nextLeft
+      if (this.keywordTray.style.top !== nextTop) this.keywordTray.style.top = nextTop
+      return
+    }
     const centerX = (rect.left + rect.width / 2 - sceneRect.left) / scale
     const anchorTop = (rect.top - sceneRect.top) / scale
     const anchorBottom = (rect.bottom - sceneRect.top) / scale
@@ -156,6 +233,8 @@ export class TooltipLayer {
     this.scene.removeEventListener('focusin', this.onFocusIn)
     this.scene.removeEventListener('focusout', this.onLeave)
     this.scene.removeEventListener('pointerdown', this.onLeave, true)
+    this.scene.removeEventListener('pointerup', this.onPointerUp, true)
     this.bubble.remove()
+    this.keywordTray.remove()
   }
 }

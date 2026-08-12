@@ -4,7 +4,7 @@ import { ELITE_ENEMY_TEXT, ENEMIES } from '@data/enemies'
 import { ALL_ITEMS, EXCLAIM_SLOTS, STAT_LABEL } from '@data/items'
 import { PASSIVES, type PassiveId } from '@core/passives'
 import { STAT_META } from '@core/player'
-import { TACTICAL_CARD_GUIDES } from '@data/tacticalCards'
+import { FIRST_FLOOR_ATTACK_GUIDE, TACTICAL_CARD_GUIDES } from '@data/tacticalCards'
 
 type ForeignLocale = Exclude<LocaleCode, 'ko'>
 type TextPair = readonly [title: string, description: string]
@@ -12,32 +12,32 @@ type TextPair = readonly [title: string, description: string]
 const CHARACTER_TEXT: Record<ForeignLocale, Record<string, TextPair>> = {
   en: {
     player:['The boy who protects stories','Holding his rain-soaked diary close, he protects each story with the right sentence.'], token:['An anxious story guide','Token circles Prompt and signals frantically whenever a dangerous scribble appears.'],
-    termite:['White teeth in the paper','It folds its clear wings and steadily gnaws through the fibers of old sentences.'], moth:['Dust sweeper between pages','Its dusty brush erases the edges of sentences piece by piece.'], flea:['A paper predator that strikes first','It flies in before the sentence is finished and tears at the scraps.'], roach:['A hard stain between sentences','Its thick shell endures attacks while it burrows deep into the diary.'], pillbug:['A shell that erases one hit','It curls up and lets the first blow roll away completely.'], mosquito:['A needle through the shield','Its long proboscis reaches the HP behind Guard.'], workerBee:['Escort of the queen’s sentence','The workers guard both sides of the Queen Bee and make her invulnerable until they fall.'], mantis:['The great scythe that trims sentences','It opens by raising its scythe to telegraph a heavy attack. Blocking it opens a long gap.'], queenBee:['Queen of the torn-paper hive','Sweet ink and wax turn every blank space into a honeycomb.'], elderSpider:['The old editor who stitches endings','An old diary and webbing bind the story to a false ending.'],
+    termite:['White teeth in the paper','It folds its clear wings and steadily gnaws through the fibers of old sentences.'], moth:['Dust sweeper between pages','Its dusty brush erases the edges of sentences piece by piece.'], flea:['A paper predator that strikes first','It flies in before the sentence is finished and tears at the scraps.'], roach:['A hard stain between sentences','Its thick shell endures attacks while it burrows deep into the diary.'], pillbug:['A shell that erases one hit','It curls up and lets the first blow roll away completely.'], mosquito:['A needle through the shield','Its long proboscis reaches the HP behind Guard.'], workerBee:['Escort of the queen’s sentence','The workers guard both sides of the Queen Bee and make her invulnerable until they fall.'], mantis:['The great scythe that trims sentences','It swings once or twice, attacks while raising its scythe, then slams. Blocking the slam opens a decisive gap.'], queenBee:['Queen of the torn-paper hive','Sweet ink and wax turn every blank space into a honeycomb.'], elderSpider:['The old editor who stitches endings','An old diary and webbing bind the story to a false ending.'],
   },
   ja: {
     player:['物語を守る少年','雨に濡れた日記を抱き、正しい文で物語を守る。'], token:['心配性な物語の案内役','トークンはプロンプトのそばを飛び回り、危険な落書きに慌ただしく合図する。'],
-    termite:['紙の中の白い歯','透明な羽をたたみ、古い文の繊維から少しずつかじる。'], moth:['本棚のほこり掃除屋','ほこりまみれの刷毛で文の端を少しずつ消す。'], flea:['先に飛び込む紙の捕食者','文が完成する前に飛来し、紙片を先に食いちぎる。'], roach:['文の間の固い染み','厚い殻で耐えながら日記の奥へ潜り込む。'], pillbug:['一撃を消す甲羅','体を丸めて最初の一撃を丸ごと受け流す。'], mosquito:['防御の隙間を刺す針','長い針で防御の奥の体力を直接削る。'], workerBee:['女王の文を守る護衛','女王蜂の両側を守り、全滅するまで本体を無敵にする。'], mantis:['文を裁つ大鎌','戦闘の最初から大鎌を掲げて強攻撃を予告する。防げば大きな隙ができる。'], queenBee:['破れ紙の巣の女王','甘いインクと蜜蝋で空欄を蜂の巣に変える。'], elderSpider:['結末を縫う古い編集者','古い日記と蜘蛛の糸で物語を偽の結末へ縛る。'],
+    termite:['紙の中の白い歯','透明な羽をたたみ、古い文の繊維から少しずつかじる。'], moth:['本棚のほこり掃除屋','ほこりまみれの刷毛で文の端を少しずつ消す。'], flea:['先に飛び込む紙の捕食者','文が完成する前に飛来し、紙片を先に食いちぎる。'], roach:['文の間の固い染み','厚い殻で耐えながら日記の奥へ潜り込む。'], pillbug:['一撃を消す甲羅','体を丸めて最初の一撃を丸ごと受け流す。'], mosquito:['防御の隙間を刺す針','長い針で防御の奥の体力を直接削る。'], workerBee:['女王の文を守る護衛','女王蜂の両側を守り、全滅するまで本体を無敵にする。'], mantis:['文を裁つ大鎌','一、二度斬った後、攻撃しながら大鎌を構えて振り下ろす。防げば決定的な隙ができる。'], queenBee:['破れ紙の巣の女王','甘いインクと蜜蝋で空欄を蜂の巣に変える。'], elderSpider:['結末を縫う古い編集者','古い日記と蜘蛛の糸で物語を偽の結末へ縛る。'],
   },
   ru: {
     player:['Мальчик — хранитель историй','Прижимая промокший дневник, он защищает историю правильными фразами.'], token:['Тревожный проводник по истории','Токен кружит рядом с Промптом и подаёт сигналы при опасных каракулях.'],
-    termite:['Белые зубы внутри бумаги','Сложив прозрачные крылья, он медленно грызёт волокна старых фраз.'], moth:['Пыльный уборщик книжных полок','Стирает края фраз пыльной щёткой, кусочек за кусочком.'], flea:['Бумажный хищник первого хода','Прилетает до завершения фразы и рвёт бумажные обрывки.'], roach:['Твёрдое пятно между фразами','Толстый панцирь помогает ему пробраться вглубь дневника.'], pillbug:['Панцирь, стирающий один удар','Сворачивается и полностью отводит первый удар.'], mosquito:['Игла сквозь щит','Длинный хоботок достаёт здоровье за Защитой.'], workerBee:['Охрана фразы королевы','Рабочие пчёлы делают матку неуязвимой, пока не будут побеждены.'], mantis:['Большая коса — редактор фраз','С начала боя поднимает косу, предупреждая о мощном ударе. Успешная защита открывает уязвимость.'], queenBee:['Королева улья из рваной бумаги','Сладкие чернила и воск превращают пробелы в соты.'], elderSpider:['Старый редактор, сшивающий финалы','Старый дневник и паутина привязывают историю к ложному финалу.'],
+    termite:['Белые зубы внутри бумаги','Сложив прозрачные крылья, он медленно грызёт волокна старых фраз.'], moth:['Пыльный уборщик книжных полок','Стирает края фраз пыльной щёткой, кусочек за кусочком.'], flea:['Бумажный хищник первого хода','Прилетает до завершения фразы и рвёт бумажные обрывки.'], roach:['Твёрдое пятно между фразами','Толстый панцирь помогает ему пробраться вглубь дневника.'], pillbug:['Панцирь, стирающий один удар','Сворачивается и полностью отводит первый удар.'], mosquito:['Игла сквозь щит','Длинный хоботок достаёт здоровье за Защитой.'], workerBee:['Охрана фразы королевы','Рабочие пчёлы делают матку неуязвимой, пока не будут побеждены.'], mantis:['Большая коса — редактор фраз','Бьёт один-два раза, атакует в стойке и обрушивает косу. Блок открывает решающую уязвимость.'], queenBee:['Королева улья из рваной бумаги','Сладкие чернила и воск превращают пробелы в соты.'], elderSpider:['Старый редактор, сшивающий финалы','Старый дневник и паутина привязывают историю к ложному финалу.'],
   },
   'zh-Hans': {
     player:['守护故事的少年','怀抱被雨淋湿的日记，用正确的句子守护故事。'], token:['焦急的故事向导','词元盘旋在提示词身旁，发现危险涂鸦时慌忙发出信号。'],
-    termite:['纸中的白色牙齿','收起透明翅膀，从旧句子的纤维开始慢慢啃食。'], moth:['书架间的灰尘清洁工','用沾满灰尘的刷子一点点擦掉句子边缘。'], flea:['抢先飞来的纸张捕食者','在句子写完前飞来，先撕咬纸屑。'], roach:['句子之间的坚硬污点','凭厚壳支撑，钻入日记深处。'], pillbug:['抹去一次攻击的甲壳','蜷起身体，完全化解第一次攻击。'], mosquito:['刺入护盾缝隙的针','用长针直接啃噬防御后的生命。'], workerBee:['守护蜂后句子的护卫','守在蜂后两侧，使本体保持无敌，全部击倒后蜂后会露出破绽。'], mantis:['裁剪句子的巨镰','战斗开始就举起巨镰预告强攻；成功格挡会让它长时间露出破绽。'], queenBee:['破纸蜂巢的女王','用甜蜜墨水与蜂蜡把空白堵成蜂巢。'], elderSpider:['缝合结局的古老编辑','用旧日记与蛛网把故事强行绑在错误结局上。'],
+    termite:['纸中的白色牙齿','收起透明翅膀，从旧句子的纤维开始慢慢啃食。'], moth:['书架间的灰尘清洁工','用沾满灰尘的刷子一点点擦掉句子边缘。'], flea:['抢先飞来的纸张捕食者','在句子写完前飞来，先撕咬纸屑。'], roach:['句子之间的坚硬污点','凭厚壳支撑，钻入日记深处。'], pillbug:['抹去一次攻击的甲壳','蜷起身体，完全化解第一次攻击。'], mosquito:['刺入护盾缝隙的针','用长针直接啃噬防御后的生命。'], workerBee:['守护蜂后句子的护卫','守在蜂后两侧，使本体保持无敌，全部击倒后蜂后会露出破绽。'], mantis:['裁剪句子的巨镰','挥砍一至两次后，边攻击边架起巨镰再下劈；成功格挡会造成决定性破绽。'], queenBee:['破纸蜂巢的女王','用甜蜜墨水与蜂蜡把空白堵成蜂巢。'], elderSpider:['缝合结局的古老编辑','用旧日记与蛛网把故事强行绑在错误结局上。'],
   },
   'zh-Hant': {
     player:['守護故事的少年','懷抱被雨淋濕的日記，用正確的句子守護故事。'], token:['焦急的故事嚮導','詞元盤旋在提示詞身旁，發現危險塗鴉時慌忙發出信號。'],
-    termite:['紙中的白色牙齒','收起透明翅膀，從舊句子的纖維開始慢慢啃食。'], moth:['書架間的灰塵清潔工','用沾滿灰塵的刷子一點點擦掉句子邊緣。'], flea:['搶先飛來的紙張捕食者','在句子寫完前飛來，先撕咬紙屑。'], roach:['句子之間的堅硬污點','憑厚殼支撐，鑽入日記深處。'], pillbug:['抹去一次攻擊的甲殼','蜷起身體，完全化解第一次攻擊。'], mosquito:['刺入護盾縫隙的針','用長針直接啃噬防禦後的生命。'], workerBee:['守護蜂后句子的護衛','守在蜂后兩側，使本體保持無敵，全部擊倒後蜂后會露出破綻。'], mantis:['裁剪句子的巨鐮','戰鬥開始就舉起巨鐮預告強攻；成功格擋會讓它長時間露出破綻。'], queenBee:['破紙蜂巢的女王','用甜蜜墨水與蜂蠟把空白堵成蜂巢。'], elderSpider:['縫合結局的古老編輯','用舊日記與蛛網把故事強行綁在錯誤結局上。'],
+    termite:['紙中的白色牙齒','收起透明翅膀，從舊句子的纖維開始慢慢啃食。'], moth:['書架間的灰塵清潔工','用沾滿灰塵的刷子一點點擦掉句子邊緣。'], flea:['搶先飛來的紙張捕食者','在句子寫完前飛來，先撕咬紙屑。'], roach:['句子之間的堅硬污點','憑厚殼支撐，鑽入日記深處。'], pillbug:['抹去一次攻擊的甲殼','蜷起身體，完全化解第一次攻擊。'], mosquito:['刺入護盾縫隙的針','用長針直接啃噬防禦後的生命。'], workerBee:['守護蜂后句子的護衛','守在蜂后兩側，使本體保持無敵，全部擊倒後蜂后會露出破綻。'], mantis:['裁剪句子的巨鐮','揮砍一至兩次後，邊攻擊邊架起巨鐮再下劈；成功格擋會造成決定性破綻。'], queenBee:['破紙蜂巢的女王','用甜蜜墨水與蜂蠟把空白堵成蜂巢。'], elderSpider:['縫合結局的古老編輯','用舊日記與蛛網把故事強行綁在錯誤結局上。'],
   },
 }
 
 const ENEMY_NOTES: Record<ForeignLocale, Record<string, string>> = {
-  en:{ mantis:'It opens each cycle by raising its scythe for a turn. Meet the shown Guard requirement to cancel the heavy attack, expose it, and skip its next attack.', queenBee:'Four workers escort the queen. Defeat them to remove her immunity, expose her, and skip her next action; she summons a new group after recovering.', elderSpider:'Its four legs reveal Joy, Anger, Sorrow, and Delight weaknesses in order. Webs pierce Guard and seal cards; matching the current weakness loosens a seal.', termite:'Slowly gnaws paper fibers without a special ability.', moth:'Erases sentence edges with a dusty brush.', flea:'Acts first before the sentence begins.', roach:'Its hard shell starts with Guard that absorbs damage.', pillbug:'One Magic Shield completely blocks the first hit.', mosquito:'Its needle damages HP without consuming Guard.' },
-  ja:{ mantis:'各サイクルの最初に大鎌を一ターン掲げる。表示された防御を満たすと強攻撃を中止し、隙を作って次の攻撃を飛ばす。', queenBee:'四匹の働き蜂が女王を守る。全滅させると無敵が解け、次の行動を飛ばす。回復後に新しい群れを呼ぶ。', elderSpider:'四本の脚が喜び・怒り・悲しみ・楽しさの弱点を順に見せる。蜘蛛の糸は防御を貫通してカードを封印し、現在の弱点で緩む。', termite:'特殊能力なしで紙の繊維を少しずつかじる。', moth:'ほこりの刷毛で文の端を消す。', flea:'文が始まる前に先攻する。', roach:'固い殻の防御が先にダメージを受ける。', pillbug:'マジックシールド一枚が最初の一撃を完全に防ぐ。', mosquito:'防御を消費せず体力へ直接ダメージを与える。' },
-  ru:{ mantis:'Каждый цикл начинает с поднятой на ход косы. Наберите показанную Защиту, чтобы отменить мощный удар, открыть уязвимость и пропустить следующую атаку.', queenBee:'Четыре рабочие пчелы защищают матку. Победите их, чтобы снять неуязвимость и пропустить её следующую атаку; затем она призовёт новую группу.', elderSpider:'Четыре ноги по очереди открывают слабости к Радости, Гневу, Печали и Веселью. Паутина пробивает Защиту и запечатывает карты; текущая слабость снимает печать.', termite:'Медленно грызёт бумагу без особых способностей.', moth:'Стирает края фраз пыльной щёткой.', flea:'Действует первой до начала фразы.', roach:'Твёрдый панцирь начинает бой с Защитой.', pillbug:'Один Магический щит полностью блокирует первый удар.', mosquito:'Бьёт по здоровью, не расходуя Защиту.' },
-  'zh-Hans':{ mantis:'每个循环开始时会举镰预告一回合。达到显示的防御需求即可取消强攻、令其露出破绽并跳过下一次攻击。', queenBee:'四只工蜂护卫蜂后。全部消灭后解除无敌、使其露出破绽并跳过下一行动；恢复后会再次召唤。', elderSpider:'四条腿依次显示喜悦、愤怒、悲伤、快乐弱点。蛛网贯通防御并封印卡牌，命中当前弱点可解除封印。', termite:'没有特殊能力，只会慢慢啃食纸纤维。', moth:'用灰尘刷子擦掉句子边缘。', flea:'在句子开始前先攻。', roach:'坚硬甲壳提供会优先承伤的防御。', pillbug:'一层魔法盾会完全抵挡第一次攻击。', mosquito:'不消耗防御，直接伤害生命。' },
-  'zh-Hant':{ mantis:'每個循環開始時會舉鐮預告一回合。達到顯示的防禦需求即可取消強攻、令其露出破綻並跳過下一次攻擊。', queenBee:'四隻工蜂護衛蜂后。全部消滅後解除無敵、使其露出破綻並跳過下一行動；恢復後會再次召喚。', elderSpider:'四條腿依次顯示喜悅、憤怒、悲傷、快樂弱點。蛛網貫通防禦並封印卡牌，命中目前弱點可解除封印。', termite:'沒有特殊能力，只會慢慢啃食紙纖維。', moth:'用灰塵刷子擦掉句子邊緣。', flea:'在句子開始前先攻。', roach:'堅硬甲殼提供會優先承傷的防禦。', pillbug:'一層魔法盾會完全抵擋第一次攻擊。', mosquito:'不消耗防禦，直接傷害生命。' },
+  en:{ mantis:'It swings once or twice, then attacks while telegraphing the slam. Meet the shown Guard to cancel it, deal ×2.5 damage during the opening, and skip its next attack.', queenBee:'Four workers escort the queen. Each defeat deals 5% Max HP backlash; wipe all four to remove immunity, deal ×2.5 damage during the opening, and skip her next action.', elderSpider:'Its four legs reveal Joy, Anger, Sorrow, and Delight weaknesses in order. Matching the current weakness deals ×2 damage and loosens a seal; a matching combo also pierces the next part.', termite:'Slowly gnaws paper fibers without a special ability.', moth:'Erases sentence edges with a dusty brush.', flea:'Acts first before the sentence begins.', roach:'Its hard shell starts with Guard that absorbs damage.', pillbug:'One Magic Shield completely blocks the first hit.', mosquito:'Its needle damages HP without consuming Guard.' },
+  ja:{ mantis:'鎌を一、二度振った後、攻撃しながら振り下ろしを予告する。表示防御を満たすと中止させ、隙の間はダメージ×2.5、次の攻撃も飛ばす。', queenBee:'四匹の働き蜂が女王を守る。一匹ごとに最大HPの5%を反動で与え、全滅で無敵解除・隙の間ダメージ×2.5・次の行動スキップ。', elderSpider:'四本の脚が喜び・怒り・悲しみ・楽しさの弱点を順に見せる。現在の弱点はダメージ×2と封印解除、慣用句も合えば次の部位を貫通する。', termite:'特殊能力なしで紙の繊維を少しずつかじる。', moth:'ほこりの刷毛で文の端を消す。', flea:'文が始まる前に先攻する。', roach:'固い殻の防御が先にダメージを受ける。', pillbug:'マジックシールド一枚が最初の一撃を完全に防ぐ。', mosquito:'防御を消費せず体力へ直接ダメージを与える。' },
+  ru:{ mantis:'После одного-двух взмахов атакует и предупреждает об ударе. Нужная Защита отменяет его, даёт урон ×2,5 и пропуск следующей атаки.', queenBee:'Четыре пчелы защищают матку. Каждая наносит отдачей 5% макс. ОЗ; все четыре снимают неуязвимость, дают урон ×2,5 и пропуск действия.', elderSpider:'Ноги по очереди открывают слабости. Текущая слабость даёт урон ×2 и снимает печать; комбо со слабостью пробивает следующую часть.', termite:'Медленно грызёт бумагу без особых способностей.', moth:'Стирает края фраз пыльной щёткой.', flea:'Действует первой до начала фразы.', roach:'Твёрдый панцирь начинает бой с Защитой.', pillbug:'Один Магический щит полностью блокирует первый удар.', mosquito:'Бьёт по здоровью, не расходуя Защиту.' },
+  'zh-Hans':{ mantis:'挥砍一至两次后，边攻击边预告下劈。满足显示防御即可取消强攻，在破绽期间造成×2.5伤害并跳过下一次攻击。', queenBee:'四只工蜂护卫蜂后。每只被击倒会反伤蜂后最大生命5%；全灭后解除无敌、破绽期间伤害×2.5并跳过下一行动。', elderSpider:'四条腿依次显示情绪弱点。命中当前弱点造成×2伤害并解除封印；同时组成惯用语则贯穿下一部位。', termite:'没有特殊能力，只会慢慢啃食纸纤维。', moth:'用灰尘刷子擦掉句子边缘。', flea:'在句子开始前先攻。', roach:'坚硬甲壳提供会优先承伤的防御。', pillbug:'一层魔法盾会完全抵挡第一次攻击。', mosquito:'不消耗防御，直接伤害生命。' },
+  'zh-Hant':{ mantis:'揮砍一至兩次後，邊攻擊邊預告下劈。滿足顯示防禦即可取消強攻，在破綻期間造成×2.5傷害並跳過下一次攻擊。', queenBee:'四隻工蜂護衛蜂后。每隻被擊倒會反傷蜂后最大生命5%；全滅後解除無敵、破綻期間傷害×2.5並跳過下一行動。', elderSpider:'四條腿依次顯示情緒弱點。命中目前弱點造成×2傷害並解除封印；同時組成慣用語則貫穿下一部位。', termite:'沒有特殊能力，只會慢慢啃食紙纖維。', moth:'用灰塵刷子擦掉句子邊緣。', flea:'在句子開始前先攻。', roach:'堅硬甲殼提供會優先承傷的防禦。', pillbug:'一層魔法盾會完全抵擋第一次攻擊。', mosquito:'不消耗防禦，直接傷害生命。' },
 }
 
 const PASSIVE_TEXT: Record<ForeignLocale, Record<PassiveId, TextPair>> = {
@@ -64,13 +64,21 @@ const TACTICAL_TEXT: Record<ForeignLocale, Array<TextPair>> = {
   'zh-Hant':[['積蓄之力','為防禦動詞加上「躍動著」，可將目前防禦的120%化為傷害且不消耗防禦。'],['貫通修飾語','為攻擊動詞加上「全力」或「孤注一擲」等貫通修飾語，直接攻擊生命。'],['重複修飾語','「瘋狂地」會讓動詞發動兩次，快速剝除魔法盾。'],['魔法盾','蚊子的長針會繞過防禦；「強忍著」提供的魔法盾可完整抵擋一次攻擊。'],['反擊防禦','為防禦動詞加上反擊修飾語，擋住螳螂強攻即可令其露出破綻。'],['範圍修飾語或憤怒集中','用「笑著」「粗暴地」「興奮地」清理工蜂，或以憤怒單體攻擊逐隻擊破。'],['重複與貫通修飾語','先以「瘋狂地」剝除長老蜘蛛的魔法盾，再用貫通修飾語越過防禦並匹配腿部弱點。'],['疊盾精英','用「瘋狂地」重複發動動詞，剝除額外魔法盾。'],['汲取精英','「強忍著」的魔法盾可完整擋下一擊並阻止敵方恢復。'],['狂襲精英','在重擊前用壓低攻勢的修飾語削弱衝鋒。']],
 }
 
-/** 2층에서 실제로 함께 보장되는 방어 수식어와 방패치기 동사를 설명한다. */
+/** 2층에서 실제로 함께 보장되는 방어 수식어와 희귀 방패치기 동사를 설명한다. */
 const SHIELD_BASH_TACTICAL_TEXT: Record<ForeignLocale, TextPair> = {
-  en:['Shield Bash','The floor-2 verb Shoved converts 100% of current Guard, including newly gained Guard, into damage without spending it. Holding It In starts Guard growth.'],
-  ja:['シールドバッシュ','2階の動詞報酬「押し返した」は、新たに得た分を含む現在の防御100%を消費せずダメージに変える。「ぐっと堪えて」で防御成長を始められる。'],
-  ru:['Удар щитом','Глагол 2-го этажа «Оттолкнул» наносит урон в размере 100% текущей Защиты, включая только что полученную, не расходуя её. «Стиснув зубы» начинает рост Защиты.'],
-  'zh-Hans':['盾击','第2层动词奖励“推了回去”会将包含本句新增值在内的当前防御100%化为伤害，且不消耗防御。“强忍着”可开启防御成长。'],
-  'zh-Hant':['盾擊','第2層動詞獎勵「推了回去」會將包含本句新增值在內的目前防禦100%化為傷害，且不消耗防禦。「強忍著」可開啟防禦成長。'],
+  en:['Shield Bash','The floor-2 Rare verb Shoved converts 100% of current Guard, including newly gained Guard, into damage without spending it. Holding It In starts Guard growth.'],
+  ja:['シールドバッシュ','2階のレア動詞「押し返した」は、新たに得た分を含む現在の防御100%を消費せずダメージに変える。「ぐっと堪えて」で防御成長を始められる。'],
+  ru:['Удар щитом','Редкий глагол 2-го этажа «Оттолкнул» наносит урон в размере 100% текущей Защиты, включая только что полученную, не расходуя её. «Стиснув зубы» начинает рост Защиты.'],
+  'zh-Hans':['盾击','第2层稀有动词“推了回去”会将包含本句新增值在内的当前防御100%化为伤害，且不消耗防御。“强忍着”可开启防御成长。'],
+  'zh-Hant':['盾擊','第2層稀有動詞「推了回去」會將包含本句新增值在內的目前防禦100%化為傷害，且不消耗防禦。「強忍著」可開啟防禦成長。'],
+}
+
+const FIRST_FLOOR_ATTACK_TEXT: Record<ForeignLocale, TextPair> = {
+  en:['Lower HP with Attacks','Complete a sentence with an Attack verb to deal damage and lower the enemy’s HP.'],
+  ja:['攻撃で体力を削る','攻撃動詞で文を完成させると、敵にダメージを与えて体力を削る。'],
+  ru:['Снижайте здоровье атаками','Завершите фразу атакующим глаголом, чтобы нанести врагу урон и снизить его здоровье.'],
+  'zh-Hans':['用攻击削减生命','用攻击动词完成句子，即可对敌人造成伤害并削减其生命。'],
+  'zh-Hant':['用攻擊削減生命','用攻擊動詞完成句子，即可對敵人造成傷害並削減其生命。'],
 }
 
 const ELITE_TEXT: Record<ForeignLocale, {
@@ -147,5 +155,6 @@ export function applyDetailedContentLocalization(locale: ForeignLocale): void {
   TACTICAL_CARD_GUIDES.forEach((guide, index) => {
     ;[guide.title, guide.tooltip] = index === 0 ? SHIELD_BASH_TACTICAL_TEXT[locale] : TACTICAL_TEXT[locale][index]
   })
+  ;[FIRST_FLOOR_ATTACK_GUIDE.title, FIRST_FLOOR_ATTACK_GUIDE.tooltip] = FIRST_FLOOR_ATTACK_TEXT[locale]
   for (const item of Object.values(ALL_ITEMS)) item.flavor = GENERIC_ITEM_FLAVOR[locale]
 }

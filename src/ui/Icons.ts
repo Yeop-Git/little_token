@@ -82,7 +82,7 @@ export const icon = (key: string): string => {
 
 /**
  * 아이템/보상 일러스트. 그려 둔 일러스트가 있으면 그걸 쓰고,
- * 없는 키(노멀 아이템·보상 단어 아이콘)는 아래 SVG로 떨어진다.
+ * 없는 키(일반 아이템·보상 단어 아이콘)는 아래 SVG로 떨어진다.
  */
 export const itemArt = (key: string): string => {
   const illus = ITEM_ART[key]

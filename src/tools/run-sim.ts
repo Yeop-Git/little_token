@@ -305,7 +305,7 @@ function applyOption(player: PlayerState, opt: RewardOption, grade: number, skil
 
 /** 한 층 클리어 보상 3단계를 실제 genRewards로 뽑아 고른다. */
 function takeRewards(player: PlayerState, grade: number, unusedDraws: number, day: number, skill: RewardSkill, focus: BuildFocus, locale: LocaleCode, rng: () => number, wallet: { inspiration: number }): void {
-  wallet.inspiration += clearRewardValue(grade, unusedDraws)
+  wallet.inspiration += clearRewardValue(grade, unusedDraws, day)
   const plannedModifierId = day === EARLY_BUILD_REWARD_DAY
     ? focus === 'guard' ? EARLY_BUILD_MODIFIER_IDS[0]
       : focus === 'heal' ? EARLY_BUILD_MODIFIER_IDS[1]
@@ -366,7 +366,7 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
 
 /** 보스 뒤 3×3 상점 — 아끼는 기량일수록 남긴 영감을 추가 성장으로 적극 환전한다. */
 function takeBossShop(player: PlayerState, grade: number, unusedDraws: number, day: number, skill: RewardSkill, focus: BuildFocus, rng: () => number, wallet: { inspiration: number }): void {
-  wallet.inspiration += clearRewardValue(grade, unusedDraws)
+  wallet.inspiration += clearRewardValue(grade, unusedDraws, day)
   let refreshes = 0
   let bought = 0
   while (refreshes < 8 && wallet.inspiration > 0) {
@@ -741,7 +741,7 @@ function fightStage(
         const reachable = c.intent.pierceGuard || c.intent.targetCount === 'all'
           ? escorts
           : Math.min(escorts, c.intent.targetCount as number)
-        const perWorker = candidateDamage(c, state) * c.intent.summonDamageMultiplier
+        const perWorker = candidateDamage(c, state)
         return Math.min(reachable, Math.floor(perWorker / (boss.def.summonPattern?.hp ?? 1)))
       }
       const queenAnswer = boss.def.summonPattern && escorts > 0
@@ -1005,6 +1005,7 @@ interface ProfileMetrics {
   earlyDeaths: number
   firstFloorDeaths: number
   avgTurns: number
+  avgFinalInspiration: number
   floor5Solved: number
   floor5Bonus: number
   midDeaths: number
@@ -1089,6 +1090,7 @@ for (const profile of SKILL_PROFILES) {
     earlyDeaths: runs.filter((r) => r.diedOn !== null && r.diedOn <= 4).length,
     firstFloorDeaths: runs.filter((r) => r.diedOn === 1).length,
     avgTurns,
+    avgFinalInspiration,
     floor5Solved: floor5Solved.length,
     floor5Bonus,
     midDeaths: runs.filter((run) => run.diedOn !== null && run.diedOn >= 6 && run.diedOn <= 10).length,
@@ -1239,6 +1241,9 @@ if (check) {
     violations.push('숙련 플레이가 초보 플레이보다 10%p 넘게 낮은 클리어율을 보인다')
   }
   if (expert.cleared < naive.cleared) violations.push('숙련 플레이가 무지성 클릭보다 낮은 완주율을 보인다')
+  if (metrics.some((metric) => metric.avgFinalInspiration > 10)) {
+    violations.push('15층 클리어 잔여 영감이 평균 10을 넘어 스테이지 보상이 지갑에 쌓이기만 한다')
+  }
   if (beginner.avgTurns < 1.4) violations.push('초보 평균 전투 길이가 1.4턴 미만이라 문장 선택이 의미를 잃는다')
   if (beginner.floor5Solved / RUNS < 0.8) violations.push('초보가 5층 그로기 기믹을 80% 이상 파훼하지 못한다')
   if (beginner.floor5Bonus <= 0) violations.push('5층 그로기 파훼가 실제 추가 피해 보상을 만들지 않는다')

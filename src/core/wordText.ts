@@ -31,21 +31,6 @@ export const BUILD_EFFECT_LABEL = {
   'zh-Hant': { magicShield: '魔法盾1層', guardAttack: '目前防禦傷害', overhealAttack: '過量治療傷害', lifeSteal: '吸血' },
 }[currentLocale]
 
-/**
- * 보스 전용 카드의 조건부 배수. 「언제 커지는가」가 곧 그 카드의 정체라 값만 적지 않고
- * 조건을 함께 적는다 — 화면에 조건이 없으면 플레이어는 그 배수를 영영 못 만난다.
- */
-const CONDITIONAL_MULT_LABEL = {
-  ko: { summon: '일벌에게', heavyTurn: '강공격 턴이면' },
-  en: { summon: 'vs workers', heavyTurn: 'on heavy-attack turn' },
-  ja: { summon: '働き蜂に', heavyTurn: '強攻撃のターンなら' },
-  ru: { summon: 'по рабочим', heavyTurn: 'в ход мощной атаки' },
-  'zh-Hans': { summon: '对工蜂', heavyTurn: '强攻回合时' },
-  'zh-Hant': { summon: '對工蜂', heavyTurn: '強攻回合時' },
-}[currentLocale]
-
-const conditionalMultText = (label: string, mult: number): string => `${label} ×${mult}`
-
 export const resourceDamageText = (label: string, rate: number): string => currentLocale === 'ko'
   ? `${label} ${Math.round(rate * 100)}% 피해`
   : `${label} ${Math.round(rate * 100)}%`
@@ -102,7 +87,7 @@ export interface ValueLine {
  *
  * 폐지한 규칙(실패·자해·회피)은 데이터가 0이라 줄을 만들지 않는다.
  */
-export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
+export function wordValueLines(w: Word, stats?: StatBlock, includeKeywords = true): ValueLine[] {
   const out: ValueLine[] = []
   const lane = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
@@ -123,7 +108,7 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
   if (w.targetCount && w.targetCount !== 1) {
     out.push({ text: `대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`, cls: 'dmg' })
   }
-  for (const keyword of wordKeywords(w)) {
+  for (const keyword of includeKeywords ? wordKeywords(w) : []) {
     const cls = ['counter', 'magicShield', 'protect'].includes(keyword.id)
       ? 'guard'
       : ['lifesteal', 'shatter', 'recuperate'].includes(keyword.id)
@@ -133,7 +118,7 @@ export function wordValueLines(w: Word, stats?: StatBlock): ValueLine[] {
           : 'buff'
     out.push({ text: keyword.label, cls })
   }
-  if (!out.length) out.push({ text: wordNoteText(w), cls: 'flat' })
+  if (!out.length && includeKeywords) out.push({ text: wordNoteText(w), cls: 'flat' })
   return out
 }
 
@@ -187,12 +172,6 @@ function noteParts(w: Word): string[] {
   if (w.targetCount && w.targetCount !== 1) out.push(`대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`)
   // 연타는 그 자체로 단일 대상이라 대상 수를 겹쳐 적지 않는다.
   out.push(...wordKeywords(w).map((keyword) => keyword.label))
-  if ((w.effects?.summonDamageMultiplier ?? 1) > 1) {
-    out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.summon, w.effects!.summonDamageMultiplier!))
-  }
-  if ((w.effects?.heavyTurnMultiplier ?? 1) > 1) {
-    out.push(conditionalMultText(CONDITIONAL_MULT_LABEL.heavyTurn, w.effects!.heavyTurnMultiplier!))
-  }
   if (w.tags.includes('adapt')) out.push(L.adapt)
   if (w.aoe === 'all') out.push(w.slot === 'adv' && currentLocale === 'ko' ? '전체 적중' : w.slot === 'adv' ? L.allHit : L.all)
   if (w.timing === 'delayed') out.push(L.next)

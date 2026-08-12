@@ -358,8 +358,8 @@ export const SKILL_ART: Record<string, string> = {
   '3020': skill3020,
   // 재사용 그림을 걷어 낸 특수 동사·보스 공략 카드 전용 일러스트.
   '3021': skill3021, // 희생을 각오했다
-  '3022': skill3022, // 빈틈을 찔렀다
-  '3023': skill3023, // 퇴치했다
+  '3022': skill3022, // 약점을 찔렀다
+  '3023': skill3023, // 흩뜨렸다
   '3024': skill3024, // 마음을 건넸다
   '3025': skill3025, // 숨을 모았다
   '3026': skill3026, // 물들였다
@@ -388,7 +388,7 @@ export const SKILL_ART: Record<string, string> = {
 
 /**
  * 아이템 일러스트 — ItemDef.art가 이 키를 참조한다.
- * 여기 없는 키는 Icons.itemArt의 SVG 폴백으로 떨어진다(노멀 아이템 2종).
+ * 여기 없는 키는 Icons.itemArt의 SVG 폴백으로 떨어진다(일반 아이템 2종).
  */
 export const ITEM_ART: Record<string, string> = {
   snack: itemSnack, // 두 겹의 문장과자

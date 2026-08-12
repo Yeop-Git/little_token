@@ -100,7 +100,6 @@ export interface PendingAttack {
   targetCount: TargetCount
   hitCount: number
   pierceGuard: boolean
-  summonDamageMultiplier: number
   emotions: Emotion[]
   tags: string[]
   comboMatched: boolean
@@ -407,7 +406,6 @@ interface AttackPlan {
   targetCount: TargetCount
   hitCount: number
   pierceGuard: boolean
-  summonDamageMultiplier: number
   emotions: Emotion[]
   tags: string[]
   /** 현재 약점과 관용구가 함께 맞았을 때만 부위 너머로 남은 피해를 보낸다. */
@@ -683,7 +681,6 @@ function disperseTargetSummons(
   targetCount: TargetCount,
   pierceGuard = false,
   emotions: readonly Emotion[] = [],
-  summonDamageMultiplier = 1,
 ): SummonDisperseResult {
   const enemy = state.enemies[target]
   if (!enemy || enemy.dead || !enemy.def.summonPattern) {
@@ -706,9 +703,7 @@ function disperseTargetSummons(
     const scale = targetCount === 1 || targetCount === 'all'
       ? 1
       : TARGET_FALLOFF[reached] ?? TARGET_FALLOFF[2]
-    // 일벌에게만 실리는 배수다. 남은 피해가 본체로 넘어갈 때는 곱하지 않는다 —
-    // 호위를 노린 문장이 본체까지 같은 배수로 때리면 그로기 구간이 통째로 무너진다.
-    const targetDamage = Math.max(0, Math.round(dmg * scale * summonDamageMultiplier))
+    const targetDamage = Math.max(0, Math.round(dmg * scale))
     const applied = Math.min(hp, targetDamage)
     damage += applied
     hpList[hpList.length - 1] = hp - applied
@@ -755,17 +750,13 @@ function disperseTargetSummons(
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
   const dealsDirectDamage = isDamageIntent(intent)
   const guardDamage = Math.round(state.guard * intent.guardAttackMultiplier)
-  // 맞서 싸우는 카드는 **큰 것이 오는 턴**에만 값이 커진다. 방어를 부수는 강공격을
-  // 준비한 턴이 아니면 상시 배율과 다를 게 없어지므로, 그 한 턴에만 곱한다.
-  const targetEnemy = state.enemies[target]
-  const heavyTurn = intent.heavyTurnMultiplier > 1
-    && !!targetEnemy && !targetEnemy.dead
-    && !!nextEnemyAttackStep(targetEnemy)?.shatterGuard
-  const braceMult = heavyTurn ? intent.heavyTurnMultiplier : 1
-  const baseDamage = Math.round(effectiveBase(intent) * mult * intent.castScale * braceMult)
+  const baseDamage = Math.round(effectiveBase(intent) * mult * intent.castScale)
   const healAmt = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
   const actualHeal = Math.min(healAmt, Math.max(0, state.playerMax - state.playerHp))
   const convertedDamage = Math.round(Math.max(0, healAmt - actualHeal) * intent.overhealDamageMultiplier)
+  // 생명력 폭발은 회복 행동의 결과를 받아 이어지는 공격이다. 먼저 실제 체력을 채운 뒤
+  // 최대 체력을 넘어 담기지 못한 양만 피해로 넘긴다.
+  state.playerHp += actualHeal
   const dmg = baseDamage + guardDamage + convertedDamage
   // 동사 종류가 방어/회복이어도 수식어가 방어도나 초과 회복을 피해로 바꾸면
   // 실제 공격 계획을 만든다. 화면 미리보기와 덱 평가기는 이미 이 피해를 보여 주므로
@@ -778,7 +769,6 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     targetCount: intent.targetCount,
     hitCount: intent.hitCount * intent.castCount,
     pierceGuard: intent.pierceGuard,
-    summonDamageMultiplier: intent.summonDamageMultiplier,
     emotions: intent.emotions,
     tags: intent.tags,
     comboMatched: intent.combos.length > 0,
@@ -790,7 +780,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
 
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
   const summonDisperse = dealsDamage
-    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions, intent.summonDamageMultiplier)
+    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions)
     : { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   // 일벌과 본체는 한 줄의 킬체인이다. 같은 피해를 본체에 한 번 더 복제하지 않고,
   // 일벌 체력을 차례로 소모하고 남은 초과분만 그로기된 본체까지 이어 보낸다.
@@ -801,7 +791,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
   let selfDmg = intent.recoil
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
-  state.playerHp = Math.min(state.playerMax, state.playerHp - selfDmg + healAmt)
+  state.playerHp = Math.max(0, state.playerHp - selfDmg)
   const hpDamage = [...attack.hits].reduce((sum, hit) => sum + hit.dmg, 0) + summonDisperse.damage
   const lifeStolen = Math.min(
     Math.max(0, state.playerMax - state.playerHp),
@@ -832,7 +822,7 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
   const pending = state.pending
   if (!pending) return null
   state.pending = null
-  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard, pending.emotions, pending.summonDamageMultiplier)
+  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard, pending.emotions)
   const bodyPlan = { ...pending, dmg: summonDisperse.remainingDamage }
   const attack = summonDisperse.killed || bodyPlan.dmg <= 0
     ? { hits: [], killed: [], overflow: 0 }

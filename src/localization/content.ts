@@ -1,5 +1,5 @@
 import { currentLocale, type LocaleCode } from './index'
-import { EARLY_WORDS, ALL_REWARD_WORDS, PUNCT_WORDS, GROW_WORDS } from '@data/earlyWords'
+import { EARLY_WORDS, ALL_REWARD_WORDS, BOSS_TACTIC_WORDS, PUNCT_WORDS, GROW_WORDS } from '@data/earlyWords'
 import { WORDS } from '@data/generated/sentenceData'
 import { EARLY_COMBOS, COMBOS } from '@data/generated/sentenceData'
 import { ALL_ITEMS, EXCLAIM_SLOTS } from '@data/items'
@@ -37,7 +37,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'You', 'That child', 'alone', 'quietly', 'madly', 'slowly', 'far and wide', 'the battle', 'the flame', 'the silence', 'the memory', 'the rain',
     'advanced', 'evaded', 'ignited', 'forgot', 'swept away', 'did it', 'tried to do it', 'did I do it?', 'ended up doing it!', '!', '.', '?', 'growing',
     'struck', 'pierced through', 'spread it', 'split it', 'scattered it', 'poured it out', 'tapped', 'pummeled',
-    'gave it back', 'held firm', 'swallowed my tears', 'rose', 'drove them off', 'struck the opening', 'braced for sacrifice',
+    'gave it back', 'held firm', 'swallowed my tears', 'rose', 'scattered them', 'struck the weakness', 'braced for sacrifice',
   ]),
   ja: mapValues([
     'ぼくは', '昨日のぼくは', 'ぼくも', '今日のぼくは', '歯を食いしばったぼくは', '奮い立つぼくは', '傷ついたぼくは', 'ぼくたちは', '明るく笑うぼくは', 'あたたかなぼくたちは',
@@ -48,7 +48,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'きみは', 'あの子は', 'ひとりで', '静かに', '狂ったように', 'ゆっくり', '広く', '戦い', '炎', '沈黙', '記憶', '雨',
     '進めた', 'かわした', '灯した', '忘れた', 'なぎ払った', 'した', 'しようとした', 'したっけ？', 'してしまった！', '！', '。', '？', 'すくすく',
     '打った', '貫いた', '広げた', '切り裂いた', 'まき散らした', '浴びせた', 'たたいた', '乱打した',
-    '返した', '耐え抜いた', '涙を飲みこんだ', '立ち上がった', '倒した', '隙を突いた', '犠牲を覚悟した',
+    '返した', '耐え抜いた', '涙を飲みこんだ', '立ち上がった', '散らした', '弱点を突いた', '犠牲を覚悟した',
   ]),
   ru: mapValues([
     'Я', 'Вчера я', 'Я тоже', 'Сегодня я', 'Стиснув зубы, я', 'Встав во весь рост, я', 'Раненый, я', 'Мы', 'Сияя улыбкой, я', 'Согретые теплом, мы',
@@ -59,7 +59,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'Ты', 'Тот ребёнок', 'в одиночку', 'тихо', 'безумно', 'медленно', 'широко', 'битву', 'пламя', 'тишину', 'память', 'дождь',
     'продолжил', 'уклонился', 'зажёг', 'забыл', 'смёл', 'сделал это', 'попытался сделать', 'я сделал это?', 'всё-таки сделал!', '!', '.', '?', 'всё выше',
     'ударил', 'пронзил', 'распространил', 'рассёк', 'рассеял', 'обрушил', 'ударил', 'избил',
-    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал', 'истребил', 'ударил в брешь', 'решился на жертву',
+    'вернул удар', 'выстоял', 'сдержал слёзы', 'встал', 'рассеял их', 'ударил в слабое место', 'решился на жертву',
   ]),
   'zh-Hans': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬紧牙关的我', '挺身而出的我', '受伤的我', '我们', '灿烂笑着的我', '温暖的我们',
@@ -70,7 +70,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那个孩子', '独自', '安静地', '疯狂地', '慢慢地', '广泛地', '战斗', '火焰', '沉默', '记忆', '雨水',
     '推进了', '回避了', '点燃了', '忘却了', '横扫了', '做了', '本想去做', '做过吗？', '终究还是做了！', '！', '。', '？', '茁壮成长',
     '击中了', '钻了进去', '扩散开了', '劈开了', '挥洒开了', '倾泻而出了', '敲击了', '猛击了',
-    '还了回去', '坚持住了', '咽下了眼泪', '站了起来', '击退了', '刺中了破绽', '做好了牺牲的觉悟',
+    '还了回去', '坚持住了', '咽下了眼泪', '站了起来', '驱散了', '刺中了弱点', '做好了牺牲的觉悟',
   ]),
   'zh-Hant': mapValues([
     '我', '昨天的我', '我也', '今天的我', '咬緊牙關的我', '挺身而出的我', '受傷的我', '我們', '燦爛笑著的我', '溫暖的我們',
@@ -81,8 +81,36 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '你', '那個孩子', '獨自', '安靜地', '瘋狂地', '慢慢地', '廣泛地', '戰鬥', '火焰', '沉默', '記憶', '雨水',
     '推進了', '迴避了', '點燃了', '忘卻了', '橫掃了', '做了', '本想去做', '做過嗎？', '終究還是做了！', '！', '。', '？', '茁壯成長',
     '擊中了', '鑽了進去', '擴散開了', '劈開了', '揮灑開了', '傾瀉而出了', '敲擊了', '猛擊了',
-    '還了回去', '堅持住了', '嚥下了眼淚', '站了起來', '擊退了', '刺中了破綻', '做好了犧牲的覺悟',
+    '還了回去', '堅持住了', '嚥下了眼淚', '站了起來', '驅散了', '刺中了弱點', '做好了犧牲的覺悟',
   ]),
+}
+
+const BOSS_TACTIC_LORE: Record<ForeignLocale, Record<string, string>> = {
+  en: {
+    queenBeeTactic: 'Scatter the two front workers with a single sentence.',
+    elderSpiderTactic: 'Read the weakness of the exposed leg and strike it precisely.',
+    mantisTactic: 'If the sentence runs short of Ink, add health and withstand the great scythe.',
+  },
+  ja: {
+    queenBeeTactic: '一つの文で前にいる働き蜂二体を散らす。',
+    elderSpiderTactic: '今見えている脚の弱点を読み、正確に突く。',
+    mantisTactic: '文を結ぶインクが足りなければ、体力を足してでも大鎌を受け止める。',
+  },
+  ru: {
+    queenBeeTactic: 'Одной фразой рассеивает двух передних рабочих пчёл.',
+    elderSpiderTactic: 'Определяет слабость открытой ноги и точно бьёт по ней.',
+    mantisTactic: 'Если фразе не хватает чернил, отдаёт здоровье, чтобы выдержать удар большой косы.',
+  },
+  'zh-Hans': {
+    queenBeeTactic: '用一句话驱散前方两只工蜂。',
+    elderSpiderTactic: '看清当前露出的蛛腿弱点，精准刺中。',
+    mantisTactic: '写完句子的墨水不足时，也要补上生命挡住巨镰。',
+  },
+  'zh-Hant': {
+    queenBeeTactic: '用一句話驅散前方兩隻工蜂。',
+    elderSpiderTactic: '看清目前露出的蛛腿弱點，精準刺中。',
+    mantisTactic: '寫完句子的墨水不足時，也要補上生命擋住巨鐮。',
+  },
 }
 
 const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
@@ -125,19 +153,19 @@ const UPDATED_LORE_IDS = [
 
 const EXTRA_WORD_LORE: Record<ForeignLocale, Record<(typeof UPDATED_LORE_IDS)[number], string>> = {
   en: {
-    focusStrike:'Anger drives every drop of Ink into one decisive point.', pourThree:'Poured-out tears wash the wound and raise a veil against the next hit.', doubleTap:'A rough tap forces the faltering heart to beat again.', magicVeil:'A bright veil braces the body and erases the next hit.', overflowingHeart:'Healing that cannot fit becomes damage and reaches the enemy.', drinkInk:'Drinking the Ink back turns overflowing life into a lively counterblow.', stainedTomorrow:'The stain reaches tomorrow’s line and draws life back.', dampenMomentum:'Writing the scattered feeling down restores its calm.', kkuk:'It blocks one painful hit and saves the remaining breath for the next sentence.', ipan:'Only a sentence paid with life gains these fierce extra hits.', pogeunhage:'Warmth steadies the guard and carries breath into the next sentence.', bangeopge:'A welcome story opens across three foes and opens the next choices too.', gyeongkwaehage:'A light rhythm restores both Ink and choices for a flowing chain.', geochilge:'A fierce rhythm repeats the verb and raises the attack stance.',
+    focusStrike:'Anger drives every drop of Ink into one decisive point.', pourThree:'Poured-out tears wash the wound and raise a veil against the next hit.', doubleTap:'A rough tap restarts the heart, and the excess beat strikes back at the enemy.', magicVeil:'A bright veil braces the body and erases the next hit.', overflowingHeart:'Healing that cannot fit becomes damage and reaches the enemy.', drinkInk:'Drinking the Ink back turns overflowing life into a lively counterblow.', stainedTomorrow:'The stain reaches tomorrow’s line and draws life back.', dampenMomentum:'Writing the scattered feeling down restores its calm.', kkuk:'It blocks one painful hit and saves the remaining breath for the next sentence.', ipan:'Only a sentence paid with life gains these fierce extra hits.', pogeunhage:'Warmth steadies the guard and carries breath into the next sentence.', bangeopge:'A welcome story opens across three foes and opens the next choices too.', gyeongkwaehage:'A light rhythm restores both Ink and choices for a flowing chain.', geochilge:'A fierce rhythm repeats the verb and raises the attack stance.',
   },
   ja: {
-    focusStrike:'怒りで全てのインクを一点へ叩き込む決め技。', pourThree:'こらえた涙で傷を洗い、次の一撃を消す幕を張る。', doubleTap:'止まりかけた心を荒く叩き、もう一度動かす。', magicVeil:'光の幕で身を固め、次の一撃を消し去る。', overflowingHeart:'収まりきらない回復をダメージに変えて敵へ渡す。', drinkInk:'インクを飲み戻し、あふれた命を楽しい反撃に変える。', stainedTomorrow:'明日の行まで染めた跡から命を取り戻す。', dampenMomentum:'乱れた気持ちを日記に書き、静かに整える。', kkuk:'痛い一撃を防ぎ、残った息を次の文へためる。', ipan:'体力をインクにした文だけに激しい追加打撃を乗せる。', pogeunhage:'温もりで守りながら、残った息を次の文へつなぐ。', bangeopge:'懐かしい物語を三体へ広げ、次の選択も開く。', gyeongkwaehage:'軽いリズムがインクと選択肢を戻し、連鎖を始める。', geochilge:'荒い勢いで動詞をもう一度繰り返し、攻撃態勢を上げる。',
+    focusStrike:'怒りで全てのインクを一点へ叩き込む決め技。', pourThree:'こらえた涙で傷を洗い、次の一撃を消す幕を張る。', doubleTap:'止まりかけた心を叩き、あふれた鼓動を敵へ打ち返す。', magicVeil:'光の幕で身を固め、次の一撃を消し去る。', overflowingHeart:'収まりきらない回復をダメージに変えて敵へ渡す。', drinkInk:'インクを飲み戻し、あふれた命を楽しい反撃に変える。', stainedTomorrow:'明日の行まで染めた跡から命を取り戻す。', dampenMomentum:'乱れた気持ちを日記に書き、静かに整える。', kkuk:'痛い一撃を防ぎ、残った息を次の文へためる。', ipan:'体力をインクにした文だけに激しい追加打撃を乗せる。', pogeunhage:'温もりで守りながら、残った息を次の文へつなぐ。', bangeopge:'懐かしい物語を三体へ広げ、次の選択も開く。', gyeongkwaehage:'軽いリズムがインクと選択肢を戻し、連鎖を始める。', geochilge:'荒い勢いで動詞をもう一度繰り返し、攻撃態勢を上げる。',
   },
   ru: {
-    focusStrike:'Гнев вбивает всю силу и чернила в одну решающую точку.', pourThree:'Пролитые слёзы смывают рану и ставят завесу от следующего удара.', doubleTap:'Грубый толчок заставляет замирающее сердце биться вновь.', magicVeil:'Светлая завеса укрепляет тело и стирает следующий удар.', overflowingHeart:'Лишнее лечение превращается в урон и достигает врага.', drinkInk:'Возвращённые чернила превращают избыток жизни в весёлый ответный удар.', stainedTomorrow:'След на завтрашней строке возвращает часть жизни.', dampenMomentum:'Записанное в дневнике смятение снова становится спокойным.', kkuk:'Блокирует болезненный удар и бережёт дыхание для следующей фразы.', ipan:'Лишь фраза, оплаченная здоровьем, получает эти яростные удары.', pogeunhage:'Тепло укрепляет защиту и переносит дыхание в следующую фразу.', bangeopge:'Знакомая история раскрывается на трёх врагов и открывает новые варианты.', gyeongkwaehage:'Лёгкий ритм возвращает чернила и выбор для непрерывной цепочки.', geochilge:'Яростный ритм повторяет глагол и усиливает атакующую стойку.',
+    focusStrike:'Гнев вбивает всю силу и чернила в одну решающую точку.', pourThree:'Пролитые слёзы смывают рану и ставят завесу от следующего удара.', doubleTap:'Толчок запускает сердце вновь, а лишний удар возвращается врагу.', magicVeil:'Светлая завеса укрепляет тело и стирает следующий удар.', overflowingHeart:'Лишнее лечение превращается в урон и достигает врага.', drinkInk:'Возвращённые чернила превращают избыток жизни в весёлый ответный удар.', stainedTomorrow:'След на завтрашней строке возвращает часть жизни.', dampenMomentum:'Записанное в дневнике смятение снова становится спокойным.', kkuk:'Блокирует болезненный удар и бережёт дыхание для следующей фразы.', ipan:'Лишь фраза, оплаченная здоровьем, получает эти яростные удары.', pogeunhage:'Тепло укрепляет защиту и переносит дыхание в следующую фразу.', bangeopge:'Знакомая история раскрывается на трёх врагов и открывает новые варианты.', gyeongkwaehage:'Лёгкий ритм возвращает чернила и выбор для непрерывной цепочки.', geochilge:'Яростный ритм повторяет глагол и усиливает атакующую стойку.',
   },
   'zh-Hans': {
-    focusStrike:'将愤怒与全部墨水压进一点的决胜一击。', pourThree:'倾泻泪水洗净伤口，并升起抵挡下一击的光幕。', doubleTap:'用力敲击将停的心，让它再次跳动。', magicVeil:'披上明亮光幕，稳住身体并抹去下一击。', overflowingHeart:'把容不下的恢复化成伤害送向敌人。', drinkInk:'饮回墨水，把溢出的生命化为欢快反击。', stainedTomorrow:'从染到明日一行的墨痕中取回生命。', dampenMomentum:'把纷乱心绪写进日记，重新平静下来。', kkuk:'挡住痛苦一击，把剩余气息留到下一句。', ipan:'只有以生命支付墨水的句子才会获得猛烈追加攻击。', pogeunhage:'温暖稳住防御，也把余力带到下一句。', bangeopge:'把重逢的故事铺向三名敌人，也打开下一次选择。', gyeongkwaehage:'轻快节奏同时补回墨水与选择，开启连写。', geochilge:'猛烈节奏让动词再发动一次，并抬高攻击态势。',
+    focusStrike:'将愤怒与全部墨水压进一点的决胜一击。', pourThree:'倾泻泪水洗净伤口，并升起抵挡下一击的光幕。', doubleTap:'敲醒将停的心，把溢出的心跳反击给敌人。', magicVeil:'披上明亮光幕，稳住身体并抹去下一击。', overflowingHeart:'把容不下的恢复化成伤害送向敌人。', drinkInk:'饮回墨水，把溢出的生命化为欢快反击。', stainedTomorrow:'从染到明日一行的墨痕中取回生命。', dampenMomentum:'把纷乱心绪写进日记，重新平静下来。', kkuk:'挡住痛苦一击，把剩余气息留到下一句。', ipan:'只有以生命支付墨水的句子才会获得猛烈追加攻击。', pogeunhage:'温暖稳住防御，也把余力带到下一句。', bangeopge:'把重逢的故事铺向三名敌人，也打开下一次选择。', gyeongkwaehage:'轻快节奏同时补回墨水与选择，开启连写。', geochilge:'猛烈节奏让动词再发动一次，并抬高攻击态势。',
   },
   'zh-Hant': {
-    focusStrike:'將憤怒與全部墨水壓進一點的決勝一擊。', pourThree:'傾瀉淚水洗淨傷口，並升起抵擋下一擊的光幕。', doubleTap:'用力敲擊將停的心，讓它再次跳動。', magicVeil:'披上明亮光幕，穩住身體並抹去下一擊。', overflowingHeart:'把容不下的恢復化成傷害送向敵人。', drinkInk:'飲回墨水，把溢出的生命化為歡快反擊。', stainedTomorrow:'從染到明日一行的墨痕中取回生命。', dampenMomentum:'把紛亂心緒寫進日記，重新平靜下來。', kkuk:'擋住痛苦一擊，把剩餘氣息留到下一句。', ipan:'只有以生命支付墨水的句子才會獲得猛烈追加攻擊。', pogeunhage:'溫暖穩住防禦，也把餘力帶到下一句。', bangeopge:'把重逢的故事鋪向三名敵人，也打開下一次選擇。', gyeongkwaehage:'輕快節奏同時補回墨水與選擇，開啟連寫。', geochilge:'猛烈節奏讓動詞再發動一次，並抬高攻擊態勢。',
+    focusStrike:'將憤怒與全部墨水壓進一點的決勝一擊。', pourThree:'傾瀉淚水洗淨傷口，並升起抵擋下一擊的光幕。', doubleTap:'敲醒將停的心，把溢出的心跳反擊給敵人。', magicVeil:'披上明亮光幕，穩住身體並抹去下一擊。', overflowingHeart:'把容不下的恢復化成傷害送向敵人。', drinkInk:'飲回墨水，把溢出的生命化為歡快反擊。', stainedTomorrow:'從染到明日一行的墨痕中取回生命。', dampenMomentum:'把紛亂心緒寫進日記，重新平靜下來。', kkuk:'擋住痛苦一擊，把剩餘氣息留到下一句。', ipan:'只有以生命支付墨水的句子才會獲得猛烈追加攻擊。', pogeunhage:'溫暖穩住防禦，也把餘力帶到下一句。', bangeopge:'把重逢的故事鋪向三名敵人，也打開下一次選擇。', gyeongkwaehage:'輕快節奏同時補回墨水與選擇，開啟連寫。', geochilge:'猛烈節奏讓動詞再發動一次，並抬高攻擊態勢。',
   },
 }
 
@@ -213,11 +241,12 @@ export function localizationCoverageErrors(): string[] {
   const errors: string[] = []
   const sourceWordIds = new Set([
     ...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS, ...Object.values(WORDS).flat(),
-    ...PUNCT_WORDS, ...GROW_WORDS,
+    ...PUNCT_WORDS, ...GROW_WORDS, ...BOSS_TACTIC_WORDS,
   ].map((word) => word.id))
   for (const locale of ['en','ja','ru','zh-Hans','zh-Hant'] as ForeignLocale[]) {
     for (const id of sourceWordIds) if (!EXTRA_WORD_TEXT[locale][id] && !WORD_TEXT[locale][id] && !(id.startsWith('gr_') && WORD_TEXT[locale].gr)) errors.push(`${locale}: word ${id} missing`)
     for (const id of UPDATED_LORE_IDS) if (!EXTRA_WORD_LORE[locale][id]) errors.push(`${locale}: lore ${id} missing`)
+    for (const word of BOSS_TACTIC_WORDS) if (!BOSS_TACTIC_LORE[locale][word.id]) errors.push(`${locale}: boss tactic lore ${word.id} missing`)
     if (COMBO_NAMES[locale].length !== COMBO_IDS.length) errors.push(`${locale}: combo count mismatch`)
     if (ITEM_NAMES[locale].length !== ITEM_IDS.length) errors.push(`${locale}: item count mismatch`)
     for (const slot of EXCLAIM_SLOTS) for (const word of slot.words) {
@@ -233,13 +262,14 @@ export function applyContentLocalization(): void {
   const texts = WORD_TEXT[locale]
   const allWords = [
     ...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS,
-    ...Object.values(WORDS).flat(), ...PUNCT_WORDS, ...GROW_WORDS,
+    ...Object.values(WORDS).flat(), ...PUNCT_WORDS, ...GROW_WORDS, ...BOSS_TACTIC_WORDS,
   ]
   for (const word of allWords) {
     const text = EXTRA_WORD_TEXT[locale][word.id] ?? texts[word.id] ?? (word.id.startsWith('gr_') ? texts.gr : undefined)
     if (text) word.text = text
     const lore = REVISED_RANK_LORE[locale][word.id]
       ?? EXTRA_WORD_LORE[locale][word.id as (typeof UPDATED_LORE_IDS)[number]]
+      ?? BOSS_TACTIC_LORE[locale][word.id]
     if (lore) word.lore = lore
   }
 

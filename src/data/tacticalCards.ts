@@ -16,13 +16,19 @@ export interface TacticalCardGuide {
   cardIds: readonly string[]
 }
 
+/** 첫 전투에서는 빌드 공략보다 공격 문장의 가장 기본적인 결과를 먼저 가르친다. */
+export const FIRST_FLOOR_ATTACK_GUIDE = {
+  title: '공격으로 체력 깎기',
+  tooltip: '공격 동사로 문장을 완성하면 적에게 피해를 주어 체력을 깎는다.',
+}
+
 export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
   {
     id: 'stored-resolve',
     enemyId: 'termite',
     rewardFloors: [2],
     title: '방패치기',
-    tooltip: '2층 동사 보상의 「밀어냈다」는 새로 얻은 방어를 포함한 현재 방어도 100%를 피해로 바꾸고 방어도는 소모하지 않는다. 「꾹 참고」로 방어 성장을 시작할 수 있다.',
+    tooltip: '2층 희귀 동사 「밀어냈다」는 새로 얻은 방어를 포함한 현재 방어도 100%를 피해로 바꾸고 방어도는 소모하지 않는다. 「꾹 참고」로 방어 성장을 시작할 수 있다.',
     cardIds: ['kkuk'],
   },
   {
@@ -89,7 +95,12 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
   },
 ]
 
-export function tacticalGuideForEnemy(enemyId: string, guideId?: string): TacticalCardGuide | undefined {
+export function tacticalGuideForEnemy(
+  enemyId: string,
+  guideId?: string,
+  stage?: { floor: number; endlessCycle: number },
+): Pick<TacticalCardGuide, 'title' | 'tooltip'> | undefined {
+  if (stage?.floor === 1 && stage.endlessCycle === 0) return FIRST_FLOOR_ATTACK_GUIDE
   return (guideId ? TACTICAL_CARD_GUIDES.find((guide) => guide.id === guideId) : undefined)
     ?? TACTICAL_CARD_GUIDES.find((guide) => guide.enemyId === enemyId)
 }

@@ -1,7 +1,7 @@
 /**
  * 스테이지 클리어 보상 — 주어·수식어 → 아이템 → 동사 순서로 각각 3택한다.
  * 전투 등급에 15층 사이클 진행 보정을 더해 뒤로 갈수록 단어 보상의 높은 희귀도가
- * 자주 나온다. 1~4층 노멀, 5~9층 희귀, 10~15층 영웅이 중심이며 각 구간에서
+ * 자주 나온다. 1~4층 일반, 5~9층 희귀, 10~15층 영웅이 중심이며 각 구간에서
  * 다음 등급 확률이 상승한다. 10층에는 전설 아이템을, 15층에는 전설 스킬을
  * 하나씩 선택 가능하게 보장한다.
  */
@@ -83,8 +83,8 @@ export const GUARANTEED_LEGENDARY_SKILL_FLOOR = 15
 export const EARLY_BUILD_REWARD_DAY = 2
 /** 2층에서 수식어로 먼저 고르는 방어·회복·순환 전술의 방향. */
 export const EARLY_BUILD_MODIFIER_IDS = ['kkuk', 'sinnage', 'gyeongkwaehage'] as const
-/** 같은 층 동사 보상은 방어·회복·운 스탯을 공격으로 쓰는 출구를 하나씩 보여 준다. */
-export const EARLY_STAT_VERB_IDS = ['storedResolve', 'drinkInk', 'spreadTwo'] as const
+/** 2층 동사 보상은 같은 희귀도 안에서 방패치기·생명력 폭발·단순 공격을 나란히 보여 준다. */
+export const EARLY_STAT_VERB_IDS = ['storedResolve', 'doubleTap', 'pierceStrike'] as const
 
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
@@ -96,7 +96,7 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 
 /**
  * 15층 희귀도 곡선.
- * 1~4층은 노멀, 5~9층은 희귀, 10~15층은 영웅이 항상 가장 큰 가중치다.
+ * 1~4층은 일반, 5~9층은 희귀, 10~15층은 영웅이 항상 가장 큰 가중치다.
  * 전투 등급은 각 구간의 중심을 뒤집지 않는 범위에서 다음 등급 확률만 조금 보탠다.
  */
 export function rewardRarityWeights(grade: number, day: number): Record<Rarity, number> {

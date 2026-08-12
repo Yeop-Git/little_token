@@ -26,29 +26,20 @@ const QUEEN_BEE_TACTIC: Word = {
   ...SPECIAL_REWARD_WORDS.find((word) => word.id === 'spreadTwo')!,
   id: 'queenBeeTactic',
   art: '3023',
-  // 그림과 감정 태그만 「퍼뜨렸다」에서 물려받고 전용 전투 수치는 여기서 명시한다.
-  // 원본을 이미 덱에 넣은
-  // 사람에게는 이름도 그림도 같은 두 장이 동사 칸에 나란히 서기 때문이다 —
-  // 무엇이 일벌을 확실히 치우는 카드인지 손패에서 바로 읽혀야 한다.
-  //
-  // 목적어는 붙이지 않는다. 동사 칸의 다른 카드가 전부 한 동작만 적는데 여기만
-  // 「일벌을」을 달면 앞에 선 주어·수식어와 이어질 때 문장이 겹쳐 읽힌다.
-  text: '퇴치했다',
+  // 두 대상을 때리는 것만으로 여왕벌의 해법이 읽힌다. 일벌 전용 숨은 배수를 더하면
+  // 카드의 공격 수치와 실제 일벌 피해가 달라져 오히려 공략 카드가 어려워진다.
+  text: '흩뜨렸다',
   stat: 'atk',
-  statMult: 0.9,
+  statMult: 1.5,
   inkCost: 3,
   targetCount: 2,
-  // 확정 퇴치를 걷고 **일벌에게만 실리는 배수**로 바꿨다. 피해량과 무관하게 지우는
-  // 효과는 덱이 약해도 결과가 같아서, 빌려온 한 장이 전투를 대신 풀어 버렸다.
-  // 배수는 그 문장이 얼마나 잘 짜였는지를 그대로 반영한다.
-  effects: { summonDamageMultiplier: 1.5 },
-  note: '토큰의 공략 단어 · 공격 ×0.9 · 2명(100%·70%) · 일벌에게 ×1.5',
-  lore: '토큰이 벌떼를 보고 급히 빌려준 한 단어.',
+  note: '공격 ×1.5 · 대상 2명',
+  lore: '한 번의 문장으로 앞선 일벌 둘을 흩뜨린다.',
 }
 
 const ELDER_SPIDER_TACTIC: Word = {
   id: 'elderSpiderTactic',
-  text: '빈틈을 찔렀다',
+  text: '약점을 찔렀다',
   slot: 'verb',
   tags: ['adapt', 'atk'],
   emotion: 'neutral',
@@ -56,38 +47,37 @@ const ELDER_SPIDER_TACTIC: Word = {
   statMult: 1.5,
   kind: 'attack',
   targetCount: 1,
-  // 보스전 대여 동사도 연타를 갖지 않고, 높은 공격 계수로 다리 공략을 돕는다.
+  inkCost: 3,
+  // adapt 태그 하나가 현재 드러난 다리 약점으로 취급된다. 관용구는 다른 두 단어로
+  // 완성해야 다음 부위까지 관통하므로, 전용 카드가 보스 공략 전체를 대신하지 않는다.
   art: '3022',
   rarity: 'common',
   note: '공격 ×1.5 · 현재 다리 약점 적용',
-  lore: '거미가 바꾼 문장을 읽고, 필요한 감정을 여백에 빌려 적었다.',
+  lore: '지금 드러난 다리의 약점을 읽고 정확히 찌른다.',
 }
 
 /**
- * 사마귀 전용 맞딜 카드.
+ * 사마귀 전용 방어 카드.
  *
- * 사마귀는 「방어 15를 한 문장에 세울 수 있는가」만 묻는 보스라, 방어 빌드가 아니면
- * 답이 없었다. 이 카드는 다른 종류의 답을 준다 — 막는 대신 마주 선다. 그래서 값이
- * **큰낫이 내려오는 턴**에만 커진다. 상시 배율로 두면 그냥 센 공격 카드가 되고,
- * 보스의 패턴을 읽을 이유가 사라진다.
+ * 동사만으로 잉크 6을 쓰므로 주어·수식어 비용이 초과분이 되어 체력으로 공개 지불되고,
+ * 방어 ×4를 세운다. 카드에 별도 자해를 넣지 않아 잉크 이월로 대가를 줄일 수 있고,
+ * 화면의 예상 체력 지불과 실제 결과도 어긋나지 않는다.
  */
 const MANTIS_TACTIC: Word = {
   id: 'mantisTactic',
-  // 동사 칸은 전부 과거형이다(때렸다·막았다·감쌌다). 여기만 기본형이면
-  // 「나는 힘껏 희생을 각오하다」로 문장이 끊긴다.
   text: '희생을 각오했다',
   slot: 'verb',
-  tags: ['brace', 'atk'],
-  emotion: 'neutral',
-  stat: 'atk',
-  statMult: 1.5,
-  kind: 'attack',
+  tags: ['grd', 'hold'],
+  emotion: 'sorrow',
+  stat: 'guard',
+  statMult: 4,
+  kind: 'guard',
   targetCount: 1,
-  effects: { heavyTurnMultiplier: 1.5 },
+  inkCost: 6,
   art: '3021',
   rarity: 'rare',
-  note: '토큰의 공략 단어 · 공격 ×1.5 · 강공격 턴이면 ×1.5',
-  lore: '큰낫이 내려오는 자리에서 물러서지 않기로 했다.',
+  note: '방어 ×4',
+  lore: '문장을 마칠 잉크가 모자라면 체력을 보태서라도 큰낫을 받아 낸다.',
 }
 
 /**
@@ -98,6 +88,9 @@ const MANTIS_TACTIC: Word = {
  * 손에 들어오는 전용 카드이며, 그 전투가 끝나면 덱에 남지 않는다.
  */
 const LENT_WORD_IDS = new Set([QUEEN_BEE_TACTIC.id, ELDER_SPIDER_TACTIC.id, MANTIS_TACTIC.id])
+
+/** 로케일 적용과 전수 검사가 보상 풀 밖의 전용 카드도 놓치지 않도록 공개한 목록. */
+export const BOSS_TACTIC_WORDS: Word[] = [QUEEN_BEE_TACTIC, ELDER_SPIDER_TACTIC, MANTIS_TACTIC]
 
 /** 이 카드는 토큰이 이번 전투에만 빌려준 것인가. 손패의 전용 표시가 이 판정을 쓴다. */
 export function isLentWord(word: Pick<Word, 'id'>): boolean {

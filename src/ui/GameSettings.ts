@@ -14,6 +14,7 @@ export interface GraphicsProfile {
 }
 
 const KEYS = {
+  initialized: 'little-token.graphics-initialized-v1',
   graphics: 'little-token-graphics-quality',
   antialiasing: 'little-token-antialiasing-quality',
   resolution: 'little-token-resolution-scale',
@@ -62,12 +63,33 @@ function writeChoice(key: string, value: string) {
   }
 }
 
-const defaultQuality = (): GraphicsQuality => {
-  if (!matchMedia('(pointer: coarse)').matches) return 'high'
-  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
-  return deviceMemory != null && deviceMemory <= 4 ? 'low' : 'medium'
+function hasStoredChoice(key: string): boolean {
+  try {
+    return localStorage.getItem(key) != null
+  } catch {
+    return false
+  }
 }
-const savedQuality = () => readChoice(KEYS.graphics, GRAPHICS_QUALITIES, defaultQuality())
+
+/**
+ * 울트라를 기본으로 삼되, 첫 실행에서 분명히 성능이 낮은 기기만 낮춘다.
+ * deviceMemory는 일부 브라우저에 없으므로 CPU 코어 수와 모바일 입력 여부를
+ * 함께 보고, 정보가 부족한 데스크톱은 기본 계약인 울트라를 유지한다.
+ */
+const recommendedQuality = (): GraphicsQuality => {
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  const cores = navigator.hardwareConcurrency
+  const coarsePointer = matchMedia('(pointer: coarse)').matches
+
+  if (coarsePointer) {
+    if ((deviceMemory != null && deviceMemory <= 4) || (cores > 0 && cores <= 4)) return 'low'
+    return 'medium'
+  }
+  if ((deviceMemory != null && deviceMemory <= 4) || (cores > 0 && cores <= 4)) return 'medium'
+  if ((deviceMemory != null && deviceMemory <= 8) || (cores > 0 && cores <= 6)) return 'high'
+  return 'ultra'
+}
+const savedQuality = () => readChoice(KEYS.graphics, GRAPHICS_QUALITIES, recommendedQuality())
 const presetFallback = () => PRESETS[savedQuality()]
 const savedAntiAliasing = () => readChoice(KEYS.antialiasing, ANTI_ALIASING_QUALITIES, presetFallback().antialiasing)
 const savedResolution = () => readChoice(KEYS.resolution, RESOLUTION_SCALES, presetFallback().resolution)
@@ -80,6 +102,38 @@ function activeChoice<T extends string>(datasetKey: string, choices: Set<T>, fal
   return value && choices.has(value) ? value : fallback()
 }
 
+function storePreset(quality: GraphicsQuality) {
+  writeChoice(KEYS.graphics, quality)
+  const preset = PRESETS[quality]
+  writeChoice(KEYS.antialiasing, preset.antialiasing)
+  writeChoice(KEYS.resolution, preset.resolution)
+  writeChoice(KEYS.fps, preset.fps)
+  writeChoice(KEYS.effects, preset.effects)
+  writeChoice(KEYS.postprocessing, preset.postprocessing)
+}
+
+function initializeStoredSettings() {
+  if (hasStoredChoice(KEYS.initialized)) return
+
+  const detailKeys = [KEYS.antialiasing, KEYS.resolution, KEYS.fps, KEYS.effects, KEYS.postprocessing]
+  const hasAnySavedSetting = hasStoredChoice(KEYS.graphics) || detailKeys.some(hasStoredChoice)
+  if (!hasAnySavedSetting) {
+    storePreset(recommendedQuality())
+  } else {
+    // 예전 버전에서 프리셋 이름만 저장된 경우에도 그 프리셋의 세부 값까지 채운다.
+    // 이미 직접 바꾼 세부 값은 보존한다.
+    const quality = savedQuality()
+    const preset = PRESETS[quality]
+    if (!hasStoredChoice(KEYS.graphics)) writeChoice(KEYS.graphics, quality)
+    if (!hasStoredChoice(KEYS.antialiasing)) writeChoice(KEYS.antialiasing, preset.antialiasing)
+    if (!hasStoredChoice(KEYS.resolution)) writeChoice(KEYS.resolution, preset.resolution)
+    if (!hasStoredChoice(KEYS.fps)) writeChoice(KEYS.fps, preset.fps)
+    if (!hasStoredChoice(KEYS.effects)) writeChoice(KEYS.effects, preset.effects)
+    if (!hasStoredChoice(KEYS.postprocessing)) writeChoice(KEYS.postprocessing, preset.postprocessing)
+  }
+  writeChoice(KEYS.initialized, '1')
+}
+
 export const GraphicsSettings = {
   get: savedQuality,
   getAntiAliasing: savedAntiAliasing,
@@ -89,13 +143,8 @@ export const GraphicsSettings = {
   getPostProcessing: savedPostProcessing,
 
   set(quality: GraphicsQuality) {
-    writeChoice(KEYS.graphics, quality)
-    const preset = PRESETS[quality]
-    writeChoice(KEYS.antialiasing, preset.antialiasing)
-    writeChoice(KEYS.resolution, preset.resolution)
-    writeChoice(KEYS.fps, preset.fps)
-    writeChoice(KEYS.effects, preset.effects)
-    writeChoice(KEYS.postprocessing, preset.postprocessing)
+    storePreset(quality)
+    writeChoice(KEYS.initialized, '1')
     this.apply()
   },
   setAntiAliasing(value: AntiAliasingQuality) {
@@ -119,6 +168,7 @@ export const GraphicsSettings = {
     document.documentElement.dataset.postprocessing = value
   },
   apply() {
+    initializeStoredSettings()
     const root = document.documentElement
     root.dataset.graphics = savedQuality()
     root.dataset.antialiasing = savedAntiAliasing()

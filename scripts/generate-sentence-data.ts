@@ -396,7 +396,7 @@ itemRows.forEach((row, index) => {
     throw new Error(`items.csv:${line}: ${typedRarity} 기본 스탯 예산은 ${expectedBudget}점이어야 합니다. (현재 ${budget}점)`)
   }
   if (typedRarity === 'common' || typedRarity === 'rare') {
-    if (passive) throw new Error(`items.csv:${line}: 노멀·희귀 아이템에는 고유효과를 넣을 수 없습니다.`)
+    if (passive) throw new Error(`items.csv:${line}: 일반·희귀 아이템에는 고유효과를 넣을 수 없습니다.`)
   } else {
     if (!passive || !PASSIVE_IDS.includes(passive as (typeof PASSIVE_IDS)[number])) {
       throw new Error(`items.csv:${line}: 영웅·전설 아이템에는 유효한 passive가 필요합니다.`)
@@ -416,7 +416,7 @@ itemRows.forEach((row, index) => {
 })
 
 if (Math.abs(itemRarityCounts.common - itemRarityCounts.rare) > 1) {
-  throw new Error(`items.csv: 노멀·희귀 분포가 고르지 않습니다. (${itemRarityCounts.common}/${itemRarityCounts.rare})`)
+  throw new Error(`items.csv: 일반·희귀 분포가 고르지 않습니다. (${itemRarityCounts.common}/${itemRarityCounts.rare})`)
 }
 if (Math.abs(itemRarityCounts.epic - itemRarityCounts.legendary) > 1) {
   throw new Error(`items.csv: 영웅·전설 분포가 고르지 않습니다. (${itemRarityCounts.epic}/${itemRarityCounts.legendary})`)

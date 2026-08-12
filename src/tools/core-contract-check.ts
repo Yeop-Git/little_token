@@ -14,14 +14,19 @@ import { EARLY_COMBOS, EARLY_WORDS, SPECIAL_REWARD_WORDS } from '@data/earlyWord
 import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 import { availableCombos } from '@core/deckInsights'
 import { floorsForEdition, isEditionFinalFloor, strictResourceError } from '@/config/edition'
-import { clearRewardValue, gradeFloor, gradeForElapsedTurns, startGrade } from '@core/grade'
+import { clearRewardValue, gradeFloor, gradeForElapsedTurns, stageInspirationBonus, startGrade } from '@core/grade'
 import { EARLY_BUILD_MODIFIER_IDS, EARLY_BUILD_REWARD_DAY, EARLY_STAT_VERB_IDS, genRewards } from '@data/rewards'
 
 const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(3, elapsed))
 assert.deepEqual(speedGrades, [5, 5, 5, 4, 4, 4, 3], 'reward grade falls once per three completed sentences until the luck floor')
 assert.equal(gradeForElapsedTurns(3, 0), startGrade(3), 'a first-turn clear keeps the full starting grade')
 assert.equal(speedGrades[speedGrades.length - 1], gradeFloor(3), 'a long battle stops at the luck floor')
-assert.equal(clearRewardValue(4, 2), 6, 'unused free draws add to earned inspiration without changing speed grade')
+assert.equal(clearRewardValue(4, 2, 1), 4, 'early speed grade converts at half scale and keeps unused draws at full value')
+assert.equal(clearRewardValue(4, 0, 5), 3, 'the guaranteed Rare boss shop supplies its one-point price difference after draws are spent')
+assert.equal(clearRewardValue(4, 2, 5), 4, 'saved draws and stage progression do not pay the same allowance twice')
+assert.equal(clearRewardValue(10, 2, 15), 8, 'the guaranteed Legendary boss shop raises the maximum clear reward by only one')
+assert.equal(clearRewardValue(0, 0, 1), 0, 'an empty first-floor clear reward cannot create Inspiration')
+assert.deepEqual([1, 5, 6, 10, 11, 15, 20, 25, 30].map(stageInspirationBonus), [0, 1, 0, 2, 0, 3, 1, 2, 3], 'boss-shop Inspiration follows guaranteed rarity in every endless cycle')
 
 const original = newRun()
 original.day = 7
@@ -100,8 +105,9 @@ const earlyStatVerbOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DA
 assert.deepEqual(
   new Set(earlyStatVerbOffers.map((option) => option.word?.id)),
   new Set(EARLY_STAT_VERB_IDS),
-  'the second-floor verb reward must expose guard, heal, and luck attack outlets',
+  'the second-floor verb reward guarantees shield bash, vitality explosion, and a simple attack',
 )
+assert(earlyStatVerbOffers.every((option) => option.rarity === 'rare'), 'every guaranteed second-floor verb has the same rare grade')
 const inkState = { playerHp: 9, playerMax: 9, guard: 4, counter: false, counterFull: false, turn: 1, enemies: [], pending: null } satisfies BattleState
 assert.equal(applyInkOverdraw(inkState, 9, 6), 3, 'overdraw must report its exact damage')
 assert.equal(inkState.playerHp, 6, 'overdraw must spend health')

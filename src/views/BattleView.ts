@@ -72,7 +72,7 @@ import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
-import { clearRewardValue, gradeForElapsedTurns, gradeTier, startGrade } from '@core/grade'
+import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
 import { rankedStat } from '@core/combatRules'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
@@ -1831,7 +1831,7 @@ export class BattleView {
     }
 
     // 공략 쪽지가 줄의 초입에 선다. 뒤따르는 능력 뱃지와 섞이지 않도록 모양·색·라벨이 모두 다르다.
-    const tacticalGuide = tacticalGuideForEnemy(e.def.id, e.def.tacticalGuideId)
+    const tacticalGuide = tacticalGuideForEnemy(e.def.id, e.def.tacticalGuideId, this.stageInfo)
     if (tacticalGuide) {
       const tooltip = tip(tacticalGuide.title, tacticalGuide.tooltip)
       icons.push(`<span class="enemy-tip-note" role="img" tabindex="0" aria-label="공략 팁 · ${tooltip}" data-tooltip="${tooltip}" data-tip-label="TIP" data-tip-place="above">${icon('note')}<b>TIP</b></span>`)
@@ -2495,7 +2495,9 @@ export class BattleView {
     const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
     const mood = this.moodOf(w)
     const emotion = emotionOrNeutral(w.emotion)
-    const values = this.wordOwnValues(w)
+    // 키워드는 바로 아래 설명 카드에서 한 번만 보여 준다. 수치 칩에도 다시 넣으면
+    // 「흡혈」처럼 같은 말이 연달아 두 번 나타난다.
+    const values = this.wordOwnValues(w, false)
     const sealed = this.cardHand.isSealed(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
@@ -2614,8 +2616,8 @@ export class BattleView {
   }
 
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
-  private wordOwnValues(w: Word): { text: string; cls: string }[] {
-    return wordValueLines(w, this.combatStats())
+  private wordOwnValues(w: Word, includeKeywords = true): { text: string; cls: string }[] {
+    return wordValueLines(w, this.combatStats(), includeKeywords)
   }
 
   // ── 좌상단 아이콘 스탯 바 ──
@@ -3905,6 +3907,14 @@ export class BattleView {
     heavy: AttackCut | null = null,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
+    // 생명력 폭발은 회복 뒤에 넘친 힘이 적에게 향하는 연속 동작이다.
+    // 회복 수치와 동작을 먼저 보여 주어 화면에서도 원인과 결과가 뒤집히지 않게 한다.
+    if (res.heal) {
+      GameAudio.play('heal')
+      playCharacterAnimation(you, 'heal')
+      this.updatePlayer(you)
+      await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+    }
     // 여왕벌은 피해를 먼저 일벌 킬체인에 소비하므로 본체 hit가 0건일 수 있다.
     // 그 경우에도 실제 공격은 일어났다. hit만 보면 정확히 30/60/120 피해에서 프롬이
     // 가만히 선 채 일벌만 뒤늦게 사라지는 역전된 그림이 된다.
@@ -4034,12 +4044,6 @@ export class BattleView {
       // 내가 쓴 문장이 나를 깎았다 — 여기서 쓰러지면 사인은 벌레가 아니라 이 문장이다.
       this.lastHurtBy = { kind: 'self', sentence: this.lastSentence }
       const fly = this.flyToPlayer(`${res.selfDmg}`, 'self', 'self')
-      if (!heavy) await fly
-    }
-    if (res.heal) {
-      GameAudio.play('heal')
-      playCharacterAnimation(you, 'heal')
-      const fly = this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
       if (!heavy) await fly
     }
     // 처치된 적은 레일이 당겨지기 전에 카드가 쓰러지며 회색으로 소멸.
@@ -4693,11 +4697,14 @@ export class BattleView {
   private renderGrade() {
     const badge = this.q('#grade-badge')
     const unusedDraws = this.cardHand?.savedDraws ?? CARD_HAND_CONFIG.drawsPerStage
-    const rewardValue = clearRewardValue(this.grade, unusedDraws)
+    const convertedGrade = gradeInspirationValue(this.grade)
+    const progressBonus = stageInspirationBonus(this.day)
+    const supplementalBonus = Math.max(progressBonus, unusedDraws)
+    const rewardValue = clearRewardValue(this.grade, unusedDraws, this.day)
     badge.classList.remove('rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary')
     badge.classList.add(`rarity-${gradeTier(this.grade)}`)
-    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${rewardValue}\n속도 등급 ${this.grade} + 미사용 무료 드로우 ${unusedDraws}. 속도 등급은 빠르게 끝낼수록 높다.`, { value: rewardValue, speed: this.grade, draws: unusedDraws })
-    badge.setAttribute('aria-label', `클리어 보상 +${rewardValue}, 속도 등급 ${this.grade}, 미사용 무료 드로우 ${unusedDraws}`)
+    const tooltip = hudTip('hudClearRewardTip', `클리어 보상 +${rewardValue}\n속도 등급 ${this.grade}의 영감 ${convertedGrade} + 추가 보너스 ${supplementalBonus}. 추가 보너스는 진행 ${progressBonus}과 미사용 무료 뽑기 ${unusedDraws} 중 큰 값이다.`, { value: rewardValue, speed: this.grade, converted: convertedGrade, bonus: supplementalBonus, progress: progressBonus, draws: unusedDraws })
+    badge.setAttribute('aria-label', `클리어 보상 +${rewardValue}, 속도 등급 환산 ${convertedGrade}, 추가 보너스 ${supplementalBonus}`)
     badge.dataset.tooltip = tooltip
     this.q('#grade').textContent = `+${rewardValue}`
   }
@@ -4717,7 +4724,7 @@ export class BattleView {
     await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
     if (victoryRemaining > 0) await sleep(victoryRemaining)
-    this.onWin(this.grade, this.combatResources(), clearRewardValue(this.grade, this.cardHand.savedDraws))
+    this.onWin(this.grade, this.combatResources(), clearRewardValue(this.grade, this.cardHand.savedDraws, this.day))
   }
 
   private combatResources(): { hp: number; guard: number } {
@@ -4758,7 +4765,7 @@ export class BattleView {
 
   /** 클리어 보상을 중앙 배지에서 좌상단 보유 영감으로 옮기고 실제 지급값까지 카운트업한다. */
   private async collectClearInspiration() {
-    const gained = clearRewardValue(this.grade, this.cardHand.savedDraws)
+    const gained = clearRewardValue(this.grade, this.cardHand.savedDraws, this.day)
     const wallet = this.q<HTMLElement>('.inspiration-wallet')
     const balance = wallet.querySelector<HTMLElement>('.inspiration-wallet-copy b')
     const source = this.q<HTMLElement>('#grade-badge')
@@ -5026,20 +5033,11 @@ export class BattleView {
       const animation: BattleAnimation = mantisTelegraph
         ? 'attack3'
         : st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`
-      // 예고는 **정지 프레임 한 장**이다. 몸을 낮추고 큰낫을 머리 위로 치켜든 마디까지
-      // 클립을 틀고, 그 자리에서 자세를 붙들어 다음 턴 내려벨 때까지 그대로 세워 둔다.
-      if (mantisTelegraph) {
-        // 예고는 **그 한 프레임이 전부**다. 클립을 앞에서부터 틀다 멈추는 게 아니라
-        // 곧바로 그 자세로 세운다 — 타이머가 없으니 어떤 순서로 다시 그려져도
-        // 예고를 놓치지 않는다. 자세는 모델 상태로 박혀 재렌더에 풀리지 않는다.
-        // (예전에는 늘린 클립 + 타이머 정지였고, 그 사이 레일이 다시 그려지면
-        //  `updateFoe`가 얼음을 풀어 예고 없이 그냥 서 있는 판이 생겼다.)
-        const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
-        poseCharacterAt(foe ?? null, animation, beats?.telegraph ?? beats?.raise ?? 0.2)
-      } else {
-        playCharacterAnimation(foe ?? null, animation)
-      }
-      if (!st.telegraphText) GameAudio.playEnemyAttack(st.animationStage)
+      // 사마귀 예고도 이제 견제 공격이다. 공격 클립과 돌진을 먼저 끝까지 보여 준 뒤
+      // 타격이 닿은 다음 예고 프레임에 세워, 로그만 찍히고 자세로 순간이동하는 느낌을
+      // 없앤다. 예고 자세 고정은 이 행동의 **결과**이지 행동 전체가 아니다.
+      playCharacterAnimation(foe ?? null, animation)
+      GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(
           [
@@ -5049,6 +5047,7 @@ export class BattleView {
           ],
           { duration: 520, easing: 'cubic-bezier(.25,.8,.3,1)' },
         )
+        foe?.classList.add('lunge')
         if (enemy?.def.boss) this.playBossSignatureEffect(enemy.def.id, 'telegraph', foe ?? null)
       } else {
         foe?.classList.add('lunge')
@@ -5074,13 +5073,6 @@ export class BattleView {
           this.popPlayer(BUILD_EFFECT_TEXT.blocked, 'guard big')
           this.log(BUILD_EFFECT_TEXT.magicBlocked)
         }
-        if (st.telegraphText) {
-          if (this.state.enemies[st.idx]?.def.id === 'mantis') {
-            this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisTelegraph)
-          }
-          this.popAt(st.idx, '강공격 준비!', 'buff')
-          this.log(`${this.state.enemies[st.idx].def.name} — ${st.telegraphText}`)
-        }
         if (st.guardShattered) {
           const you = this.q<HTMLElement>('.actor.you')
           SquareBurst.playOn(you, 'guard', { spread: 115 })
@@ -5093,6 +5085,15 @@ export class BattleView {
         this.hitOne(you)
         this.popPlayer(`${st.dealt}`, 'dmg big')
         this.log(st.text)
+      }
+      // 예고 턴도 실제 공격이므로 피해 유무와 상관없이 공격 결과 뒤에 경고를 남긴다.
+      // 예전에는 무피해 분기 안에만 있어, 견제 피해가 생기면 오히려 예고가 사라졌다.
+      if (st.telegraphText) {
+        if (this.state.enemies[st.idx]?.def.id === 'mantis') {
+          this.showBossTokenHint(TOKEN_BOSS_HINTS.mantisTelegraph)
+        }
+        this.popAt(st.idx, '강공격 준비!', 'buff')
+        this.log(`${this.state.enemies[st.idx].def.name} — ${st.telegraphText}`)
       }
       if (st.counterHit) {
         if (st.counterHit.magicShieldBroken) {
@@ -5126,7 +5127,11 @@ export class BattleView {
         this.log(`모인 일벌 ${st.summonsReleased}마리가 돌격하고 여왕의 양옆이 비었다.`)
       }
       await sleep(240)
-      if (!st.telegraphText) foe?.classList.remove('lunge')
+      if (mantisTelegraph) {
+        const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
+        poseCharacterAt(foe ?? null, animation, beats?.telegraph ?? beats?.raise ?? 0.2)
+      }
+      foe?.classList.remove('lunge')
     }
     this.renderActors()
   }

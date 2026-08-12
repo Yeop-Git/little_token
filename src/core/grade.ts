@@ -30,11 +30,26 @@ export const gradeForElapsedTurns = (luck: number, elapsedTurns: number): number
     startGrade(luck) - Math.floor(Math.max(0, elapsedTurns) / GRADE_DECAY_INTERVAL),
   )
 
-/** 희귀도용 속도 등급과 별개로, 남긴 무료 드로우를 최종 영감 획득량에 더한다. */
-export const clearRewardValue = (grade: number, unusedDraws: number): number =>
-  Math.max(0, Math.round(grade)) + Math.max(0, Math.floor(unusedDraws))
+/** 희귀도에는 0~10 전부 쓰는 속도 등급을 지갑용 영감으로 압축한다. */
+export const gradeInspirationValue = (grade: number): number =>
+  Math.ceil(Math.max(0, Math.round(grade)) / 2)
 
-/** 등급 → 희귀도 가중치. 등급이 오르면 노멀이 줄고 상위 희귀도 확률이 열린다. */
+/**
+ * 보스 진열에 확정되는 희귀·영웅·전설 카드의 일반 카드 대비 가격 차액을 보장한다.
+ * 매 층 주지 않고 5층 간격의 상점에서 바로 쓰게 해 진행 보너스가 지갑에 쌓이지 않게 한다.
+ */
+export const stageInspirationBonus = (day: number): number => {
+  const stage = Math.max(1, Math.floor(Number.isFinite(day) ? day : 1))
+  const floor = ((stage - 1) % 15) + 1
+  return floor === 5 ? 1 : floor === 10 ? 2 : floor === 15 ? 3 : 0
+}
+
+/** 진행 보너스와 남긴 무료 드로우 중 큰 쪽만 더해 같은 여유를 두 번 지급하지 않는다. */
+export const clearRewardValue = (grade: number, unusedDraws: number, day: number): number =>
+  gradeInspirationValue(grade)
+  + Math.max(stageInspirationBonus(day), Math.max(0, Math.floor(unusedDraws)))
+
+/** 등급 → 희귀도 가중치. 등급이 오르면 일반이 줄고 상위 희귀도 확률이 열린다. */
 export function rarityWeights(grade: number): Record<Rarity, number> {
   const g = clamp(grade, 0, GRADE_MAX)
   return {

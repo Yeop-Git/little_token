@@ -30,7 +30,7 @@ export function rankedStat(value: number, rank: number): number {
 export const WEAKNESS_MULT = 1.25
 
 /** 부위 보스(장로거미)의 지금 드러난 부위 약점을 맞혔을 때의 피해 배율. */
-export const PART_WEAKNESS_MULT = 1.5
+export const PART_WEAKNESS_MULT = 2
 
 /** 같은 감정 카드가 모였을 때의 공명 배율. 무감정 카드는 세지 않는다. */
 export const EMOTION_RESONANCE = { pair: 1.15, triple: 1.3, perExtra: 0.15 } as const

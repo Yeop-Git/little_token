@@ -1342,6 +1342,60 @@ button {
   border-color: rgba(255, 208, 108, .72);
   box-shadow: 0 12px 28px rgba(0, 0, 0, .62), 0 0 18px rgba(255, 184, 71, .12);
 }
+/* 카드 키워드는 카드 옆에 한 묶음으로 세운다. 키워드마다 독립된 행을 써서
+   두 개 이상이어도 서로 덮지 않고 한눈에 훑을 수 있다. */
+.tip-keyword-tray {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1500;
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  width: 300px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-5px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.tip-keyword-tray[data-side='left'] { transform: translateX(5px); }
+.tip-keyword-tray.show { opacity: 1; transform: translateX(0); }
+.tip-keyword-card {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 11px 13px 12px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 208, 108, .7);
+  border-radius: 8px 13px 9px 12px;
+  color: #f8efdf;
+  background: linear-gradient(145deg, rgba(34, 25, 42, .98), rgba(14, 10, 20, .98));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .58), inset 0 0 0 1px rgba(255, 255, 255, .04);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .72);
+}
+.tip-keyword-card::before {
+  content: '';
+  position: absolute;
+  inset: 8px auto 8px 6px;
+  width: 3px;
+  border-radius: 99px;
+  background: linear-gradient(#ffe19a, #b87927);
+  box-shadow: 0 0 8px rgba(255, 190, 79, .4);
+}
+.tip-keyword-card strong {
+  color: #ffe1a1;
+  font-size: 17px;
+  font-weight: 1000;
+  line-height: 1.2;
+}
+.tip-keyword-card span {
+  color: #ddd1bd;
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.42;
+}
 /* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
 html[data-postprocessing='off'] .tip-bubble {
   -webkit-backdrop-filter: none;
@@ -5501,8 +5555,11 @@ html[data-postprocessing='off'] .tip-bubble {
 .card-note {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
+  width: 100%;
+  max-width: 100%;
   min-height: 35px;
   padding: 2px 7px 0;
   color: #654a38;
@@ -5510,6 +5567,7 @@ html[data-postprocessing='off'] .tip-bubble {
   font-weight: 900;
   line-height: 1.25;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 .card-front small {
   margin-top: auto;
@@ -5681,7 +5739,9 @@ html[data-postprocessing='off'] .tip-bubble {
 .card-emotion .emotion-symbol { width: 30px; height: 30px; font-size: 22px; }
 .card-note.has-action {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  align-content: center;
   justify-content: center;
   gap: 3px;
 }
@@ -5704,10 +5764,15 @@ html[data-postprocessing='off'] .tip-bubble {
 .card-action-inline.action-guard { color: #286aa3; }
 .card-action-inline.action-heal { color: #3b7b32; }
 .card-note-divider { flex: none; opacity: .58; }
-.card-note-text { min-width: 0; }
+.card-note-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .card-keywords {
   display: inline-flex;
   min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
@@ -5715,12 +5780,13 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .card-keyword {
   position: relative;
+  max-width: 100%;
   cursor: help;
   font-weight: 1000;
   text-decoration: underline;
   text-decoration-thickness: 1.5px;
   text-underline-offset: 2px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .card-keyword:focus-visible,
 .card-keyword:hover {
@@ -6058,7 +6124,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .rarity-legendary { --rarity-color: #ffd76a; }
 .word-cell[class*='rarity-'] { --wglow: var(--rarity-color); }
 
-/* 카드 포일 — 노멀은 무광, 희귀는 은빛, 영웅은 무지개 홀로그램, 전설은 분할 프리즘. */
+/* 카드 포일 — 일반은 무광, 희귀는 은빛, 영웅은 무지개 홀로그램, 전설은 분할 프리즘. */
 .card-foil,
 .rp-foil {
   position: absolute;
@@ -7243,6 +7309,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
   animation: page-turn 0.7s cubic-bezier(0.3, 0.9, 0.3, 1);
 }
+.reward-card.skip-entrance { animation: none; }
 .reward-skip {
   position: absolute;
   right: 22px;
@@ -7487,6 +7554,8 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-pick:hover::before { opacity: 1; }
 .reward-kindline {
+  --reward-bar-color: #f5f5f2;
+  --reward-bar-rgb: 245, 245, 242;
   position: relative;
   min-height: 58px;
   display: flex;
@@ -7495,11 +7564,21 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   gap: 10px;
   padding: 9px 12px;
   border-radius: 8px 15px 7px 14px;
-  color: #fff5de;
-  background: rgba(12, 9, 18, .78);
-  box-shadow: inset 0 0 0 1px rgba(255, 230, 178, .24), 0 6px 16px rgba(0, 0, 0, .28);
+  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(var(--reward-bar-rgb), .16), rgba(12, 9, 18, .94) 34%, rgba(12, 9, 18, .94) 66%, rgba(var(--reward-bar-rgb), .16)),
+    rgba(12, 9, 18, .92);
+  box-shadow:
+    inset 0 0 0 2px rgba(var(--reward-bar-rgb), .54),
+    inset 0 1px 0 rgba(255, 255, 255, .14),
+    0 0 18px rgba(var(--reward-bar-rgb), .14),
+    0 6px 16px rgba(0, 0, 0, .32);
   transition: opacity .2s ease, transform .2s ease, box-shadow .2s ease;
 }
+.reward-kindline.rarity-common { --reward-bar-color: #f5f5f2; --reward-bar-rgb: 245, 245, 242; }
+.reward-kindline.rarity-rare { --reward-bar-color: #61bfff; --reward-bar-rgb: 97, 191, 255; }
+.reward-kindline.rarity-epic { --reward-bar-color: #c17aff; --reward-bar-rgb: 193, 122, 255; }
+.reward-kindline.rarity-legendary { --reward-bar-color: #ffd45f; --reward-bar-rgb: 255, 212, 95; }
 .reward-card-sticker {
   position: absolute;
   top: 14px;
@@ -7528,14 +7607,17 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-type-label {
   flex: 0 0 auto;
-  padding: 7px 11px;
+  padding: 8px 14px;
   border-radius: 999px;
-  color: #fff7df;
-  background: rgba(255, 255, 255, .08);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent);
+  color: #fff;
+  background: rgba(var(--reward-bar-rgb), .14);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--reward-bar-rgb), .78),
+    0 0 12px rgba(var(--reward-bar-rgb), .12);
   font-size: 14px;
   font-weight: 1000;
   letter-spacing: .04em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
 }
 .reward-rarity-label {
   position: absolute;
@@ -7543,14 +7625,18 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--rarity-color);
-  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--reward-bar-color, var(--rarity-color));
+  background: rgba(var(--reward-bar-rgb), .13);
+  box-shadow: inset 0 0 0 1px rgba(var(--reward-bar-rgb), .5);
+  font-size: 13px;
   font-weight: 1000;
   letter-spacing: .04em;
   line-height: 1;
-  text-shadow: 0 0 10px color-mix(in srgb, var(--rarity-color) 70%, transparent);
+  text-shadow: 0 0 10px rgba(var(--reward-bar-rgb), .72);
 }
-.reward-rarity-label i { font-size: 9px; font-style: normal; }
+.reward-rarity-label i { font-size: 9px; font-style: normal; filter: drop-shadow(0 0 4px currentColor); }
 .reward-choice.is-purchasing .reward-kindline {
   transform: translateY(-8px) scale(1.03);
   box-shadow: inset 0 0 0 2px rgba(255, 219, 139, .58), 0 0 24px rgba(255, 190, 86, .26);
@@ -7650,8 +7736,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   margin-top: -1px;
   padding: 5px 8px;
   border-radius: 0 0 13px 13px;
-  background: linear-gradient(180deg, rgba(22, 16, 29, .96), rgba(11, 8, 17, .98));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wglow, var(--gold)) 46%, transparent), inset 0 0 0 1px rgba(255, 230, 178, .2);
+  background:
+    linear-gradient(90deg, rgba(var(--reward-bar-rgb), .16), rgba(11, 8, 17, .98) 38%, rgba(11, 8, 17, .98) 62%, rgba(var(--reward-bar-rgb), .16)),
+    rgba(11, 8, 17, .98);
+  box-shadow: inset 0 0 0 1px rgba(var(--reward-bar-rgb), .58), 0 0 12px rgba(var(--reward-bar-rgb), .1);
 }
 .reward-shop-card .reward-type-label { padding: 5px 8px; font-size: 11px; }
 .reward-shop-card .reward-rarity-label { left: 8px; gap: 3px; font-size: 9px; }
@@ -7929,7 +8017,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .rp-item-passive span { grid-column: 1 / -1; color: #fff4de; font-size: 12px; line-height: 1.35; }
 .rp-effect {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  align-content: center;
   justify-content: center;
   gap: 7px;
   min-height: 40px;

@@ -67,6 +67,7 @@ applyLocaleToDocument()
 applyContentLocalization()
 if (currentLocale !== 'ko') applyDetailedContentLocalization(currentLocale)
 installDomLocalization()
+// 렌더러와 이펙트가 만들어지기 전에 최초 기기 프리셋을 확정하고 모든 세부 값을 적용한다.
 GraphicsSettings.apply()
 GameAudio.installButtonSounds()
 installFoilShaders()
@@ -746,7 +747,10 @@ function makeShopStock(grade: number, refreshes: number): RewardPickRef[] {
   )
 }
 
-async function goInspirationShop(grade = run.reward?.grade ?? startGrade(run.player.stats.luck)) {
+async function goInspirationShop(
+  grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
+  playEntrance = true,
+) {
   const request = ++battleRequest
   reset()
   stage.setAttribute('data-theme', 'day')
@@ -772,11 +776,12 @@ async function goInspirationShop(grade = run.reward?.grade ?? startGrade(run.pla
     refreshes: pending.shopRefreshes,
     purchases: pending.shopPurchases,
     mode: 'shop',
+    playEntrance,
     options,
     onPick: (opt) => {
       const cost = rewardPrice(opt)
       if (run.inspiration < cost) {
-        goInspirationShop(grade)
+        goInspirationShop(grade, false)
         return
       }
       const slotIndex = options.indexOf(opt)
@@ -785,7 +790,7 @@ async function goInspirationShop(grade = run.reward?.grade ?? startGrade(run.pla
         if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
         if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
         saveRun(run)
-        goInspirationShop(grade)
+        goInspirationShop(grade, false)
       }
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
@@ -796,7 +801,7 @@ async function goInspirationShop(grade = run.reward?.grade ?? startGrade(run.pla
           if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
           if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
           saveRun(run)
-          goInspirationShop(grade)
+          goInspirationShop(grade, false)
         })
       }
     },
@@ -954,7 +959,7 @@ function goItem(
     onDone: (result) => {
       if (inspirationCost > 0 && !spendInspiration(run, inspirationCost)) {
         if (rewardPhase) advanceReward(grade, rewardPhase)
-        else if (onComplete) goInspirationShop(grade)
+        else if (onComplete) goInspirationShop(grade, false)
         return
       }
       applyItemReward(run.player, result)

@@ -12,22 +12,14 @@ export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중 : 본체 무적'
 export const ENEMIES: Record<string, EnemyDef> = {
   mantis: {
     id: 'mantis', name: '사마귀', boss: true,
-    // 준비 → 내려베기 → 휘두르기가 3턴 한 사이클이다. 첫 두 턴이 곧 파훼 교실이라
-    // 강한 덱도 규칙을 먼저 읽고, 세 번째 턴에 숨을 고른다.
-    //
-    // 예전에는 준비 → 내려베기 2턴뿐이라 **평타가 아예 없었다.** 매 턴이 예고
-    // 아니면 강타여서 플레이어는 방어만 강요받았고, 상단 문장도 경고 두 종류만
-    // 돌아 늘 강공격 직전처럼 읽혔다. 숨 돌릴 한 턴을 넣어 공격·회복 문장을 쓸
-    // 자리를 만들고, 대신 내려베기를 더 무겁게 해 못 막았을 때의 값을 올린다.
-    // 숨 돌리는 턴은 **사이클 끝**에 둔다 — 앞에 두면 예고→내려베기를 두 번 보기
-    // 전에 전투가 끝나 보스가 자기 패턴을 못 보여 주고 죽는다.
-    // 카드풀 확장 뒤 강한 초반 문장의 상한이 올라 두 번째 예고 직전에 끝나는 경우가
-    // 생겼다. 두 번째 강타까지 닿는 160으로 보강하고, 길어진 전투가 초보를 처형하지
-    // 않도록 공격력은 한 단계 낮춘다. 난점은 생존 수치가 아니라 예고 대응이다.
-    hp: 160, atk: 6, every: 1, initiative: 'first',
+    // 평타(50% 확률로 한 번 더) → 견제하며 자세 잡기 → 내려베기가 한 사이클이다.
+    // 예고 턴에도 견제를 함께 해 사마귀 턴이 자세 연출만으로 끝나지 않는다.
+    // 파훼 성공은 받는 피해 ×2.5와 예정 공격 스킵으로 전투 길이를 크게 줄인다.
+    hp: 65, atk: 6, every: 1, initiative: 'first',
     sprite: 'boss_mantis', guard: 8, weakEmotion: 'sorrow',
     attackPattern: [
-      { name: '강공격 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0, telegraphText: '큰낫을 높이 들고 다음 공격을 준비한다!' },
+      { name: '낫 휘두르기', bonusAtk: 0, animationStage: 1, damageScale: 0.75, repeatOnceChance: 0.5 },
+      { name: '견제하며 자세 잡기', bonusAtk: 0, animationStage: 2, damageScale: 0.55, telegraphText: '낫으로 견제하며 큰낫 내려베기를 준비한다!' },
       {
         name: '큰낫 내려베기',
         bonusAtk: 0,
@@ -39,16 +31,16 @@ export const ENEMIES: Record<string, EnemyDef> = {
         lifeStealRate: 0.5,
         // 첫 몇 번의 실패는 버틸 수 있지만, 예고를 읽고 완전히 막은 순간에는
         // 피해 증가와 다음 공격 스킵을 함께 줘 전투의 흐름을 크게 뒤집는다.
-        groggyDamageMult: 1.5,
+        groggyDamageMult: 2.5,
         groggyRequiresGuardShatter: true,
       },
-      { name: '낫 휘두르기', bonusAtk: 0, animationStage: 1, damageScale: 0.75 },
     ],
-    note: '큰낫을 들어 강공격을 예고하고 내려벤 뒤, 한 턴 숨을 고르며 낫을 휘두르는 세 턴 패턴을 반복한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 받는 피해가 커지고 예정된 다음 공격을 한 턴 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
+    note: '낫 휘두르기를 한두 번 쓴 뒤, 견제 공격과 함께 큰낫 내려베기를 예고한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 이번 문장 피해를 ×2.5로 받고 예정된 다음 공격을 한 번 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
-    hp: 68, atk: 7, every: 3, initiative: 'second',
+    // 매 턴 독침 행동을 하되, 기존 3턴 주기의 총압력과 비슷하도록 한 발 위력을 낮춘다.
+    hp: 58, atk: 3, every: 1, initiative: 'second',
     sprite: 'boss_queen_bee', weakEmotion: 'anger',
     summonPattern: {
       name: '일벌',
@@ -63,12 +55,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
       maxPerSide: 2,
       refillOnlyWhenEmpty: true,
       pierceWhileEscorted: true,
-      backlashMaxHpRatePerUnit: 0.03,
+      backlashMaxHpRatePerUnit: 0.05,
       focusedBacklash: { emotion: 'anger', multiplier: 2 },
       groggyEvery: 4,
-      groggyDamageMult: 1.5,
+      groggyDamageMult: 2.5,
     },
-    note: `전투 시작에 체력 30인 일벌 네 마리를 한꺼번에 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 문장 피해는 일벌 넷을 차례로 쓰러뜨린 뒤 남은 만큼 본체까지 이어진다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 3%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×1.5 그로기에 빠지고 다음 턴에는 아무 행동도 하지 않는다. 그 다음 턴 시작에 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
+    note: `전투 시작에 체력 30인 일벌 네 마리를 한꺼번에 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 문장 피해는 일벌 넷을 차례로 쓰러뜨린 뒤 남은 만큼 본체까지 이어진다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 5%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×2.5 그로기에 빠지고 다음 턴에는 아무 행동도 하지 않는다. 그 다음 턴 시작에 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
@@ -78,7 +70,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
     // 거미줄 조이기만 방패 위를 타고 넘어 몸을 감는다. 다음 앞다리 휘두르기는
     // 방어로 막을 수 있어, 약점 공략을 재촉하면서도 방어 빌드 전체를 지우지 않는다.
     // 거미줄 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
-    hp: 74, atk: 12, every: 2, initiative: 'first',
+    // 거미줄 부여만 로그에 남고 본체가 멈춰 보이지 않도록 매 턴 직접 공격한다.
+    // 행동 빈도가 두 배가 된 만큼 한 발 위력은 절반으로 낮춘다.
+    hp: 91, atk: 6, every: 1, initiative: 'first',
     sprite: 'boss_elder_spider', guard: 12, magicShield: 1, weakEmotion: null,
     attackPattern: [
       { name: '거미줄 조이기', bonusAtk: 0, animationStage: 1, pierceGuard: true },
@@ -92,7 +86,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄 조이기는 방어막을 넘어 몸에 직접 감기지만 다음 앞다리 휘두르기는 방어로 막을 수 있다. 거미줄 피해는 한 번에 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×1.5와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄 조이기는 방어막을 넘어 몸에 직접 감기지만 다음 앞다리 휘두르기는 방어로 막을 수 있다. 거미줄 피해는 한 번에 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×2와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',

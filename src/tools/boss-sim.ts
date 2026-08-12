@@ -205,8 +205,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
         const reachable = candidate.intent.pierceGuard || candidate.intent.targetCount === 'all'
           ? escorts
           : Math.min(escorts, candidate.intent.targetCount)
-        // 일벌 전용 배수는 실제 판정과 같은 자리에서 곱해야 정책이 그 카드를 알아본다.
-        const perWorker = candidate.dmg * candidate.intent.summonDamageMultiplier
+        const perWorker = candidate.dmg
         return Math.min(reachable, Math.floor(perWorker / (boss.def.summonPattern?.hp ?? 1)))
       }
       const queenAnswer = boss.def.id === 'queenBee' && escorts > 0
@@ -304,6 +303,13 @@ const verbose = process.argv.includes('--verbose')
 const failures: string[] = []
 const total = <T>(runs: T[], value: (run: T) => number) => runs.reduce((sum, run) => sum + value(run), 0)
 type SimResult = ReturnType<typeof simulate>
+const basicTurnBands: Record<number, readonly [min: number, max: number]> = {
+  5: [3, 4.5],
+  10: [6, 7.5],
+  // 시드 평균 9.5~9.9는 화면상 약 10턴, 12.0~12.4는 약 12턴으로 읽는다.
+  15: [9.5, 12.5],
+}
+const basicGreedyTurns = new Map<number, number>()
 
 for (const day of [5, 10, 15]) {
   const byPolicy = new Map<Policy, SimResult[]>()
@@ -333,16 +339,20 @@ for (const day of [5, 10, 15]) {
   const smart = byPolicy.get('smart')!
   const greedyWins = greedy.filter((run) => run.won).length
   const smartWins = smart.filter((run) => run.won).length
-  const averageTurns = [...greedy, ...smart].reduce((sum, run) => sum + run.turns, 0) / (greedy.length + smart.length)
-  if (averageTurns < 8) failures.push(`${day}층: 평균 ${averageTurns.toFixed(1)}턴으로 보스 패턴을 읽기 전에 끝납니다.`)
+  const basicTurns = total(greedy, (run) => run.turns) / greedy.length
+  basicGreedyTurns.set(day, basicTurns)
+  const [minTurns, maxTurns] = basicTurnBands[day]
+  if (basicTurns < minTurns || basicTurns > maxTurns) {
+    failures.push(`${day}층: 기본 전투가 목표 ${minTurns}~${maxTurns}턴을 벗어났습니다 (${basicTurns.toFixed(1)}턴).`)
+  }
   if (smartWins < greedyWins) failures.push(`${day}층: 패턴 대응 정책 승리 ${smartWins}회가 최대 피해 정책 ${greedyWins}회보다 적습니다.`)
 
   if (day === 5) {
     for (const [policy, runs] of byPolicy) {
       const telegraphs = total(runs, (run) => run.telegraphs)
       const heavyAttacks = total(runs, (run) => run.heavyAttacks)
-      if (telegraphs < runs.length * 2) failures.push(`5층 ${policy}: 강공격 예고가 런당 2회 미만입니다 (${telegraphs}/${runs.length}).`)
-      if (heavyAttacks < runs.length * 2) failures.push(`5층 ${policy}: 예고 강공격이 런당 2회 미만입니다 (${heavyAttacks}/${runs.length}).`)
+      if (telegraphs < runs.length * .75) failures.push(`5층 ${policy}: 한 사이클 전투에서 강공격 예고가 충분히 나오지 않습니다 (${telegraphs}/${runs.length}).`)
+      if (heavyAttacks < runs.length * .6) failures.push(`5층 ${policy}: 예고 뒤 강공격까지 이어지는 판이 너무 적습니다 (${heavyAttacks}/${runs.length}).`)
     }
     const greedyGuardRate = total(greedy, (run) => run.guardedTelegraph) / Math.max(1, total(greedy, (run) => run.heavyAttacks))
     const smartGuardRate = total(smart, (run) => run.guardedTelegraph) / Math.max(1, total(smart, (run) => run.heavyAttacks))
@@ -353,8 +363,8 @@ for (const day of [5, 10, 15]) {
     for (const [policy, runs] of byPolicy) {
       const waves = total(runs, (run) => run.summonWaves)
       const groggies = total(runs, (run) => run.queenGroggies)
-      if (waves < runs.length * 2) failures.push(`10층 ${policy}: 일벌 소환 웨이브가 런당 2회 미만입니다 (${waves}/${runs.length}).`)
-      if (groggies < runs.length * 2) failures.push(`10층 ${policy}: 호위 전멸 그로기가 런당 2회 미만입니다 (${groggies}/${runs.length}).`)
+      if (waves < runs.length * 1.5) failures.push(`10층 ${policy}: 6~7턴 전투에서 일벌 웨이브가 충분히 반복되지 않습니다 (${waves}/${runs.length}).`)
+      if (groggies < runs.length * 1.5) failures.push(`10층 ${policy}: 호위 전멸 보상이 충분히 열리지 않습니다 (${groggies}/${runs.length}).`)
     }
     const greedyGroggyRate = total(greedy, (run) => run.queenGroggies) / Math.max(1, total(greedy, (run) => run.summonWaves))
     const smartGroggyRate = total(smart, (run) => run.queenGroggies) / Math.max(1, total(smart, (run) => run.summonWaves))
@@ -387,26 +397,15 @@ for (const day of [5, 10, 15]) {
       : day === 10
         ? total(runs, (run) => run.summonWaves)
         : total(runs, (run) => run.webTurns)
-    // 요구치는 **보스 사이클 길이에 맞춰** 정한다. "패턴을 두 바퀴 보여 주고 죽어라"는
-    // 뜻은 같지만, 한 바퀴가 몇 턴인지는 보스마다 다르다.
-    //
-    // 5층 사마귀는 예고 → 내려베기 → 휘두르기 3턴 주기다. 2번째 예고가 4턴째에
-    // 오는데 강한 빌드는 5~6턴에 끝내고, 방어에 성공하면 그로기가 다음 공격을 한 턴
-    // 더 미룬다 — **잘 싸울수록 2번째 예고가 밀린다.** 3턴 주기에 "런당 2회"를 그대로
-    // 요구하면 보스 체력을 억지로 불려야 하고(실측: 116 → 176까지 올려도 카운트는
-    // 20~22에서 안 움직이고 일반 플레이만 늘어졌다) 전투가 지루해진다.
-    // 그래서 사마귀는 1.5회(= 예고를 한 번은 반드시 보고, 절반은 두 번 본다)를 바닥으로
-    // 둔다. "패턴을 못 보여 주고 죽는 보스"를 막는다는 계약의 목적은 그대로다.
-    //
-    // 10층 여왕벌도 같은 이유로 1.5회다. 웨이브는 일벌 넷을 **모두** 치웠을 때만 다시
-    // 서는데(refillOnlyWhenEmpty), 예전에는 첫 손패에 범위 답 한 장을 끼워 넣어 주고
-    // 있어서 강한 빌드가 매번 웨이브를 갈아치웠다. 그 보장을 걷은 지금은 범위 카드를
-    // 손에 쥔 판에서만 두 번째 웨이브가 선다 — 실측 1.92회. 요구치를 2로 두면 없어진
-    // 규칙을 계약이 계속 요구하게 된다.
-    const requiredPerRun = day === 15 ? 4 : 1.5
+    // 숙련 빌드는 기본 턴 목표보다 먼저 끝내는 것이 의도다. 핵심 기믹이 최소 한 번은
+    // 보이되, 높은 피해나 완벽한 맥락으로 사이클 자체를 건너뛰는 플레이를 막지 않는다.
+    const requiredPerRun = day === 15 ? 4 : day === 10 ? 1 : .25
     console.log(`day ${day} ${build.padEnd(10)} 평균 ${avgTurns.toFixed(1)}턴 · 패턴 ${patternCount}/${runs.length} · 승 ${runs.filter((run) => run.won).length}/${runs.length}`)
     if (patternCount < runs.length * requiredPerRun) {
       failures.push(`${day}층 ${build}: 강한 빌드에서 핵심 패턴이 런당 ${requiredPerRun}회 미만입니다 (${patternCount}/${runs.length}).`)
+    }
+    if (runs.every((run) => run.won) && avgTurns >= (basicGreedyTurns.get(day) ?? Infinity)) {
+      failures.push(`${day}층 ${build}: 숙련 빌드 ${avgTurns.toFixed(1)}턴이 기본 ${basicGreedyTurns.get(day)?.toFixed(1)}턴보다 짧지 않습니다.`)
     }
   }
 }
@@ -415,4 +414,4 @@ if (failures.length) {
   console.error(`\n보스 재미·패턴 계약 위반 ${failures.length}건:\n- ${failures.join('\n- ')}`)
   process.exit(1)
 }
-console.log('\n보스 재미·패턴 계약 통과 — 세 보스 모두 사이클 길이에 맞는 패턴 노출 · 대응 정책 우위 · 상위 피해/반복강화 스트레스')
+console.log('\n보스 재미·패턴 계약 통과 — 기본 3~4 / 6~7 / 10~12턴 · 파훼 보상 · 숙련 빌드 단축')

@@ -140,7 +140,7 @@ function checkVerbWording(): string[] {
  * 실제 데이터로 검증한다. 셋을 본다.
  *   ① 주어 배율은 등급 예산 ±오차, 수식어는 공개 전술만 가지며 고비용은 강계수·복합형이다.
  *   ② 일반 동사는 행동 종류·참조 스탯·등급 계수·잉크 비용만 가진다.
- *   ③ 초기 덱의 노멀 정원(주어 1 · 수식 3 · 동사 3) — 노멀 쌍둥이 방지.
+ *   ③ 초기 덱의 일반 정원(주어 1 · 수식 3 · 동사 3) — 일반 쌍둥이 방지.
  * 여기에 카드 문구(`note`)가 실제 수치를 빠뜨리지 않았는지도 함께 본다.
  * 5슬롯 확장 데이터는 고정 위력 등 옛 규칙이 남아 있어 대상에서 뺀다(보존 자료).
  */
@@ -167,7 +167,7 @@ function checkBudget(): string[] {
   const early = Object.entries(EARLY_WORDS).flatMap(([slot, list]) => list.map((w) => ({ slot, w, pool: '초기' })))
   const reward = REWARD_WORDS.map((w) => ({ slot: w.slot, w, pool: '보상' }))
   const special = SPECIAL_REWARD_WORDS.map((w) => ({ slot: w.slot, w, pool: '규칙' }))
-  console.log(`\n등급 예산 검사 — 노멀 ${MULT_BUDGET.common} · 희귀 ${MULT_BUDGET.rare} · 영웅 ${MULT_BUDGET.epic}`)
+  console.log(`\n등급 예산 검사 — 일반 ${MULT_BUDGET.common} · 희귀 ${MULT_BUDGET.rare} · 영웅 ${MULT_BUDGET.epic}`)
 
   for (const { slot, w, pool } of [...early, ...reward, ...special]) {
     const rarity = w.rarity ?? 'common'

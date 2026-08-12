@@ -86,13 +86,6 @@ export interface WordEffects {
   attackRank?: number
   /** 현재 스테이지 중 플레이어 방어 랭크 변화. */
   guardRank?: number
-  /** 소환물(일벌)에게만 곱하는 피해 배수. 본체와 일반 적에게는 적용하지 않는다. */
-  summonDamageMultiplier?: number
-  /**
-   * 적이 방어를 부수는 강공격을 준비한 턴에만 곱하는 피해 배수.
-   * 맞서 싸우는 카드의 값은 "언제 쓰는가"에 걸려 있어야 하므로 상시 배율로 두지 않는다.
-   */
-  heavyTurnMultiplier?: number
 }
 
 // 문장이 기대는 플레이어 스탯 — 현재 일반 런에서는 동사의 깡수치가 여기서 나온다.
@@ -141,7 +134,7 @@ export interface Word {
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
 
 export const RARITY_LABEL: Record<Rarity, string> = {
-  common: '노멀',
+  common: '일반',
   rare: '희귀',
   epic: '영웅',
   legendary: '전설',
@@ -200,8 +193,6 @@ export interface Intent {
   lifeStealRate: number
   attackRank: number
   guardRank: number
-  summonDamageMultiplier: number
-  heavyTurnMultiplier: number
   emotions: Emotion[]
   emotionResonance: number
   tags: string[]
@@ -302,7 +293,7 @@ export interface EnemyDef {
     damageScale?: number
     /** 이 기술을 한 번 더 반복할 확률. 한 사이클에서 최대 한 번만 굴린다. */
     repeatOnceChance?: number
-    /** 피해 없이 다음 공격을 준비할 때 화면에 띄우는 예고 문구. */
+    /** 다음 공격을 준비할 때 화면에 띄우는 예고 문구. 현재 행동에 피해가 있을 수도 있다. */
     telegraphText?: string
     /** 이 기술만 플레이어 방어를 소모하지 않고 체력에 직접 피해를 준다. */
     pierceGuard?: boolean

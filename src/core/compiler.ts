@@ -323,8 +323,6 @@ export function compile(
     lifeStealRate: Math.max(0, ...order.map((key) => sel[key]?.effects?.lifeStealRate ?? 0)),
     attackRank: sumEffect('attackRank'),
     guardRank: sumEffect('guardRank'),
-    summonDamageMultiplier: Math.max(1, ...order.map((key) => sel[key]?.effects?.summonDamageMultiplier ?? 1)),
-    heavyTurnMultiplier: Math.max(1, ...order.map((key) => sel[key]?.effects?.heavyTurnMultiplier ?? 1)),
     emotions,
     emotionResonance,
     tags: allTags,
