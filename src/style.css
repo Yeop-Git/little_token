@@ -1261,20 +1261,15 @@ button {
   box-sizing: border-box;
   width: max-content;
   /* 자리는 JS가 무대 안으로 밀어 넣는다 — 잘려 못 읽느니 줄이 한 줄 느는 쪽이 낫다. */
-  max-width: 440px;
-  padding: 11px 16px;
-  border: 1px solid rgba(255, 209, 128, .82);
-  border-radius: 14px;
-  color: #fff6e2;
-  /* 배경은 살짝 더 진하게 — 밝은 배경 일러스트 위에서 너무 비쳐 글자가 묻혔다. */
-  background: rgba(18, 12, 25, .88);
-  -webkit-backdrop-filter: blur(9px) saturate(1.1);
-  backdrop-filter: blur(9px) saturate(1.1);
-  box-shadow: 0 0 14px rgba(255, 188, 92, .18), 0 8px 20px rgba(0, 0, 0, .58);
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.4;
-  /* 툴팁 문구는 `제목\n설명…`처럼 줄바꿈으로 들어온다 — 줄바꿈은 살리고 접기는 그대로 둔다. */
+  max-width: 390px;
+  padding: 0;
+  border: 1px solid rgba(255, 221, 153, .58);
+  border-radius: 11px;
+  color: #f8efdf;
+  background: linear-gradient(155deg, rgba(31, 23, 39, .97), rgba(13, 10, 19, .97));
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .62), 0 0 0 1px rgba(255, 255, 255, .045) inset;
   white-space: pre-line;
   text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
   opacity: 0;
@@ -1282,24 +1277,71 @@ button {
   transform: translateY(-4px);
   transition: opacity .14s ease, transform .14s ease;
 }
-.tip-bubble[data-place='above'] { transform: translateY(4px); }
+.tip-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: #18121f;
+  border-right: 1px solid rgba(255, 221, 153, .58);
+  border-bottom: 1px solid rgba(255, 221, 153, .58);
+  transform: translateX(-50%) rotate(45deg);
+}
+.tip-bubble[data-actual-place='above']::after { bottom: -6px; }
+.tip-bubble[data-actual-place='below']::after { top: -6px; transform: translateX(-50%) rotate(225deg); }
+.tip-bubble[data-actual-place='above'] { transform: translateY(4px); }
 .tip-bubble.show { opacity: 1; transform: translateY(0); }
+.tip-bubble-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px 6px;
+}
+.tip-bubble-head[hidden] { display: none; }
 /* 공략 쪽지처럼 성격이 다른 안내는 머리에 라벨 한 칸을 달아 규칙 설명과 구분한다. */
 .tip-bubble-label {
-  display: block;
+  display: inline-flex;
+  flex: none;
   width: max-content;
-  margin-bottom: 7px;
-  padding: 2px 10px;
+  padding: 2px 7px;
   border-radius: 999px;
   color: #2a1a0c;
   background: linear-gradient(140deg, #ffdc9a, #f0b45f);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
-  font: 900 15px/1.35 Georgia, serif;
-  letter-spacing: .14em;
+  font: 900 11px/1.35 Georgia, serif;
+  letter-spacing: .11em;
   text-shadow: none;
 }
 .tip-bubble-label[hidden] { display: none; }
-.tip-bubble-body { display: block; }
+.tip-bubble-title {
+  min-width: 0;
+  color: #ffe1a1;
+  font-size: 18px;
+  font-weight: 1000;
+  line-height: 1.25;
+  letter-spacing: .01em;
+  text-shadow: 0 0 10px rgba(255, 198, 95, .25), 0 2px 5px rgba(0, 0, 0, .72);
+}
+.tip-bubble-title[hidden] { display: none; }
+.tip-bubble-body {
+  display: block;
+  padding: 10px 13px;
+  color: #f4ead7;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.48;
+}
+.tip-bubble.has-title .tip-bubble-body {
+  padding-top: 0;
+  color: #d9cebc;
+  font-size: 15px;
+  font-weight: 650;
+}
+.tip-bubble[data-kind='keyword'] {
+  border-color: rgba(255, 208, 108, .72);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .62), 0 0 18px rgba(255, 184, 71, .12);
+}
 /* 절전 모드에서는 흐림을 끄는 대신 바탕을 진하게 해 글자가 안 묻히게 한다. */
 html[data-postprocessing='off'] .tip-bubble {
   -webkit-backdrop-filter: none;
@@ -5314,6 +5356,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .word-card.selected {
   z-index: 900 !important;
 }
+.word-card.touch-previewing { z-index: 900 !important; }
 .word-card:hover:not(.blocked):not(.drawing) .card-lift,
 .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift {
   transform: translateY(-54px) scale(1.06);
@@ -5323,6 +5366,30 @@ html[data-postprocessing='off'] .tip-bubble {
   transform: translateY(calc(var(--selected-lift) * -1)) scale(var(--selected-scale));
   filter: drop-shadow(0 0 16px var(--wglow)) drop-shadow(0 24px 20px rgba(0,0,0,.58));
 }
+.word-card.touch-previewing .card-lift {
+  transform: translateY(-54px) scale(1.06);
+  filter: drop-shadow(0 0 13px var(--wglow)) drop-shadow(0 22px 18px rgba(0,0,0,.52));
+}
+.card-touch-confirm-hint {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 30;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: #20140b;
+  background: #ffe09a;
+  box-shadow: 0 3px 10px rgba(0,0,0,.38), inset 0 0 0 1px rgba(111,71,20,.28);
+  font-size: 10px;
+  font-weight: 1000;
+  line-height: 1.15;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.word-card.touch-previewing .card-touch-confirm-hint { display: block; }
 .word-card.pressing:not(.blocked):not(.drawing) .card-lift {
   transform: translateY(-40px) scale(.985);
   transition-duration: .09s;
@@ -7420,9 +7487,11 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .reward-pick:hover::before { opacity: 1; }
 .reward-kindline {
+  position: relative;
   min-height: 58px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 9px 12px;
   border-radius: 8px 15px 7px 14px;
@@ -7430,6 +7499,32 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   background: rgba(12, 9, 18, .78);
   box-shadow: inset 0 0 0 1px rgba(255, 230, 178, .24), 0 6px 16px rgba(0, 0, 0, .28);
   transition: opacity .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.reward-card-sticker {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 8;
+  width: max-content;
+  padding: 7px 13px 6px;
+  border: 2px solid rgba(255, 255, 255, .72);
+  border-radius: 7px 4px 8px 3px;
+  color: #10241a;
+  background: #9df2c2;
+  box-shadow: 0 3px 0 rgba(14, 61, 40, .34), 0 8px 17px rgba(0, 0, 0, .42), 0 0 16px rgba(91, 238, 161, .38);
+  font-size: 15px;
+  font-weight: 1000;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-shadow: 0 1px rgba(255, 255, 255, .48);
+  transform: translateX(-50%) rotate(-4deg);
+  pointer-events: none;
+}
+.reward-card-sticker.is-reinforce {
+  color: #402306;
+  background: #ffc76e;
+  box-shadow: 0 3px 0 rgba(91, 48, 5, .36), 0 8px 17px rgba(0, 0, 0, .42), 0 0 16px rgba(255, 177, 71, .4);
+  transform: translateX(-50%) rotate(4deg);
 }
 .reward-type-label {
   flex: 0 0 auto;
@@ -7442,35 +7537,20 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-weight: 1000;
   letter-spacing: .04em;
 }
-.reward-state {
-  min-width: 0;
-  display: flex;
+.reward-rarity-label {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 1.25;
-}
-.reward-state b {
-  flex: 0 0 auto;
-  padding: 4px 7px;
-  border-radius: 6px;
+  gap: 5px;
+  color: var(--rarity-color);
   font-size: 12px;
   font-weight: 1000;
   letter-spacing: .04em;
+  line-height: 1;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--rarity-color) 70%, transparent);
 }
-.reward-state.is-new-reward { color: #c9f7df; }
-.reward-state.is-new-reward b {
-  color: #092a1d;
-  background: #8df0bc;
-  box-shadow: 0 0 14px rgba(93, 239, 167, .45);
-}
-.reward-state.is-owned-word { color: #ffd9a2; }
-.reward-state.is-owned-word b {
-  color: #3c2108;
-  background: #ffc66e;
-  box-shadow: 0 0 14px rgba(255, 177, 71, .38);
-}
+.reward-rarity-label i { font-size: 9px; font-style: normal; }
 .reward-choice.is-purchasing .reward-kindline {
   transform: translateY(-8px) scale(1.03);
   box-shadow: inset 0 0 0 2px rgba(255, 219, 139, .58), 0 0 24px rgba(255, 190, 86, .26);
@@ -7574,14 +7654,15 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wglow, var(--gold)) 46%, transparent), inset 0 0 0 1px rgba(255, 230, 178, .2);
 }
 .reward-shop-card .reward-type-label { padding: 5px 8px; font-size: 11px; }
-.reward-shop-card .reward-state { font-size: 10px; }
-.reward-shop-card .reward-state b { padding: 3px 5px; font-size: 10px; }
+.reward-shop-card .reward-rarity-label { left: 8px; gap: 3px; font-size: 9px; }
+.reward-shop-card .reward-rarity-label i { font-size: 7px; }
+.reward-shop-card .reward-card-sticker { top: 7px; padding: 4px 8px 3px; font-size: 10px; }
 .reward-kind-cost {
-  flex: 0 0 auto;
+  position: absolute;
+  right: 8px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   padding: 4px 7px;
   border-radius: 999px;
   color: #ffe597;
@@ -7984,6 +8065,65 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
 .rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
 .rd-hint b { color: var(--gold); }
+.word-keyword-details {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(255, 236, 196, .2);
+}
+.word-keyword-details h3 {
+  margin: 0 0 9px;
+  color: #ffe0a0;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .12em;
+}
+.word-keyword-list { display: grid; gap: 7px; }
+.word-keyword-detail {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: #fff5df;
+  background: rgba(255, 255, 255, .055);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wglow, var(--gold)) 30%, transparent);
+}
+.word-keyword-detail b {
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: #1a1420;
+  background: #f6d58c;
+  font-size: 11px;
+  font-weight: 1000;
+  line-height: 1.2;
+}
+.word-keyword-detail span { font-size: 12px; line-height: 1.45; }
+.reward-pick.touch-previewing {
+  transform: translateY(-10px);
+  box-shadow: 0 26px 50px rgba(0, 0, 0, .55), 0 0 0 2px var(--wglow, var(--gold)), 0 0 30px color-mix(in srgb, var(--wglow, var(--gold)) 42%, transparent), inset 0 1px 0 var(--glass-hi);
+}
+.reward-touch-confirm-hint {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 58px;
+  z-index: 9;
+  width: max-content;
+  max-width: calc(100% - 28px);
+  padding: 7px 11px;
+  border-radius: 8px;
+  color: #281b0b;
+  background: #ffe09a;
+  box-shadow: 0 4px 14px rgba(0,0,0,.44), inset 0 0 0 1px rgba(111,71,20,.3);
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1.15;
+  transform: translateX(-50%) rotate(-1deg);
+  pointer-events: none;
+}
+.reward-pick.touch-previewing .reward-touch-confirm-hint { display: block; }
+.reward-shop-card .reward-touch-confirm-hint { top: 43px; padding: 4px 7px; font-size: 9px; }
 .rd-deck-head {
   display: flex;
   align-items: center;

@@ -16,8 +16,10 @@ const GAP = 9
 export class TooltipLayer {
   private scene: HTMLElement
   private bubble: HTMLElement
+  private head: HTMLElement
   /** `data-tip-label`이 붙은 쪽지에만 서는 머리 라벨(예: 공략 팁의 `TIP`). */
   private label: HTMLElement
+  private title: HTMLElement
   private body: HTMLElement
   private anchor: HTMLElement | null = null
   private raf = 0
@@ -28,11 +30,16 @@ export class TooltipLayer {
     this.bubble = document.createElement('div')
     this.bubble.className = 'tip-bubble'
     this.bubble.setAttribute('aria-hidden', 'true')
+    this.head = document.createElement('span')
+    this.head.className = 'tip-bubble-head'
     this.label = document.createElement('span')
     this.label.className = 'tip-bubble-label'
+    this.title = document.createElement('strong')
+    this.title.className = 'tip-bubble-title'
     this.body = document.createElement('span')
     this.body.className = 'tip-bubble-body'
-    this.bubble.append(this.label, this.body)
+    this.head.append(this.label, this.title)
+    this.bubble.append(this.head, this.body)
     scene.appendChild(this.bubble)
 
     scene.addEventListener('pointerover', this.onOver)
@@ -63,9 +70,18 @@ export class TooltipLayer {
     if (host !== this.anchor) {
       this.anchor = host
       const label = host.dataset.tipLabel ?? ''
+      const lines = text.split('\n')
+      const explicitTitle = host.dataset.tipTitle ?? ''
+      const title = explicitTitle || (lines.length > 1 ? lines.shift()!.trim() : '')
+      const body = explicitTitle ? text : lines.join('\n').trim()
       this.label.textContent = label
       this.label.hidden = !label
-      this.body.textContent = text
+      this.title.textContent = title
+      this.title.hidden = !title
+      this.head.hidden = !label && !title
+      this.body.textContent = body
+      this.bubble.classList.toggle('has-title', !!title)
+      this.bubble.dataset.kind = host.dataset.tipKind ?? ''
       this.bubble.dataset.place = host.dataset.tipPlace === 'above' ? 'above' : 'below'
       this.bubble.classList.add('show')
     }
@@ -111,11 +127,18 @@ export class TooltipLayer {
 
     const w = this.bubble.offsetWidth
     const h = this.bubble.offsetHeight
-    const above = this.bubble.dataset.place === 'above'
+    let above = this.bubble.dataset.place === 'above'
     let y = above ? anchorTop - h - GAP : anchorBottom + GAP
     // 자리가 모자라면 반대쪽으로 넘긴다 — 잘려 못 읽는 것보다 낫다.
-    if (y < EDGE_PAD) y = anchorBottom + GAP
-    if (y + h > stageH - EDGE_PAD) y = anchorTop - h - GAP
+    if (y < EDGE_PAD) {
+      y = anchorBottom + GAP
+      above = false
+    }
+    if (y + h > stageH - EDGE_PAD) {
+      y = anchorTop - h - GAP
+      above = true
+    }
+    this.bubble.dataset.actualPlace = above ? 'above' : 'below'
     const x = Math.min(Math.max(centerX - w / 2, EDGE_PAD), Math.max(EDGE_PAD, stageW - EDGE_PAD - w))
 
     // 매 프레임 같은 값을 다시 써 넣으면 레이아웃이 계속 무효화된다 — 바뀔 때만 쓴다.

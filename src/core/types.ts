@@ -304,6 +304,8 @@ export interface EnemyDef {
     repeatOnceChance?: number
     /** 피해 없이 다음 공격을 준비할 때 화면에 띄우는 예고 문구. */
     telegraphText?: string
+    /** 이 기술만 플레이어 방어를 소모하지 않고 체력에 직접 피해를 준다. */
+    pierceGuard?: boolean
     /** 예고된 최대 피해 이상을 방어했을 때 전량 소모하고 체력 피해를 0으로 만든다. */
     shatterGuard?: boolean
     /** 실제 체력 피해 중 적이 회복하는 비율. */

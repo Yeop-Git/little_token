@@ -75,11 +75,15 @@ export const ENEMIES: Record<string, EnemyDef> = {
     // 다리 하나가 곧 체력 한 막이다. 막당 체력이 낮으면 문장 하나가 다리 둘을
     // 한꺼번에 끊어 기쁨·분노·슬픔·즐거움 약점이 드러나기도 전에 사라진다.
     //
-    // 거미줄은 방패 위를 타고 넘어 몸을 감는다(pierceGuard). 방어로 버티는 길을
-    // 막아야 "지금 드러난 약점을 읽어 다리를 끊는다"가 유일한 활로가 된다.
-    // 대신 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
+    // 거미줄 조이기만 방패 위를 타고 넘어 몸을 감는다. 다음 앞다리 휘두르기는
+    // 방어로 막을 수 있어, 약점 공략을 재촉하면서도 방어 빌드 전체를 지우지 않는다.
+    // 거미줄 한 방은 최대 체력의 1/5로 묶여 있어 즉사가 아니라 조여드는 압박이다.
     hp: 74, atk: 12, every: 2, initiative: 'first',
-    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, pierceGuard: true, weakEmotion: null,
+    sprite: 'boss_elder_spider', guard: 12, magicShield: 1, weakEmotion: null,
+    attackPattern: [
+      { name: '거미줄 조이기', bonusAtk: 0, animationStage: 1, pierceGuard: true },
+      { name: '앞다리 휘두르기', bonusAtk: 0, animationStage: 2 },
+    ],
     parts: [
       { id: 'leg-joy', name: '첫째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'joy', label: '기쁨' } },
       { id: 'leg-anger', name: '둘째 다리', kind: 'leg', weakness: { kind: 'emotion', value: 'anger', label: '분노' } },
@@ -88,7 +92,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄은 방어막을 넘어 몸에 직접 감기므로 막아서 버틸 수 없고, 대신 한 번의 피해가 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×1.5와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
+    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄 조이기는 방어막을 넘어 몸에 직접 감기지만 다음 앞다리 휘두르기는 방어로 막을 수 있다. 거미줄 피해는 한 번에 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×1.5와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',

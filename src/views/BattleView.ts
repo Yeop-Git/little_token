@@ -84,7 +84,7 @@ import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
 import { BOSS_BY_FLOOR, stageFor, type Stage } from '@data/stages'
 import { DISPLAY_FLOORS } from '@/config/edition'
 import { CARD_HAND_CONFIG, CardHand, type DebugCardSpawnResult } from '@/ui/CardHand'
-import { wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
+import { wordCardFrontHtml, wordKeywordDetailsHtml, wordMood } from '@/ui/WordCardFace'
 import { GameAudio } from '@/audio/GameAudio'
 import { inkMeterHtml, updateInkMeter } from '@/ui/InkMeter'
 import { IntroDialogue } from '@views/IntroDialogue'
@@ -1860,7 +1860,7 @@ export class BattleView {
     }
     if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
     if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
-    if (e.def.pierceGuard) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
+    if (e.def.pierceGuard || e.def.attackPattern?.some((step) => step.pierceGuard)) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
     if (summonPattern) add(
       `summon${summons >= (summonPattern.releaseAt ?? Infinity) ? ' ready' : ''}`,
       icon('jar'),
@@ -2513,9 +2513,10 @@ export class BattleView {
       <div class="wd-body">
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
-        ${this.projectionHtml(w, key)}
-        <div class="wd-values"><div class="v flat">잉크 ${wordInkCost(w)}</div>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
-        ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
+         ${this.projectionHtml(w, key)}
+         <div class="wd-values"><div class="v flat">잉크 ${wordInkCost(w)}</div>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+         ${wordKeywordDetailsHtml(w)}
+         ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
       </div>
       ${sealed ? `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>` : ''}`

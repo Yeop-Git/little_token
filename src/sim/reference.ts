@@ -899,9 +899,9 @@ export function enemyAttackDamageForRoll(
       * BOSS_ATTACK_MULTIPLIER[attackStage]
       * (attackStep?.damageScale ?? 1),
   )
-  // 거미줄은 방어 위를 타고 넘는 대신 한 번에 최대 체력의 1/5까지만 조인다.
+  // 방어 위를 타고 넘는 거미줄 기술만 한 번에 최대 체력의 1/5까지 조인다.
   const webShowCap = Math.max(1, Math.round(state.playerMax * .2))
-  const pressureBase = enemy.def.webPattern ? Math.min(uncappedRaw, webShowCap) : uncappedRaw
+  const pressureBase = enemy.def.webPattern && attackStep?.pierceGuard ? Math.min(uncappedRaw, webShowCap) : uncappedRaw
   const damage = Math.round(pressureBase * bossTurnPressureMultiplier(enemy, state.turn))
   return Math.max(0, damage)
 }
@@ -931,12 +931,13 @@ export function enemyAttackDefense(
   const summonPattern = enemy.def.summonPattern
   const escorts = summonCount(enemy)
   const summonsReleased = summonPattern?.releaseAt != null && escorts >= summonPattern.releaseAt ? escorts : 0
-  const piercedGuard = !!enemy.def.pierceGuard
+  const attackStep = nextEnemyAttackStep(enemy)
+  const piercedGuard = !!attackStep?.pierceGuard
+    || !!enemy.def.pierceGuard
     || summonsReleased > 0
     || (!!summonPattern?.pierceWhileEscorted && escorts > 0)
   const magicShieldBlocked = (state.playerMagicShield ?? 0) > 0
   const immune = !!state.damageImmune || magicShieldBlocked
-  const attackStep = nextEnemyAttackStep(enemy)
   const guardRequired = enemyGuardBreakRequirement(enemy, state.turn)
   const guardShattered = !immune && !!attackStep?.shatterGuard && state.guard >= guardRequired
   const absorbed = immune ? 0 : guardShattered ? state.guard : piercedGuard ? 0 : Math.min(state.guard, raw)

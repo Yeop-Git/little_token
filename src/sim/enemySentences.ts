@@ -180,15 +180,21 @@ function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string
   const weakness = active?.def.weakness
   const webMax = enemy.def.webPattern?.maxSealedCards ?? 0
   const web = spiderWebTension(enemy)
+  const step = nextEnemyAttackStep(enemy)
+  const pierces = !!step?.pierceGuard || !!enemy.def.pierceGuard
   return {
     key: `spider-${active?.def.id ?? 'done'}-${web}-${enemy.nextAttackTurn}-${eventText ?? ''}`,
     label: tx('nextBossSentence'),
     tone: state.turn >= enemy.nextAttackTurn ? 'danger' : web >= webMax ? 'warn' : 'calm',
-    tokens: tokens(['subject', tx('spiderSubject')], ['modifier', tx('beyondGuard')], ['verb', tx('tightenWeb')]),
+    tokens: tokens(
+      ['subject', tx('spiderSubject')],
+      ['modifier', tx(pierces ? 'beyondGuard' : 'fromFront')],
+      ['verb', pierces ? tx('tightenWeb') : step?.name ?? tx('tightenWeb')],
+    ),
     meta: [
       timingText(state, enemy),
       damageMeta(state, enemy),
-      tx('guardPierce'),
+      ...(pierces ? [tx('guardPierce')] : []),
       tx('sealCount', { current: web, max: webMax }),
       ...(weakness ? [tx('currentWeakness', { weakness: weakness.label }), tx('weaknessAction'), tx('weaknessComboPierce')] : [tx('bodyNoWeakness')]),
     ],

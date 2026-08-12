@@ -112,6 +112,8 @@ interface ActionStats {
   wide: number
   guardEngine: number
   healEngine: number
+  guardEngineDamage: number
+  healEngineDamage: number
   telegraphs: number
   groggies: number
   groggyBonusDamage: number
@@ -127,6 +129,8 @@ const emptyActions = (): ActionStats => ({
   wide: 0,
   guardEngine: 0,
   healEngine: 0,
+  guardEngineDamage: 0,
+  healEngineDamage: 0,
   telegraphs: 0,
   groggies: 0,
   groggyBonusDamage: 0,
@@ -636,7 +640,7 @@ function fightStage(
     }
 
     const modifierIndex = tables.template.slots.findIndex((slot) => slot.key === 'adv')
-    const engineId = focus === 'guard' ? 'deulsseogimyeo' : focus === 'heal' ? 'pogeunhage' : null
+    const engineId = focus === 'guard' ? 'deulsseogimyeo' : focus === 'heal' ? 'sinnage' : null
     const engineReady = focus === 'guard'
       ? state.guard >= state.playerMax * 0.25
       : focus === 'heal' && state.playerHp >= state.playerMax * 0.8
@@ -683,7 +687,8 @@ function fightStage(
     const bestGuardEngine = hand
       .filter((candidate) => candidate.intent.guardAttackMultiplier > 0)
       .sort((a, b) => candidateDamage(b, state) - candidateDamage(a, state))[0]
-    const guardIgnored = !!boss.def.pierceGuard
+    const guardIgnored = !!nextEnemyAttackStep(boss)?.pierceGuard
+      || !!boss.def.pierceGuard
       || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
     let pick = skill === 'greedy'
       ? randomSequentialPick(hand, tables.template.slots.map((slot) => slot.key), rng)
@@ -728,7 +733,8 @@ function fightStage(
       const telegraphed = !!step && step.damageScale === 0
       const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
       const willBeHit = turn >= boss.nextAttackTurn
-      const incomingPierce = !!boss.def.pierceGuard
+      const incomingPierce = !!nextEnemyAttackStep(boss)?.pierceGuard
+        || !!boss.def.pierceGuard
         || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
       const threat = boss.def.atk * boss.atkMult * (incoming ? 1.2 : 1)
       const workerClear = (c: Candidate) => {
@@ -819,9 +825,12 @@ function fightStage(
         : 1
       const result = applyIntent(state, intent, scale, target)
       const hitDamage = result.hits.reduce((sum, hit) => sum + hit.dmg, 0)
-      actions.damage += hitDamage
+      const dealt = hitDamage
         + result.summonDamage
         + result.summonBacklashDamage
+      actions.damage += dealt
+      if (intent.guardAttackMultiplier > 0) actions.guardEngineDamage += dealt
+      if (intent.overhealDamageMultiplier > 0) actions.healEngineDamage += dealt
       if (groggyMult > 1) actions.groggyBonusDamage += Math.max(0, hitDamage - Math.round(hitDamage / groggyMult))
       let kills = result.killed.length
       let overflow = result.overflow
@@ -835,6 +844,8 @@ function fightStage(
         })
         if (transfer.killed) kills++
         actions.damage += transfer.dealt
+        if (intent.guardAttackMultiplier > 0) actions.guardEngineDamage += transfer.dealt
+        if (intent.overhealDamageMultiplier > 0) actions.healEngineDamage += transfer.dealt
         overflow = transfer.overflow
         if (!transfer.killed) break
       }
@@ -914,6 +925,7 @@ interface RunResult {
   finalStats: PlayerStats
   log: string[]
   actions: ActionStats
+  engineAcquireFloor: { guard: number | null; heal: number | null }
   /** 사망 또는 15층 종료 시점의 영감 잔액 — 보상 경제가 쌓이기만 하는지 확인한다. */
   finalInspiration: number
 }
@@ -929,6 +941,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
     const hpTrace: RunResult['hpTrace'] = []
     const log: string[] = []
     const actions = emptyActions()
+    const engineAcquireFloor: RunResult['engineAcquireFloor'] = { guard: null, heal: null }
     for (let day = 1; day <= STORY_FLOORS; day++) {
       const hpBefore = Math.min(carried.hp, player.stats.hp)
       const result = fightStage(player, day, carried, combat, focus, locale, rng, verbose ? log : null)
@@ -946,14 +959,17 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
         log.push(`  ${String(day).padStart(2)}층 ${result.won ? '승' : '패'} · ${result.turns}턴 · HP ${hpBefore}→${result.hp}/${result.maxHp}`)
       }
       if (!result.won) {
-        return { reachedFloor: day - 1, diedOn: day, killedBy: result.killedBy, hpTrace, finalStats: { ...player.stats }, log, actions, finalInspiration: wallet.inspiration }
+        return { reachedFloor: day - 1, diedOn: day, killedBy: result.killedBy, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
       }
       carried.hp = result.hp
       carried.guard = result.guard
       if (stageFor(day).isBoss) takeBossShop(player, result.grade, result.unusedDraws, day, reward, focus, rng, wallet)
       else takeRewards(player, result.grade, result.unusedDraws, day, reward, focus, locale, rng, wallet)
+      const ownedWords = Object.values(player.deck).flat()
+      if (engineAcquireFloor.guard === null && ownedWords.some((word) => (word.effects?.guardAttackMultiplier ?? 0) > 0)) engineAcquireFloor.guard = day
+      if (engineAcquireFloor.heal === null && ownedWords.some((word) => (word.effects?.overhealDamageMultiplier ?? 0) > 0)) engineAcquireFloor.heal = day
     }
-    return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions, finalInspiration: wallet.inspiration }
+    return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
   } finally {
     Math.random = realRandom
   }
@@ -1093,6 +1109,8 @@ interface BuildMetrics {
   actionRates: ActionStats
   damagePerSentence: number
   averageTurns: number
+  engineDamageShare: { guard: number; heal: number }
+  averageEngineAcquireFloor: { guard: number | null; heal: number | null }
   deathFloors: string
   averageStats: PlayerStats
 }
@@ -1123,6 +1141,8 @@ for (const focus of BUILD_FOCUSES) {
     wide: totals.wide / sentences,
     guardEngine: totals.guardEngine / sentences,
     healEngine: totals.healEngine / sentences,
+    guardEngineDamage: totals.guardEngineDamage / sentences,
+    healEngineDamage: totals.healEngineDamage / sentences,
     telegraphs: totals.telegraphs / sentences,
     groggies: totals.groggies / sentences,
     groggyBonusDamage: totals.groggyBonusDamage / sentences,
@@ -1138,6 +1158,15 @@ for (const focus of BUILD_FOCUSES) {
     damagePerSentence: totals.damage / sentences,
     averageTurns: runs.flatMap((run) => run.hpTrace).reduce((sum, trace) => sum + trace.turns, 0)
       / Math.max(1, runs.flatMap((run) => run.hpTrace).length),
+    engineDamageShare: {
+      guard: totals.guardEngineDamage / Math.max(1, totals.damage),
+      heal: totals.healEngineDamage / Math.max(1, totals.damage),
+    },
+    averageEngineAcquireFloor: (['guard', 'heal'] as const).reduce((floors, engine) => {
+      const acquired = runs.map((run) => run.engineAcquireFloor[engine]).filter((floor): floor is number => floor !== null)
+      floors[engine] = acquired.length ? acquired.reduce((sum, floor) => sum + floor, 0) / acquired.length : null
+      return floors
+    }, { guard: null, heal: null } as { guard: number | null; heal: number | null }),
     deathFloors: [...new Set(runs.map((run) => run.diedOn).filter((floor): floor is number => floor !== null))]
       .sort((a, b) => a - b)
       .map((floor) => `${floor}:${runs.filter((run) => run.diedOn === floor).length}`)
@@ -1163,6 +1192,11 @@ for (const focus of BUILD_FOCUSES) {
     + ` L${metric.averageStats.luck.toFixed(0)}`
     + ` | wide ${pct(actionRates.wide, 1)} guard-engine ${pct(actionRates.guardEngine, 1)}`
     + ` heal-engine ${pct(actionRates.healEngine, 1)}`,
+  )
+  const acquire = metric.averageEngineAcquireFloor
+  console.log(
+    `           engine damage guard ${pct(metric.engineDamageShare.guard, 1)} · heal ${pct(metric.engineDamageShare.heal, 1)}`
+    + ` | first acquired guard ${acquire.guard?.toFixed(1) ?? '-'}F · heal ${acquire.heal?.toFixed(1) ?? '-'}F`,
   )
   if (traceBuild === focus) {
     const sample = runs.find((run) => run.diedOn !== null) ?? runs[0]

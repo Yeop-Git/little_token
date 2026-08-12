@@ -6,7 +6,7 @@
  */
 
 import { INK_UI, SKILL_ART } from '@/assets'
-import { currentLocale, type LocaleCode } from '@/localization'
+import { currentLocale, t, type LocaleCode } from '@/localization'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, type Word } from '@core/types'
@@ -90,6 +90,30 @@ export function wordActionInline(word: Word): string {
   return `<span class="card-action-inline action-${actionKind}">${icon(actionGlyph(actionKind))}<b>${label}</b></span>`
 }
 
+const escapeCardText = (value: string) => value
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+export function wordKeywordChipsHtml(word: Word): string {
+  const keywords = wordKeywords(word)
+  return keywords.length
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" tabindex="0" role="definition" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-kind="keyword" data-tip-place="above" data-tooltip="${escapeCardText(keyword.detail)}">${keyword.label}</span>`).join('')}</span>`
+    : ''
+}
+
+export function wordKeywordDetailsHtml(word: Word): string {
+  const keywords = wordKeywords(word)
+  if (!keywords.length) return ''
+  const heading = t('wordKeywords', '키워드')
+  return `<section class="word-keyword-details" aria-label="${heading}">
+    <h3>${heading}</h3>
+    <div class="word-keyword-list">${keywords.map((keyword) => `
+      <div class="word-keyword-detail keyword-${keyword.id}">
+        <b>${keyword.label}</b>
+        <span>${keyword.detail}</span>
+      </div>`).join('')}</div>
+  </section>`
+}
+
 function wordCardNoteHtml(word: Word, note: string): string {
   const action = wordActionInline(word)
   const keywords = wordKeywords(word)
@@ -102,11 +126,7 @@ function wordCardNoteHtml(word: Word, note: string): string {
           ? `×${(1 + word.bonus).toFixed(2)}`
           : ''
     : wordCardDisplayNote(word, note)
-  const escape = (value: string) => value
-    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const keywordHtml = keywords.length
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" tabindex="0" role="definition" aria-label="${escape(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escape(`${keyword.label} — ${keyword.detail}`)}">${keyword.label}</span>`).join('')}</span>`
-    : ''
+  const keywordHtml = wordKeywordChipsHtml(word)
   return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
 }
 

@@ -7,6 +7,7 @@ import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
 import { isLentWord } from '@data/earlyWords'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
+import { t } from '@/localization'
 
 // 클릭한 카드가 화면 중앙으로 날아가 터진 뒤 문장에 적용되는 시간.
 const COMMIT_FLIGHT_MS = 480
@@ -156,6 +157,8 @@ export class CardHand {
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
   private inputEnabled = true
+  private lastPointerType = ''
+  private touchPreviewId: string | null = null
   private serial = 0
   private epoch = 0
   private conflictOf: ConflictResolver = () => null
@@ -177,8 +180,14 @@ export class CardHand {
     const button = this.cardButton(event.target)
     if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return
     button.classList.remove('pressing')
-    this.opts.onHoverEnd?.()
     const state = this.currentState()
+    const touchPreview = state?.hand.find((item) => item.instanceId === this.touchPreviewId)
+    if (touchPreview) {
+      this.opts.onHover?.(touchPreview.word)
+      this.opts.onPreview(touchPreview.word)
+      return
+    }
+    this.opts.onHoverEnd?.()
     const selected = state?.hand.find((item) => item.instanceId === this.selectedId)
     if (selected) this.opts.onPreview(selected.word)
     else this.opts.onPreviewEnd()
@@ -186,9 +195,23 @@ export class CardHand {
   private readonly onHandClick = (event: MouseEvent) => {
     const button = this.cardButton(event.target)
     const card = button ? this.cardFor(button) : undefined
-    if (button && card) this.commit(card, button)
+    if (!button || !card) return
+    const isTouch = this.lastPointerType === 'touch'
+    this.lastPointerType = ''
+    if (isTouch && this.touchPreviewId !== card.instanceId) {
+      this.touchPreviewId = card.instanceId
+      this.opts.onHover?.(card.word)
+      this.opts.onPreview(card.word)
+      this.opts.handRoot.querySelectorAll<HTMLButtonElement>('.word-card').forEach((candidate) => {
+        candidate.classList.toggle('touch-previewing', candidate === button)
+      })
+      return
+    }
+    this.touchPreviewId = null
+    this.commit(card, button)
   }
   private readonly onHandPointerDown = (event: PointerEvent) => {
+    this.lastPointerType = event.pointerType
     if (this.inputEnabled) this.cardButton(event.target)?.classList.add('pressing')
   }
   private readonly onHandPointerUp = (event: PointerEvent) => this.cardButton(event.target)?.classList.remove('pressing')
@@ -223,6 +246,7 @@ export class CardHand {
     this.states.clear()
     this.slotKey = ''
     this.selectedId = null
+    this.touchPreviewId = null
     this.drawingId = null
     this.processing = false
   }
@@ -296,6 +320,7 @@ export class CardHand {
       this.drawingId = null
       this.processing = false
       this.slotKey = slotKey
+      this.touchPreviewId = null
     }
     this.conflictOf = conflictOf
 
@@ -533,7 +558,7 @@ export class CardHand {
       // 풀에 들어가면, 다음에 빌려 쓸 때 그 애니메이션이 이어져 뒷면이 보이거나
       // 엉뚱한 자리에서 시작한다. CSS 애니메이션은 다시 붙을 때 처음부터 돈다.
       button.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
-      button.classList.remove('pressing', 'selected', 'drawing', 'sealed', 'blocked', 'web-catching')
+      button.classList.remove('pressing', 'selected', 'touch-previewing', 'drawing', 'sealed', 'blocked', 'web-catching')
       button.remove()
       const key = button.dataset.poolKey
       if (!key) return
@@ -557,11 +582,12 @@ export class CardHand {
       const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
       const selected = this.selectedId === card.instanceId
       const drawing = this.drawingId === card.instanceId
+      const touchPreviewing = this.touchPreviewId === card.instanceId
       const rarity = card.word.rarity ?? 'common'
       const emotionKey = emotionOrNeutral(card.word.emotion)
       // 빌려온 카드 표시는 앞면 안에 있고 카드 풀은 단어 id로 나뉘므로, 재사용할 때는
       // 클래스만 다시 붙이면 된다 — 표시가 다른 단어로 새어 갈 길이 없다.
-      button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}${isLentWord(card.word) ? ' lent' : ''}`
+      button.className = `word-card mood-${wordMood(card.word)} emotion-${emotionKey} rarity-${rarity}${selected ? ' selected' : ''}${touchPreviewing ? ' touch-previewing' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${drawing ? ' drawing' : ''}${isLentWord(card.word) ? ' lent' : ''}`
       button.dataset.instanceId = card.instanceId
       button.disabled = !this.inputEnabled || !!unavailable
       button.setAttribute('aria-label', unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : this.cardAriaLabel(card.word))
@@ -595,6 +621,7 @@ export class CardHand {
     const sealed = this.sealedWordIds.has(card.word.id)
     const unavailable = sealed ? '거미줄 봉인 · 이번 문장에는 선택할 수 없다' : blocked
     const selected = this.selectedId === card.instanceId
+    const touchPreviewing = this.touchPreviewId === card.instanceId
     const isDrawing = this.drawingId === card.instanceId
     const aria = unavailable ? `${card.word.text}, 선택 불가: ${unavailable}` : this.cardAriaLabel(card.word)
     const rarity = card.word.rarity ?? 'common'
@@ -608,12 +635,13 @@ export class CardHand {
       footer: sealed ? 'WEB SEALED' : blocked ? '맥락 충돌' : lent ? "TOKEN'S HINT" : 'WORD CARD',
       overlay: webOverlay + lentMarkHtml(lent),
     })
-    return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}${lent ? ' lent' : ''}"
+    return `<button class="word-card mood-${wordMood(card.word)} emotion-${emotion} rarity-${rarity}${selected ? ' selected' : ''}${touchPreviewing ? ' touch-previewing' : ''}${unavailable ? ' blocked' : ''}${sealed ? ' sealed' : ''}${isDrawing ? ' drawing' : ''}${lent ? ' lent' : ''}"
       data-instance-id="${card.instanceId}" aria-label="${aria}" aria-pressed="${selected}" ${!this.inputEnabled || unavailable ? 'disabled' : ''}
       style="--card-x:${line.translateX.toFixed(1)}px;--card-z:${line.zIndex};--selected-lift:${CARD_HAND_CONFIG.selectedLift}px;--selected-scale:${CARD_HAND_CONFIG.selectedScale}">
       <span class="card-lift"><span class="card-inner">
         <span class="card-face card-back" aria-hidden="true"><i></i><b>그림일기</b></span>
         ${front}
+        <span class="card-touch-confirm-hint" aria-hidden="true">${t('cardTapAgain', '한 번 더 눌러 선택')}</span>
       </span></span>
     </button>`
   }

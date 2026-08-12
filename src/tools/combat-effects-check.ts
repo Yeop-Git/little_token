@@ -278,7 +278,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const webBoss = makeEnemy(foe('web-pressure', {
     boss: true,
     atk: 100,
-    pierceGuard: true,
+    attackPattern: [{ name: '거미줄 조이기', bonusAtk: 0, pierceGuard: true }],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
   }))
   const s = state([webBoss])
@@ -447,7 +447,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   const plain = enemyTurn(s, () => 0, 'second')[0]
   assert(!plain.piercedGuard && plain.dealt === 0 && plain.absorbed === 10, 'a queen strike without a full escort ring is still blockable')
 }
-// 장로거미는 방패를 넘어 오지만 한 방이 최대 체력의 1/5을 넘지 않는다.
+// 장로거미는 거미줄 공격만 방패를 넘어 오고, 다음 앞다리 공격은 방어로 막힌다.
 {
   const stage = stageFor(15)
   // 본편 첫 장로거미는 밸런스 배율상 상한보다 약하므로, 상한 자체를 검증할 때는
@@ -457,6 +457,9 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   const r = enemyTurn(s, () => .999, 'first')[0]
   assert(r.piercedGuard && r.absorbed === 0 && s.guard === 400, 'spider web goes over the shield instead of consuming it')
   assert(r.dealt === 20 && s.playerHp === 80, 'a single spider strike is capped at a fifth of max hp')
+  s.turn = spider.nextAttackTurn
+  const plain = enemyTurn(s, () => .999, 'second')[0]
+  assert(!plain.piercedGuard && plain.dealt === 0 && plain.absorbed > 20 && s.guard < 400, 'spider foreleg sweep is blockable and consumes guard normally')
 }
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
@@ -796,7 +799,10 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
   const s = state([spider]); s.playerMax = 100
   const sentence = enemySentenceFor(s, spider, { eventText: '「힘껏」 카드를 실로 묶었다.' })!
   assert(sentence.manuscript?.length === 5 && sentence.manuscript[0].active && sentence.manuscript[0].emotion === 'joy', 'spider manuscript mirrors the active sequential weakness')
-  assert(sentence.eventText?.includes('힘껏') && sentence.meta.includes('방어 관통'), 'spider stolen word is written beside the persistent piercing intent')
+  assert(sentence.eventText?.includes('힘껏') && sentence.meta.includes('방어 관통'), 'spider stolen word is written beside the current piercing intent')
   assert(enemyDamageRange(s, spider)[1] === 20, 'spider sentence damage preview reads the same one-fifth hp cap as combat')
+  spider.attackPatternIndex = 1
+  const blockable = enemySentenceFor(s, spider)!
+  assert(!blockable.meta.includes('방어 관통') && blockable.tokens.some((token) => token.text === '앞다리 휘두르기'), 'spider sentence exposes the alternating blockable attack')
 }
 console.log('combat effects: ok')

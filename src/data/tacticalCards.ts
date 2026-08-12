@@ -21,9 +21,9 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     id: 'stored-resolve',
     enemyId: 'termite',
     rewardFloors: [2],
-    title: '버틴 힘',
-    tooltip: '방어 동사에 「들썩이며」를 붙이면 현재 방어도의 120%를 피해로 바꾼다. 방어도는 소모하지 않는다.',
-    cardIds: ['dandanhi'],
+    title: '방패치기',
+    tooltip: '2층 동사 보상의 「밀어냈다」는 새로 얻은 방어를 포함한 현재 방어도 100%를 피해로 바꾸고 방어도는 소모하지 않는다. 「꾹 참고」로 방어 성장을 시작할 수 있다.',
+    cardIds: ['kkuk'],
   },
   {
     id: 'pierce',

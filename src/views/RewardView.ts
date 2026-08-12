@@ -13,7 +13,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { wordActionInline, wordCardDisplayNote } from '@/ui/WordCardFace'
+import { wordActionInline, wordCardDisplayNote, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
@@ -30,6 +30,7 @@ import { availableCombos } from '@core/deckInsights'
 import { DISPLAY_FLOORS } from '@/config/edition'
 import { discoveredComboIds } from '@core/comboDiscovery'
 import { wordInkCost } from '@core/ink'
+import { TooltipLayer } from '@/ui/TooltipLayer'
 
 interface Opts {
   day: number
@@ -162,7 +163,18 @@ function mainEffect(opt: RewardOption): string {
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
   const word = opt.word!
   const action = wordActionInline(word)
+  const keywords = wordKeywordChipsHtml(word)
   const note = action ? wordCardDisplayNote(word) : wordNoteText(word)
+  if (keywords) {
+    const prefix = word.statMult != null
+      ? `×${word.statMult}`
+      : word.variance
+        ? wordCardDisplayNote(word, note).split(' · ')[0]
+        : word.bonus
+          ? `×${(1 + word.bonus).toFixed(2)}`
+          : ''
+    return `${action}${prefix ? `<span class="rp-effect-copy">${prefix}</span>` : ''}${keywords}`
+  }
   return action
     ? `${action}<span class="rp-effect-copy">${note}</span>`
     : note
@@ -244,6 +256,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${word.level ?? 1}` : ' · 새 단어'}</div>
     ${facts}
     <div class="wd-values">${values.map((value) => `<div class="v ${value.cls}">${value.text}</div>`).join('')}</div>
+    ${wordKeywordDetailsHtml(word)}
     ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}
     ${opt.reinforce ? reinforceDeltas(word) : ''}
     ${influenceNote(word)}`
@@ -290,11 +303,9 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
     : p.kind === 'item'
       ? text('rewardSelectedItem', '내 소품으로 결정!')
       : text('rewardSelectedNew', '내 단어장에 기록!')
-  const status = p.reinforce
-    ? `<span class="reward-state is-owned-word"><b>${text('rewardOwnedTag', '보유 중')}</b>${text('rewardReinforcePreview', '선택 시 강화 +{amount}', { amount: reinforcement })}</span>`
-    : `<span class="reward-state is-new-reward"><b>New!</b>${p.kind === 'item'
-      ? text('rewardNewItemHint', '새 소품 획득')
-      : text('rewardNewWordHint', '단어장에 새로 등록')}</span>`
+  const sticker = p.reinforce
+    ? text('rewardReinforceSticker', '+{amount} 강화', { amount: 1 })
+    : 'New!'
   return `
     <div class="reward-choice">
       <div class="reward-pick ${mood}${emotion} rarity-${p.rarity} ${rewardKind} ${nameSize}" data-i="${i}" data-price="${price}" role="button" tabindex="0" aria-label="${cardLabel}">
@@ -302,12 +313,14 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
         <span class="rp-tint" aria-hidden="true"></span>
         <span class="rp-veil" aria-hidden="true"></span>
         <span class="rp-foil" aria-hidden="true"></span>
+        <span class="reward-card-sticker ${p.reinforce ? 'is-reinforce' : 'is-new'}" aria-hidden="true">${sticker}</span>
         <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
         ${rewardWordMeta(p)}
         <span class="rp-unavailable" aria-hidden="true">
           <b>${text('rewardUnavailable', '구매 불가')}</b>
           <small>${text('rewardInsufficient', '영감 부족')}</small>
         </span>
+        <span class="reward-touch-confirm-hint" aria-hidden="true">${text('cardTapAgain', '한 번 더 눌러 선택')}</span>
         <div class="rp-foot">
           <div class="rp-name">${p.name}</div>
           <div class="rp-effect">${mainEffect(p)}</div>
@@ -317,8 +330,8 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
         </div>
       </div>
       <div class="reward-kindline">
+        <span class="reward-rarity-label rarity-${p.rarity}"><i aria-hidden="true">◆</i>${RARITY_LABEL[p.rarity]}</span>
         <span class="reward-type-label">${typeLabel(p)}</span>
-        ${status}
         ${shop ? `<span class="reward-kind-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>` : ''}
       </div>
     </div>`
@@ -328,6 +341,9 @@ export class RewardView {
   private root: HTMLElement
   private opts: Opts
   private locked = false
+  private tooltips: TooltipLayer | null = null
+  private lastPointerType = ''
+  private touchPreviewIndex: number | null = null
 
   constructor(root: HTMLElement, opts: Opts) {
     this.root = root
@@ -368,7 +384,7 @@ export class RewardView {
             </div>
           </div>
           <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
-            <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 효과·확률·영향 스탯이 여기 표시된다.')}</div>
+            <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 효과·키워드·상세 규칙이 여기 표시된다.')}</div>
           </aside>
         </div>
       </div>`
@@ -381,15 +397,31 @@ export class RewardView {
       if (price > opts.inspiration) {
         el.classList.add('is-unaffordable')
       }
+      el.addEventListener('pointerdown', (event) => {
+        this.lastPointerType = event.pointerType
+      })
       el.addEventListener('mouseenter', () => this.showDetail(option, el))
       el.addEventListener('focus', () => this.showDetail(option, el))
-      el.addEventListener('click', () => this.take(el, option))
+      el.addEventListener('click', () => {
+        const isTouch = this.lastPointerType === 'touch'
+        this.lastPointerType = ''
+        if (isTouch && this.touchPreviewIndex !== i) {
+          this.touchPreviewIndex = i
+          this.showDetail(option, el)
+          this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
+            pick.classList.toggle('touch-previewing', pick === el)
+          })
+          return
+        }
+        this.take(el, option)
+      })
       el.addEventListener('keydown', (event) => {
         if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return
         event.preventDefault()
         this.take(el, option)
       })
     })
+    this.tooltips = new TooltipLayer(this.root.querySelector<HTMLElement>('.reward-scene')!)
     this.root.querySelector<HTMLButtonElement>('.reward-skip')?.addEventListener('click', (event) => {
       event.stopPropagation()
       this.skip()
@@ -560,5 +592,8 @@ export class RewardView {
     if (deck) deck.disabled = true
   }
 
-  destroy() {}
+  destroy() {
+    this.tooltips?.destroy()
+    this.tooltips = null
+  }
 }

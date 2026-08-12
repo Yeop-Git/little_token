@@ -64,6 +64,15 @@ const TACTICAL_TEXT: Record<ForeignLocale, Array<TextPair>> = {
   'zh-Hant':[['積蓄之力','為防禦動詞加上「躍動著」，可將目前防禦的120%化為傷害且不消耗防禦。'],['貫通修飾語','為攻擊動詞加上「全力」或「孤注一擲」等貫通修飾語，直接攻擊生命。'],['重複修飾語','「瘋狂地」會讓動詞發動兩次，快速剝除魔法盾。'],['魔法盾','蚊子的長針會繞過防禦；「強忍著」提供的魔法盾可完整抵擋一次攻擊。'],['反擊防禦','為防禦動詞加上反擊修飾語，擋住螳螂強攻即可令其露出破綻。'],['範圍修飾語或憤怒集中','用「笑著」「粗暴地」「興奮地」清理工蜂，或以憤怒單體攻擊逐隻擊破。'],['重複與貫通修飾語','先以「瘋狂地」剝除長老蜘蛛的魔法盾，再用貫通修飾語越過防禦並匹配腿部弱點。'],['疊盾精英','用「瘋狂地」重複發動動詞，剝除額外魔法盾。'],['汲取精英','「強忍著」的魔法盾可完整擋下一擊並阻止敵方恢復。'],['狂襲精英','在重擊前用壓低攻勢的修飾語削弱衝鋒。']],
 }
 
+/** 2층에서 실제로 함께 보장되는 방어 수식어와 방패치기 동사를 설명한다. */
+const SHIELD_BASH_TACTICAL_TEXT: Record<ForeignLocale, TextPair> = {
+  en:['Shield Bash','The floor-2 verb Shoved converts 100% of current Guard, including newly gained Guard, into damage without spending it. Holding It In starts Guard growth.'],
+  ja:['シールドバッシュ','2階の動詞報酬「押し返した」は、新たに得た分を含む現在の防御100%を消費せずダメージに変える。「ぐっと堪えて」で防御成長を始められる。'],
+  ru:['Удар щитом','Глагол 2-го этажа «Оттолкнул» наносит урон в размере 100% текущей Защиты, включая только что полученную, не расходуя её. «Стиснув зубы» начинает рост Защиты.'],
+  'zh-Hans':['盾击','第2层动词奖励“推了回去”会将包含本句新增值在内的当前防御100%化为伤害，且不消耗防御。“强忍着”可开启防御成长。'],
+  'zh-Hant':['盾擊','第2層動詞獎勵「推了回去」會將包含本句新增值在內的目前防禦100%化為傷害，且不消耗防禦。「強忍著」可開啟防禦成長。'],
+}
+
 const ELITE_TEXT: Record<ForeignLocale, {
   rarity: [string, string, string]
   traits: Array<[string, string, ...string[]]>
@@ -98,10 +107,15 @@ export function applyDetailedContentLocalization(locale: ForeignLocale): void {
     const [label, note, ...attacks] = eliteText.traits[index]
     Object.assign(ELITE_ENEMY_TEXT.trait[trait], { label, note, attacks })
   })
-  const attackText: Record<ForeignLocale, Array<[string,string]>> = {
-    en:[['Heavy-attack stance','Great scythe slam']], ja:[['強攻撃の構え','大鎌振り下ろし']], ru:[['Стойка мощной атаки','Удар большой косой']], 'zh-Hans':[['强攻姿态','巨镰下劈']], 'zh-Hant':[['強攻姿態','巨鐮下劈']],
+  const attackText: Record<ForeignLocale, { mantis: string[], spider: string[] }> = {
+    en:{ mantis:['Heavy-attack stance','Great scythe slam','Sweeping slash'], spider:['Web tightening','Foreleg sweep'] },
+    ja:{ mantis:['強攻撃の構え','大鎌振り下ろし','横薙ぎ'], spider:['蜘蛛の糸締め','前脚振り'] },
+    ru:{ mantis:['Стойка мощной атаки','Удар большой косой','Размашистый удар'], spider:['Затягивание паутины','Удар передней лапой'] },
+    'zh-Hans':{ mantis:['强攻姿态','巨镰下劈','横扫'], spider:['收紧蛛网','前腿横扫'] },
+    'zh-Hant':{ mantis:['強攻姿態','巨鐮下劈','橫掃'], spider:['收緊蛛網','前腿橫掃'] },
   }
-  ENEMIES.mantis.attackPattern?.forEach((step, index) => { step.name = attackText[locale][0][index] })
+  ENEMIES.mantis.attackPattern?.forEach((step, index) => { step.name = attackText[locale].mantis[index] })
+  ENEMIES.elderSpider.attackPattern?.forEach((step, index) => { step.name = attackText[locale].spider[index] })
   if (ENEMIES.mantis.attackPattern?.[0]) ENEMIES.mantis.attackPattern[0].telegraphText = locale === 'en' ? 'Raises the great scythe to prepare the next attack!' : locale === 'ja' ? '大鎌を高く掲げて次の攻撃を準備する！' : locale === 'ru' ? 'Поднимает большую косу и готовит следующую атаку!' : locale === 'zh-Hans' ? '高举巨镰，准备下一次攻击！' : '高舉巨鐮，準備下一次攻擊！'
   if (ENEMIES.queenBee.summonPattern) ENEMIES.queenBee.summonPattern.name = CHARACTER_VISUALS.workerBee.name
   const partNames: Record<ForeignLocale, string[]> = { en:['First leg','Second leg','Third leg','Fourth leg','Body'], ja:['一番目の脚','二番目の脚','三番目の脚','四番目の脚','本体'], ru:['Первая нога','Вторая нога','Третья нога','Четвёртая нога','Тело'], 'zh-Hans':['第一条腿','第二条腿','第三条腿','第四条腿','本体'], 'zh-Hant':['第一條腿','第二條腿','第三條腿','第四條腿','本體'] }
@@ -130,6 +144,8 @@ export function applyDetailedContentLocalization(locale: ForeignLocale): void {
     const [key, value] = Object.entries(word.mods)[0]
     word.note = `${STAT_LABEL[key as keyof typeof STAT_LABEL]} +${value}`
   }
-  TACTICAL_CARD_GUIDES.forEach((guide, index) => { [guide.title, guide.tooltip] = TACTICAL_TEXT[locale][index] })
+  TACTICAL_CARD_GUIDES.forEach((guide, index) => {
+    ;[guide.title, guide.tooltip] = index === 0 ? SHIELD_BASH_TACTICAL_TEXT[locale] : TACTICAL_TEXT[locale][index]
+  })
   for (const item of Object.values(ALL_ITEMS)) item.flavor = GENERIC_ITEM_FLAVOR[locale]
 }
