@@ -17,6 +17,7 @@ import rewardItem from './ui/reward_item.webp'
 import rewardVerb from './ui/reward_verb.webp'
 import rewardClear from './ui/reward_clear.webp'
 import rewardRefresh from './ui/reward_refresh.svg'
+import shopExit from './ui/shop_exit.webp'
 import rewardShop from './illustrations/token-shop-chest.webp'
 import inkBottle from './ui/ink_bottle.webp'
 import inkBarFrame from './ui/ink_bar_frame.webp'
@@ -222,6 +223,7 @@ export const REWARD_ART = {
   verb: rewardVerb,
   clear: rewardClear,
   refresh: rewardRefresh,
+  exit: shopExit,
   shop: rewardShop,
 }
 

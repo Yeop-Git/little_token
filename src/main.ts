@@ -794,7 +794,9 @@ async function goInspirationShop(
       }
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
-        if (result.kind === 'needs-discard') goDiscard(opt.word, result.candidates, finishPurchase)
+        if (result.kind === 'needs-discard') {
+          goDiscard(opt.word, result.candidates, finishPurchase, () => goInspirationShop(grade, false))
+        }
         else finishPurchase()
       } else if (opt.item) {
         goItem(opt.item, grade, undefined, rewardPickRef(opt), cost, () => {
@@ -857,7 +859,7 @@ async function finishReward() {
 }
 
 /** 교체를 마친 뒤 어디로 돌아갈지는 부르는 쪽이 정한다 — 보상 흐름과 치트가 같은 화면을 쓴다. */
-function goDiscard(incoming: Word, candidates: Word[], onDone: () => void) {
+function goDiscard(incoming: Word, candidates: Word[], onDone: () => void, onDiscardIncoming = onDone) {
   battleRequest++
   reset()
   stage.setAttribute('data-theme', 'day')
@@ -869,6 +871,7 @@ function goDiscard(incoming: Word, candidates: Word[], onDone: () => void) {
       if (result.kind === 'needs-discard') return
       onDone()
     },
+    onDiscardIncoming,
   })
 }
 
@@ -916,10 +919,15 @@ async function goReward(
       if (opt.kind === 'word' && opt.word) {
         const result = registerWord(run.player, opt.word)
         if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, () => {
-            spendInspiration(run, cost)
-            advanceReward(grade, phase, pick)
-          })
+          goDiscard(
+            opt.word,
+            result.candidates,
+            () => {
+              spendInspiration(run, cost)
+              advanceReward(grade, phase, pick)
+            },
+            () => advanceReward(grade, phase),
+          )
         } else {
           spendInspiration(run, cost)
           advanceReward(grade, phase, pick)

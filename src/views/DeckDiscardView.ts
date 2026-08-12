@@ -1,54 +1,39 @@
-import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
-import { BACKGROUNDS, SKILL_ART, TOKEN_FACES } from '@/assets'
-import { wordNoteText, wordValueLines } from '@core/wordText'
-import { emotionIconBadge } from '@/ui/EmotionBadge'
+import { emotionOrNeutral, type Word } from '@core/types'
+import { BACKGROUNDS, TOKEN_FACES } from '@/assets'
+import { wordNoteText } from '@core/wordText'
+import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 
 interface Opts {
   incoming: Word
   candidates: Word[]
   onDiscard: (word: Word) => void
+  onDiscardIncoming: () => void
 }
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식어', verb: '동사' }
 
-function cardContents(word: Word, label: string, action: string): string {
-  const art = word.art ? SKILL_ART[word.art] : undefined
+function cardButton(word: Word, label: string, action: string, attrs: string, extraClass = '', showLabel = false): string {
   const rarity = word.rarity ?? 'common'
+  const emotion = emotionOrNeutral(word.emotion)
   return `
-    ${art ? `<img class="discard-art" src="${art}" alt="" />` : ''}
-    <span class="discard-veil" aria-hidden="true"></span>
-    <span class="discard-order">${label}</span>
-    <span class="discard-copy">
-      <span class="discard-meta">${emotionIconBadge(emotionOrNeutral(word.emotion), 'rp-emotion')} ${RARITY_LABEL[rarity]} · Lv.${word.level ?? 1}</span>
-      <strong>${word.text}</strong>
-      <span class="discard-effect">${wordValueLines(word).map((line) => line.text).join(' · ') || wordNoteText(word)}</span>
+    <button class="discard-choice word-card mood-${wordMood(word)} emotion-${emotion} rarity-${rarity}${extraClass ? ` ${extraClass}` : ''}"
+      type="button" ${attrs} aria-label="${label}, ${word.text}, ${action}"
+      style="--card-x:0px;--card-z:1">
+      ${showLabel ? `<span class="discard-order">${label}</span>` : ''}
+      ${wordCardInnerHtml(word, { note: wordNoteText(word) })}
       <span class="discard-action">${action}</span>
-    </span>`
-}
-
-function candidateHtml(word: Word, index: number): string {
-  const rarity = word.rarity ?? 'common'
-  return `
-    <button class="discard-pick discard-card-face rarity-${rarity}" type="button" data-i="${index}">
-      ${cardContents(word, `보유 카드 ${index + 1}`, '이 카드를 버리기')}
     </button>`
 }
 
-/**
- * 새로 들어올 카드는 미리보기다 — 고를 수 있는 자리가 아니다.
- * 예전에는 이 카드도 후보 버튼과 같은 `.discard-pick` 클래스를 써서 호버하면
- * 똑같이 떠올랐고, 아래의 클릭 핸들러도 같이 붙었다. 누르면 `data-i`가 없어
- * `candidates[NaN]`이 undefined로 나와 그 자리에서 예외가 났고 — 화면은 그대로,
- * 아무 일도 일어나지 않았다. 클래스를 나누고 포인터를 아예 안 받게 한다.
- */
+function candidateHtml(word: Word, index: number): string {
+  return cardButton(word, `보유 카드 ${index + 1}`, '이 카드를 버리기', `data-i="${index}"`, 'discard-pick')
+}
+
 function incomingHtml(word: Word): string {
-  const rarity = word.rarity ?? 'common'
   return `
     <aside class="discard-preview" aria-label="새로 들어올 카드">
       <div class="discard-preview-label">새로 들어올 카드</div>
-      <div class="discard-card-face discard-new-card rarity-${rarity}">
-        ${cardContents(word, '새 카드', '이 카드가 들어옵니다')}
-      </div>
+      ${cardButton(word, '새 카드', '새 카드를 버리기', 'data-discard-incoming="true"', 'discard-new-card', true)}
     </aside>`
 }
 
@@ -70,7 +55,7 @@ export class DeckDiscardView {
             <div class="t hand">한 장을 지우고 새 문장을 쓰자</div>
           </div>
           <div class="discard-incoming">
-            오른쪽의 새 카드 <b>「${opts.incoming.text}」</b>를 넣기 위해 현재 보유 카드 중 한 장을 골라 버린다.
+            새 카드 <b>「${opts.incoming.text}」</b>와 교체할 보유 카드 중 하나를 고르거나, 새 카드를 버린다.
           </div>
           <div class="discard-body">
             <div class="reward-grid discard-grid" tabindex="0" aria-label="버릴 보유 카드 목록">
@@ -93,6 +78,13 @@ export class DeckDiscardView {
         button.classList.add('is-chosen')
         window.setTimeout(() => opts.onDiscard(target), 180)
       })
+    })
+    this.root.querySelector<HTMLButtonElement>('[data-discard-incoming]')?.addEventListener('click', (event) => {
+      if (chosen) return
+      chosen = true
+      const button = event.currentTarget as HTMLButtonElement
+      button.classList.add('is-chosen')
+      window.setTimeout(opts.onDiscardIncoming, 180)
     })
   }
 

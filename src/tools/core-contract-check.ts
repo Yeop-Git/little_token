@@ -91,7 +91,7 @@ assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even be
 assert.equal(inkExceedsLimit(9, 6), true, 'more than two overdraw is not selectable')
 assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost != null), 'reward verbs expose Ink cost as part of their identity')
 const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word) => word.id === id)!)
-assert.equal(specialCost('magicVeil'), 6, 'high-ratio guard-to-heal conversion reaches the verb cost ceiling')
+assert.equal(specialCost('magicVeil'), 5, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('overflowingHeart'), 5, 'overheal-to-damage pays for its conversion coefficient')
 assert.equal(specialCost('stainedTomorrow'), 5, 'high-ratio lifesteal pays by its healing ratio')

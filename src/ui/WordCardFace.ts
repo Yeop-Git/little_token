@@ -83,6 +83,16 @@ export function wordCardDisplayNote(word: Word, note = wordNoteText(word)): stri
   return [compact, ...parts.slice(1)].filter(Boolean).join(' · ')
 }
 
+/** 카드 앞면의 주행동 수치. 키워드는 바로 아래 전용 칩에서 한 번만 보여 준다. */
+export function wordCardPrimaryNote(word: Word, note = wordNoteText(word)): string {
+  const keywords = wordKeywords(word)
+  if (!keywords.length) return wordCardDisplayNote(word, note)
+  if (word.statMult != null) return `×${word.statMult}`
+  if (word.variance) return wordCardDisplayNote(word, note).split(' · ')[0]
+  if (word.bonus) return `×${(1 + word.bonus).toFixed(2)}`
+  return ''
+}
+
 export function wordActionInline(word: Word): string {
   const actionKind = wordActionKind(word)
   if (!actionKind) return ''
@@ -116,16 +126,9 @@ export function wordKeywordDetailsHtml(word: Word): string {
 
 function wordCardNoteHtml(word: Word, note: string): string {
   const action = wordActionInline(word)
-  const keywords = wordKeywords(word)
-  const displayNote = keywords.length
-    ? word.statMult != null
-      ? `×${word.statMult}`
-      : word.variance
-        ? wordCardDisplayNote(word, note).split(' · ')[0]
-        : word.bonus
-          ? `×${(1 + word.bonus).toFixed(2)}`
-          : ''
-    : wordCardDisplayNote(word, note)
+  // 선택 불가 사유처럼 호출부가 갈아 끼운 문구는 그대로 보여 주고, 정상 카드만
+  // 주행동과 키워드를 분리한다. 키워드 이름을 요약 줄과 칩에 두 번 쓰지 않는다.
+  const displayNote = note === wordNoteText(word) ? wordCardPrimaryNote(word, note) : note
   const keywordHtml = wordKeywordChipsHtml(word)
   return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
 }

@@ -87,6 +87,7 @@ export const hasVerbTactic = (w: Word): boolean => {
     || w.tags.includes('preempt')
     || !!effects?.pierceGuard
     || (effects?.castCount ?? 1) > 1
+    || (effects?.magicShield ?? 0) > 0
     || (effects?.inkDiscount ?? 0) > 0
     || (effects?.attackRank ?? 0) !== 0
     || (effects?.guardRank ?? 0) !== 0

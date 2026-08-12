@@ -380,15 +380,20 @@ export class RewardView {
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i, shop)).join('')}
             </div>
-            <div class="reward-controls">
+            ${shop ? '' : `<div class="reward-controls">
               <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
-              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${shop ? text('shopRefresh', '상품 새로고침') : text('rewardRefresh', '다른 발상 떠올리기')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
-              <button class="reward-skip" type="button" title="${shop ? text('shopLeaveHint', '구매를 마치고 다음 스테이지로 간다.') : '이번 단계에서 아무것도 기록하지 않고 넘어갑니다'}">${shop ? text('shopLeave', '상점 나가기') : '그냥 넘어가기'}</button>
-            </div>
+              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
+              <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
+            </div>`}
           </div>
-          <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
-            <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 효과·키워드·상세 규칙이 여기 표시된다.')}</div>
-          </aside>
+          ${shop ? '<div class="reward-side">' : ''}
+            <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
+              <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 효과·키워드·상세 규칙이 여기 표시된다.')}</div>
+            </aside>
+            ${shop ? `<button class="reward-deck" type="button" style="min-height:48px">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
+            <button class="reward-refresh" type="button" style="min-height:48px;justify-content:center" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('shopRefresh', '상품 새로고침')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>` : ''}
+            ${shop ? `<button class="reward-skip" type="button" title="${text('shopLeaveHint', '구매를 마치고 다음 스테이지로 간다.')}"><img src="${REWARD_ART.exit}" alt="" aria-hidden="true" /><span>${text('shopLeave', '상점 나가기')}</span></button>` : ''}
+          ${shop ? '</div>' : ''}
         </div>
       </div>`
 

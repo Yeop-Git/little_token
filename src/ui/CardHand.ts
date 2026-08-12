@@ -1,7 +1,7 @@
 import { SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
-import { wordCardDisplayNote, wordCardFrontHtml, wordMood } from '@/ui/WordCardFace'
+import { wordCardFrontHtml, wordCardPrimaryNote, wordMood } from '@/ui/WordCardFace'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
@@ -597,7 +597,9 @@ export class CardHand {
       button.style.setProperty('--selected-lift', `${CARD_HAND_CONFIG.selectedLift}px`)
       button.style.setProperty('--selected-scale', String(CARD_HAND_CONFIG.selectedScale))
       const note = button.querySelector<HTMLElement>('.card-note-text')
-      if (note) note.textContent = unavailable ?? wordCardDisplayNote(card.word)
+      // 키워드는 아래 전용 칩이 맡는다. 카드 재사용 갱신에서도 전체 note를 다시 넣으면
+      // 같은 키워드가 요약 줄과 칩에 한 번씩 중복된다.
+      if (note) note.textContent = unavailable ?? wordCardPrimaryNote(card.word)
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
       if (emotionBadge) {
         emotionBadge.outerHTML = emotionIconBadge(emotionKey, 'card-emotion')
