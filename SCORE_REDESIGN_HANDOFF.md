@@ -11,7 +11,8 @@ git fetch origin claude/project-thread-68eo4a
 git checkout claude/project-thread-68eo4a
 npm ci
 npm run score:check   # 단위 검사 (CSV → 생성 → 검사)
-npm run score:sim     # 헤드리스 시뮬레이터 (구현 후)
+npm run score:sim -- --runs=40          # 봇 10종 런 시뮬레이션 (약 30초)
+npm run score:sim -- --curves --runs=40 # 감정 × 스테이지 형태 점수 곡선
 ```
 
 ## 파일 지도
@@ -25,6 +26,11 @@ npm run score:sim     # 헤드리스 시뮬레이터 (구현 후)
 | `src/score/scoring.ts` | 순수 점수 계산기. `validatePick`, `critInfo`, `scoreSentence`, `expectedScore` |
 | `src/score/stage.ts` | 층 계획(목표 = 적 수 × 체력 × 형태 배수), 스테이지 시작·문장 반영·클리어 돈 |
 | `src/tools/score-check.ts` | 단위 검사 (§4 예시 2.25, 5.625/4.0 포함) |
+| `src/score/hand.ts` | 손패. 칸마다 뽑을 더미·손패·버린 더미. §15 쉬는 카드, 흔들었다(새로 뽑기), 우연히 만난 나는(한 장 교체) |
+| `src/score/tryout.ts` | 써 보기(§11). 덱 전체의 표준 스테이지 첫·가운데·마지막 문장 최고 기댓값 평균. 상점 UI와 봇이 같이 쓴다 |
+| `src/score/shop.ts` | 상점 진열(헌책방 4·문방구 3+소품·필통 2, 보스 뒤 추가), 다음 날씨 대응 카드 보장, 재련(감탄·정도·평가 3/5), 스탯 적용 |
+| `src/tools/score-sim.ts` | 헤드리스 시뮬레이터. 봇 10종(tryout, mono-감정 5, mixer, items-only, no-items, random), 층별·형태별·카드·구매 통계, `--curves` |
+| `docs/score-redesign/SIM_RESULTS.md` | **첫 시뮬 결과와 다음 조정 후보** |
 
 ## 구현하며 정한 해석 (기획안에 수치·규칙이 없던 곳)
 
@@ -52,16 +58,30 @@ npm run score:sim     # 헤드리스 시뮬레이터 (구현 후)
 
 - [x] §14-1 데이터 CSV 원본과 생성기
 - [x] §14-2 순수함수 점수 계산기와 단위 검사
-- [ ] §14-3 헤드리스 시뮬레이터 (§15 보강 규칙: 쉬는 카드·새 물감 포함)
+- [x] §14-3 헤드리스 시뮬레이터 (§15 쉬는 카드·새 물감 포함). 첫 결과: `docs/score-redesign/SIM_RESULTS.md`
+- [ ] §14-3b 시뮬로 수치 맞추기 ← **다음 작업**
 - [ ] §14-4 화면(전투·상점·재련)
 - [ ] §14-5 6개 언어 번역과 `locale:check`
 - [ ] §13 AGENTS.md 갱신 (재기획을 본 규칙으로 승격할 때)
+
+## 다음 작업 (권장 순서)
+
+1. `docs/score-redesign/SIM_RESULTS.md`를 읽는다. 지금은 모든 봇이 5~6층에서 멈춘다(승률 0%).
+2. 경제부터 맞춘다: `src/score/data.ts`의 `CLEAR_MONEY_BASE`, `src/score/shop.ts`의 `WORD_PRICE`·`ITEM_PRICE`.
+   덱·유물이 실제로 자라는지 층별 표의 `덱`·`유물` 열로 확인한다.
+3. 그다음 `src/score/csv/floors.csv` 목표 곡선을 봇 성장에 맞춘다(층별 `점수/목표` 1.1~1.3 목표).
+4. 감정 균형: `--curves`에서 분노가 모든 형태 1위. `cards.csv` 파라미터로 조정한다.
+5. 계획 봇(2~3문장 앞을 봄)을 추가하면 슬픔 저축·예고 평가가 정확해진다.
+6. 수치가 잡히면 §14-4 화면. 전투 화면의 롤업은 `SentenceResult.steps`를 그대로 쓰면 된다.
 
 ## 아직 안 한 것
 
 - 유물 **겹주어·겹동사**(3차): 칸 수가 바뀌어 계산기에서 no-op. 각주·줄바꿈은 구현함.
 - **반복 구매 강화**(`DeckCard.level`): 필드만 있고 점수에 반영하지 않음.
-- 소울하트(지킴)·하트 거래·상점 가격 표는 시뮬레이터에서 단순화해 쓴다.
+- **하트 거래**(§10)와 **팔기·지우개**(§11)는 시뮬레이터에 없다.
+- 지킴(소울하트)은 조각 단위로만 처리한다(초과 문장 피해를 먼저 흡수).
+- 봇은 한 문장 앞만 본다(목표에 닿는 가장 싼 문장, 아니면 기회당 기댓값 최고 + 눈물 소량 가산).
+- 흩뜨렸다의 선택지, 「-ㄹ까」·「나도」 같은 문장 사이 효과를 봇이 계획적으로 쓰지 않는다.
 
 ## 버전과 태그
 
