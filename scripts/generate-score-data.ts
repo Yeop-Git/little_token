@@ -75,7 +75,7 @@ const cardOut = cards.map((r) => {
     id: r.id, slot: r.slot, emotion: r.emotion, name: r.name, grammar: r.grammar, cost,
     a: num(r.a, 'cards.csv', r.id, 'a'), b: num(r.b, 'cards.csv', r.id, 'b'),
     c: num(r.c, 'cards.csv', r.id, 'c'), d: num(r.d, 'cards.csv', r.id, 'd'),
-    start: r.start === '1', rule: r.rule, shines: r.shines,
+    start: r.start === '1', grow: r.grow, rule: r.rule, shines: r.shines,
   }
 })
 // §6: 슬롯 3 × 감정 5 × 5장.

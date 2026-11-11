@@ -28,6 +28,8 @@ export interface CardDef {
   c: number
   d: number
   start: boolean
+  /** 반복 구매 강화가 키우는 파라미터. 소문자는 값 전체, 대문자는 1을 넘는 부분(곱셈 배수)만 키운다. 빈 값은 강화 불가. */
+  grow: string
   rule: string
   shines: string
 }
@@ -122,7 +124,7 @@ export interface DeckCard {
   uid: number
   cardId: string
   sticker?: string
-  /** 반복 구매 강화 단계(0부터). 아직 점수에 반영하지 않는다(인계 노트 참고). */
+  /** 반복 구매 강화 단계(0~MAX_LEVEL). 단계마다 `CardDef.grow`의 파라미터가 LEVEL_STEP만큼 커진다. */
   level: number
 }
 
@@ -131,6 +133,10 @@ export interface SentencePick {
   subj: DeckCard
   adv?: DeckCard
   verb: DeckCard
+  /** 유물 「겹주어」가 여는 둘째 주어 칸(선택). */
+  subj2?: DeckCard
+  /** 유물 「겹동사」가 여는 둘째 동사 칸(선택). 칩만 절반으로 더한다. */
+  verb2?: DeckCard
 }
 
 /** 직전 문장들의 기록. 이월·예고·의문 같은 문장 사이 효과의 근거. */

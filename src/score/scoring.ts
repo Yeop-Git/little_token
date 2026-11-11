@@ -7,7 +7,7 @@
  * 유물 줄은 그 뒤 왼쪽에서 오른쪽으로 발동한다(§4-4).
  */
 import {
-  CRIT_BASE, CRIT_CAP, CRIT_MULT, NEW_PAINT_MULT, RESONANCE, card as cardDef, form as formDef,
+  CRIT_BASE, CRIT_CAP, CRIT_MULT, NEW_PAINT_MULT, RESONANCE, card as cardDef, form as formDef, leveled,
   relic as relicDef, sticker as stickerDef, weather as weatherDef,
 } from './data'
 import type {
@@ -39,27 +39,40 @@ interface Resolved {
   subjSticker?: StickerDef
   advSticker?: StickerDef
   verbSticker?: StickerDef
+  subj2?: CardDef
+  subj2Sticker?: StickerDef
+  verb2?: CardDef
 }
 
 function resolve(pick: SentencePick): Resolved {
   const st = (c?: DeckCard) => (c?.sticker ? stickerDef(c.sticker) : undefined)
+  const def = (c: DeckCard) => leveled(cardDef(c.cardId), c.level)
   return {
-    subj: cardDef(pick.subj.cardId),
-    adv: pick.adv ? cardDef(pick.adv.cardId) : undefined,
-    verb: cardDef(pick.verb.cardId),
+    subj: def(pick.subj),
+    adv: pick.adv ? def(pick.adv) : undefined,
+    verb: def(pick.verb),
     subjSticker: st(pick.subj),
     advSticker: st(pick.adv),
     verbSticker: st(pick.verb),
+    subj2: pick.subj2 ? def(pick.subj2) : undefined,
+    subj2Sticker: st(pick.subj2),
+    verb2: pick.verb2 ? def(pick.verb2) : undefined,
   }
 }
 
-const isUri = (c: CardDef) => c.grammar === '우리'
+const isUriCard = (c?: CardDef) => c?.grammar === '우리'
+const subjects = (r: Resolved): CardDef[] => (r.subj2 ? [r.subj, r.subj2] : [r.subj])
+const hasSubj = (r: Resolved, id: string) => r.subj.id === id || r.subj2?.id === id
+const subjDef = (r: Resolved, id: string) => subjects(r).find((c) => c.id === id)
+const isUri = (r: Resolved) => subjects(r).some(isUriCard)
 const RESTRICTION_ORDER = ['rain', 'heat', 'gust', 'hail', 'drowsy', 'fog', 'calm', 'eclipse', 'blackout']
 
-/** 칸 순서대로의 실효 감정. 뒤섞어는 주어와 동사의 감정을 바꾼다. */
+/** 칸 순서대로의 실효 감정(주어, 수식어, 동사, 그 뒤 겹주어·겹동사). 뒤섞어는 주어와 동사의 감정을 바꾼다. */
 function slotEmotions(r: Resolved): (ScoreEmotion | undefined)[] {
   const out: (ScoreEmotion | undefined)[] = [r.subj.emotion, r.adv?.emotion, r.verb.emotion]
   if (r.adv?.id === 'dwiseok') [out[0], out[2]] = [out[2], out[0]]
+  if (r.subj2) out.push(r.subj2.emotion)
+  if (r.verb2) out.push(r.verb2.emotion)
   return out
 }
 
@@ -68,7 +81,8 @@ const distinct = (es: (ScoreEmotion | undefined)[]) => [...new Set(es.filter((e)
 /** 제약 무시 수: 아무개는·단단히·부숴버렸다(스테이지당 1번). */
 function ignoreBudget(r: Resolved, ctx: StageContext): { count: number; usesBuswo: boolean } {
   let count = 0
-  if (r.subj.id === 'amugae') count += r.subj.b
+  const amugae = subjDef(r, 'amugae')
+  if (amugae) count += amugae.b
   if (r.adv?.id === 'dandan') count += r.adv.b
   const usesBuswo = r.verb.id === 'buswo' && !ctx.oncePerStageUsed.includes('buswo')
   if (usesBuswo) count += r.verb.b
@@ -98,7 +112,7 @@ function activeWeathers(r: Resolved, ctx: StageContext): { weathers: WeatherDef[
 /** 날씨 목록에 대해 이 문장을 막는 이유. 없으면 undefined. */
 function violation(r: Resolved, ctx: StageContext, weathers: WeatherDef[]): string | undefined {
   const words: [CardDef | undefined, StickerDef | undefined][] = [
-    [r.subj, r.subjSticker], [r.adv, r.advSticker], [r.verb, r.verbSticker],
+    [r.subj, r.subjSticker], [r.adv, r.advSticker], [r.verb, r.verbSticker], [r.subj2, r.subj2Sticker], [r.verb2, undefined],
   ]
   const hapil = r.adv?.id === 'hapil'
   for (const w of weathers) {
@@ -127,16 +141,24 @@ export function validatePick(pick: SentencePick, ctx: StageContext): ValidationR
   if (r.subj.slot !== 'subj' || r.verb.slot !== 'verb' || (r.adv && r.adv.slot !== 'adv')) {
     return { ok: false, reason: '칸이 맞지 않음' }
   }
+  if ((r.subj2 && r.subj2.slot !== 'subj') || (r.verb2 && r.verb2.slot !== 'verb')) return { ok: false, reason: '칸이 맞지 않음' }
+  if ((pick.subj2 && pick.subj2.uid === pick.subj.uid) || (pick.verb2 && pick.verb2.uid === pick.verb.uid)) return { ok: false, reason: '같은 단어를 두 칸에 놓을 수 없음' }
   for (const [c, s] of [[r.subj, r.subjSticker], [r.adv, r.advSticker], [r.verb, r.verbSticker]] as const) {
     if (c && s && s.slot !== c.slot) return { ok: false, reason: `${s.name}은 ${c.name}에 붙지 않음` }
   }
   // 기회가 남아 있으면 비용이 남은 기회를 넘을 수 없다. 기회를 다 쓴 뒤(한 대씩 맞으며)에는 기회 1 동사만.
   const room = Math.max(1, ctx.chancesLeft)
-  if (r.verb.cost > room) return { ok: false, reason: `남은 기회 ${ctx.chancesLeft}: 기회 ${r.verb.cost} 동사 잠김` }
+  if (costOf(r) > room) return { ok: false, reason: `남은 기회 ${ctx.chancesLeft}: 기회 ${costOf(r)} 동사 잠김` }
   const { weathers } = activeWeathers(r, ctx)
   if (!r.adv && !weathers.some((w) => w.id === 'drowsy')) return { ok: false, reason: '수식어 칸이 비어 있음' }
   const v = violation(r, ctx, weathers)
   return v ? { ok: false, reason: v } : { ok: true }
+}
+
+/** 문장의 기회 비용. 겹동사는 두 동사 중 큰 쪽. */
+const costOf = (r: Resolved) => Math.max(r.verb.cost, r.verb2?.cost ?? 0)
+export function pickCost(pick: SentencePick): number {
+  return costOf(resolve(pick))
 }
 
 // ── 대성공 ──
@@ -151,7 +173,8 @@ export function critInfo(pick: SentencePick, ctx: StageContext, loadout: ScoreLo
   const { weathers } = activeWeathers(r, ctx)
   if (weathers.some((w) => w.id === 'fog')) return { chance: 0, mult: CRIT_MULT }
   let p = CRIT_BASE + loadout.stats.crit + ctx.carry.crit
-  if (r.subj.id === 'sinnan') p += r.subj.b
+  const sinnan = subjDef(r, 'sinnan')
+  if (sinnan) p += sinnan.b
   if (r.adv?.id === 'saljjak') p += r.adv.a
   if (r.adv?.id === 'deulsseok') p += r.adv.a
   if (r.verb.id === 'deonjyeot') p += r.verb.b
@@ -214,7 +237,8 @@ export function scoreSentence(
   const ci = critInfo(pick, ctx, loadout)
   const crit = critRoll < ci.chance
   const isFirst = ctx.sentencesUsed === 0
-  const isLast = ctx.chancesLeft - r.verb.cost <= 0
+  const cost = costOf(r)
+  const isLast = ctx.chancesLeft - cost <= 0
   const prev = ctx.history[ctx.history.length - 1]
   const emotions = slotEmotions(r)
   const kinds = distinct(emotions)
@@ -255,8 +279,7 @@ export function scoreSentence(
   add(ctx.carry.add, 'carry', '이월 가산')
 
   // 1. 동사 칩(칩은 순서와 무관하지만 롤업은 동사 칸에서 보인다).
-  const verbChips = (): number => {
-    const v = r.verb
+  const verbChips = (v: CardDef): number => {
     switch (v.id) {
       case 'ttaeryeot': return stats.anger * v.a
       case 'naerichyeot': return stats.anger * (isFirst ? v.a : v.b)
@@ -275,7 +298,7 @@ export function scoreSentence(
       }
       case 'teoreo': return stats.joy * v.a
       case 'peotteu': return stats.joy * v.a
-      case 'hamkke': return stats.joy * v.a * (isUri(r.subj) ? v.b : 1)
+      case 'hamkke': return stats.joy * v.a * (isUri(r) ? v.b : 1)
       case 'deonjyeot': return stats.pleasure * v.a
       case 'gullyeot': return stats.pleasure * roller.range(v.a, v.b)
       case 'twinggyeot': return stats.pleasure * v.a
@@ -293,9 +316,9 @@ export function scoreSentence(
   // 감쌌다: 수식어의 가산 효과 +50%. 동사보다 먼저 읽는 수식어에 걸리므로 미리 본다.
   const modAddScale = r.verb.id === 'gamssat' ? 1 + r.verb.b : 1
 
-  const subjectEffect = () => {
-    const s = r.subj
+  const applySubject = (s: CardDef, st: StickerDef | undefined) => {
     const eclipse = has('eclipse')
+    const before = w.subjectAdd
     const sAdd = (x: number, label: string) => { if (!eclipse) add(x, 'subj', label, true) }
     switch (s.id) {
       case 'hwanan': sAdd(isFirst ? s.a + s.b : s.a, s.name); break
@@ -325,13 +348,17 @@ export function scoreSentence(
       case 'sebeon': sAdd(kinds.length >= 3 ? s.a : 0, s.name); break
       default: throw new Error(`주어 효과 없음: ${s.id}`)
     }
-    const st = r.subjSticker
+    const own = w.subjectAdd - before
     if (st && !eclipse) {
-      if (st.id === 'do') add(w.subjectAdd * (st.a - 1), 'sticker', st.name, true)
+      if (st.id === 'do') add(own * (st.a - 1), 'sticker', st.name, true)
       if (st.id === 'kkaji') add(Math.max(0, ctx.chancesLeft) * st.a, 'sticker', st.name, true)
-      if (st.id === 'majeo' && isLast) add(w.subjectAdd * (st.a - 1), 'sticker', st.name, true)
+      if (st.id === 'majeo' && isLast) add(own * (st.a - 1), 'sticker', st.name, true)
     }
     if (st?.id === 'man' && kinds.length === 1) times(st.a, 'sticker', st.name)
+  }
+  const subjectEffect = () => {
+    applySubject(r.subj, r.subjSticker)
+    if (r.subj2) applySubject(r.subj2, r.subj2Sticker)
   }
 
   function modifierEffect(m: CardDef, label = m.name) {
@@ -344,7 +371,7 @@ export function scoreSentence(
       case 'geochil': chips(m.a, 'adv', label); break
       case 'kkuk': w.tearsGain += m.a; chips(m.b, 'adv', label); break
       case 'nunmul': chips(stats.sorrow * m.a, 'adv', label); break
-      case 'motda': mAdd(Math.max(0, ctx.chancesLeft - r.verb.cost) * m.a); break
+      case 'motda': mAdd(Math.max(0, ctx.chancesLeft - cost) * m.a); break
       case 'sseulsseul': chips((prev?.score ?? 0) * m.a, 'adv', label); break
       case 'aesseo':
         if (tears - w.tearsSpent >= m.a) { w.tearsSpent += m.a; times(m.b, 'adv', label) }
@@ -370,7 +397,7 @@ export function scoreSentence(
 
   const advEffect = () => {
     if (!r.adv) return
-    const reads = r.subj.id === 'ttatteut' ? 2 : 1
+    const reads = hasSubj(r, 'ttatteut') ? 2 : 1
     for (let i = 0; i < reads; i++) modifierEffect(r.adv, i ? `${r.adv.name} (두 번 읽기)` : r.adv.name)
     const st = r.advSticker
     if (st?.id === 'ge') add(st.a, 'sticker', st.name)
@@ -378,17 +405,18 @@ export function scoreSentence(
   }
 
   const verbEffect = () => {
-    let vc = verbChips()
+    let vc = verbChips(r.verb)
     if (r.verb.id === 'heullyeo' && tears > 0) {
       times(1 + tears * r.verb.c, 'verb', r.verb.name)
     }
     // 웃으며·-며: 동사를 한 번 더 발동.
-    if (r.adv?.id === 'useum') vc *= r.adv.a * (r.subj.id === 'ttatteut' ? r.adv.a : 1)
+    if (r.adv?.id === 'useum') vc *= r.adv.a * (hasSubj(r, 'ttatteut') ? r.adv.a : 1)
     if (r.advSticker?.id === 'myeo') vc *= r.advSticker.a
     chips(vc, 'verb', r.verb.name)
+    if (r.verb2) chips(verbChips(r.verb2) * relicDef('twinVerb').a, 'verb', r.verb2.name)
     if (r.verb.id === 'bakkwo') times(r.verb.b, 'verb', r.verb.name)
     const st = r.verbSticker
-    if (st?.id === 'ja' && isUri(r.subj)) times(st.a, 'sticker', st.name)
+    if (st?.id === 'ja' && isUri(r)) times(st.a, 'sticker', st.name)
     if (st?.id === 'lgeot' && !isLast) times(st.a, 'sticker', st.name)
     if (st?.id === 'beoryeot' && isLast) times(st.a, 'sticker', st.name)
   }
@@ -407,14 +435,14 @@ export function scoreSentence(
     })
     let best = Math.max(0, ...counts.values())
     // 웃는 나는: 주어 한 장이 어떤 감정으로도 침(나머지 칸 중 가장 많은 감정 + 1).
-    if (r.subj.id === 'utneun') {
-      const rest = new Map<ScoreEmotion, number>()
-      emotions.slice(1).forEach((e) => { if (e) rest.set(e, (rest.get(e) ?? 0) + 1) })
+    if (hasSubj(r, 'utneun')) {
+      const rest = new Map(counts)
+      rest.set('joy', (rest.get('joy') ?? 1) - 1)
       best = Math.max(best, Math.max(0, ...rest.values()) + 1)
     }
     // 거꾸로 선 나는: 한 단어가 다른 칸 감정을 따라감(감정이 둘 이상일 때만 의미가 있다).
-    if (r.subj.id === 'geokkuro' && kinds.length > 1) best += 1
-    if (r.adv?.id === 'pogeun') best += r.adv.a * (r.subj.id === 'ttatteut' ? 2 : 1)
+    if (hasSubj(r, 'geokkuro') && kinds.length > 1) best += 1
+    if (r.adv?.id === 'pogeun') best += r.adv.a * (hasSubj(r, 'ttatteut') ? 2 : 1)
     const level = Math.min(3, Math.floor(best))
     times(RESONANCE[level], 'resonance', `감정 공명 ${level}장`)
   }
@@ -480,7 +508,8 @@ export function scoreSentence(
   if (r.adv?.id === 'gyeongkwae' && crit) stageAddGain += r.adv.a
 
   const carry: CarryState = { ...EMPTY_CARRY }
-  if (r.subj.id === 'andohan') carry.add += w.addPool * r.subj.b
+  const andohan = subjDef(r, 'andohan')
+  if (andohan) carry.add += w.addPool * andohan.b
   if (r.advSticker?.id === 'go') carry.add += w.addPool * r.advSticker.a
   if (r.verb.id === 'teoreo') carry.add += r.verb.b
   if (r.verb.id === 'peotteu') carry.chips += w.chips * r.verb.b
@@ -491,21 +520,23 @@ export function scoreSentence(
   const onceUsed: string[] = []
   let refund = 0
   if (usesBuswo) onceUsed.push('buswo')
-  if (crit && r.adv?.id === 'jaeppal' && !ctx.oncePerStageUsed.includes('jaeppal')) { refund = r.verb.cost; onceUsed.push('jaeppal') }
+  if (crit && r.adv?.id === 'jaeppal' && !ctx.oncePerStageUsed.includes('jaeppal')) { refund = cost; onceUsed.push('jaeppal') }
   if (crit && r.verb.id === 'twinggyeot' && !ctx.oncePerStageUsed.includes('twinggyeot') && refund === 0) { refund = 1; onceUsed.push('twinggyeot') }
   const blackout = has('blackout')
-  const freeSwaps = r.subj.id === 'uyeon' && !blackout ? r.subj.b : 0
+  const uyeon = subjDef(r, 'uyeon')
+  const freeSwaps = uyeon && !blackout ? uyeon.b : 0
   const redrawHand = r.verb.id === 'heundeul' && crit && !blackout
 
   const record: SentenceRecord = {
     score, chips: w.chips, addPool: w.addPool, subjectAdd: w.subjectAdd, emotions: kinds, slotEmotions: emotions,
-    modifierId: r.adv?.id, wordIds: [r.subj.id, ...(r.adv ? [r.adv.id] : []), r.verb.id], crit, cost: r.verb.cost,
+    modifierId: r.adv?.id, crit, cost,
+    wordIds: [r.subj.id, ...(r.adv ? [r.adv.id] : []), r.verb.id, ...(r.subj2 ? [r.subj2.id] : []), ...(r.verb2 ? [r.verb2.id] : [])],
   }
   void ignored
   return {
     score, chips: w.chips, mult: w.mult, amp, crit, critChance: ci.chance, critMult: ci.mult,
     addPool: w.addPool, subjectAdd: w.subjectAdd, steps: w.steps, tearsAfter, carry, stageAddGain,
-    chanceSpent: Math.max(0, r.verb.cost - refund), freeSwaps, redrawHand, onceUsed, record,
+    chanceSpent: Math.max(0, cost - refund), freeSwaps, redrawHand, onceUsed, record,
   }
 }
 

@@ -69,3 +69,43 @@ export function tryoutCard(base: TryoutBaseline, deck: DeckCard[], changed: Deck
     return Math.max(0, ...kept.map((t) => t.ev), ...withNew.map((p) => expectedScore(p, ctx, loadout)))
   }))
 }
+
+// ── 상점 물건의 써 보기 ──
+
+export interface OfferTryout {
+  from: number
+  to: number
+  /** 스티커를 붙이면 가장 좋은 단어. */
+  targetUid?: number
+  /** 유물을 놓으면 가장 좋은 자리. */
+  relicAt?: number
+}
+
+/** 단어(새 단어 또는 강화)를 덱에 넣었을 때. */
+export function tryoutWord(base: TryoutBaseline, deck: DeckCard[], loadout: ScoreLoadout, cardId: string, upgradeUid?: number): OfferTryout {
+  const owned = upgradeUid != null ? deck.find((c) => c.uid === upgradeUid) : undefined
+  const probe: DeckCard = owned ? { ...owned, level: owned.level + 1 } : { uid: -1, cardId, level: 0 }
+  return { from: base.value, to: Math.max(base.value, tryoutCard(base, deck, probe, loadout)) }
+}
+
+/** 스티커를 맞는 칸의 단어 중 가장 좋은 곳에 붙였을 때. */
+export function tryoutSticker(base: TryoutBaseline, deck: DeckCard[], loadout: ScoreLoadout, stickerId: string, slot: string): OfferTryout {
+  let best: OfferTryout = { from: base.value, to: base.value }
+  for (const c of deck) {
+    if (cardDef(c.cardId).slot !== slot) continue
+    const v = tryoutCard(base, deck, { ...c, sticker: stickerId }, loadout)
+    if (best.targetUid == null || v > best.to) best = { from: base.value, to: v, targetUid: c.uid }
+  }
+  return best
+}
+
+/** 유물을 가장 좋은 자리에 놓았을 때. */
+export function tryoutRelic(base: TryoutBaseline, loadout: ScoreLoadout, relicId: string): OfferTryout {
+  let best: OfferTryout = { from: base.value, to: -Infinity, relicAt: loadout.relics.length }
+  for (let at = 0; at <= loadout.relics.length; at++) {
+    const relics = [...loadout.relics.slice(0, at), relicId, ...loadout.relics.slice(at)]
+    const v = tryoutLoadout(base, { stats: loadout.stats, relics })
+    if (v > best.to) best = { from: base.value, to: v, relicAt: at }
+  }
+  return best
+}

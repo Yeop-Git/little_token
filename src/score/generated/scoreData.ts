@@ -14,6 +14,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "ab",
     "rule": "가산 +{a}. 이번 스테이지 첫 문장이면 +{b}",
     "shines": "첫 문장에서 한 방"
   },
@@ -29,6 +30,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "가산 +{a}. 동사가 분노면 칩 +{b}",
     "shines": "분노 동사와 짝"
   },
@@ -44,6 +46,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "마지막 기회면 가산 +{a}, 아니면 +{b}",
     "shines": "세 번째 문장"
   },
@@ -59,6 +62,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "가산 +{a}. 이 문장의 분노 단어 1장당 +{b}",
     "shines": "분노 3장 공명 문장"
   },
@@ -74,6 +78,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "aB",
     "rule": "가산 +{a}. 세 단어가 모두 같은 감정이면 ×{b}",
     "shines": "한 감정으로 맞춘 문장"
   },
@@ -89,6 +94,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "직전 문장의 주어 가산을 이번에도 더함(첫 문장은 +{a})",
     "shines": "앞 문장이 좋았을 때"
   },
@@ -104,6 +110,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "눈물 1당 가산 +{a} (상한 +{b})",
     "shines": "눈물을 모은 뒤"
   },
@@ -119,6 +126,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 문장 끝에 눈물 +{b}",
     "shines": "첫 문장에서 저장"
   },
@@ -134,6 +142,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "이번 스테이지에서 쓴 문장 수 × {a} 가산",
     "shines": "마지막 문장"
   },
@@ -149,6 +158,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 동사가 슬픔이면 눈물 +{b} 추가",
     "shines": "슬픔 동사와 짝"
   },
@@ -164,6 +174,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "가산 +{a}",
     "shines": "언제나, 입문"
   },
@@ -179,6 +190,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 수식어 효과를 두 번 읽음 (곱셈 수식어면 제곱)",
     "shines": "곱셈 수식어와"
   },
@@ -194,6 +206,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 공명을 셀 때 어떤 감정으로도 침 (문장당 1장)",
     "shines": "공명이 한 장 모자랄 때"
   },
@@ -209,6 +222,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 이 문장 가산 풀의 {b%}를 다음 문장에 이월",
     "shines": "연속 문장"
   },
@@ -224,6 +238,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "남은 기회 1당 가산 +{a}",
     "shines": "첫 문장"
   },
@@ -239,6 +254,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 직전 문장의 수식어 효과를 이번에도 적용",
     "shines": "수식어 연속"
   },
@@ -254,6 +270,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 대성공 확률 +{b%}",
     "shines": "대성공 덱"
   },
@@ -269,6 +286,7 @@ export const SCORE_CARDS = [
     "c": 0.5,
     "d": 0,
     "start": false,
+    "grow": "b",
     "rule": "{c%} 가산 +{a}, {c%} 가산 +{b}",
     "shines": "한 방 노림"
   },
@@ -284,6 +302,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 대성공이면 가산 ×{b}",
     "shines": "대성공 덱"
   },
@@ -299,6 +318,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 문장 시작 시 손패 {b}장 무료 교체",
     "shines": "맞는 짝을 찾을 때"
   },
@@ -314,6 +334,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 {a} × 서로 다른 감정 수",
     "shines": "섞은 문장"
   },
@@ -329,6 +350,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "aB",
     "rule": "가산 +{a}. 혼돈 단어가 2장 이상이면 ×{b}",
     "shines": "혼돈 덱"
   },
@@ -344,6 +366,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 한 단어의 감정을 다른 칸 감정으로 취급",
     "shines": "공명을 맞출 때"
   },
@@ -359,6 +382,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 이번 문장의 제약 {b}개 무시",
     "shines": "제약이 아픈 날"
   },
@@ -374,6 +398,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "서로 다른 감정이 3개면 가산 +{a}",
     "shines": "세 감정 문장"
   },
@@ -389,6 +414,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "ab",
     "rule": "가산 +{a}. 이번 스테이지의 분노 단어 1장당 +{b}",
     "shines": "분노를 쌓아 가는 판"
   },
@@ -404,6 +430,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "A",
     "rule": "첫 문장이면 ×{a}",
     "shines": "첫 문장"
   },
@@ -419,6 +446,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "주어 가산을 {a}배로 더함",
     "shines": "주어가 센 문장"
   },
@@ -434,6 +462,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "A",
     "rule": "마지막 기회면 ×{a}",
     "shines": "마지막 기회"
   },
@@ -449,6 +478,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 +{a}",
     "shines": "주어가 약한 날"
   },
@@ -464,6 +494,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "b",
     "rule": "눈물 +{a}. 칩 +{b}",
     "shines": "눈물 저장"
   },
@@ -479,6 +510,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "슬픔 스탯 × {a}을 칩에 더함",
     "shines": "슬픔 스탯이 큰 덱"
   },
@@ -494,6 +526,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "아직 쓰지 않은 기회 1당 가산 +{a}",
     "shines": "첫 문장"
   },
@@ -509,6 +542,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "직전 문장 점수의 {a%}를 칩에 더함",
     "shines": "연속 문장"
   },
@@ -524,6 +558,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "B",
     "rule": "눈물 {a}을 소모하면 이번 문장 ×{b}",
     "shines": "눈물을 모은 뒤"
   },
@@ -539,6 +574,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "가산 +{a}. 이번 문장은 제약 {b}개의 영향을 받지 않음",
     "shines": "제약 날"
   },
@@ -554,6 +590,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "이웃(주어·동사) 감정이 서로 다르면 가산 +{a}, 아니면 +{b}",
     "shines": "섞인 문장"
   },
@@ -569,6 +606,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "",
     "rule": "감정 공명을 {a}단계 올림 (2장→3장 배수)",
     "shines": "공명이 한 장 모자랄 때"
   },
@@ -584,6 +622,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "직전 문장과 같은 감정이 있으면 가산 +{a}",
     "shines": "같은 감정 연타"
   },
@@ -599,6 +638,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "A",
     "rule": "동사를 한 번 더 발동 (칩 ×{a})",
     "shines": "칩이 큰 동사"
   },
@@ -614,6 +654,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "대성공 확률 +{a%}",
     "shines": "대성공 덱"
   },
@@ -629,6 +670,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "",
     "rule": "대성공이면 이 기회를 쓰지 않은 것으로 침 (스테이지당 {a}번)",
     "shines": "목표 직전"
   },
@@ -644,6 +686,7 @@ export const SCORE_CARDS = [
     "c": 0.5,
     "d": 0,
     "start": false,
+    "grow": "A",
     "rule": "{c%} ×{a}, {c%} ×{b}",
     "shines": "한 방 노림"
   },
@@ -659,6 +702,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "대성공 확률 +{a%}. 대성공 배율 ×1.5→×{b}",
     "shines": "대성공 덱"
   },
@@ -674,6 +718,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "대성공할 때마다 이번 스테이지 가산 +{a} (누적)",
     "shines": "대성공 연쇄"
   },
@@ -689,6 +734,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "가산 +{a}. 이번 문장을 오른쪽에서 왼쪽 순서로 계산",
     "shines": "순서를 뒤집어야 이득일 때"
   },
@@ -704,6 +750,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "",
     "rule": "주어와 동사의 감정을 서로 바꿈",
     "shines": "공명을 맞출 때"
   },
@@ -719,6 +766,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "이번 스테이지에 쓴 서로 다른 감정 수 × {a} 가산",
     "shines": "마지막 문장"
   },
@@ -734,6 +782,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "A",
     "rule": "직전 문장과 모든 감정이 다르면 ×{a}",
     "shines": "감정을 바꿔 쓸 때"
   },
@@ -749,6 +798,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "제약으로 막힌 감정의 카드도 쓸 수 있고 가산 +{a}",
     "shines": "제약을 역이용"
   },
@@ -764,6 +814,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "칩 = 분노 스탯 × {a}",
     "shines": "기본"
   },
@@ -779,6 +830,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "칩 = 분노 × {a} (첫 문장), 그 외 ×{b}",
     "shines": "첫 문장"
   },
@@ -794,6 +846,7 @@ export const SCORE_CARDS = [
     "c": 2,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "가산 풀이 {c} 이상이면 칩 = 분노 × {a}, 아니면 ×{b}",
     "shines": "주어와 수식어가 센 문장"
   },
@@ -809,6 +862,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 분노 × {a}. 제약 하나 무효 (스테이지당 {b}번)",
     "shines": "제약 날"
   },
@@ -824,6 +878,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "[기회 2] 칩 = 분노 × {a}",
     "shines": "기회가 넉넉한 스테이지, 또는 속전의 단판"
   },
@@ -839,6 +894,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "칩 = 슬픔 × {a}. 눈물 +{b}",
     "shines": "저장"
   },
@@ -854,6 +910,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "칩 = 슬픔 × {a} + 눈물 1당 {b} (눈물 유지)",
     "shines": "눈물을 지키며 쓰기"
   },
@@ -869,6 +926,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 슬픔 × {a}. 눈물 +{b}",
     "shines": "첫 문장"
   },
@@ -884,6 +942,7 @@ export const SCORE_CARDS = [
     "c": 0.04,
     "d": 0.25,
     "start": false,
+    "grow": "ab",
     "rule": "[기회 2] 칩 = 슬픔 × {a}. 눈물을 전부 소모해 1당 칩 +{b}, 배율 +{c%} (곱), 소모 후 눈물 {d%} 유지",
     "shines": "긴 스테이지의 마지막 문장"
   },
@@ -899,6 +958,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "칩 = 슬픔 × {a} + 직전 문장 점수의 {b%}",
     "shines": "앞 문장이 좋았을 때"
   },
@@ -914,6 +974,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": true,
+    "grow": "a",
     "rule": "칩 = 기쁨 × {a}. 수식어의 가산 효과를 +{b%}",
     "shines": "가산형 수식어와"
   },
@@ -929,6 +990,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "칩 = 기쁨 × {a} + 주어·수식어 중 큰 쪽 감정 스탯의 {b%}",
     "shines": "다른 감정이 큰 덱"
   },
@@ -944,6 +1006,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "ab",
     "rule": "칩 = 기쁨 × {a}. 다음 문장 가산 +{b} 예약",
     "shines": "연속 문장"
   },
@@ -959,6 +1022,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 기쁨 × {a}. 이 문장 칩의 {b%}를 다음 문장의 칩에 더함",
     "shines": "연속 문장"
   },
@@ -974,6 +1038,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "[기회 2] 칩 = 기쁨 × {a}. 주어가 우리면 칩 ×{b}",
     "shines": "우리 주어"
   },
@@ -989,6 +1054,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 즐거움 × {a}. 대성공 확률 +{b%}",
     "shines": "대성공 덱"
   },
@@ -1004,6 +1070,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "b",
     "rule": "칩 = 즐거움 × ({a}~{b} 중 무작위)",
     "shines": "한 방 노림"
   },
@@ -1019,6 +1086,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 즐거움 × {a}. 대성공이면 기회 환급 (스테이지당 {b}번)",
     "shines": "목표 직전"
   },
@@ -1034,6 +1102,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 즐거움 × {a}. 대성공이면 손패를 모두 새로 뽑음",
     "shines": "손패를 고칠 때"
   },
@@ -1049,6 +1118,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "aB",
     "rule": "[기회 2] 칩 = 즐거움 × {a}. 대성공 배율 ×1.5→×{b}",
     "shines": "대성공 덱"
   },
@@ -1064,6 +1134,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "[기회 2] 칩 = 이 문장의 서로 다른 감정 수 × {a}",
     "shines": "세 감정 문장"
   },
@@ -1079,6 +1150,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 가장 큰 감정 스탯과 가장 작은 감정 스탯의 평균 × {a}",
     "shines": "고르게 키운 덱"
   },
@@ -1094,7 +1166,8 @@ export const SCORE_CARDS = [
     "c": 0.1,
     "d": 0,
     "start": false,
-    "rule": "칩 = 가장 큰 스탯 × {a}. 서로 다른 감정 수만큼 눈물 +{b} 또는 이번 스테이지 가산 +{c} (선택)",
+    "grow": "a",
+    "rule": "칩 = 가장 큰 스탯 × {a}. 서로 다른 감정 수만큼 눈물 +{b}",
     "shines": "자원 조달"
   },
   {
@@ -1109,6 +1182,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 가장 큰 스탯 × {a}. 오늘의 약점 감정으로 취급(약점 ×{b})",
     "shines": "약점이 걸린 날"
   },
@@ -1124,6 +1198,7 @@ export const SCORE_CARDS = [
     "c": 0,
     "d": 0,
     "start": false,
+    "grow": "a",
     "rule": "칩 = 가장 작은 스탯 × {a}",
     "shines": "한 감정에 치우치지 않은 덱"
   }
@@ -1762,7 +1837,7 @@ export const SCORE_FLOORS = [
     "weather": "gust",
     "weather2": "eclipse",
     "enemies": 20,
-    "hp": 25,
+    "hp": 13,
     "boss": "mantis",
     "note": "사마귀 (보스 제약은 초안)"
   },
@@ -1772,7 +1847,7 @@ export const SCORE_FLOORS = [
     "weather": "drizzle",
     "weather2": "",
     "enemies": 26,
-    "hp": 18,
+    "hp": 16,
     "boss": "",
     "note": ""
   },
@@ -1782,7 +1857,7 @@ export const SCORE_FLOORS = [
     "weather": "gust",
     "weather2": "",
     "enemies": 40,
-    "hp": 22,
+    "hp": 23,
     "boss": "",
     "note": ""
   },
@@ -1792,7 +1867,7 @@ export const SCORE_FLOORS = [
     "weather": "heat",
     "weather2": "",
     "enemies": 50,
-    "hp": 30,
+    "hp": 36,
     "boss": "",
     "note": ""
   },
@@ -1802,7 +1877,7 @@ export const SCORE_FLOORS = [
     "weather": "hail",
     "weather2": "",
     "enemies": 70,
-    "hp": 40,
+    "hp": 30,
     "boss": "",
     "note": ""
   },
@@ -1812,7 +1887,7 @@ export const SCORE_FLOORS = [
     "weather": "rain",
     "weather2": "hail",
     "enemies": 80,
-    "hp": 100,
+    "hp": 33,
     "boss": "queenBee",
     "note": "여왕벌 (보스 제약은 초안)"
   },
@@ -1822,7 +1897,7 @@ export const SCORE_FLOORS = [
     "weather": "eclipse",
     "weather2": "",
     "enemies": 110,
-    "hp": 70,
+    "hp": 36,
     "boss": "",
     "note": ""
   },
@@ -1832,7 +1907,7 @@ export const SCORE_FLOORS = [
     "weather": "fog",
     "weather2": "",
     "enemies": 150,
-    "hp": 87,
+    "hp": 16,
     "boss": "",
     "note": ""
   },
@@ -1842,7 +1917,7 @@ export const SCORE_FLOORS = [
     "weather": "snow",
     "weather2": "",
     "enemies": 280,
-    "hp": 75,
+    "hp": 33,
     "boss": "",
     "note": ""
   },
@@ -1852,7 +1927,7 @@ export const SCORE_FLOORS = [
     "weather": "drowsy",
     "weather2": "",
     "enemies": 280,
-    "hp": 95,
+    "hp": 24,
     "boss": "",
     "note": ""
   },
@@ -1862,7 +1937,7 @@ export const SCORE_FLOORS = [
     "weather": "fog",
     "weather2": "drowsy",
     "enemies": 300,
-    "hp": 300,
+    "hp": 23,
     "boss": "elderSpider",
     "note": "장로거미 (보스 제약은 초안)"
   }

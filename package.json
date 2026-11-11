@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "engines": {
@@ -45,7 +45,10 @@
     "policy:sim": "npm run data:generate && tsx src/tools/token-policy-sim.ts",
     "score:data": "tsx scripts/generate-score-data.ts",
     "score:check": "npm run score:data && tsx src/tools/score-check.ts",
-    "score:sim": "npm run score:data && tsx src/tools/score-sim.ts"
+    "score:sim": "npm run score:data && tsx src/tools/score-sim.ts",
+    "score:zh-hant": "python3 scripts/generate-score-zh-hant.py",
+    "score:locale": "npm run score:data && tsx src/tools/score-locale-check.ts",
+    "score:test": "npm run score:check && tsx src/tools/score-locale-check.ts"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",

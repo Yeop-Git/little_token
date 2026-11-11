@@ -11,21 +11,21 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import {
-  OVERTIME_HIT_PIECES, PIECES_PER_HEART, SCORE_CARDS, SCORE_FORMS, SCORE_STATS, card as cardDef, relic as relicDef,
+  FLOORS_TOTAL, PIECES_PER_HEART, SCORE_CARDS, SCORE_FORMS, SCORE_STATS, card as cardDef, relic as relicDef,
   startingStats, sticker as stickerDef,
 } from '../score/data'
-import { afterSentence, newHand, redraw, swapOne, type Hand } from '../score/hand'
-import { expectedScore, rngRoller, scoreSentence, validatePick } from '../score/scoring'
+import { afterSentence, newHand, type Hand } from '../score/hand'
+import { ScoreRun } from '../score/run'
+import { expectedRoller, expectedScore, pickCost, rngRoller, scoreSentence, validatePick } from '../score/scoring'
 import {
-  FORGE_SLOTS, HEAL_PRICE, RELIC_SLOTS, REROLL_PRICE, applyStatPoints, bonusSpread, forgeChoices, rollStock,
-  RARITY_BASE_POINTS, type Rarity, type ShopOffer,
+  FORGE_SLOTS, RARITY_BASE_POINTS, RARITY_BONUS, REROLL_PRICE, applyStatPoints, highestEmotion, type ShopOffer,
 } from '../score/shop'
-import { applySentence, clearMoney, planStage, startStage } from '../score/stage'
+import { applySentence, startStage } from '../score/stage'
 import { tryoutBaseline, tryoutCard, tryoutLoadout, type TryoutBaseline } from '../score/tryout'
 import type {
   DeckCard, ScoreEmotion, ScoreLoadout, ScoreStats, SentencePick, StageContext, StatDef,
 } from '../score/types'
-import { SCORE_EMOTIONS, STAT_EMOTIONS } from '../score/types'
+import { SCORE_EMOTIONS } from '../score/types'
 
 // ── 인자 ──
 
@@ -35,7 +35,13 @@ const args = new Map(process.argv.slice(2).map((a) => {
 }))
 const RUNS = Number(args.get('runs') ?? 20)
 const SEED = Number(args.get('seed') ?? 1)
-const FLOORS = 15
+const FLOORS = FLOORS_TOTAL
+/** --god: 하트가 닳지 않는다. 모든 층의 점수 여력을 재서 목표 곡선을 맞출 때 쓴다. */
+const GOD = args.has('god')
+/** --cap: 목표를 무시하고 기회를 다 쓰면 넘어간다(목표는 표에만 남긴다). 층별 점수 여력을 잰다. */
+const CAP = args.has('cap')
+/** 봇이 눈물 1개의 미래 가치를 이번 문장 기댓값의 몇 배로 보는지. */
+const TEAR_FORESIGHT = 0.04
 
 function mulberry32(seed: number) {
   let a = seed >>> 0
@@ -46,29 +52,6 @@ function mulberry32(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-}
-
-// ── 런 상태 ──
-
-interface RunState {
-  floor: number
-  deck: DeckCard[]
-  stats: ScoreStats
-  relics: string[]
-  pieces: number
-  guard: number
-  money: number
-  cleared: number
-  nextUid: number
-}
-
-const loadoutOf = (r: RunState): ScoreLoadout => ({ stats: r.stats, relics: r.relics })
-
-function newRun(): RunState {
-  let uid = 0
-  const deck = SCORE_CARDS.filter((c) => c.start).map((c) => ({ uid: ++uid, cardId: c.id, level: 0 }))
-  const stats = startingStats()
-  return { floor: 1, deck, stats, relics: [], pieces: stats.mind, guard: 0, money: 0, cleared: 0, nextUid: uid + 1 }
 }
 
 // ── 통계 ──
@@ -87,7 +70,7 @@ interface Tally {
   formClears: Record<string, { stages: number; noOvertime: number; leftover: number }>
   finalStats: Record<string, number>
   finalDeckEmotions: Record<string, number>
-  floors: Record<number, { n: number; target: number; scored: number; sentences: number; money: number; deck: number; relics: number }>
+  floors: Record<number, { n: number; target: number; scored: number; inChance: number; sentences: number; money: number; deck: number; relics: number }>
 }
 
 const newTally = (): Tally => ({
@@ -103,10 +86,12 @@ interface Bot {
   /** 상점에서 이 물건을 볼 수 있는가(편향 봇의 필터). */
   allows(o: ShopOffer): boolean
   /** 써 보기 값에 곱하는 가중치. */
-  weight?(o: ShopOffer, run: RunState): number
+  weight?(o: ShopOffer, run: ScoreRun): number
   /** 재련 칸 선택. 기본은 써 보기. */
   forgeBias?(s: StatDef): number
   random?: boolean
+  /** 하트 거래를 쓰는 봇. */
+  trades?: boolean
 }
 
 const emotionOfOffer = (o: ShopOffer): ScoreEmotion | undefined => (o.kind === 'word' ? cardDef(o.id).emotion : undefined)
@@ -130,6 +115,7 @@ const BOTS: Bot[] = [
   },
   { name: 'items-only', allows: (o) => o.kind === 'item' },
   { name: 'no-items', allows: (o) => o.kind !== 'item' },
+  { name: 'trader', allows: () => true, trades: true },
   { name: 'random', allows: () => true, random: true },
 ]
 
@@ -156,12 +142,13 @@ function choosePick(picks: SentencePick[], ctx: StageContext, loadout: ScoreLoad
   const finishers: { p: SentencePick; ev: number; cost: number }[] = []
   for (const p of picks) {
     const ev = expectedScore(p, ctx, loadout)
-    const cost = cardDef(p.verb.cardId).cost
+    const cost = pickCost(p)
     if (ev >= need) finishers.push({ p, ev, cost })
-    const res = scoreSentence(p, ctx, loadout, { pick: (q, a, b) => q * a + (1 - q) * b, range: (a, b) => (a + b) / 2 }, 1)
+    const res = scoreSentence(p, ctx, loadout, expectedRoller, 1)
     const later = Math.max(0, ctx.chancesLeft - cost)
-    const tearValue = later > 0 ? (res.tearsAfter - ctx.tears) * 0.04 * ev : 0
-    const key = (ev + tearValue) / Math.max(1, cost)
+    const tearValue = later > 0 ? (res.tearsAfter - ctx.tears) * TEAR_FORESIGHT * ev : 0
+    const carryValue = later > 0 ? (res.carry.mult - 1) * ev + res.carry.add * ev * 0.3 : 0
+    const key = (ev + tearValue + carryValue) / Math.max(1, cost)
     if (key > bestKey) { bestKey = key; best = p }
   }
   if (finishers.length) {
@@ -171,70 +158,17 @@ function choosePick(picks: SentencePick[], ctx: StageContext, loadout: ScoreLoad
   return best!
 }
 
-// ── 스테이지 ──
-
-interface StageOutcome { cleared: boolean; dead: boolean; leftover: number; overtime: number; scored: number; target: number; sentences: number }
-
-function playStage(run: RunState, bot: Bot, tally: Tally, rng: () => number): StageOutcome {
-  const plan = planStage(run.floor, STAT_EMOTIONS[Math.floor(rng() * 4)])
-  const loadout = loadoutOf(run)
-  let ctx = startStage(plan, loadout)
-  let hand = newHand(run.deck, rng)
-  let scored = 0
-  let overtime = 0
-  for (let guard = 0; guard < 60; guard++) {
-    if (scored >= plan.target) break
-    if (ctx.chancesLeft <= 0) {
-      overtime++
-      let hit = OVERTIME_HIT_PIECES
-      const absorbed = Math.min(run.guard, hit)
-      run.guard -= absorbed
-      hit -= absorbed
-      run.pieces -= hit
-      tally.heartsLost += hit / PIECES_PER_HEART
-      if (run.pieces <= 0) { tally.overtime += overtime; return { cleared: false, dead: true, leftover: 0, overtime, scored, target: plan.target, sentences: ctx.sentencesUsed } }
-    }
-    let picks = handPicks(hand, ctx)
-    if (!picks.length) {
-      // 손패로 문장을 못 만들면 한 번 새로 뽑고, 덱 전체로도 못 만들면 소프트락(런 종료로 기록).
-      hand = redraw(hand, rng)
-      picks = handPicks(hand, ctx)
-      if (!picks.length) {
-        tally.softlocks++
-        tally.overtime += overtime
-        return { cleared: false, dead: true, leftover: 0, overtime, scored, target: plan.target, sentences: ctx.sentencesUsed }
-      }
-    }
-    const pick = choosePick(picks, ctx, loadout, plan.target - scored, bot, rng)
-    const res = scoreSentence(pick, ctx, loadout, rngRoller(rng), rng())
-    scored += res.score
-    for (const id of res.record.wordIds) {
-      bump(tally.cardPlays, id)
-      if (run.floor >= 10) bump(tally.latePlays, id)
-    }
-    ctx = applySentence(ctx, res)
-    hand = afterSentence(hand, { subj: pick.subj, adv: pick.adv, verb: pick.verb }, rng)
-    if (res.redrawHand) hand = redraw(hand, rng)
-    if (res.freeSwaps > 0 && hand.adv.hand.length) hand = swapOne(hand, 'adv', hand.adv.hand[0], rng)
-  }
-  if (scored < plan.target) { tally.overtime += overtime; return { cleared: false, dead: true, leftover: 0, overtime, scored, target: plan.target, sentences: ctx.sentencesUsed } }
-  const f = (tally.formClears[plan.formId] ??= { stages: 0, noOvertime: 0, leftover: 0 })
-  f.stages++
-  if (!overtime) f.noOvertime++
-  f.leftover += Math.max(0, ctx.chancesLeft)
-  tally.overtime += overtime
-  run.money += clearMoney(ctx, loadout)
-  return { cleared: true, dead: false, leftover: Math.max(0, ctx.chancesLeft), overtime, scored, target: plan.target, sentences: ctx.sentencesUsed }
-}
-
 // ── 상점 ──
 
-function offerValue(o: ShopOffer, run: RunState, base: TryoutBaseline): { value: number; apply: () => void } | undefined {
-  const lo = loadoutOf(run)
+interface Valued { value: number; apply: () => void }
+
+function offerValue(o: ShopOffer, run: ScoreRun, base: TryoutBaseline): Valued | undefined {
+  const lo = run.loadout
   if (o.kind === 'word') {
-    const nc: DeckCard = { uid: run.nextUid, cardId: o.id, level: 0 }
-    const value = tryoutCard(base, run.deck, nc, lo) - base.value
-    return { value, apply: () => { run.nextUid++; run.deck.push(nc) } }
+    const owned = o.upgradeUid != null ? run.deck.find((c) => c.uid === o.upgradeUid) : undefined
+    const probe: DeckCard = owned ? { ...owned, level: owned.level + 1 } : { uid: -1, cardId: o.id, level: 0 }
+    const value = tryoutCard(base, run.deck, probe, lo) - base.value
+    return { value, apply: () => { run.buy(o) } }
   }
   if (o.kind === 'sticker') {
     const slot = stickerDef(o.id).slot
@@ -246,144 +180,147 @@ function offerValue(o: ShopOffer, run: RunState, base: TryoutBaseline): { value:
     }
     if (!best) return undefined
     const target = best.target
-    return { value: best.value, apply: () => { target.sticker = o.id } }
+    return { value: best.value, apply: () => { run.buy(o, { targetUid: target.uid }) } }
   }
   if (o.kind === 'relic') {
-    if (run.relics.length >= RELIC_SLOTS) return undefined
-    let best = { value: -Infinity, at: 0 }
-    for (let at = 0; at <= run.relics.length; at++) {
-      const relics = [...run.relics.slice(0, at), o.id, ...run.relics.slice(at)]
-      const v = tryoutLoadout(base, { stats: run.stats, relics }) - base.value
-      if (v > best.value) best = { value: v, at }
-    }
-    // 점수 밖에서 작동하는 유물(경제·생존·눈물 시작)은 써 보기에 안 잡히므로 작은 기본값을 준다.
-    const kind = relicDef(o.id).kind
-    const floorValue = kind === 'economy' || o.id === 'beanstalk' || o.id === 'diary' || o.id === 'bookmark' || o.id === 'quote' ? base.value * 0.06 : 0
-    const at = best.at
-    return { value: Math.max(best.value, floorValue), apply: () => { run.relics.splice(at, 0, o.id) } }
+    if (run.relics.length >= run.relicSlots) return undefined
+    const r = relicValue(o.id, run, base)
+    return { value: r.value, apply: () => { run.buy(o, { relicAt: r.at }) } }
   }
-  // 아이템: 재련 기댓값을 근사한다(가장 센 감정 1점 + 가장 센 정도 1점, 등급 보너스 포함 점수 비례).
-  const pts = 3 + RARITY_BASE_POINTS[o.rarity] + (o.rarity === 'common' ? 0 : o.rarity === 'rare' ? 1 : o.rarity === 'epic' ? 2 : 3)
-  const probe = applyStatPoints(applyStatPoints(run.stats, bestEmotionStat(run.stats), 1), 'baseAdd', 1)
+  // 아이템: 재련 기댓값을 근사한다(가장 센 감정 1점 + 기본 가산 1점, 등급 보너스 포함 점수 비례).
+  const pts = 3 + RARITY_BASE_POINTS[o.rarity] + RARITY_BONUS[o.rarity]
+  const probe = applyStatPoints(applyStatPoints(run.stats, highestEmotion(run.stats), 1), 'baseAdd', 1)
   const v = (tryoutLoadout(base, { stats: probe, relics: run.relics }) - base.value) * (pts / 2)
-  return { value: v, apply: () => forgeItem(run, o.rarity, base) }
+  return { value: v, apply: () => { if (run.buy(o)) forge(run) } }
 }
 
-const bestEmotionStat = (s: ScoreStats) => STAT_EMOTIONS.reduce((a, b) => (s[b] > s[a] ? b : a))
+function relicValue(id: string, run: ScoreRun, base: TryoutBaseline): { value: number; at: number } {
+  let best = { value: -Infinity, at: 0 }
+  for (let at = 0; at <= run.relics.length; at++) {
+    const relics = [...run.relics.slice(0, at), id, ...run.relics.slice(at)]
+    const v = tryoutLoadout(base, { stats: run.stats, relics }) - base.value
+    if (v > best.value) best = { value: v, at }
+  }
+  // 써 보기(표준 3문장, 겹칸 없음)에 안 잡히는 유물은 기본값을 준다.
+  const kind = relicDef(id).kind
+  const share = id === 'twinSubj' || id === 'twinVerb' ? 0.15
+    : kind === 'economy' || ['beanstalk', 'diary', 'bookmark', 'quote', 'echo', 'retry'].includes(id) ? 0.06 : 0
+  return { value: Math.max(best.value, base.value * share), at: best.at }
+}
 
 let currentBot: Bot = BOTS[0]
 let currentTally: Tally = newTally()
-let currentRng: () => number = Math.random
 
-function forgeItem(run: RunState, rarity: Rarity, base: TryoutBaseline) {
-  const rng = currentRng
-  // 기본 스탯: 일반 1점·희귀 2점(무작위 감정).
-  const basePts = RARITY_BASE_POINTS[rarity]
-  if (basePts) {
-    const e = STAT_EMOTIONS[Math.floor(rng() * 4)]
-    run.stats = applyStatPoints(run.stats, e, basePts)
-    bump(currentTally.statPicks, `base:${e}`, basePts)
-  }
-  const choices = forgeChoices(run.stats, rng)
-  const bonus = bonusSpread(rarity, rng)
-  FORGE_SLOTS.forEach((slot, i) => {
-    const pts = 1 + bonus[i]
-    const opts = choices[i]
+function forge(run: ScoreRun) {
+  const bot = currentBot
+  if (run.forge?.baseStat) bump(currentTally.statPicks, `base:${run.forge.baseStat}`, RARITY_BASE_POINTS[run.forge.rarity])
+  while (run.phase === 'forge' && run.forge) {
+    const f = run.forge
+    const opts = f.choices[f.step]
+    const pts = 1 + f.bonus[f.step]
     let pick: StatDef
-    if (currentBot.random) pick = opts[Math.floor(rng() * opts.length)]
-    else if (slot === 'verdict') {
+    if (bot.random) pick = opts[Math.floor(run.rng() * opts.length)]
+    else if (FORGE_SLOTS[f.step] === 'verdict') {
       const pref = run.pieces <= 8 ? ['mind', 'guard', 'allowance', 'luck', 'freeReroll'] : ['allowance', 'mind', 'guard', 'luck', 'freeReroll']
       pick = [...opts].sort((a, b) => pref.indexOf(a.id) - pref.indexOf(b.id))[0]
     } else {
+      const base = tryoutBaseline(run.deck, run.loadout)
       pick = opts
-        .map((s) => ({ s, v: (tryoutLoadout(base, { stats: applyStatPoints(run.stats, s.id, pts), relics: run.relics }) - base.value + (s.id === 'startTears' ? base.value * 0.02 : 0)) * (currentBot.forgeBias?.(s) ?? 1) }))
+        .map((s) => ({ s, v: (tryoutLoadout(base, { stats: applyStatPoints(run.stats, s.id, pts), relics: run.relics }) - base.value + (s.id === 'startTears' ? base.value * 0.02 : 0)) * (bot.forgeBias?.(s) ?? 1) }))
         .sort((a, b) => b.v - a.v)[0].s
     }
-    run.stats = applyStatPoints(run.stats, pick.id, pts)
-    if (pick.id === 'mind') run.pieces += pick.perPoint * pts
-    if (pick.id === 'guard') run.guard += pick.perPoint * pts
     bump(currentTally.statPicks, pick.id, pts)
-  })
+    run.forgeChoose(pick.id)
+  }
 }
 
-function shop(run: RunState, bot: Bot, tally: Tally, rng: () => number, afterBoss: boolean) {
+const offerKey = (o: ShopOffer) => (o.kind === 'item' ? `item:${o.rarity}` : o.kind === 'word' && o.upgradeUid != null ? `upgrade:${o.id}` : `${o.kind}:${o.id}`)
+
+function shop(run: ScoreRun, bot: Bot, tally: Tally) {
   // 하트가 1개 이하면 먼저 회복(돈 10 = 하트 1개).
-  while (run.pieces <= PIECES_PER_HEART && run.money >= HEAL_PRICE && run.pieces < run.stats.mind) {
-    run.money -= HEAL_PRICE
-    run.pieces = Math.min(run.stats.mind, run.pieces + PIECES_PER_HEART)
-    bump(tally.bought, 'heal')
-  }
-  let stock = rollStock({ deck: run.deck, relics: run.relics, luck: run.stats.luck, afterBoss, nextWeathers: planStage(run.floor + 1).weatherIds }, rng)
-  let freeRerolls = run.stats.freeReroll
-  for (let round = 0; round < 8; round++) {
-    const affordable = stock.filter((o) => o.price <= run.money && bot.allows(o))
-    if (!affordable.length) break
-    if (bot.random) {
-      const o = affordable[Math.floor(rng() * affordable.length)]
-      const base = tryoutBaseline(run.deck, loadoutOf(run))
-      const v = offerValue(o, run, base)
-      if (v) { run.money -= o.price; v.apply(); bump(tally.bought, offerKey(o)) }
-      stock = stock.filter((x) => x !== o)
-      continue
-    }
-    const base = tryoutBaseline(run.deck, loadoutOf(run))
+  while (run.pieces <= PIECES_PER_HEART && run.heal()) bump(tally.bought, 'heal')
+  // 거래 봇: 하트가 가득하면 하트 1개를 돈 15로 바꾼다(§10 환전).
+  if (bot.trades && run.pieces >= run.maxPieces && run.pieces >= 3 * PIECES_PER_HEART && run.trade('exchange')) bump(tally.bought, 'trade:exchange')
+  for (let round = 0; round < 10 && run.phase === 'shop'; round++) {
+    const affordable = run.shop!.stock.filter((o) => o.price <= run.money && bot.allows(o))
+    const base = tryoutBaseline(run.deck, run.loadout)
     let best: { o: ShopOffer; v: number; apply: () => void } | undefined
-    for (const o of affordable) {
-      const r = offerValue(o, run, base)
-      if (!r) continue
-      const v = (r.value * (bot.weight?.(o, run) ?? 1)) / o.price
-      if (r.value > 0 && (!best || v > best.v)) best = { o, v, apply: r.apply }
+    if (bot.random) {
+      const o = affordable[Math.floor(run.rng() * affordable.length)]
+      const r = o && offerValue(o, run, base)
+      if (r) best = { o, v: 1, apply: r.apply }
+      else break
+    } else {
+      for (const o of affordable) {
+        const r = offerValue(o, run, base)
+        if (!r || r.value <= 0) continue
+        const v = (r.value * (bot.weight?.(o, run) ?? 1)) / o.price
+        if (!best || v > best.v) best = { o, v, apply: r.apply }
+      }
     }
     if (!best) {
-      // 살 것이 없으면 새로고침 한 번(무료 우선).
-      if (freeRerolls > 0 || run.money >= REROLL_PRICE + 4) {
-        if (freeRerolls > 0) freeRerolls--
-        else run.money -= REROLL_PRICE
-        bump(tally.bought, 'reroll')
-        stock = rollStock({ deck: run.deck, relics: run.relics, luck: run.stats.luck, afterBoss, nextWeathers: planStage(run.floor + 1).weatherIds }, rng)
-        continue
-      }
+      // 살 것이 없으면 새로고침(무료 우선, 유료는 여윳돈이 있을 때).
+      if ((run.shop!.freeRerolls > 0 || run.money >= REROLL_PRICE + 5) && run.reroll()) { bump(tally.bought, 'reroll'); continue }
       break
     }
-    run.money -= best.o.price
+    const key = offerKey(best.o)
     best.apply()
-    bump(tally.bought, offerKey(best.o))
-    stock = stock.filter((x) => x !== best!.o)
+    bump(tally.bought, key)
   }
+  run.leaveShop()
 }
-
-const offerKey = (o: ShopOffer) => (o.kind === 'item' ? `item:${o.rarity}` : `${o.kind}:${o.id}`)
 
 // ── 런 ──
 
-function playRun(bot: Bot, tally: Tally, rng: () => number) {
-  const run = newRun()
+function playRun(bot: Bot, tally: Tally, seed: number) {
+  const run = new ScoreRun(seed)
   tally.runs++
-  for (run.floor = 1; run.floor <= FLOORS; run.floor++) {
-    const moneyIn = run.money
-    const out = playStage(run, bot, tally, rng)
-    const fl = (tally.floors[run.floor] ??= { n: 0, target: 0, scored: 0, sentences: 0, money: 0, deck: 0, relics: 0 })
-    fl.n++; fl.target += out.target; fl.scored += out.scored; fl.sentences += out.sentences
-    fl.money += moneyIn; fl.deck += run.deck.length; fl.relics += run.relics.length
-    if (out.dead) { tally.floorReached.push(run.floor); finish(run, tally); return }
-    run.cleared++
-    const isBoss = !!planStage(run.floor).boss
-    if (isBoss) run.pieces = Math.min(run.stats.mind, run.pieces + PIECES_PER_HEART)
-    if (run.relics.includes('beanstalk') && run.cleared % relicDef('beanstalk').a === 0 && run.stats.mind < relicDef('beanstalk').b * PIECES_PER_HEART) {
-      run.stats = { ...run.stats, mind: run.stats.mind + PIECES_PER_HEART }
-      run.pieces += PIECES_PER_HEART
+  let floorSeen = 0
+  for (let guard = 0; guard < 2000 && (run.phase === 'battle' || run.phase === 'shop'); guard++) {
+    if (run.phase === 'shop') { shop(run, bot, tally); continue }
+    const st = run.stage
+    if (run.floor !== floorSeen) {
+      floorSeen = run.floor
+      const fl = (tally.floors[run.floor] ??= newFloor())
+      fl.n++; fl.target += st.plan.target; fl.money += run.money; fl.deck += run.deck.length; fl.relics += run.relics.length
+      if (CAP) st.plan = { ...st.plan, target: Number.MAX_SAFE_INTEGER }
     }
-    if (run.floor < FLOORS) shop(run, bot, tally, rng, isBoss)
+    if (!run.rescueHand()) { tally.softlocks++; break }
+    const picks = run.handPicks()
+    const pick = choosePick(picks, st.ctx, run.loadout, st.plan.target - st.scored, bot, run.rng)
+    const floor = run.floor
+    const hit = run.overtimeHit()
+    const res = run.play(pick)
+    const fl = tally.floors[floor]
+    fl.scored += res.score; fl.sentences++
+    if (!hit) fl.inChance += res.score
+    if (CAP && run.phase === 'battle' && run.floor === floor && run.stage.ctx.chancesLeft <= 0) run.forceClear()
+    if (GOD && (run.phase as string) === 'lost') { run.phase = 'battle' }
+    if (GOD) run.pieces = Math.max(run.pieces, run.maxPieces)
+    if (hit) { tally.overtime++; tally.heartsLost += hit / PIECES_PER_HEART }
+    for (const id of res.record.wordIds) {
+      bump(tally.cardPlays, id)
+      if (floor >= 10) bump(tally.latePlays, id)
+    }
+    if (run.phase !== 'battle' || run.floor !== floor) {
+      // 스테이지가 끝났다(클리어 또는 패배).
+      if ((run.phase as string) !== 'lost') {
+        const f = (tally.formClears[st.plan.formId] ??= { stages: 0, noOvertime: 0, leftover: 0 })
+        f.stages++
+        if (!st.overtime) f.noOvertime++
+        f.leftover += Math.max(0, st.ctx.chancesLeft)
+      }
+    }
   }
-  tally.wins++
-  tally.floorReached.push(FLOORS + 1)
-  finish(run, tally)
-}
-
-function finish(run: RunState, tally: Tally) {
+  if (run.phase === 'won') tally.wins++
+  tally.floorReached.push(run.phase === 'won' ? FLOORS + 1 : run.floor)
   for (const k of Object.keys(run.stats)) bump(tally.finalStats, k, (run.stats as unknown as Record<string, number>)[k])
   for (const c of run.deck) bump(tally.finalDeckEmotions, cardDef(c.cardId).emotion)
+  bump(tally.finalStats, 'deckSize', run.deck.length)
+  bump(tally.finalStats, 'relicCount', run.relics.length)
 }
+
+const newFloor = () => ({ n: 0, target: 0, scored: 0, inChance: 0, sentences: 0, money: 0, deck: 0, relics: 0 })
 
 // ── 감정 × 형태 곡선 ──
 
@@ -459,12 +396,12 @@ function report(results: Record<string, Tally>) {
   }
 
   for (const t of Object.values(results)) for (const [k, v] of Object.entries(t.floors)) {
-    const f = (all.floors[Number(k)] ??= { n: 0, target: 0, scored: 0, sentences: 0, money: 0, deck: 0, relics: 0 })
-    f.n += v.n; f.target += v.target; f.scored += v.scored; f.sentences += v.sentences; f.money += v.money; f.deck += v.deck; f.relics += v.relics
+    const f = (all.floors[Number(k)] ??= newFloor())
+    f.inChance += v.inChance; f.n += v.n; f.target += v.target; f.scored += v.scored; f.sentences += v.sentences; f.money += v.money; f.deck += v.deck; f.relics += v.relics
   }
   console.log('\n## 층별 (전체 봇, 그 층에 들어간 판 평균)\n')
-  printTable(['층', '판', '목표', '낸 점수', '점수/목표', '문장 수', '입장 돈', '덱', '유물'], Object.entries(all.floors).map(([k, f]) => [
-    k, String(f.n), String(Math.round(f.target / f.n)), String(Math.round(f.scored / f.n)), (f.scored / f.target).toFixed(2),
+  printTable(['층', '판', '목표', '기회 안 점수', '기회 안 점수/목표', '문장 수', '입장 돈', '덱', '유물'], Object.entries(all.floors).map(([k, f]) => [
+    k, String(f.n), String(Math.round(f.target / f.n)), String(Math.round(f.inChance / f.n)), (f.inChance / f.target).toFixed(2),
     (f.sentences / f.n).toFixed(1), (f.money / f.n).toFixed(1), (f.deck / f.n).toFixed(1), (f.relics / f.n).toFixed(1),
   ]))
 
@@ -481,7 +418,7 @@ function report(results: Record<string, Tally>) {
   console.log(`10층 이후 시작 카드 비중: ${starters.map((c) => `${c.name} ${pct(all.latePlays[c.id] ?? 0, lateTotal / 3)}`).join(', ')}`)
 
   console.log('\n## 구매\n')
-  const kinds = ['word', 'sticker', 'relic', 'item', 'heal', 'reroll']
+  const kinds = ['word', 'upgrade', 'sticker', 'relic', 'item', 'heal', 'reroll', 'trade']
   console.log(kinds.map((k) => `${k} ${Object.entries(all.bought).filter(([x]) => x === k || x.startsWith(k + ':')).reduce((a, [, v]) => a + v, 0)}`).join(' · '))
   console.log(`스티커: ${top(Object.fromEntries(Object.entries(all.bought).filter(([k]) => k.startsWith('sticker:')).map(([k, v]) => [k.slice(8), v])), 15).map(([k, v]) => `${k} ${v}`).join(', ')}`)
   console.log(`유물: ${top(Object.fromEntries(Object.entries(all.bought).filter(([k]) => k.startsWith('relic:')).map(([k, v]) => [relicDef(k.slice(6)).name, v])), 24).map(([k, v]) => `${k} ${v}`).join(', ')}`)
@@ -501,11 +438,7 @@ if (args.has('curves')) {
     const tally = newTally()
     currentBot = bot
     currentTally = tally
-    for (let i = 0; i < RUNS; i++) {
-      const rng = mulberry32(SEED * 10007 + i)
-      currentRng = rng
-      playRun(bot, tally, rng)
-    }
+    for (let i = 0; i < RUNS; i++) playRun(bot, tally, SEED * 10007 + i)
     results[bot.name] = tally
     process.stderr.write(`${bot.name} ${pct(tally.wins, tally.runs)} (${((Date.now() - t0) / 1000).toFixed(0)}s)\n`)
   }

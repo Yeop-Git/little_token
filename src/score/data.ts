@@ -52,5 +52,23 @@ export const PIECES_PER_SOUL = 3
 /** 기회를 다 쓴 뒤 한 문장을 더 쓸 때마다 잃는 하트 조각(§1 "한 대씩"). 기획안에 수치가 없어 초안. */
 export const OVERTIME_HIT_PIECES = 4
 /** 클리어 돈: 기본 + 남은 기회 1당. 기획안에 기본값이 없어 초안. */
-export const CLEAR_MONEY_BASE = 4
-export const MONEY_PER_LEFTOVER_CHANCE = 1
+export const CLEAR_MONEY_BASE = 7
+export const MONEY_PER_LEFTOVER_CHANCE = 2
+/** 반복 구매 강화: 단계마다 핵심 수치 +20%, 최대 3단계. 초안. */
+export const LEVEL_STEP = 0.2
+export const MAX_LEVEL = 3
+
+/** 강화 단계를 반영한 카드 정의. */
+export function leveled(def: CardDef, level: number): CardDef {
+  if (!level || !def.grow) return def
+  const k = 1 + LEVEL_STEP * Math.min(MAX_LEVEL, level)
+  const out = { ...def }
+  for (const ch of def.grow) {
+    const key = ch.toLowerCase() as 'a' | 'b' | 'c' | 'd'
+    out[key] = ch === key ? def[key] * k : 1 + (def[key] - 1) * k
+  }
+  return out
+}
+
+/** 한 런의 층 수. */
+export const FLOORS_TOTAL = SCORE_FLOORS.length

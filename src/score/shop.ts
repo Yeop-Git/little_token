@@ -3,22 +3,38 @@
  * 가게 셋: 문방구(스티커·소품), 헌책방(단어 낱장), 필통 가게(유물). 보스를 넘긴 날은 가게가 하나 더 열린다.
  * 가격 중 기획안에 없는 것(단어, 소품, 새로고침, 하트 회복 외)은 초안 상수다.
  */
-import { SCORE_CARDS, SCORE_RELICS, SCORE_STATS, SCORE_STICKERS, SCORE_WEATHERS, relic as relicDef } from './data'
+import { MAX_LEVEL, SCORE_CARDS, SCORE_RELICS, SCORE_STATS, SCORE_STICKERS, SCORE_WEATHERS, relic as relicDef } from './data'
 import type { DeckCard, ScoreStats, StatDef, StatEmotion } from './types'
 import { STAT_EMOTIONS } from './types'
 
-export const WORD_PRICE = 4
-export const WORD_PRICE_COST2 = 5
-export const ITEM_PRICE = 6
+export const WORD_PRICE = 3
+export const WORD_PRICE_COST2 = 4
+export const ITEM_PRICE = 7
 export const REROLL_PRICE = 2
 /** §10: 상점에서 돈 10으로 하트 1개 회복. */
 export const HEAL_PRICE = 10
 export const RELIC_SLOTS = 5
-/** 칸 수가 바뀌는 3차 유물은 계산기가 아직 처리하지 않아 진열하지 않는다. */
-export const UNSHELVED_RELICS = ['twinSubj', 'twinVerb']
+/** 진열된 단어가 이미 가진 단어의 강화로 나올 확률. */
+export const UPGRADE_OFFER_RATE = 0.25
+export const wordPrice = (cost: number) => (cost === 2 ? WORD_PRICE_COST2 : WORD_PRICE)
+/** 팔기는 반값(§11), 지우개는 단어를 덱에서 뺀다. 지우개 가격은 초안. */
+export const ERASER_PRICE = 3
+/** 덱이 문장을 만들 수 있도록 칸마다 남겨야 하는 최소 장 수. */
+export const MIN_SLOT_CARDS = 2
+
+/** 하트 거래(§10). 가격은 하트 조각. 마지막 하트 1개는 낼 수 없다. */
+export const HEART_TRADES = {
+  sticker: { pieces: 1, name: '스티커 직접 고르기' },
+  exchange: { pieces: 4, name: '환전', money: 15 },
+  recall: { pieces: 4, name: '되새김', levels: 2 },
+  pledge: { pieces: 4, name: '굳은 약속', bonus: 3 },
+  haggle: { pieces: 8, name: '유물 흥정', candidates: 3 },
+  sixthSlot: { pieces: 12, name: '여섯 번째 칸' },
+} as const
+export type HeartTradeId = keyof typeof HEART_TRADES
 
 export type ShopOffer =
-  | { kind: 'word'; id: string; price: number; guaranteed?: boolean }
+  | { kind: 'word'; id: string; price: number; guaranteed?: boolean; upgradeUid?: number }
   | { kind: 'sticker'; id: string; price: number }
   | { kind: 'relic'; id: string; price: number }
   | { kind: 'item'; rarity: Rarity; price: number }
@@ -74,11 +90,24 @@ function guaranteedWords(input: StockInput, rng: () => number): ShopOffer[] {
 
 export function rollStock(input: StockInput, rng: () => number): ShopOffer[] {
   const owned = new Set(input.deck.map((c) => c.cardId))
-  const words = sample(SCORE_CARDS.filter((c) => !owned.has(c.id)), 4, rng).map((c): ShopOffer => ({
-    kind: 'word', id: c.id, price: c.cost === 2 ? WORD_PRICE_COST2 : WORD_PRICE,
-  }))
+  const fresh = SCORE_CARDS.filter((c) => !owned.has(c.id))
+  // 이미 가진 단어가 다시 나오면 반복 구매 강화다(§11 "반복 구매로 강화").
+  const upgradable = input.deck.filter((d) => d.level < MAX_LEVEL && !!SCORE_CARDS.find((c) => c.id === d.cardId)?.grow)
+  const words: ShopOffer[] = []
+  const freshPicks = sample(fresh, 4, rng)
+  const upPicks = sample(upgradable, 4, rng)
+  for (let i = 0; i < 4; i++) {
+    const up = upPicks.length && rng() < UPGRADE_OFFER_RATE ? upPicks.pop() : undefined
+    if (up) {
+      const c = SCORE_CARDS.find((x) => x.id === up.cardId)!
+      words.push({ kind: 'word', id: c.id, price: wordPrice(c.cost), upgradeUid: up.uid })
+    } else {
+      const c = freshPicks.pop()
+      if (c) words.push({ kind: 'word', id: c.id, price: wordPrice(c.cost) })
+    }
+  }
   const stickers = sample(SCORE_STICKERS, 3, rng).map((s): ShopOffer => ({ kind: 'sticker', id: s.id, price: s.price }))
-  const relicPool = SCORE_RELICS.filter((r) => !input.relics.includes(r.id) && !UNSHELVED_RELICS.includes(r.id))
+  const relicPool = SCORE_RELICS.filter((r) => !input.relics.includes(r.id))
   const relics = sample(relicPool, input.afterBoss ? 3 : 2, rng).map((r): ShopOffer => ({ kind: 'relic', id: r.id, price: r.price }))
   const items: ShopOffer[] = Array.from({ length: input.afterBoss ? 2 : 1 }, () => ({
     kind: 'item', rarity: rollRarity(input.luck, rng), price: ITEM_PRICE,
@@ -110,10 +139,10 @@ export function forgeChoices(stats: ScoreStats, rng: () => number): StatDef[][] 
   })
 }
 
-/** 등급 보너스 점수를 세 칸에 무작위로 나눈다. */
-export function bonusSpread(rarity: Rarity, rng: () => number): number[] {
+/** 등급 보너스 점수(+굳은 약속)를 세 칸에 무작위로 나눈다. */
+export function bonusSpread(rarity: Rarity, rng: () => number, extra = 0): number[] {
   const out = [0, 0, 0]
-  for (let i = 0; i < RARITY_BONUS[rarity]; i++) out[Math.floor(rng() * 3)]++
+  for (let i = 0; i < RARITY_BONUS[rarity] + extra; i++) out[Math.floor(rng() * 3)]++
   return out
 }
 

@@ -1,8 +1,9 @@
 # 리틀토큰 코어 재기획안: 점수 구조
 
-> **상태: 기획안 (구현 중 — 브랜치 `claude/project-thread-68eo4a`, 진행 상황은 `SCORE_REDESIGN_HANDOFF.md`).** 이 문서는 현재 런타임을 설명하지 않는다. 현재 규칙은 `AGENTS.md`와
+> **상태: 기획안 (시험판 구현됨 — 브랜치 `claude/project-thread-68eo4a`, `/score.html`, 진행 상황은 `SCORE_REDESIGN_HANDOFF.md`).** 이 문서는 현재 런타임을 설명하지 않는다. 현재 규칙은 `AGENTS.md`와
 > `SENTENCE_COMBAT_SPEC.md`가 기준이며, 이 문서의 내용은 **별도 브랜치에서 구현하고 시험한 뒤에만**
-> 본 규칙으로 승격한다. 수치는 모두 시뮬레이션 전의 초안이다.
+> 본 규칙으로 승격한다. 이 문서의 수치는 초안이고, 시뮬로 맞춘 현재 값은 `src/score/csv`와
+> `docs/score-redesign/SIM_RESULTS.md`가 기준이다(목표 곡선 §1은 측정값에 맞춰 낮췄다).
 > 확정/초안/미정 구분은 마지막 장을 본다.
 
 ## 0. 모토: DDD (도파민 중심 개발)

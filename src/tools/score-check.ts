@@ -2,7 +2,9 @@
  * 점수 재기획안 단위 검사 (SCORE_REDESIGN.md §4·§5·§15의 예시 수치를 그대로 확인한다).
  * 실행: npm run score:check
  */
-import { SCORE_CARDS, startingStats } from '../score/data'
+import { MAX_LEVEL, SCORE_CARDS, card as cardDef, leveled, startingStats } from '../score/data'
+import { ScoreRun } from '../score/run'
+import { HEART_TRADES, MIN_SLOT_CARDS } from '../score/shop'
 import { critInfo, expectedRoller, expectedScore, scoreSentence, validatePick } from '../score/scoring'
 import { applySentence, planStage, startStage } from '../score/stage'
 import type { DeckCard, ScoreLoadout, ScoreStats, SentencePick, StageContext } from '../score/types'
@@ -151,10 +153,109 @@ for (const c of SCORE_CARDS) {
 // §1 목표 곡선과 스테이지 진행.
 {
   check('1층 목표 48', planStage(1).target === 48, String(planStage(1).target))
-  check('15층 보스 목표 90,000', planStage(15).target === 90000)
+  check('모든 층의 목표와 기회가 양수', Array.from({ length: 15 }, (_, i) => planStage(i + 1)).every((p) => p.target > 0 && p.chances > 0))
   check('6층 장마 기회 10', planStage(6).chances === 10)
   const st = startStage(planStage(1), loadout({ startTears: 3 }, ['diary']))
   check('시작 눈물 = 스탯 3 + 낡은 일기장 3', st.tears === 6)
+}
+
+// 반복강화: grow 소문자는 값 전체, 대문자는 1을 넘는 몫만 키운다. 상한은 MAX_LEVEL.
+{
+  const na = cardDef('na')
+  check('강화 1단계: 나는 가산 0.5 → 0.6', near(leveled(na, 1).a, 0.6))
+  check('강화는 MAX_LEVEL에서 멈춘다', near(leveled(na, MAX_LEVEL + 5).a, leveled(na, MAX_LEVEL).a))
+  const upper = SCORE_CARDS.find((c) => /[A-D]/.test(c.grow ?? ''))
+  if (upper) {
+    const key = (upper.grow!.match(/[A-D]/)![0].toLowerCase()) as 'a' | 'b' | 'c' | 'd'
+    check('대문자 grow: 1을 넘는 몫만 20%', near(leveled(upper, 1)[key], 1 + (upper[key] - 1) * 1.2), `${upper.id}.${key}`)
+  }
+  const none = SCORE_CARDS.find((c) => !c.grow)
+  if (none) check('grow가 없으면 그대로', leveled(none, 3) === none)
+  const base = scoreSentence(pick('na', 'dandan', 'gamssat'), ctx(), loadout(), expectedRoller, NO_CRIT)
+  const p2 = pick('na', 'dandan', 'gamssat'); p2.subj.level = 2
+  const up = scoreSentence(p2, ctx(), loadout(), expectedRoller, NO_CRIT)
+  check('강화한 카드는 점수가 오른다', up.score > base.score, `${base.score} → ${up.score}`)
+}
+
+// 겹주어·겹동사: 유물이 있어야 둘째 칸을 쓸 수 있고, 둘째 동사는 절반 칩.
+{
+  const one = pick('na', 'dandan', 'gamssat')
+  const twoS: SentencePick = { ...pick('na', 'dandan', 'gamssat'), subj2: dc('hwanan') }
+  const tr = new ScoreRun(1)
+  check('겹주어 유물 없이 둘째 주어는 막힌다', !tr.validate(twoS).ok)
+  tr.relics.push('twinSubj')
+  check('겹주어 유물이 있으면 놓인다', tr.validate(twoS).ok)
+  const r1 = scoreSentence(one, ctx(), loadout({}, ['twinSubj']), expectedRoller, NO_CRIT)
+  const r2 = scoreSentence(twoS, ctx(), loadout({}, ['twinSubj']), expectedRoller, NO_CRIT)
+  check('둘째 주어의 가산이 더해진다', r2.score > r1.score, `${r1.score} → ${r2.score}`)
+  const twoV: SentencePick = { ...pick('na', 'dandan', 'gamssat'), verb2: dc('ttaeryeot') }
+  check('겹동사 유물 없이 둘째 동사는 막힌다', !tr.validate(twoV).ok)
+  const v1 = scoreSentence(one, ctx(), loadout({}, ['twinVerb']), expectedRoller, NO_CRIT)
+  const v2 = scoreSentence(twoV, ctx(), loadout({}, ['twinVerb']), expectedRoller, NO_CRIT)
+  check('둘째 동사는 절반 칩을 더한다', near(v2.chips - v1.chips, startingStats().anger * 0.5), `${v1.chips} → ${v2.chips}`)
+}
+
+// 런 엔진: 같은 씨앗은 같은 런, 전투 → 상점 → 재련 → 다음 층.
+{
+  const playOut = (seed: number) => {
+    const run = new ScoreRun(seed)
+    let guard = 0
+    while (run.phase === 'battle' && run.floor === 1 && guard++ < 50) {
+      if (!run.rescueHand()) break
+      const best = run.handPicks().sort((a, b) => run.preview(b) - run.preview(a))[0]
+      run.play(best)
+    }
+    return run
+  }
+  const a = playOut(11)
+  const b = playOut(11)
+  check('씨앗이 같으면 같은 런', a.money === b.money && a.stage.scored === b.stage.scored && JSON.stringify(a.shop?.stock) === JSON.stringify(b.shop?.stock))
+  check('1층을 넘기면 상점', a.phase === 'shop' && !!a.shop && a.money > 0, a.phase)
+  check('상점은 다음 두 층을 예보한다', a.shop!.forecast.length === 2 && a.shop!.forecast[0].floor === 2)
+
+  // 살 수 없는 것은 막힌다.
+  const dear = a.shop!.stock.find((o) => o.price > a.money)
+  if (dear) check('돈이 모자라면 못 산다', !a.buy(dear))
+  // 단어 사기.
+  a.money = 99
+  const word = a.shop!.stock.find((o) => o.kind === 'word' && o.upgradeUid == null)
+  if (word) {
+    const n = a.deck.length
+    const m = a.money
+    check('단어를 사면 단어장에 들어간다', a.buy(word) && a.deck.length === n + 1 && a.money === m - word.price)
+  }
+  // 소품 → 재련 3칸 → 상점 복귀.
+  const item = a.shop!.stock.find((o) => o.kind === 'item')
+  if (item) {
+    const before = JSON.stringify(a.stats)
+    check('소품을 사면 재련이 열린다', a.buy(item) && (a.phase as string) === 'forge' && !!a.forge)
+    let steps = 0
+    while ((a.phase as string) === 'forge' && steps++ < 5) a.forgeChoose(a.forge!.choices[a.forge!.step][0].id)
+    check('재련은 세 칸을 고르면 끝난다', steps === 3 && (a.phase as string) === 'shop')
+    check('재련이 스탯을 올린다', JSON.stringify(a.stats) !== before)
+  }
+  // 칸마다 최소 장수는 지킨다.
+  const subj = a.deck.filter((c) => cardDef(c.cardId).slot === 'subj')
+  let sold = 0
+  for (const c of subj) if (a.sell(c.uid)) sold++
+  check('칸의 단어는 최소 장수 아래로 못 판다', a.deck.filter((c) => cardDef(c.cardId).slot === 'subj').length === MIN_SLOT_CARDS && sold === subj.length - MIN_SLOT_CARDS)
+  // 하트 거래: 현재 하트로 내고 마지막 하트는 못 낸다.
+  const pieces = a.pieces
+  const m2 = a.money
+  check('환전: 조각을 내고 돈을 받는다', a.trade('exchange') && a.pieces === pieces - HEART_TRADES.exchange.pieces && a.money > m2)
+  while (a.canTrade('exchange').ok) a.trade('exchange')
+  check('하트 거래는 마지막 하트를 남긴다', a.pieces >= 1 && !a.canTrade('exchange').ok, String(a.pieces))
+  check('상점을 나서면 2층 전투', a.leaveShop() && a.floor === 2 && (a.phase as string) === 'battle')
+
+  // 구제: 손패로 문장을 못 만들면 새로 뽑는다.
+  const r = new ScoreRun(5)
+  check('시작 손패로 문장을 만들 수 있다', r.rescueHand() && r.handPicks().length > 0)
+  // 연장전: 기회를 다 쓰면 하트를 낸다.
+  r.stage.ctx = { ...r.stage.ctx, chancesLeft: 0 }
+  r.stage.plan = { ...r.stage.plan, target: 1e12 }
+  const hp = r.pieces
+  r.play(r.handPicks()[0])
+  check('연장전은 하트 조각을 깎는다', r.pieces < hp, `${hp} → ${r.pieces}`)
 }
 
 console.log(`score:check — 통과 ${passes} · 실패 ${failures}`)
