@@ -126,6 +126,18 @@ export const UI_KO = {
   tokenOvertime: '기회를 다 썼어... 이제부터는 한 문장마다 아파!',
   tokenBigHit: '우와, 방금 문장 대단했어!',
   tokenBoss: '보스야! 날씨가 두 개나 걸렸어. 조심해!',
+  chanceLabel: '기회',
+  toBoss: '{boss}까지 {n}층',
+  bossNow: '{boss} 보스전',
+  bestPreview: '최대',
+  settings: '설정',
+  reason_noFit: '지금 고른 단어와 문장을 이룰 수 없다',
+  shopTitle: '모은 돈으로 단어장을 키우자!',
+  kind_word: '단어',
+  kind_sticker: '스티커',
+  kind_relic: '유물',
+  forgeDone: '재련 완료',
+  forgeSub: '세 마디를 골라 스탯을 새긴다',
 } as const
 
 export type UiKey = keyof typeof UI_KO
