@@ -4,9 +4,10 @@
 충돌하면 현재 런타임을 먼저 확인하고, 기획 의도를 보존하는 방향으로 차이를
 명시적으로 해소한다.
 
-> 점수 구조 재기획(`SCORE_REDESIGN.md`)은 `src/score/`와 `/score.html` 시험판에서 따로 구현·시험 중이다.
-> 아직 본 규칙이 아니므로 이 문서의 규칙을 바꾸지 않는다. 진행 상황은 `SCORE_REDESIGN_HANDOFF.md`를 본다.
-> `src/score/`는 `src/core`·`src/views`를 import하지 않고, 그 반대도 마찬가지다.
+> 점수 구조 재기획(`SCORE_REDESIGN.md`)은 `src/score/` 엔진으로 구현돼 있고, 로컬 브랜치 `score-redesign-ingame`
+> (v_0.16.0~)에서는 타이틀의 시작이 이 루프로 들어간다(`src/views/ScoreRunView.ts`, 기존 루프는 `?loop=legacy`).
+> 손맛 검증 전이라 이 문서의 규칙은 아직 바꾸지 않는다. 진행 상황은 `SCORE_REDESIGN_HANDOFF.md`를 본다.
+> `src/score/`는 `src/core`·`src/views`를 import하지 않는다. 화면 쪽에서 `src/score`를 읽는 곳은 `ScoreRunView`와 `main.ts`뿐이다.
 
 ## 프로젝트 정체성
 

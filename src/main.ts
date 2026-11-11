@@ -42,6 +42,7 @@ import { installResourceFailureMonitor } from '@/ui/ResourceFailures'
 import { pickFieldBackground, type FieldBackground } from '@data/backgrounds'
 import { installMobileViewport } from '@/ui/MobileViewport'
 import { installRuntimeErrorBoundary } from '@/ui/RuntimeErrorBoundary'
+import type { ScoreRun } from '@/score/run'
 
 /** 시네마틱이 걷힌 뒤 제목·메뉴를 올리기까지 두는 시간. */
 const TITLE_UI_HOLD_MS = 850
@@ -470,11 +471,16 @@ function goTitle(withIntro: unknown = false) {
   reset()
   stage.setAttribute('data-theme', 'day')
   const title = new TitleView(stage, {
-    hasSave: !!loadRun(),
+    // 점수 재기획 루프는 저장이 없다. 이어하기는 이번 실행 동안 메모리에 든 런만 잇는다.
+    hasSave: !!scoreRun,
     holdUi: playIntro,
     onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
+      if (USE_SCORE_LOOP) {
+        void goScoreRun(fresh || !scoreRun)
+        return
+      }
       if (fresh) clearRun()
       const saved = fresh ? null : loadRun()
       run = saved ?? newRun()
@@ -519,6 +525,42 @@ function goTitle(withIntro: unknown = false) {
     clearTimeout(thawTimer)
     intro.destroy()
   }
+}
+
+/**
+ * 점수 재기획(SCORE_REDESIGN.md) 루프. 전투 → 상점 ⇄ 재련 → 다음 층을 한 화면 컨트롤러가 돈다.
+ * `?loop=legacy`로 들어오면 기존 잉크·적 턴 루프를 그대로 쓸 수 있다(비교용).
+ */
+const USE_SCORE_LOOP = new URLSearchParams(location.search).get('loop') !== 'legacy'
+let scoreRun: ScoreRun | null = null
+
+async function goScoreRun(fresh: boolean) {
+  const request = ++battleRequest
+  const [{ ScoreRun }, { ScoreRunView }] = await Promise.all([
+    import('@/score/run'),
+    import('@views/ScoreRunView'),
+  ])
+  if (request !== battleRequest) return
+  if (fresh || !scoreRun) {
+    const seedParam = Number(new URLSearchParams(location.search).get('seed'))
+    scoreRun = new ScoreRun(Number.isFinite(seedParam) && seedParam > 0 ? seedParam : Math.floor(Math.random() * 1e9))
+    // 새 런은 토큰의 기분도 평정에서 다시 시작한다. 유대·성향·기억은 남는다.
+    sharedTokenMind().beginRun()
+  }
+  reset()
+  const active = scoreRun
+  current = new ScoreRunView(stage, {
+    run: active,
+    dev: import.meta.env.DEV,
+    onHome: () => goTitle(),
+    onNewRun: () => void goScoreRun(true),
+    onFinished: (outcome, floor) => {
+      // 런이 끝나는 길목. 토큰은 여기서만 이번 런을 기억에 넣는다(승패 모두 한 번).
+      sharedTokenMind().endRun({ day: floor, outcome: outcome === 'won' ? 'clear' : 'defeat' })
+      if (scoreRun === active) scoreRun = null
+    },
+  })
+  mountVersion()
 }
 
 async function goCombatGuide() {
@@ -1081,5 +1123,6 @@ else if (start === 'defeat') goDefeat()
 else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
 else if (start === 'guide') goCombatGuide()
+else if ((start as string) === 'score') void goScoreRun(true)
 // 부팅으로 들어온 타이틀에서만 오프닝 시네마틱을 튼다(?scene=title이면 검수용이라 건너뛴다).
 else goTitle(!params.get('scene'))

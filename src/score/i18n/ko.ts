@@ -115,6 +115,17 @@ export const UI_KO = {
   language: '언어',
   stats: '스탯',
   back: '본 게임으로',
+  home: '홈으로',
+  toTitle: '타이틀로',
+  score: '점수',
+  goShop: '상점으로',
+  closeDetail: '닫기',
+  tokenStart: '목표 점수를 넘기면 벌레들이 물러나! 단어를 골라 문장을 써 봐.',
+  tokenClear: '해냈어! 상점에 들러서 단어장을 키워 보자!',
+  tokenLast: '마지막 기회야! 가장 센 문장으로 가자!',
+  tokenOvertime: '기회를 다 썼어... 이제부터는 한 문장마다 아파!',
+  tokenBigHit: '우와, 방금 문장 대단했어!',
+  tokenBoss: '보스야! 날씨가 두 개나 걸렸어. 조심해!',
 } as const
 
 export type UiKey = keyof typeof UI_KO
