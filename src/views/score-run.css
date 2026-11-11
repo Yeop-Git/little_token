@@ -831,3 +831,47 @@ button.sr-dock-relic { font-size: 14px; }
 .sr-shop .reward-side :is(.reward-deck, .reward-refresh):not([disabled]) { opacity: 1 !important; color: #fff1d2 !important; filter: none !important; }
 /* 집계판 아래 내역 칩 줄이 벌레 이름표와 겹치지 않게 조금 올린다 */
 .score-battle .tally { top: 31%; }
+
+/* ── 칩 수치 키우기 · 글자 외곽선 (v_0.16.3) ── */
+.rc {
+  border: 1.5px solid rgba(20, 10, 4, 0.75);
+  text-shadow: -1px -1px 0 rgba(20, 10, 4, 0.85), 1px -1px 0 rgba(20, 10, 4, 0.85), -1px 1px 0 rgba(20, 10, 4, 0.85), 1px 1px 0 rgba(20, 10, 4, 0.85), 0 2px 3px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+/* 칩 안의 숫자(+0.6, ×1.5, = …)는 이름보다 한 단 크게 */
+.rc i { font-size: 1.3em; font-weight: 900; letter-spacing: -0.01em; }
+.rc.rc-bare { font-size: 1.15em; }
+.rc-crit, .rc-emo { text-shadow: -1px -1px 0 rgba(255, 255, 255, 0.55), 1px 1px 0 rgba(255, 255, 255, 0.55); }
+.rc-cond { border: 0; border-bottom: 2px solid currentColor; box-shadow: none; text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9); }
+.card-face:not(.art) .rc-cond { text-shadow: none; }
+/* 칩 밖에 홀로 선 수치(+1.2, × 0.8)도 크고 외곽선 있게 */
+.rc-num {
+  font-size: 1.25em;
+  color: #fff3cf;
+  text-shadow: -1px -1px 0 #1c0f06, 1px -1px 0 #1c0f06, -1px 1px 0 #1c0f06, 1px 1px 0 #1c0f06;
+}
+.card-face:not(.art) .rc-num { color: #3a1f08; text-shadow: none; }
+/* 카드 앞면 설명: 글자 자체에도 외곽선을 둘러 원화 위에서 묻히지 않게 */
+.score-battle .word-card .card-front.art .card-note-text {
+  color: #fff7e2;
+  text-shadow: -1px -1px 0 #1c0f06, 1px -1px 0 #1c0f06, -1px 1px 0 #1c0f06, 1px 1px 0 #1c0f06, 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+.score-battle .word-card .card-note-text { font-size: 15px; }
+.score-battle .word-card .card-note-text .rc { font-size: 14px; }
+/* 상세 패널·상점 */
+.score-battle .sr-rule-v, .sr-shop .sr-rule-v { font-size: 21px; }
+.score-battle .sr-rule-v .rc, .sr-shop .sr-rule-v .rc { font-size: 19px; }
+.sr-shop .reward-pick .rp-effect-copy { font-size: 14px; text-shadow: -1px -1px 0 #1c0f06, 1px -1px 0 #1c0f06, -1px 1px 0 #1c0f06, 1px 1px 0 #1c0f06; }
+.sr-shop .reward-pick .rp-effect-copy .rc { font-size: 14px; }
+.sr-dock-card-rule { font-size: 14px; }
+.sr-dock-card-rule .rc { font-size: 13.5px; }
+.sr-rule-chip .rc { font-size: 16px; }
+/* 예상 점수·목표·집계판 숫자도 외곽선 */
+.sr-mn-part b, .score-battle .sr-goal-hud .hpn b, .score-battle .tally-box b, .score-battle .tally-total {
+  text-shadow: -2px -2px 0 #1c0f06, 2px -2px 0 #1c0f06, -2px 2px 0 #1c0f06, 2px 2px 0 #1c0f06, 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+.sr-mn-part b { font-size: 36px; }
+.sr-mn-part.total b { font-size: 44px; }
+.score-battle .tally-chip { font-size: 18px; text-shadow: -1px -1px 0 #1c0f06, 1px 1px 0 #1c0f06; }
+/* 긴 설명 카드가 아래로 잘리지 않게 일반 글자는 한 단 작게, 칩은 그대로 */
+.score-battle .word-card .card-note-text { font-size: 13.5px; line-height: 1.3; }
