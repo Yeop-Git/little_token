@@ -1,0 +1,16 @@
+floor,form,weather,weather2,enemies,hp,boss,note
+1,standard,clear,,8,6,,한 문장에 대부분 쓸림
+2,standard,clear,,10,7,,
+3,standard,rain,,13,9,,
+4,blitz,sunset,,16,14,,
+5,standard,gust,eclipse,20,25,mantis,사마귀 (보스 제약은 초안)
+6,monsoon,drizzle,,26,18,,
+7,chain,gust,,40,22,,
+8,standard,heat,,50,30,,
+9,gamble,hail,,70,40,,
+10,standard,rain,hail,80,100,queenBee,여왕벌 (보스 제약은 초안)
+11,bazaar,eclipse,,110,70,,
+12,monsoon,fog,,150,87,,
+13,chain,snow,,280,75,,
+14,gamble,drowsy,,280,95,,
+15,standard,fog,drowsy,300,300,elderSpider,장로거미 (보스 제약은 초안)
