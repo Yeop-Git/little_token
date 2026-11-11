@@ -746,3 +746,88 @@ button.sr-dock-relic { font-size: 14px; }
 .sr-screen .e-pleasure { --emo: #7fd6a4; }
 .sr-screen .e-chaos { --emo: #c4a0f2; }
 .sr-end-card .sr-end-ops button { min-height: 54px; padding: 0 30px; font-size: 20px; }
+
+/* ── 규칙 칩 (scoreRuleChips.ts) — 집계판과 같은 색: 파랑 = 깡 점수, 빨강 = 배율 ── */
+.rc-line { display: block; line-height: 1.5; }
+.rc-line + .rc-line { margin-top: 2px; }
+.rc {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 1px;
+  border-radius: 6px;
+  font-weight: 900;
+  line-height: 1.35;
+  white-space: nowrap;
+  color: #fff;
+  font-style: normal;
+}
+.rc i { font-style: normal; }
+.rc-chips { background: #2f6fd0; }
+.rc-mult { background: #d0453a; }
+.rc-tears { background: #2b93b8; }
+.rc-crit { background: #e2ad24; color: #2a1a00; }
+.rc-chance { background: #3d9a6a; }
+.rc-sticker { background: #8257b8; }
+.rc-cond { background: none; color: #ffd88a; padding: 0 1px; border-radius: 0; border-bottom: 2px solid currentColor; }
+.rc-emo { color: #1c120c; background: var(--emo, #e9d9ba); }
+.rc-num { font-weight: 900; }
+.rc.e-anger, .rc-emo.e-anger { --emo: #ff8a72; }
+.rc.e-sorrow, .rc-emo.e-sorrow { --emo: #7fb2ee; }
+.rc.e-joy, .rc-emo.e-joy { --emo: #f2cc55; }
+.rc.e-pleasure, .rc-emo.e-pleasure { --emo: #7fd6a4; }
+.rc.e-chaos, .rc-emo.e-chaos { --emo: #c4a0f2; }
+/* 원화 없는 밝은 카드 면에서는 조건 밑줄을 진하게 */
+.card-face:not(.art) .rc-cond { color: #8a5200; }
+/* 손패 카드 안: 칩 줄이 카드 폭을 넘지 않게 줄바꿈을 허용한다 */
+.score-battle .word-card .card-note-text { display: block; white-space: normal; font-size: 13px; line-height: 1.35; text-align: center; }
+.score-battle .word-card .card-note-text .rc { white-space: normal; font-size: 12.5px; }
+.sr-rule-v { text-align: left; font-size: 16px; line-height: 1.5; }
+.sr-rule-chip .rc-line { display: inline; }
+.sr-rule-chip .rc-line + .rc-line::before { content: ' · '; }
+.sr-shop .reward-pick .rp-effect-copy .rc { font-size: 12.5px; }
+
+/* ── 가시성 검수 (v_0.16.2) ── */
+/* 좌상단: 돈·눈물 다음 줄로 하트·감정 스탯을 내려 목표판 밑으로 파고들지 않게 한다 */
+.score-battle .hud-left-status { flex-wrap: wrap; max-width: 520px; }
+.score-battle .hud-left-status #stats { flex-basis: 100%; justify-content: flex-start; }
+.score-battle #stats .hud-stat b { font-size: 22px; }
+/* 목표 점수판: 점수 숫자를 크게 */
+.score-battle .sr-goal-hud .hpn { font-size: 30px; font-weight: 900; }
+.score-battle .sr-goal-hud .hpn b { font-size: 38px; }
+.score-battle .sr-goal-hud .boss-health-mark { font-size: 15px; }
+.sr-rule-row { gap: 8px; }
+.sr-rule-chip { font-size: 17px; padding: 4px 12px; }
+.sr-rule-chip .rc { font-size: 15px; }
+/* 동사 카드의 「공격」 표시는 점수 루프에 없는 개념이라 숨긴다 */
+.score-battle .word-card .card-action-inline { display: none; }
+.score-battle .word-card .card-note-text { font-size: 14px; }
+.score-battle .word-card .card-note-text .rc { font-size: 13.5px; }
+/* 지금 배율 → 깡 점수 × 배율 = 예상 점수 세 칸 */
+.score-battle .sr-mult-now { display: flex; align-items: center; gap: 10px; padding: 8px 16px; top: 296px; }
+.sr-mn-part { display: flex; flex-direction: column; align-items: center; line-height: 1; padding: 4px 12px 6px; border-radius: 10px; }
+.sr-mn-part small { font-size: 14px; font-weight: 800; opacity: 0.9; margin-bottom: 3px; color: #fff; }
+.sr-mn-part b { font-size: 32px; color: #fff; }
+.sr-mn-part.chips { background: #2f6fd0; }
+.sr-mn-part.mult { background: #d0453a; }
+.sr-mn-part.total { background: rgba(255, 227, 154, 0.16); box-shadow: inset 0 0 0 2px #ffe39a; }
+.sr-mn-part.total b { color: #ffe39a; font-size: 38px; }
+.sr-mn-op { font-size: 28px; color: #f6e7c8; font-weight: 900; }
+/* 집계판이 뜨는 동안 문장 체인과 예상 점수는 비켜 준다 (같은 숫자가 두 겹으로 보이지 않게) */
+.score-battle.sr-tallying :is(#chain, #mult-now) { opacity: 0; transition: opacity 0.15s ease; }
+/* 상세 패널 규칙을 크게 */
+.score-battle .sr-rule-v, .sr-shop .sr-rule-v { font-size: 19px; }
+.score-battle .sr-rule-v .rc, .sr-shop .sr-rule-v .rc { font-size: 17px; }
+.score-battle .wd-values .v.flat { font-size: 17px; }
+/* 남은 기회 글자 */
+.score-battle .sr-chance-meter .ink-meter-copy small { font-size: 18px; }
+/* 상점 오른쪽 줄: 패널이 길어져 「다음 층으로」가 화면 밖으로 밀리지 않게, 버튼 글자는 또렷하게 */
+.sr-shop .sr-shop-dock { max-height: 560px; flex: none; }
+.sr-shop .reward-side :is(.reward-deck, .reward-refresh) { opacity: 1; color: #fff1d2; font-size: 17px; font-weight: 800; }
+.sr-shop .reward-side :is(.reward-deck, .reward-refresh)[disabled] { opacity: 0.45; }
+.sr-shop .sr-forecast-row { font-size: 17px; }
+.sr-shop .reward-wallet-earned .sr-heart { width: 24px; height: 22px; }
+.score-battle .chain-rail { top: 178px; }
+.score-battle .sr-mult-now { top: 262px; padding: 6px 14px; }
+.sr-shop .reward-side :is(.reward-deck, .reward-refresh):not([disabled]) { opacity: 1 !important; color: #fff1d2 !important; filter: none !important; }
+/* 집계판 아래 내역 칩 줄이 벌레 이름표와 겹치지 않게 조금 올린다 */
+.score-battle .tally { top: 31%; }

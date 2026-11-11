@@ -28,7 +28,7 @@ export const UI_KO = {
   level: '강화 {n}',
   resting: '쉬는 중',
   preview: '예상',
-  chips: '칩',
+  chips: '깡 점수',
   mult: '배율',
   crit: '대성공',
   critChance: '대성공 {p}%',

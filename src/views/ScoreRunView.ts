@@ -37,6 +37,7 @@ import { GameAudio } from '@/audio/GameAudio'
 import { BACKGROUNDS, FORGE_HAMMER_ART, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART } from '@/assets'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { wordCardInnerHtml } from '@/ui/WordCardFace'
+import { gameWords, ruleChipsHtml } from '@views/scoreRuleChips'
 import { CardHand } from '@/ui/CardHand'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon, itemArt } from '@/ui/Icons'
@@ -97,6 +98,8 @@ function cardRule(c: DeckCard): string {
 }
 const stickerRule = (id: string) => { const d = stickerDef(id); return contentRule('sticker', id, { a: d.a, b: d.b }) }
 const relicRule = (id: string) => { const d = relicDef(id); return contentRule('relic', id, { a: d.a, b: d.b }) }
+/** 스탯 이름도 게임 화면의 말로(기본 칩 → 기본 깡 점수, 기본 가산 → 기본 배율). */
+const statName = (id: string) => gameWords(contentName('stat', id))
 const weatherRule = (id: string) => contentRule('weather', id, { a: weatherDef(id).a })
 const formRule = (id: string) => contentRule('form', id, { a: formDef(id).a })
 
@@ -140,6 +143,7 @@ export class ScoreRunView {
   private autoWriteTimer = 0
   private token: TokenActor | null = null
   private cardHand: CardHand | null = null
+  private handObserver: MutationObserver | null = null
   private tooltips: TooltipLayer | null = null
   /** 손패 카드(Word)의 id → 엔진의 덱 카드. */
   private wordCards = new Map<string, DeckCard>()
@@ -200,6 +204,8 @@ export class ScoreRunView {
   private teardownScene() {
     if (!this.scene) return
     clearTimeout(this.autoWriteTimer)
+    this.handObserver?.disconnect()
+    this.handObserver = null
     this.cardHand?.destroy()
     this.cardHand = null
     this.tooltips?.destroy()
@@ -299,6 +305,10 @@ export class ScoreRunView {
       onPreview: (word) => this.renderDetail(word),
       onPreviewEnd: () => this.renderDetail(null),
     })
+    // 손패는 카드 앞면을 공용 함수로 그리고 다시 그릴 때 설명을 글자로 덮는다. 카드가 붙을 때마다 설명을 칩으로 바꿔 끼운다.
+    const handRoot = scene.querySelector<HTMLElement>('#card-hand')!
+    this.handObserver = new MutationObserver(() => this.decorateHand())
+    this.handObserver.observe(handRoot, { childList: true })
     this.syncFoes(true)
     this.paintBattle()
     this.later(900, () => {
@@ -475,10 +485,10 @@ export class ScoreRunView {
     const stat = (glyph: string, label: string, value: string) =>
       `<div class="hud-stat" role="img" tabindex="0" aria-label="${esc(`${label} ${value}`)}" data-tooltip="${esc(`${label} ${value}`)}"><span class="si">${icon(glyph)}</span><b>${value}</b></div>`
     scene.querySelector('#stats')!.innerHTML = `${heartsHtml(run.pieces, run.maxPieces)}${run.guard ? `<span class="sr-guard">◈${run.guard}</span>` : ''}
-      ${stat('sword', contentName('stat', 'anger'), fmt2(run.stats.anger))}
-      ${stat('shield', contentName('stat', 'sorrow'), fmt2(run.stats.sorrow))}
-      ${stat('cross', contentName('stat', 'joy'), fmt2(run.stats.joy))}
-      ${stat('clover', contentName('stat', 'pleasure'), fmt2(run.stats.pleasure))}`
+      ${stat('sword', statName('anger'), fmt2(run.stats.anger))}
+      ${stat('shield', statName('sorrow'), fmt2(run.stats.sorrow))}
+      ${stat('cross', statName('joy'), fmt2(run.stats.joy))}
+      ${stat('clover', statName('pleasure'), fmt2(run.stats.pleasure))}`
     this.paintRelicStrip()
     this.paintGoal()
     this.paintChances()
@@ -510,8 +520,8 @@ export class ScoreRunView {
     const sp = speciesFor(this.run.floor)
     const title = sp.boss ? this.visualFor(sp.boss).name : t('target')
     const chips = [
-      `<span class="sr-rule-chip form" data-tooltip="${esc(formRule(plan.formId))}" tabindex="0"><b>${esc(contentName('form', plan.formId))}</b>${esc(formRule(plan.formId))}</span>`,
-      ...plan.weatherIds.map((id) => `<span class="sr-rule-chip w-${weatherDef(id).kind}" data-tooltip="${esc(weatherRule(id))}" tabindex="0"><b>${esc(contentName('weather', id))}</b>${esc(weatherRule(id))}</span>`),
+      `<span class="sr-rule-chip form" data-tooltip="${esc(formRule(plan.formId))}" tabindex="0"><b>${esc(contentName('form', plan.formId))}</b>${ruleChipsHtml(formRule(plan.formId))}</span>`,
+      ...plan.weatherIds.map((id) => `<span class="sr-rule-chip w-${weatherDef(id).kind}" data-tooltip="${esc(weatherRule(id))}" tabindex="0"><b>${esc(contentName('weather', id))}</b>${ruleChipsHtml(weatherRule(id))}</span>`),
       ...(st.ctx.weakness ? [`<span class="sr-rule-chip w-bonus"><b>${t('weakness', { name: t(`emotion_${st.ctx.weakness}`) })}</b></span>`] : []),
     ].join('')
     host.innerHTML = `
@@ -633,6 +643,16 @@ export class ScoreRunView {
     hand.setInputEnabled(!this.busy)
   }
 
+  private decorateHand() {
+    this.scene?.querySelectorAll<HTMLElement>('#card-hand .word-card').forEach((btn) => {
+      const note = btn.querySelector<HTMLElement>('.card-note-text')
+      const uid = Number(btn.dataset.instanceId?.match(/sc-(\d+)-/)?.[1])
+      const c = this.run.deck.find((x) => x.uid === uid)
+      if (!note || !c || btn.classList.contains('blocked')) return
+      note.innerHTML = ruleChipsHtml(cardRule(c)) + (c.sticker ? ruleChipsHtml(stickerRule(c.sticker)) : '')
+    })
+  }
+
   private onCardConfirm(word: Word) {
     if (this.busy || this.run.phase !== 'battle') return
     const c = this.wordCards.get(word.id)
@@ -727,11 +747,12 @@ export class ScoreRunView {
     let chips = 0
     let mult = 1
     let label = t('preview')
+    let total = 0
     if (pick && this.run.validate(pick).ok) {
       const res = scoreSentence(pick, ctx, this.run.loadout, expectedRoller, 1)
       chips = res.chips
       mult = res.mult * res.amp
-      label = `${t('preview')} ${fmt(this.run.preview(pick))}`
+      total = this.run.preview(pick)
     } else {
       // 아직 칸이 남았으면 지금 고른 단어로 닿을 수 있는 가장 센 문장을 보인다.
       let best = -1
@@ -743,10 +764,16 @@ export class ScoreRunView {
         chips = res.chips
         mult = res.mult * res.amp
       }
-      label = `${t('bestPreview')} ${fmt(Math.max(0, best))}`
+      label = t('bestPreview')
+      total = Math.max(0, best)
     }
-    host.className = `mult-now landed${mult >= 2 ? ' hot' : ''}`
-    host.innerHTML = `<span class="mn-lane">${esc(label)}</span><span class="mn-flat">${fmt2(chips)}</span><span class="mn-x">×</span><span class="mn-mult">${fmt2(mult)}</span>`
+    // 깡 점수 × 배율 = 예상 점수. 세 덩어리를 칩으로 갈라 숫자끼리 붙어 읽히지 않게 한다.
+    host.className = `mult-now landed sr-mult-now${mult >= 2 ? ' hot' : ''}`
+    host.innerHTML = `<span class="sr-mn-part chips"><small>${t('chips')}</small><b>${fmt2(chips)}</b></span>
+      <span class="sr-mn-op">×</span>
+      <span class="sr-mn-part mult"><small>${t('mult')}</small><b>${fmt2(mult)}</b></span>
+      <span class="sr-mn-op">=</span>
+      <span class="sr-mn-part total"><small>${esc(label)}</small><b>${fmt(total)}</b></span>`
   }
 
   /** 오른쪽 상세 패널 — 원래 단어 상세와 같은 자리·같은 껍데기. */
@@ -769,8 +796,8 @@ export class ScoreRunView {
       <div class="wd-body">
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${esc(contentName('card', c.cardId))}</div></div>
         <div class="wd-grade">✦ ${t(`slot_${d.slot}`)} · ${t(`emotion_${d.emotion}`)}${c.level ? ` · ${'★'.repeat(c.level)}` : ''}</div>
-        <div class="wd-values">${d.slot === 'verb' ? `<div class="v flat">${t('cost', { n: d.cost })}</div>` : ''}<div class="v buff">${esc(cardRule(c))}</div>
-          ${c.sticker ? `<div class="v gamble">${esc(contentName('sticker', c.sticker))} · ${esc(stickerRule(c.sticker))}</div>` : ''}</div>
+        <div class="wd-values">${d.slot === 'verb' ? `<div class="v flat">${t('cost', { n: d.cost })}</div>` : ''}<div class="v sr-rule-v">${ruleChipsHtml(cardRule(c))}</div>
+          ${c.sticker ? `<div class="v sr-rule-v"><b class="rc rc-sticker">${esc(contentName('sticker', c.sticker))}</b> ${ruleChipsHtml(stickerRule(c.sticker))}</div>` : ''}</div>
       </div>`
   }
 
@@ -796,10 +823,12 @@ export class ScoreRunView {
     const hurt = piecesBefore - (run.pieces + run.guard)
     GameAudio.playSentenceComplete(emotions)
     if (hurt > 0) this.playerHurt(hurt)
+    this.scene?.classList.add('sr-tallying')
     const tally = await this.playTally(res)
     await this.playAttack(before, res)
     tally?.classList.remove('parked')
     tally?.classList.add('out')
+    this.scene?.classList.remove('sr-tallying')
     this.later(340, () => tally?.remove())
     if (this.destroyed) return
     this.sel = {}
@@ -1086,7 +1115,7 @@ export class ScoreRunView {
         <span class="rp-unavailable" aria-hidden="true"><b>${esc(reason || t('reason_noMoney'))}</b></span>
         <div class="rp-foot">
           <div class="rp-name">${esc(info.name)}</div>
-          <div class="rp-effect"><span class="rp-effect-copy">${esc(info.rule)}</span></div>
+          <div class="rp-effect"><span class="rp-effect-copy">${ruleChipsHtml(info.rule)}</span></div>
         </div>
       </div>
       <div class="reward-kindline rarity-${rarity}">
@@ -1100,7 +1129,7 @@ export class ScoreRunView {
     const info = this.offerInfo(o)
     return `<div class="wd-title-row">${info.emotion ? emotionIconBadge(info.emotion, 'wd-emotion') : ''}<div class="wd-name">${esc(info.name)}</div></div>
       <div class="wd-grade">✦ ${esc(info.kind)} · ${esc(info.type)}</div>
-      <div class="wd-values"><div class="v buff">${esc(info.rule)}</div><div class="v flat">${t('price', { n: o.price })}</div></div>
+      <div class="wd-values"><div class="v sr-rule-v">${ruleChipsHtml(info.rule)}</div><div class="v flat">${t('price', { n: o.price })}</div></div>
       ${info.tryout ? `<div class="wd-inf">${this.tryoutLine(info.tryout)}</div>` : ''}`
   }
 
@@ -1118,7 +1147,7 @@ export class ScoreRunView {
           <button type="button" data-act="eraseWord" data-uid="${c.uid}">${t('erase', { n: priceWithReceipt(ERASER_PRICE, run.relics) })}</button></span>`
         return `<div class="sr-dock-card e-${d.emotion}${targetMode ? (isTarget ? ' is-target' : ' is-off') : ''}" ${isTarget ? `data-act="target" data-uid="${c.uid}" role="button" tabindex="0"` : ''}>
           <div class="sr-dock-card-head"><span class="sr-emo-tag e-${d.emotion}">${t(`emotion_${d.emotion}`)}</span><b>${esc(contentName('card', c.cardId))}${c.sticker ? ` <em>${esc(contentName('sticker', c.sticker))}</em>` : ''}</b>${c.level ? `<i>${'★'.repeat(c.level)}</i>` : ''}${d.slot === 'verb' && d.cost > 1 ? `<small>${t('cost', { n: d.cost })}</small>` : ''}</div>
-          <span class="sr-dock-card-rule">${esc(cardRule(c))}${c.sticker ? ` · ${esc(stickerRule(c.sticker))}` : ''}</span>
+          <span class="sr-dock-card-rule">${ruleChipsHtml(cardRule(c))}${c.sticker ? ruleChipsHtml(stickerRule(c.sticker)) : ''}</span>
           ${ops}
         </div>`
       }).join('')
@@ -1135,7 +1164,7 @@ export class ScoreRunView {
       if (!id) return `<div class="sr-dock-relic empty">${t('relicEmpty')}</div>`
       return `<div class="sr-dock-relic k-${relicDef(id).kind}">
         <span class="sr-dock-relic-art">${this.relicArtHtml(id)}</span>
-        <span class="sr-dock-relic-copy"><b>${esc(contentName('relic', id))}</b><small>${esc(relicRule(id))}</small></span>
+        <span class="sr-dock-relic-copy"><b>${esc(contentName('relic', id))}</b><small>${ruleChipsHtml(relicRule(id))}</small></span>
         <span class="sr-bag-ops">
           <button type="button" data-act="relicLeft" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${t('moveLeft')}">◀</button>
           <button type="button" data-act="relicRight" data-i="${i}" ${i >= run.relics.length - 1 ? 'disabled' : ''} aria-label="${t('moveRight')}">▶</button>
@@ -1149,7 +1178,7 @@ export class ScoreRunView {
         <b>${t(`trade_${id}`)}</b><span>${t(`trade_${id}_rule`)}</span><em>♥ ${t('pieces', { n: HEART_TRADES[id].pieces })}</em></button>`
     }).join('')
     const haggle = sh.haggle ? `<section class="sr-dock-group"><h3>${t('haggleChoose')}</h3>${sh.haggle.map((id) => `<button type="button" class="sr-dock-relic k-${relicDef(id).kind}" data-act="haggle" data-id="${id}">
-        <span class="sr-dock-relic-art">${this.relicArtHtml(id)}</span><span class="sr-dock-relic-copy"><b>${esc(contentName('relic', id))}</b><small>${esc(relicRule(id))}</small></span></button>`).join('')}</section>` : ''
+        <span class="sr-dock-relic-art">${this.relicArtHtml(id)}</span><span class="sr-dock-relic-copy"><b>${esc(contentName('relic', id))}</b><small>${ruleChipsHtml(relicRule(id))}</small></span></button>`).join('')}</section>` : ''
     return `${haggle}<div class="rd-deck-head"><span>${t('relics')}</span><b>${run.relics.length}/${run.relicSlots}</b></div>
       <p class="sr-dock-hint">${t('relicOrderHint')}</p>${cells}
       <div class="rd-deck-head"><span>${t('heartTrade')}</span><b>${heartsHtml(run.pieces, run.maxPieces)}</b></div>
@@ -1201,11 +1230,11 @@ export class ScoreRunView {
   private statsHtml(): string {
     const s = this.run.stats
     const rows: [string, string][] = [
-      ...STAT_EMOTIONS.map((e): [string, string] => [contentName('stat', e), fmt2(s[e])]),
-      [contentName('stat', 'baseChips'), fmt2(s.baseChips)], [contentName('stat', 'baseAdd'), `+${fmt2(s.baseAdd)}`],
-      [contentName('stat', 'crit'), `+${Math.round(s.crit * 100)}%`], [contentName('stat', 'startTears'), fmt2(s.startTears)],
-      [contentName('stat', 'amp'), `+${Math.round(s.amp * 100)}%`], [contentName('stat', 'allowance'), fmt2(s.allowance)],
-      [contentName('stat', 'luck'), fmt2(s.luck)], [contentName('stat', 'freeReroll'), fmt2(s.freeReroll)],
+      ...STAT_EMOTIONS.map((e): [string, string] => [statName(e), fmt2(s[e])]),
+      [statName('baseChips'), fmt2(s.baseChips)], [statName('baseAdd'), `+${fmt2(s.baseAdd)}`],
+      [statName('crit'), `+${Math.round(s.crit * 100)}%`], [statName('startTears'), fmt2(s.startTears)],
+      [statName('amp'), `+${Math.round(s.amp * 100)}%`], [statName('allowance'), fmt2(s.allowance)],
+      [statName('luck'), fmt2(s.luck)], [statName('freeReroll'), fmt2(s.freeReroll)],
     ]
     return `<div class="sr-stats"><h3>${t('stats')}</h3>${rows.map(([k, v]) => `<span>${esc(k)} <b>${v}</b></span>`).join('')}</div>`
   }
@@ -1222,7 +1251,7 @@ export class ScoreRunView {
     const steps = FORGE_SLOTS.map((s, i) => `<span class="step ${i === f.step ? 'active' : i < f.step ? 'done' : ''}"><b>${i + 1}</b> ${t(`forge_${s}`)}${f.bonus[i] ? ` +${f.bonus[i]}` : ''}</span>`).join('<span class="sep">·</span>')
     const chain = FORGE_SLOTS.map((s, i) => {
       const p = f.picked[i]
-      return p ? `<span class="chain-word">${esc(contentName('stat', p.id))}</span>` : `<span class="chain-ghost">${t(`forge_${s}`)}</span>`
+      return p ? `<span class="chain-word">${esc(statName(p.id))}</span>` : `<span class="chain-ghost">${t(`forge_${s}`)}</span>`
     }).join(' ')
     const s = run.stats
     const statRows: [string, string][] = [
@@ -1232,11 +1261,11 @@ export class ScoreRunView {
     ]
     const choices = f.choices[f.step].map((st) => {
       const word: Word = {
-        id: `forge-${slot}-${st.id}`, text: contentName('stat', st.id), slot, tags: [], emotion: 'neutral',
+        id: `forge-${slot}-${st.id}`, text: statName(st.id), slot, tags: [], emotion: 'neutral',
         note: contentRule('stat', st.id, { p: st.perPoint * points }), rarity: f.rarity,
       }
       return `<button type="button" class="word-cell iforge-word-card word-card mood-buff rarity-${f.rarity}${f.bonus[f.step] ? ' rarity-boosted' : ''}" style="--card-x:0px;--card-z:1" data-act="forge" data-id="${st.id}">
-        ${wordCardInnerHtml(word, { note: `<span class="item-card-main-stat">${esc(word.note)}</span>`, footer: t(`forge_${slot}`), artUrl: art, hideMeta: true, overlay: f.bonus[f.step] ? `<span class="item-card-bonuses"><span class="rarity-bonus">${t('forgePoints', { n: points })}</span></span>` : '' })}
+        ${wordCardInnerHtml(word, { note: `<span class="item-card-main-stat">${ruleChipsHtml(word.note)}</span>`, footer: t(`forge_${slot}`), artUrl: art, hideMeta: true, overlay: f.bonus[f.step] ? `<span class="item-card-bonuses"><span class="rarity-bonus">${t('forgePoints', { n: points })}</span></span>` : '' })}
       </button>`
     }).join('')
     return `<div class="scene item-scene sr-screen sr-forge-scene" style="background-image:url(${BACKGROUNDS.bg001})">
@@ -1254,12 +1283,12 @@ export class ScoreRunView {
             <div class="iforge-illust-copy">
               <div class="glint">✦ ${t('forge')} ✦</div>
               <div class="iname">${t('item')} · ${t(`rarity_${f.rarity}`)}</div>
-              <div class="grade">${f.baseStat ? esc(t('forgeBase', { name: contentName('stat', f.baseStat), n: RARITY_BASE_POINTS[f.rarity] * 3 })) : ''}</div>
+              <div class="grade">${f.baseStat ? esc(t('forgeBase', { name: statName(f.baseStat), n: RARITY_BASE_POINTS[f.rarity] * 3 })) : ''}</div>
             </div>
           </div>
           <div class="iforge-stats glass">
             <div class="dock-title">${t('stats')}</div>
-            <div class="stat-list" id="stats">${statRows.map(([id, v]) => `<div class="stat" data-stat="${id}"><span class="sl">${esc(contentName('stat', id))}</span><span class="sv">${v}</span></div>`).join('')}</div>
+            <div class="stat-list" id="stats">${statRows.map(([id, v]) => `<div class="stat" data-stat="${id}"><span class="sl">${esc(statName(id))}</span><span class="sv">${v}</span></div>`).join('')}</div>
           </div>
         </div>
         <div class="iforge-complete" id="forge-complete" aria-live="polite"><span>✦</span><b>${t('forgeDone')}</b><em>${t('forgeSub')}</em><span>✦</span></div>
