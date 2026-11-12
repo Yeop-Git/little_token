@@ -1,6 +1,6 @@
 # 버전 관리
 
-현재 버전: **v_0.16.3**
+현재 버전: **v_0.16.4**
 
 `VERSION.md`와 `package.json`의 버전은 항상 같은 값을 사용한다. Git 커밋
 제목은 `v_x.x.x - 변경 요약` 형식으로 작성하고, 버전 기준점에는 같은 이름의
@@ -22,6 +22,10 @@ annotated tag를 남긴다.
 갱신한다.
 
 ## 변경 이력
+
+### v_0.16.4 — 2026-11-12 (재기획 브랜치 `score-redesign-ingame`)
+
+- 원본 CSS 번들 예산을 274KB → 280KB로 올렸다. v_0.16.2~0.16.3의 규칙 칩·외곽선 스타일로 `index.css`가 274.3KB가 되어 `npm run build`의 `bundle:check`가 실패했고, 그 때문에 Vercel 프리뷰 빌드도 실패했다. gzip 예산(60KB)은 그대로다.
 
 ### v_0.16.3 — 2026-11-11 (재기획 로컬 브랜치 `score-redesign-ingame`)
 
