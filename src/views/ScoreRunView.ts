@@ -98,7 +98,7 @@ function cardRule(c: DeckCard): string {
 }
 const stickerRule = (id: string) => { const d = stickerDef(id); return contentRule('sticker', id, { a: d.a, b: d.b }) }
 const relicRule = (id: string) => { const d = relicDef(id); return contentRule('relic', id, { a: d.a, b: d.b }) }
-/** 스탯 이름도 게임 화면의 말로(기본 칩 → 기본 깡 점수, 기본 가산 → 기본 배율). */
+/** 스탯 이름도 게임 화면의 말로(기본 가산 → 기본 배율). 점수의 두 축은 칩 × 배율. */
 const statName = (id: string) => gameWords(contentName('stat', id))
 const weatherRule = (id: string) => contentRule('weather', id, { a: weatherDef(id).a })
 const formRule = (id: string) => contentRule('form', id, { a: formDef(id).a })
@@ -767,7 +767,7 @@ export class ScoreRunView {
       label = t('bestPreview')
       total = Math.max(0, best)
     }
-    // 깡 점수 × 배율 = 예상 점수. 세 덩어리를 칩으로 갈라 숫자끼리 붙어 읽히지 않게 한다.
+    // 칩 × 배율 = 예상 점수. 세 덩어리를 칩으로 갈라 숫자끼리 붙어 읽히지 않게 한다.
     host.className = `mult-now landed sr-mult-now${mult >= 2 ? ' hot' : ''}`
     host.innerHTML = `<span class="sr-mn-part chips"><small>${t('chips')}</small><b>${fmt2(chips)}</b></span>
       <span class="sr-mn-op">×</span>
@@ -872,7 +872,7 @@ export class ScoreRunView {
   }
 
   /**
-   * 원래 전투의 집계판(깡 점수 × 배율 → 총합 롤업)을 그대로 띄운다. 엔진의 롤업 단계(§0 폭발)를
+   * 원래 전투의 집계판(칩 × 배율 → 총합 롤업)을 그대로 띄운다. 엔진의 롤업 단계(§0 폭발)를
    * 칩이 오른 단계와 배율이 오른 단계로 나눠 차례로 꽂는다. 화면 아무 곳이나 누르면 빨리 넘긴다.
    */
   private async playTally(res: SentenceResult): Promise<HTMLElement | null> {
