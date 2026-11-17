@@ -139,6 +139,7 @@ export class CardHand {
   private drawsLeft = CARD_HAND_CONFIG.drawsPerStage
   private processing = false
   private inputEnabled = true
+  private pendingTurnEntrance = true
   private serial = 0
   private epoch = 0
   private conflictOf: ConflictResolver = () => null
@@ -206,6 +207,7 @@ export class CardHand {
     this.epoch++
     this.states.clear()
     this.slotKey = ''
+    this.pendingTurnEntrance = true
     this.selectedId = null
     this.drawingId = null
     this.processing = false
@@ -216,6 +218,7 @@ export class CardHand {
     this.inputEnabled = enabled
     this.opts.handRoot.classList.toggle('input-locked', !enabled)
     this.render()
+    if (enabled) this.playPendingEntrance()
   }
 
   /** 장로거미 전용 — 봉인을 누적하되 현재 손패에는 선택 가능한 카드를 반드시 남긴다. */
@@ -342,6 +345,52 @@ export class CardHand {
       this.selectedId = null
     }
     this.render()
+    if (changed && this.inputEnabled) this.playPendingEntrance()
+  }
+
+  /** 새 턴의 첫 손패만 덱에서 나눠 주고, 이후 슬롯은 짧게 올린다. */
+  private playPendingEntrance() {
+    const turnStart = this.pendingTurnEntrance
+    this.pendingTurnEntrance = false
+    if (turnStart) this.playTurnDeal()
+    else this.playHandEntrance()
+  }
+
+  private playTurnDeal() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const deck = this.opts.deckButton.getBoundingClientRect()
+    this.opts.handRoot.querySelectorAll<HTMLElement>(':scope > .word-card').forEach((card, index) => {
+      const rect = card.getBoundingClientRect()
+      // 화면 축척이 적용된 모바일 무대에서도 덱 중심에서 출발하도록 CSS 좌표로 환산한다.
+      const scaleX = rect.width / card.offsetWidth || 1
+      const scaleY = rect.height / card.offsetHeight || 1
+      const dx = (deck.left + deck.width / 2 - rect.left - rect.width / 2) / scaleX
+      const dy = (deck.top + deck.height / 2 - rect.top - rect.height / 2) / scaleY
+      const timing: KeyframeAnimationOptions = {
+        duration: 700, delay: index * 110, easing: 'cubic-bezier(.2,.78,.2,1)', fill: 'backwards',
+      }
+      card.animate([
+        { opacity: 0, translate: `${dx}px ${dy}px`, scale: '.48', rotate: '8deg' },
+        { opacity: 1, translate: `${dx * .4}px ${dy * .4 - 28}px`, scale: '1.03', rotate: '3deg', offset: .62 },
+        { opacity: 1, translate: '0 0', scale: '1', rotate: '0deg' },
+      ], timing)
+      card.querySelector<HTMLElement>('.card-inner')?.animate([
+        { transform: 'rotateY(180deg)' },
+        { transform: 'rotateY(180deg)', offset: .35 },
+        { transform: 'rotateY(0deg)' },
+      ], timing)
+    })
+  }
+
+  /** 슬롯이 열릴 때 손패를 차례로 올린다. 재렌더나 개별 드로우에는 반복하지 않는다. */
+  private playHandEntrance() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    this.opts.handRoot.querySelectorAll<HTMLElement>(':scope > .word-card').forEach((card, index) => {
+      card.animate(
+        [{ opacity: 0, translate: '0 42px' }, { opacity: 1, translate: '0 0' }],
+        { duration: 340, delay: index * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' },
+      )
+    })
   }
 
   destroy() {

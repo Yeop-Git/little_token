@@ -2,8 +2,6 @@ import { INK_UI } from '@/assets'
 import { t } from '@/localization'
 import {
   SENTENCE_BASE_INK,
-  SENTENCE_CARRY_LIMIT,
-  SENTENCE_MAX_INK,
   SENTENCE_OVERDRAW_LIMIT,
 } from '@core/ink'
 
@@ -20,15 +18,15 @@ function inkText(key: string, korean: string, values: Record<string, number> = {
   return text
 }
 
-export function inkMeterHtml(): string {
-  const bottles = Array.from({ length: SENTENCE_MAX_INK }, (_, index) =>
+export function inkMeterHtml(max = SENTENCE_BASE_INK): string {
+  const bottles = Array.from({ length: max }, (_, index) =>
     `<span class="ink-meter-vial" data-ink-bottle="${index}"><img src="${INK_UI.bottle}" alt=""></span>`,
   ).join('')
   return `<div class="ink-meter" id="ink-meter" role="img" tabindex="0" aria-live="polite">
     <span class="ink-meter-vials" aria-hidden="true">
       ${bottles}
     </span>
-    <span class="ink-meter-copy"><small>${t('hudInkLabel', '잉크')}</small><b><span data-ink-now>${SENTENCE_BASE_INK}</span><i>/</i><span data-ink-max>${SENTENCE_BASE_INK}</span></b></span>
+    <span class="ink-meter-copy"><small>${t('hudInkLabel', '잉크')}</small><b><span data-ink-now>${max}</span><i>/</i><span data-ink-max>${max}</span></b></span>
     <span class="ink-meter-extra" data-ink-extra hidden></span>
     <em class="ink-meter-overdraw" data-ink-overdraw hidden></em>
   </div>`
@@ -45,9 +43,9 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
     SENTENCE_OVERDRAW_LIMIT,
     Math.max(overdraw, previewSpent - max),
   )
-  // 프레임은 언제나 10칸이다. 턴마다 가용량이 6↔8로 바뀌어도 잉크 한 칸의 폭은 같다.
-  const fill = Math.max(0, Math.min(1, remaining / SENTENCE_MAX_INK))
-  const overdrawFill = Math.max(0, Math.min(1, overdraw / SENTENCE_MAX_INK))
+  // 잉크 칸은 문장의 최대 비용을 나타낸다.
+  const fill = Math.max(0, Math.min(1, remaining / max))
+  const overdrawFill = Math.max(0, Math.min(1, overdraw / max))
 
   meter.style.setProperty('--ink-fill', `${fill * 100}%`)
   meter.style.setProperty('--ink-overdraw-fill', `${overdrawFill * 100}%`)
@@ -56,7 +54,7 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   meter.classList.toggle('is-overdrawn', overdraw > 0)
   meter.classList.toggle('is-low', remaining > 0 && remaining <= Math.ceil(max * 0.3))
   meter.querySelector<HTMLElement>('[data-ink-now]')!.textContent = String(remaining)
-  meter.querySelector<HTMLElement>('[data-ink-max]')!.textContent = String(SENTENCE_MAX_INK)
+  meter.querySelector<HTMLElement>('[data-ink-max]')!.textContent = String(max)
   const extra = meter.querySelector<HTMLElement>('[data-ink-extra]')!
   extra.hidden = overdraw <= 0
   extra.textContent = overdraw > 0 ? `+${overdraw}` : ''
@@ -86,13 +84,7 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   const accessibilityText = overdraw > 0
     ? inkText('hudInkOverdrawAria', `잉크 ${spent}/${max}, 초과 체력 피해 ${overdraw}`, { spent, max, overdraw })
     : inkText('hudInkAria', `남은 잉크 ${remaining}/${max}`, { remaining, max })
-  const tooltip = (overdraw > 0
-    ? t('hudInkOverdrawTip', `잉크 ${spent}/${max}\n기본 ${SENTENCE_BASE_INK} + 이월 ${SENTENCE_CARRY_LIMIT} + 체력 ${SENTENCE_OVERDRAW_LIMIT}까지 최대 ${SENTENCE_MAX_INK}. 초과분 체력 ${overdraw}을 직접 지불한다.`)
-    : t('hudInkTip', `잉크 ${remaining}/${max}\n기본 ${SENTENCE_BASE_INK} + 이월 ${SENTENCE_CARRY_LIMIT} + 체력 ${SENTENCE_OVERDRAW_LIMIT}까지 최대 ${SENTENCE_MAX_INK}. 남은 잉크는 최대 ${SENTENCE_CARRY_LIMIT} 이월된다.`))
-    .split('{spent}').join(String(spent))
-    .split('{remaining}').join(String(remaining))
-    .split('{max}').join(String(max))
-    .split('{overdraw}').join(String(overdraw))
+  const tooltip = inkText('hudInkTip', '잉크 {remaining}/{max}\n문장마다 잉크 {max}로 시작하며 선택한 단어가 잉크를 사용합니다.', { remaining, max })
   meter.setAttribute('aria-label', accessibilityText)
   meter.dataset.tooltip = tooltip
   meter.dataset.tipPlace = 'above'

@@ -2,10 +2,8 @@ import { GameAudio } from '@/audio/GameAudio'
 import {
   GraphicsSettings,
   type AntiAliasingQuality,
-  type EffectsQuality,
   type FrameRateLimit,
   type GraphicsQuality,
-  type PostProcessingQuality,
   type ResolutionScale,
 } from '@/ui/GameSettings'
 import { icon } from '@/ui/Icons'
@@ -27,13 +25,12 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
   const antiAliasing = GraphicsSettings.getAntiAliasing()
   const resolution = GraphicsSettings.getResolution()
   const fps = GraphicsSettings.getFps()
-  const effects = GraphicsSettings.getEffects()
-  const postprocessing = GraphicsSettings.getPostProcessing()
 
   host.innerHTML = `
     <div class="ov-backdrop"></div>
     <section class="ov-panel glass settings-panel" role="dialog" aria-modal="true" aria-label="${t('settings', '설정')}">
       <div class="ov-head"><div class="ov-title">${icon('settings')} ${t('settings', '설정')}</div><button class="ov-close" id="ov-x" type="button" aria-label="${t('close', '닫기')}">${icon('close')}</button></div>
+      <button type="button" class="settings-defaults" id="settings-defaults">${t('resetSettings', '기본설정으로 되돌리기')}</button>
       <div class="settings-tabs" role="tablist" aria-label="${t('settingsCategories', '설정 분류')}">
         <button id="settings-tab-graphics" type="button" role="tab" data-settings-tab="graphics" aria-controls="settings-panel-graphics" aria-selected="true" tabindex="0">${t('graphics', '그래픽')}</button>
         <button id="settings-tab-sound" type="button" role="tab" data-settings-tab="sound" aria-controls="settings-panel-sound" aria-selected="false" tabindex="-1">${t('sound', '사운드')}</button>
@@ -61,22 +58,6 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
             ${['30', '45', '60', 'unlimited'].map((value) => `<button type="button" data-fps="${value}" class="${fps === value ? 'on' : ''}"><b>${value === 'unlimited' ? t('unlimited', '무제한') : value}</b></button>`).join('')}
           </div>
         </div>
-        <div class="settings-group">
-          <div class="settings-label"><b>${t('effects', '이펙트')}</b><span>${t('effectsHint', '파편·불꽃 밀도')}</span></div>
-          <div class="graphics-options triple-options" role="group" aria-label="이펙트 품질">
-            <button type="button" data-effects="low" class="${effects === 'low' ? 'on' : ''}"><b>${t('low', '낮음')}</b></button>
-            <button type="button" data-effects="medium" class="${effects === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b></button>
-            <button type="button" data-effects="high" class="${effects === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b></button>
-          </div>
-        </div>
-        <div class="settings-group">
-          <div class="settings-label"><b>${t('postprocessing', '후처리')}</b><span>${t('postprocessingHint', '블러·색감·비네팅')}</span></div>
-          <div class="graphics-options triple-options" role="group" aria-label="후처리 품질">
-            <button type="button" data-postprocessing="off" class="${postprocessing === 'off' ? 'on' : ''}"><b>${t('off', '끔')}</b></button>
-            <button type="button" data-postprocessing="medium" class="${postprocessing === 'medium' ? 'on' : ''}"><b>${t('medium', '보통')}</b></button>
-            <button type="button" data-postprocessing="high" class="${postprocessing === 'high' ? 'on' : ''}"><b>${t('high', '높음')}</b></button>
-          </div>
-        </div>
         <div class="settings-group settings-wide">
           <div class="settings-label"><b>${t('antialiasing', '안티앨리어싱')}</b><span>${t('antialiasingHint', '캐릭터 가장자리')}</span></div>
           <div class="graphics-options triple-options" role="group" aria-label="안티앨리어싱 품질">
@@ -87,11 +68,14 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
         </div>
       </div>
       <div id="settings-panel-sound" class="settings-tab-panel" data-settings-panel="sound" role="tabpanel" aria-labelledby="settings-tab-sound" hidden>
-        <div class="settings-group">
-          <div class="settings-label"><b>${t('masterVolume', '마스터 볼륨')}</b><span id="volume-value">${volume}%</span></div>
-          <input id="volume-range" type="range" min="0" max="100" step="5" value="${volume}" aria-label="마스터 볼륨">
-          <p>${t('volumeHint', '배경음악과 효과음의 전체 크기를 조절합니다.')}</p>
-        </div>
+        ${[
+          ['master', t('masterVolume', '마스터 볼륨'), volume],
+          ['music', t('musicVolume', '배경음악'), Math.round(GameAudio.getMusicVolume() * 100)],
+          ['effects', t('effectsVolume', '효과음'), Math.round(GameAudio.getEffectsVolume() * 100)],
+        ].map(([key, label, value]) => `<div class="settings-group">
+          <div class="settings-label"><b>${label}</b><span id="${key}-volume-value">${value}%</span></div>
+          <input class="volume-range" id="${key}-volume-range" type="range" min="0" max="100" step="5" value="${value}" aria-label="${label}">
+        </div>`).join('')}
       </div>
       <div id="settings-panel-other" class="settings-tab-panel" data-settings-panel="other" role="tabpanel" aria-labelledby="settings-tab-other" hidden>
         <div class="settings-group language-settings-group">
@@ -178,8 +162,6 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
       aa: GraphicsSettings.getAntiAliasing(),
       resolution: GraphicsSettings.getResolution(),
       fps: GraphicsSettings.getFps(),
-      effects: GraphicsSettings.getEffects(),
-      postprocessing: GraphicsSettings.getPostProcessing(),
     }
     Object.entries(values).forEach(([key, value]) => host!.querySelectorAll<HTMLElement>(`[data-${key}]`).forEach((item) => item.classList.toggle('on', item.dataset[key] === value)))
   }
@@ -187,15 +169,34 @@ export function openSettingsModal(root: HTMLElement, opts: { onResetAll: () => v
   host.querySelectorAll<HTMLButtonElement>('[data-aa]').forEach((button) => button.addEventListener('click', () => { GraphicsSettings.setAntiAliasing(button.dataset.aa as AntiAliasingQuality); syncGraphicsSelection() }))
   host.querySelectorAll<HTMLButtonElement>('[data-resolution]').forEach((button) => button.addEventListener('click', () => { GraphicsSettings.setResolution(button.dataset.resolution as ResolutionScale); syncGraphicsSelection() }))
   host.querySelectorAll<HTMLButtonElement>('[data-fps]').forEach((button) => button.addEventListener('click', () => { GraphicsSettings.setFps(button.dataset.fps as FrameRateLimit); syncGraphicsSelection() }))
-  host.querySelectorAll<HTMLButtonElement>('[data-effects]').forEach((button) => button.addEventListener('click', () => { GraphicsSettings.setEffects(button.dataset.effects as EffectsQuality); syncGraphicsSelection() }))
-  host.querySelectorAll<HTMLButtonElement>('[data-postprocessing]').forEach((button) => button.addEventListener('click', () => { GraphicsSettings.setPostProcessing(button.dataset.postprocessing as PostProcessingQuality); syncGraphicsSelection() }))
+  for (const [key, set] of [
+    ['master', (value: number) => GameAudio.setVolume(value)],
+    ['music', (value: number) => GameAudio.setMusicVolume(value)],
+    ['effects', (value: number) => GameAudio.setEffectsVolume(value)],
+  ] as const) {
+    const range = host.querySelector<HTMLInputElement>(`#${key}-volume-range`)!
+    const value = host.querySelector<HTMLElement>(`#${key}-volume-value`)!
+    range.addEventListener('input', () => {
+      value.textContent = `${range.value}%`
+      set(Number(range.value) / 100)
+    })
+  }
 
-  const range = host.querySelector<HTMLInputElement>('#volume-range')!
-  const value = host.querySelector<HTMLElement>('#volume-value')!
-  range.addEventListener('input', () => {
-    const next = Number(range.value)
-    value.textContent = `${next}%`
-    GameAudio.setVolume(next / 100)
+  host.querySelector<HTMLButtonElement>('#settings-defaults')!.addEventListener('click', () => {
+    GraphicsSettings.reset()
+    GameAudio.setVolume(1)
+    GameAudio.setMusicVolume(1)
+    GameAudio.setEffectsVolume(1)
+    if (currentLocale !== 'ko') {
+      setLocale('ko')
+      window.location.reload()
+      return
+    }
+    syncGraphicsSelection()
+    for (const key of ['master', 'music', 'effects']) {
+      host!.querySelector<HTMLInputElement>(`#${key}-volume-range`)!.value = '100'
+      host!.querySelector<HTMLElement>(`#${key}-volume-value`)!.textContent = '100%'
+    }
   })
 
   const recordsReset = host.querySelector<HTMLButtonElement>('#records-reset')!

@@ -30,7 +30,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
-import { selectionInkCost, SENTENCE_BASE_INK, SENTENCE_CARRY_LIMIT, SENTENCE_MAX_INK, SENTENCE_OVERDRAW_LIMIT } from '@core/ink'
+import { selectionInkCost, SENTENCE_MAX_INK } from '@core/ink'
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -47,7 +47,7 @@ import { BOSS_BY_FLOOR, bossHealthBarsForFloor, MAX_ENCOUNTER, STORY_FLOORS } fr
 import { CARD_HAND_CONFIG } from '@/ui/CardHand'
 import { emotionBadgeContent } from '@/ui/EmotionBadge'
 import { wordCardHtml } from '@/ui/WordCardFace'
-import { currentLocale } from '@/localization'
+import { currentLocale, t } from '@/localization'
 import { localizedGuidePages } from '@/localization/guide'
 import { IS_DEMO } from '@/config/edition'
 import { discoveredComboIds } from '@core/comboDiscovery'
@@ -216,7 +216,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
-      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · 기본 ${SENTENCE_BASE_INK}, 남은 잉크 이월 최대 ${SENTENCE_CARRY_LIMIT}, 체력 초과 집필 최대 ${SENTENCE_OVERDRAW_LIMIT}로 한 문장은 최대 ${SENTENCE_MAX_INK}까지 쓴다.</p>
+      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · ${t('guideInkRule', '문장마다 잉크 {max}로 시작하며, 단어를 고르면 잉크를 사용한다.').replace('{max}', String(SENTENCE_MAX_INK))}</p>
 
       <h3 class="g-h3">일반전 한 턴의 순서</h3>
       <ol class="g-flow">

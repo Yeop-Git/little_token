@@ -762,7 +762,7 @@ export class BattleView {
         </div>
 
         <div class="slot-step" id="steps" aria-label="문장 조립 단계"></div>
-        ${inkMeterHtml()}
+        ${inkMeterHtml(this.currentInkAvailable())}
 
         <div class="word-zone">
           <div class="card-table" aria-label="단어 카드 선택 영역">
@@ -815,6 +815,8 @@ export class BattleView {
     this.q('#home-btn').addEventListener('click', () => this.onHome?.())
     this.q('#battle-help-button').addEventListener('click', () => this.setHelpOpen(!this.helpOpen))
     this.q('#steps').addEventListener('click', (event) => {
+      const back = (event.target as Element | null)?.closest<HTMLButtonElement>('.step-back')
+      if (back) { this.rewindToSlot(this.slotIndex - 1); return }
       const button = (event.target as Element | null)?.closest<HTMLButtonElement>('.step[data-i]')
       if (!button) return
       this.rewindToSlot(Number(button.dataset.i))
@@ -832,6 +834,7 @@ export class BattleView {
       onHover: (word) => this.previewInkSpend(word),
       onHoverEnd: () => this.clearInkPreview(),
       onPreview: (word, anchor) => {
+        if (this.complete() || this.busy || this.over) return
         this.keepDock()
         this.renderDetail(word)
         this.anchorDetail(anchor)
@@ -2142,7 +2145,7 @@ export class BattleView {
   }
 
   private currentInkAvailable(): number {
-    return sentenceInkAvailable(this.carriedInk)
+    return sentenceInkAvailable(this.carriedInk, this.player)
   }
 
   private previewInkSpend(word: Word): void {
@@ -2267,7 +2270,9 @@ export class BattleView {
   // ── 중앙 하단: 슬롯 스텝 + 가로 단어 ──
   private renderWords() {
     // 겹슬롯(주어 2·동사 2)은 같은 카드풀을 쓰므로 "3·4 동사" 한 칸으로 합쳐 보여준다.
-    this.q('#steps').innerHTML = this.stepGroups()
+    const backLabel = t('sentenceBack', '이전 선택')
+    const back = `<button class="step-back" type="button" aria-label="${backLabel}" title="${backLabel}" ${this.slotIndex === 0 || this.busy || this.over ? 'disabled' : ''}><span aria-hidden="true">←</span> ${backLabel}</button>`
+    this.q('#steps').innerHTML = back + this.stepGroups()
       .map((g) => {
         const active = g.indices.includes(this.slotIndex)
         const done = g.indices.every((i) => this.sel[this.t.template.slots[i].key])
@@ -2503,7 +2508,7 @@ export class BattleView {
     const detail = this.q('#detail')
     this.unanchorDetail(detail)
     const key = this.order()[this.slotIndex]
-    const w = word ?? this.sel[key] ?? null
+    const w = word
     if (!w) {
       this.clearDetailDock()
       return
@@ -2513,9 +2518,8 @@ export class BattleView {
     const slotLabel = this.t.template.slots.find((s) => s.key === key)?.label ?? ''
     const mood = this.moodOf(w)
     const emotion = emotionOrNeutral(w.emotion)
-    // 키워드는 바로 아래 설명 카드에서 한 번만 보여 준다. 수치 칩에도 다시 넣으면
-    // 「흡혈」처럼 같은 말이 연달아 두 번 나타난다.
-    const values = this.wordOwnValues(w, false)
+    // 키워드 설명은 상세 카드에 표시하므로 수치 칩에는 넣지 않는다.
+    const values = this.wordOwnValues(w, false).slice(w.stat && w.statMult != null && w.statMult > 0 || w.power ? 1 : 0)
     const sealed = this.cardHand.isSealed(w)
     // 현재 문장에 이 단어를 끼우면 맥락이 어긋나는지 미리 경고(실행 전 학습).
     const trial: Selection = { ...this.sel, [key]: w }
@@ -2534,7 +2538,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
          ${this.projectionHtml(w, key)}
-         <div class="wd-values"><div class="v flat">잉크 ${wordInkCost(w)}</div>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
          ${wordKeywordDetailsHtml(w)}
          ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
@@ -2643,36 +2647,17 @@ export class BattleView {
   // "적용(이 단어가 더하는 값) · 최종(현재 문장 총합)" 프로젝션 블록.
   // slotKey는 지금 고르고 있는 칸 — 겹동사면 verb2일 수 있다.
   private projectionHtml(w: Word, slotKey: string): string {
-    const base: Selection = { ...this.sel }
-    delete base[slotKey]
     const now = this.projectFinal({ ...this.sel, [slotKey]: w })
-    const prev = this.projectFinal(base)
     const metrics: { key: 'dmg' | 'heal' | 'guard' | 'self'; label: string }[] = [
       { key: 'dmg', label: '피해' },
       { key: 'heal', label: '회복' },
       { key: 'guard', label: '방어' },
       { key: 'self', label: '자해' },
     ]
-    const rows = metrics
-      .filter((m) => now[m.key] > 0 || (m.key === 'dmg' && prev.dmg > 0))
-      .map((m) => {
-        const delta = now[m.key] - prev[m.key]
-        const sign = delta > 0 ? '+' : delta < 0 ? '' : '±'
-        const dcls = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
-        return `<div class="pj-row ${m.key}">
-          <span class="pj-l">${m.label}</span>
-          <span class="pj-d ${dcls}">${sign}${delta}</span>
-          <span class="pj-f">${now[m.key]}</span>
-        </div>`
-      })
-      .join('')
-    if (!rows) return '' // 순수 보정 단어(회피/지연 등)는 프로젝션 없이 고유 효과만
-    const multLine = now.multiplier !== 1 ? `<span class="pj-mult">위력 ×${now.multiplier.toFixed(2)}</span>` : ''
-    return `<div class="wd-proj">
-      <div class="pj-head"><span>이 단어 적용</span><span>${combatPreviewText().estimate}</span>${multLine}</div>
-      <div class="pj-rows">${rows}</div>
-      <div class="pj-caveat">${combatPreviewText().caveat}</div>
-    </div>`
+    const rows = metrics.filter((metric) => now[metric.key] > 0)
+      .map((metric) => `<div class="pj-row ${metric.key}"><span class="pj-l">${metric.label}</span><span class="pj-f">${now[metric.key]}</span></div>`).join('')
+    if (!rows) return ''
+    return `<div class="wd-proj"><div class="pj-head">${combatPreviewText().estimate}</div><div class="pj-rows">${rows}</div></div>`
   }
 
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
@@ -3173,7 +3158,7 @@ export class BattleView {
         }),
         action: intent.kind === 'guard' ? 'guard' : intent.kind === 'heal' ? 'heal' : 'attack',
         combo: intent.combos.length > 0,
-        // 잉크 여유는 이월분에 따라 문장마다 다르다 — 고정 상한이 아니라 지금 값을 쓴다.
+        // 아이템에 따른 현재 잉크 한도를 사용한다.
         overdraw: inkOverdraw(selectionInkCost(this.sel), this.currentInkAvailable()) > 0,
       })
       this.scheduleAutoComplete()
@@ -3188,12 +3173,12 @@ export class BattleView {
     const key = this.order()[this.slotIndex]
     const projected = { ...this.sel, [key]: word }
     const projectedCost = selectionInkCost(projected)
-    if (inkExceedsLimit(projectedCost, this.currentInkAvailable())) return '현재 잉크 한도 초과'
+    if (inkExceedsLimit(projectedCost, this.currentInkAvailable())) return t('inkLimitExceeded', '현재 잉크 한도 초과')
     const prefix: Selection = {}
     this.order().slice(0, this.slotIndex + 1).forEach((slot) => { prefix[slot] = projected[slot] })
     return canCompleteSentence(this.t, prefix, this.currentInkAvailable(), (candidate) => this.cardHand.isSealed(candidate))
       ? null
-      : '남은 문장을 완성할 잉크 부족'
+      : t('inkCannotComplete', '남은 문장을 완성할 잉크 부족')
   }
 
   private scheduleAutoComplete(): void {

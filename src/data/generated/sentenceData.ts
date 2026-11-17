@@ -204,7 +204,7 @@ export const REWARD_WORDS: Word[] = [
       "now"
     ],
     "emotion": "joy",
-    "inkCost": 4,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -227,7 +227,7 @@ export const REWARD_WORDS: Word[] = [
       "grit"
     ],
     "emotion": "anger",
-    "inkCost": 4,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -268,7 +268,7 @@ export const REWARD_WORDS: Word[] = [
       "hurt"
     ],
     "emotion": "sorrow",
-    "inkCost": 4,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -291,7 +291,7 @@ export const REWARD_WORDS: Word[] = [
       "both"
     ],
     "emotion": "pleasure",
-    "inkCost": 4,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -553,7 +553,7 @@ export const REWARD_WORDS: Word[] = [
       "solid"
     ],
     "emotion": "sorrow",
-    "inkCost": 4,
+    "inkCost": 3,
     "rarity": "rare",
     "art": "2005",
     "note": "매직실드 1 · 방어 +1랭크",
@@ -749,7 +749,7 @@ export const REWARD_WORDS: Word[] = [
       "warm"
     ],
     "emotion": "joy",
-    "inkCost": 4,
+    "inkCost": 3,
     "rarity": "rare",
     "art": "2012",
     "note": "매직실드 1 · 방어 +1랭크",
@@ -767,7 +767,7 @@ export const REWARD_WORDS: Word[] = [
       "greet"
     ],
     "emotion": "joy",
-    "inkCost": 4,
+    "inkCost": 3,
     "crit": 0.3,
     "targetCount": 3,
     "rarity": "legendary",
@@ -866,7 +866,7 @@ export const REWARD_WORDS: Word[] = [
       "bounce"
     ],
     "emotion": "pleasure",
-    "inkCost": 4,
+    "inkCost": 3,
     "rarity": "legendary",
     "art": "2019",
     "note": "카운터 · 방어 +3랭크",

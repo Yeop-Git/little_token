@@ -96,7 +96,6 @@ export class ItemExclaimView {
       : `<div class="art">${itemArt(item.art)}</div>`
     this.root.innerHTML = `
       <div class="scene item-scene" style="background-image:url(${BACKGROUNDS.bg001})">
-        <div class="slot-step iforge-steps" id="esteps"></div>
         <div class="iforge">
           <div class="iforge-chain" id="chain"></div>
 
@@ -125,12 +124,12 @@ export class ItemExclaimView {
           </div>
 
           <div class="iforge-complete" id="forge-complete" aria-live="polite">
-            <span>✦</span><b>제련 완료</b><em>세 마디의 힘이 아이템에 새겨졌다</em><span>✦</span>
+            <span>✦</span><b>제련 완료</b><span>✦</span>
           </div>
 
           <div class="iforge-choose">
             <div class="word-row" id="egrid"></div>
-            <div class="iforge-choose-title"><b>제련 문장</b><span>세 마디를 골라 아이템에 힘을 새긴다</span></div>
+            <div class="iforge-choose-title"><b>제련 문장</b><span>세 단어를 선택하세요</span></div>
           </div>
         </div>
       </div>`
@@ -291,11 +290,11 @@ export class ItemExclaimView {
 
   private refresh() {
     // 상단 감탄 체인
-    this.q('#chain').innerHTML = EXCLAIM_SLOTS.map((s) => {
+    this.q('#chain').innerHTML = EXCLAIM_SLOTS.map((s, index) => {
       const w = s.words.find((x) => x.id === this.picks[s.key])
       return w
         ? `<span class="chain-word">${w.text}</span>`
-        : `<span class="chain-ghost">${s.label}</span>`
+        : `<span class="chain-ghost${index === this.slotIndex && !this.complete() ? ' is-current' : ''}"${index === this.slotIndex && !this.complete() ? ' aria-current="step"' : ''}>${s.label}</span>`
     }).join(' ')
 
     // 스탯표(▲ 증가)
@@ -305,12 +304,6 @@ export class ItemExclaimView {
       return `<div class="stat" data-stat="${k}"><span class="sl">${STAT_LABEL[k]}</span>
         <span class="sv">${formatNumber(totals[k])}${up ? `<span class="up">▲${formatNumber(up)}</span>` : ''}</span></div>`
     }).join('')
-
-    // 슬롯 스텝 — 지금 어느 마디를 고르는 중인지만 알린다. 고른 마디는 되돌리지 않는다.
-    this.q('#esteps').innerHTML = EXCLAIM_SLOTS.map((s, i) => {
-      const cls = i === this.slotIndex ? 'active' : this.picks[s.key] ? 'done' : ''
-      return `<span class="step ${cls}"><b>${i + 1}</b> ${s.label}</span>`
-    }).join('<span class="sep">·</span>')
 
     // 현재 슬롯의 텍스트 선택지 — 행운 감탄이 붙은 칸은 금빛으로 빛나고, 첫 등장에만 팅!.
     const slot = EXCLAIM_SLOTS[this.slotIndex]

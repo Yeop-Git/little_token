@@ -17,10 +17,10 @@ export type PassiveId =
   | 'retry' // 신데렐라의 황금사과 — 대성공에 실패하면 한 번 더 굴린다
   | 'twinSubj' // 미녀의 거울 — 주어 칸이 둘이 된다
   | 'heavyShoe' // 백설공주의 유리구두 — 동사 깡수치에 고정 가산
-  | 'matchFire' // 빨간망토의 불씨 — 배율 칸마다 보너스 추가
+  | 'matchFire' // 빨간망토의 불씨 — 문장 잉크 +2
   | 'luckCloak' // 성냥팔이의 붉은 망토 — 모든 동사가 운을 깡수치로 받는다
   | 'bbq' // 아기돼지의 숯불화로 — 이번 전투 처치 수만큼 배율 상승
-  | 'doubt' // 피노키오의 물음표 — 완성한 문장 끝에 "…근데?"가 붙는다
+  | 'doubt' // 피노키오의 물음표 — 문장 잉크 +1
   | 'beanstalk' // 잭의 하늘나물 — 각 전투의 첫 문장을 마치면 최대 체력이 자란다
 
 /** 백설공주의 구두가 동사 깡수치에 더하는 값. */
@@ -58,12 +58,12 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   punct: {
     id: 'punct',
     name: '문장부호',
-    desc: '문장 끝에 문장부호를 붙이는 칸이 생긴다',
+    desc: '문장 끝에 문장부호 칸이 생긴다 · 최대 잉크 +1',
   },
   twinVerb: {
     id: 'twinVerb',
     name: '겹동사',
-    desc: `동사 칸이 둘이 된다 · 두 번째 동사는 ${Math.round(TWIN_VERB_SCALE * 100)}% 수치로 공격과 회복을 섞는다`,
+    desc: `동사 칸이 둘이 된다 · 두 번째 동사는 ${Math.round(TWIN_VERB_SCALE * 100)}% 수치 · 최대 잉크 +2`,
   },
   retry: {
     id: 'retry',
@@ -73,7 +73,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   twinSubj: {
     id: 'twinSubj',
     name: '겹주어',
-    desc: '주어 칸이 둘이 된다 · 배율을 두 번 얹는다',
+    desc: '주어 칸이 둘이 된다 · 최대 잉크 +1',
   },
   heavyShoe: {
     id: 'heavyShoe',
@@ -82,8 +82,8 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   },
   matchFire: {
     id: 'matchFire',
-    name: '불붙은 배율',
-    desc: `배율 칸마다 +${Math.round(MATCH_FIRE_BONUS * 100)}%씩 더 붙는다`,
+    name: '타오르는 잉크',
+    desc: '매 문장의 최대 잉크 +2',
   },
   luckCloak: {
     id: 'luckCloak',
@@ -97,8 +97,8 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   },
   doubt: {
     id: 'doubt',
-    name: '근데?',
-    desc: `문장을 완성하면 끝에 「${DOUBT_SUFFIX}」가 붙어 ×1.00~×${(1 + DOUBT_RANGE).toFixed(2)}을 굴린다`,
+    name: '이어지는 이야기',
+    desc: '매 문장의 최대 잉크 +1',
   },
   beanstalk: {
     id: 'beanstalk',
@@ -109,6 +109,13 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
 
 export function hasPassive(player: PlayerState | undefined, id: PassiveId): boolean {
   return !!player?.items.some((it) => it.passive === id)
+}
+
+/** 기존 아이템의 고유효과는 매 문장의 잉크 한도를 늘린다. */
+export function bonusInkFor(player: PlayerState | undefined): number {
+  return (hasPassive(player, 'doubt') ? 1 : 0) + (hasPassive(player, 'matchFire') ? 2 : 0)
+    + (hasPassive(player, 'punct') ? 1 : 0) + (hasPassive(player, 'twinSubj') ? 1 : 0)
+    + (hasPassive(player, 'twinVerb') ? 2 : 0)
 }
 
 export function beanstalkGrowthFor(player: PlayerState | undefined, available: boolean): number {
@@ -154,8 +161,8 @@ export function modsFor(player: PlayerState | undefined, kills = 0): CompileMods
   return {
     verbFlat: hasPassive(player, 'heavyShoe') ? HEAVY_SHOE_FLAT : 0,
     verbLuck: hasPassive(player, 'luckCloak') ? LUCK_CLOAK_RATE : 0,
-    bonusEach: hasPassive(player, 'matchFire') ? MATCH_FIRE_BONUS : 0,
+    bonusEach: 0,
     stageMult: hasPassive(player, 'bbq') ? 1 + kills * BBQ_PER_KILL : 1,
-    doubt: hasPassive(player, 'doubt'),
+    doubt: false,
   }
 }

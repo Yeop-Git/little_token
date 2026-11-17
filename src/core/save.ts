@@ -1,3 +1,4 @@
+import { NO_PROGRESS_SAVE, progressStorage } from './progressStorage'
 import {
   COMBAT_BALANCE_VERSION,
   DECK_LIMITS,
@@ -390,17 +391,18 @@ export function serializeRun(run: RunState): string {
 }
 
 export function loadRun(): RunState | null {
+  if (NO_PROGRESS_SAVE) return null
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
+    const raw = progressStorage()!.getItem(SAVE_KEY)
     if (!raw) return null
     const run = deserializeRun(raw)
     if (!run) {
-      localStorage.setItem(CORRUPT_SAVE_KEY, raw)
-      localStorage.removeItem(SAVE_KEY)
+      progressStorage()!.setItem(CORRUPT_SAVE_KEY, raw)
+      progressStorage()!.removeItem(SAVE_KEY)
       return null
     }
     const normalized = serializeRun(run)
-    if (normalized !== raw) localStorage.setItem(SAVE_KEY, normalized)
+    if (normalized !== raw) progressStorage()!.setItem(SAVE_KEY, normalized)
     return run
   } catch {
     return null
@@ -408,8 +410,9 @@ export function loadRun(): RunState | null {
 }
 
 export function saveRun(run: RunState): void {
+  if (NO_PROGRESS_SAVE) return
   try {
-    localStorage.setItem(SAVE_KEY, serializeRun(run))
+    progressStorage()!.setItem(SAVE_KEY, serializeRun(run))
   } catch {
     // 저장 공간을 사용할 수 없는 브라우저에서도 게임 진행은 유지한다.
   }
@@ -418,7 +421,7 @@ export function saveRun(run: RunState): void {
 // 새로하기와 패배는 진행 중인 런만 지운다. 전체 기록 삭제는 설정에서 별도로 한다.
 export function hasSeenTutorial(): boolean {
   try {
-    return localStorage.getItem(TUTORIAL_KEY) === '1'
+    return progressStorage()!.getItem(TUTORIAL_KEY) === '1'
   } catch {
     return false
   }
@@ -426,7 +429,7 @@ export function hasSeenTutorial(): boolean {
 
 export function markTutorialSeen(): void {
   try {
-    localStorage.setItem(TUTORIAL_KEY, '1')
+    progressStorage()!.setItem(TUTORIAL_KEY, '1')
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
@@ -435,7 +438,7 @@ export function markTutorialSeen(): void {
 /** 전투 훈수는 최초 발견에만 나온다. 새 스테이지마다 같은 설명을 반복하지 않는다. */
 export function hasSeenCombatCoach(hint: CombatCoachHint): boolean {
   try {
-    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    const raw = progressStorage()!.getItem(COMBAT_COACH_KEY)
     return raw ? (JSON.parse(raw) as unknown[]).includes(hint) : false
   } catch {
     return false
@@ -444,10 +447,10 @@ export function hasSeenCombatCoach(hint: CombatCoachHint): boolean {
 
 export function markCombatCoachSeen(hint: CombatCoachHint): void {
   try {
-    const raw = localStorage.getItem(COMBAT_COACH_KEY)
+    const raw = progressStorage()!.getItem(COMBAT_COACH_KEY)
     const seen = new Set<CombatCoachHint>(raw ? JSON.parse(raw) : [])
     seen.add(hint)
-    localStorage.setItem(COMBAT_COACH_KEY, JSON.stringify([...seen]))
+    progressStorage()!.setItem(COMBAT_COACH_KEY, JSON.stringify([...seen]))
   } catch {
     // Storage가 막혀도 현재 전투 진행은 계속한다.
   }
@@ -455,8 +458,8 @@ export function markCombatCoachSeen(hint: CombatCoachHint): void {
 
 function clearTutorialHistory(): void {
   try {
-    localStorage.removeItem(TUTORIAL_KEY)
-    localStorage.removeItem(COMBAT_COACH_KEY)
+    progressStorage()!.removeItem(TUTORIAL_KEY)
+    progressStorage()!.removeItem(COMBAT_COACH_KEY)
   } catch {
     // 저장소를 못 쓰는 환경에서는 완료 기록도 남아 있지 않다.
   }
@@ -466,12 +469,12 @@ function clearTutorialHistory(): void {
 function clearPrefixedStorage(): void {
   try {
     const doomed: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
+    for (let i = 0; i < progressStorage()!.length; i++) {
+      const key = progressStorage()!.key(i)
       if (key?.startsWith(STORAGE_PREFIX)) doomed.push(key)
     }
     // 훑는 도중에 지우면 인덱스가 밀려 건너뛰는 키가 생긴다. 다 모으고 나서 지운다.
-    doomed.forEach((key) => localStorage.removeItem(key))
+    doomed.forEach((key) => progressStorage()!.removeItem(key))
   } catch {
     // 저장소를 못 쓰는 환경에서는 지울 기록도 없다.
   }
@@ -479,7 +482,7 @@ function clearPrefixedStorage(): void {
 
 export function clearRun(): void {
   try {
-    localStorage.removeItem(SAVE_KEY)
+    progressStorage()!.removeItem(SAVE_KEY)
   } catch {
     // 저장소를 못 쓰는 환경이면 애초에 남은 런도 없다.
   }

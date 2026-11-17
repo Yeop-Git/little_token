@@ -1,6 +1,6 @@
 {
   "name": "diary-word-battle",
-  "version": "0.14.8",
+  "version": "0.14.9",
   "description": "그림일기 단어 조립 전투 — a picture-diary sentence-combat roguelite",
   "type": "module",
   "engines": {
@@ -42,12 +42,18 @@
     "release:check": "tsx scripts/release-check.ts",
     "test": "npm run type-check && npm run sweep && npm run check && npm run locale:check && npm run effects:check && npm run core:check && npm run emotion:check && npm run items:check && npm run characters:check && npm run experience:check && npm run mind:check && npm run policy:sim && npm run boss:sim && npm run balance:check",
     "mind:check": "npm run data:generate && tsx src/tools/token-mind-check.ts",
-    "policy:sim": "npm run data:generate && tsx src/tools/token-policy-sim.ts"
+    "policy:sim": "npm run data:generate && tsx src/tools/token-policy-sim.ts",
+    "prebuild:gstar": "npm run assets:optimize",
+    "build:gstar": "npm run data:generate && npm run assets:check && npm run characters:check && npm run resources:check && npm run experience:check && tsc && vite build --mode gstar --outDir ../dist-gstar && npm run bundle:check -- --dist=dist-gstar --edition=full",
+    "prebuild:electron:gstar": "npm run assets:optimize",
+    "build:electron:gstar": "npm run data:generate && npm run assets:check && npm run characters:check && npm run resources:check && npm run experience:check && tsc && node scripts/build-electron-gstar.mjs"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "@types/howler": "^2.2.13",
     "@types/node": "^26.1.1",
     "@types/three": "^0.179.0",
+    "electron": "^45.3.3",
     "lightningcss": "^1.33.0",
     "playwright-core": "^1.61.1",
     "sharp": "^0.34.5",

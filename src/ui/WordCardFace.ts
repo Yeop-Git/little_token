@@ -12,7 +12,7 @@ import { icon } from '@/ui/Icons'
 import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
-import { wordKeywords } from '@core/wordKeywords'
+import { wordKeywords, type WordKeywordId } from '@core/wordKeywords'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -106,20 +106,19 @@ const escapeCardText = (value: string) => value
 export function wordKeywordChipsHtml(word: Word): string {
   const keywords = wordKeywords(word)
   return keywords.length
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" tabindex="0" role="definition" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-kind="keyword" data-tip-place="above" data-tooltip="${escapeCardText(keyword.detail)}">${keyword.label}</span>`).join('')}</span>`
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}">${keyword.label}</span>`).join('')}</span>`
     : ''
 }
 
-export function wordKeywordDetailsHtml(word: Word): string {
-  const keywords = wordKeywords(word)
+export function wordKeywordDetailsHtml(word: Word, omitValues?: ReadonlySet<WordKeywordId>): string {
+  const keywords = wordKeywords(word, omitValues)
   if (!keywords.length) return ''
   const heading = t('wordKeywords', '키워드')
   return `<section class="word-keyword-details" aria-label="${heading}">
     <h3>${heading}</h3>
     <div class="word-keyword-list">${keywords.map((keyword) => `
       <div class="word-keyword-detail keyword-${keyword.id}">
-        <b>${keyword.label}</b>
-        <span>${keyword.detail}</span>
+        <b>${keyword.label}</b><span>${keyword.detail}</span>
       </div>`).join('')}</div>
   </section>`
 }

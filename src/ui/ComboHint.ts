@@ -33,7 +33,7 @@ function partnersFor(tags: string[], src: ComboHintSource, self: Word): string {
   }
   if (!names.length) return '짝이 될 카드가 아직 없다'
   const shown = names.slice(0, MAX_PARTNERS)
-  const tail = names.length > MAX_PARTNERS ? `${shown.join(' · ')} 등과` : gwa(shown.join(' · '))
+  const tail = names.length > MAX_PARTNERS ? `${shown.join(', ')} 등과` : gwa(shown.join(', '))
   return `${tail} 함께`
 }
 
@@ -50,13 +50,13 @@ export function comboHintHtml(w: Word, src: ComboHintSource, active: string[] = 
       return `<div class="cl-row${on ? ' on' : ''}">
         <span class="cl-n">「${combo.name}」</span>
         <span class="cl-m">×${combo.mult.toFixed(2)}</span>
-        <span class="cl-w">${on ? '지금 발동 중' : need}</span>
+        ${on ? '' : `<span class="cl-w">${need}</span>`}
       </div>`
     })
     .join('')
   const more = leads.length > MAX_ROWS ? `<div class="cl-more">+${leads.length - MAX_ROWS}종 더</div>` : ''
   return `<div class="wd-combos">
-    <div class="wd-ch">여는 맥락 <em>${leads.length}종</em></div>
+    <div class="wd-ch">여는 맥락</div>
     ${rows}${more}
   </div>`
 }

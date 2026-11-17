@@ -29,6 +29,8 @@ type EffectName =
   | 'gameOver'
 type BgmName = 'title' | 'storyEaten' | 'battlePaperPages' | 'battlePaperTaiko' | 'battleHeroicMarch' | 'bossSaltSkater' | 'bossQueenBee' | 'bossElderSpider'
 const VOLUME_KEY = 'little-token-master-volume'
+const MUSIC_KEY = 'little-token-music-volume'
+const EFFECTS_KEY = 'little-token-effects-volume'
 const BGM_VOLUME = 0.16
 const EFFECT_VOLUME: Record<EffectName, number> = {
   sentenceComplete: 0.46,
@@ -86,9 +88,9 @@ const RESONANCE_EFFECT: Partial<Record<Emotion, EffectName>> = {
   pleasure: 'resonancePleasure',
 }
 
-const savedVolume = () => {
+const savedVolume = (key = VOLUME_KEY) => {
   try {
-    const raw = localStorage.getItem(VOLUME_KEY)
+    const raw = localStorage.getItem(key)
     if (raw == null) return 1
     const value = Number(raw)
     return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1
@@ -114,6 +116,8 @@ class GameAudioController {
   private buttonSoundsInstalled = false
   private streamsUnlocked = false
   private masterVolume = savedVolume()
+  private musicVolume = savedVolume(MUSIC_KEY)
+  private effectsVolume = savedVolume(EFFECTS_KEY)
 
   constructor() {
     Howler.volume(this.masterVolume)
@@ -144,6 +148,22 @@ class GameAudioController {
     } catch {
       // 저장소가 막혀 있어도 현재 재생에는 반영한다.
     }
+  }
+
+  getMusicVolume() { return this.musicVolume }
+  getEffectsVolume() { return this.effectsVolume }
+  getCinematicVolume() { return this.masterVolume * this.musicVolume }
+
+  setMusicVolume(volume: number) {
+    this.musicVolume = Math.max(0, Math.min(1, volume))
+    this.bgms.forEach((bgm) => bgm.volume(BGM_VOLUME * this.musicVolume))
+    try { localStorage.setItem(MUSIC_KEY, String(this.musicVolume)) } catch { /* current session still applies */ }
+  }
+
+  setEffectsVolume(volume: number) {
+    this.effectsVolume = Math.max(0, Math.min(1, volume))
+    this.effects.forEach((source, effect) => source.volume(EFFECT_VOLUME[effect] * this.effectsVolume))
+    try { localStorage.setItem(EFFECTS_KEY, String(this.effectsVolume)) } catch { /* current session still applies */ }
   }
 
   startBgm(track: BgmName = 'title') {
@@ -205,7 +225,7 @@ class GameAudioController {
 
   /** 배율 칩이 연달아 붙는 순간의 슬롯머신식 점수 카운트업. */
   playMultiplierRise() {
-    if (this.masterVolume <= 0 || !Howler.usingWebAudio) return
+    if (this.masterVolume * this.effectsVolume <= 0 || !Howler.usingWebAudio) return
     const ctx = Howler.ctx
     void ctx.resume().catch(() => undefined)
     const now = ctx.currentTime
@@ -218,7 +238,7 @@ class GameAudioController {
       oscillator.frequency.setValueAtTime(frequency, start)
       oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.07, start + 0.06)
       gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.05 * this.masterVolume, start + 0.005)
+      gain.gain.exponentialRampToValueAtTime(0.05 * this.masterVolume * this.effectsVolume, start + 0.005)
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.068)
       oscillator.connect(gain).connect(ctx.destination)
       oscillator.start(start)
@@ -230,7 +250,7 @@ class GameAudioController {
     bell.type = 'triangle'
     bell.frequency.setValueAtTime(1318.51, bellStart)
     bellGain.gain.setValueAtTime(0.0001, bellStart)
-    bellGain.gain.exponentialRampToValueAtTime(0.12 * this.masterVolume, bellStart + 0.008)
+    bellGain.gain.exponentialRampToValueAtTime(0.12 * this.masterVolume * this.effectsVolume, bellStart + 0.008)
     bellGain.gain.exponentialRampToValueAtTime(0.0001, bellStart + 0.22)
     bell.connect(bellGain).connect(ctx.destination)
     bell.start(bellStart)
@@ -241,7 +261,7 @@ class GameAudioController {
   playForgeHit(beat = 0) {
     const source = this.getEffect('forgeHit')
     const voice = source.play()
-    source.volume(EFFECT_VOLUME.forgeHit, voice)
+    source.volume(EFFECT_VOLUME.forgeHit * this.effectsVolume, voice)
     source.rate(Math.min(1.08, 1 + Math.max(0, beat) * 0.025), voice)
   }
 
@@ -294,7 +314,7 @@ class GameAudioController {
   playSwordHit(hitIndex: number) {
     const source = this.getEffect('swordHit')
     const voice = source.play()
-    source.volume(EFFECT_VOLUME.swordHit, voice)
+    source.volume(EFFECT_VOLUME.swordHit * this.effectsVolume, voice)
     source.rate(Math.min(1.5, 1 + Math.max(0, hitIndex) * 0.1), voice)
   }
 
@@ -311,7 +331,7 @@ class GameAudioController {
     }
     const source = this.getEffect(effect)
     const voice = source.play()
-    source.volume(EFFECT_VOLUME[effect], voice)
+    source.volume(EFFECT_VOLUME[effect] * this.effectsVolume, voice)
     if (effect === 'resonanceAnger') {
       // 레퀴엠식 "빠밤"의 첫 두 화음만 남겨, 다음 문장 조립을 가리지 않게 한다.
       window.setTimeout(() => {
@@ -354,7 +374,7 @@ class GameAudioController {
       html5: true,
       preload: 'metadata',
       loop: true,
-      volume: BGM_VOLUME,
+      volume: BGM_VOLUME * this.musicVolume,
       pool: 1,
     })
     bgm.on('loaderror', (_id, error) => {
@@ -383,7 +403,7 @@ class GameAudioController {
       src: [AUDIO[effect]],
       html5: streams,
       preload: streams ? 'metadata' : true,
-      volume: EFFECT_VOLUME[effect],
+      volume: EFFECT_VOLUME[effect] * this.effectsVolume,
       pool: effect === 'cardHover' || effect === 'wordSelect' || effect === 'hover' || effect === 'swordHit' ? 8 : effect === 'pencil' ? 1 : 5,
     })
     source.on('loaderror', (_id, error) => {

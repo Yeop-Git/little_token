@@ -89,27 +89,27 @@ const BOSS_TACTIC_LORE: Record<ForeignLocale, Record<string, string>> = {
   en: {
     queenBeeTactic: 'Scatter the two front workers with a single sentence.',
     elderSpiderTactic: 'Read the weakness of the exposed leg and strike it precisely.',
-    mantisTactic: 'If the sentence runs short of Ink, add health and withstand the great scythe.',
+    mantisTactic: 'Stand resolute against the great scythe.',
   },
   ja: {
     queenBeeTactic: '一つの文で前にいる働き蜂二体を散らす。',
     elderSpiderTactic: '今見えている脚の弱点を読み、正確に突く。',
-    mantisTactic: '文を結ぶインクが足りなければ、体力を足してでも大鎌を受け止める。',
+    mantisTactic: '大鎌を受け止める固い決意を抱く。',
   },
   ru: {
     queenBeeTactic: 'Одной фразой рассеивает двух передних рабочих пчёл.',
     elderSpiderTactic: 'Определяет слабость открытой ноги и точно бьёт по ней.',
-    mantisTactic: 'Если фразе не хватает чернил, отдаёт здоровье, чтобы выдержать удар большой косы.',
+    mantisTactic: 'Твёрдая решимость выдержать удар большой косы.',
   },
   'zh-Hans': {
     queenBeeTactic: '用一句话驱散前方两只工蜂。',
     elderSpiderTactic: '看清当前露出的蛛腿弱点，精准刺中。',
-    mantisTactic: '写完句子的墨水不足时，也要补上生命挡住巨镰。',
+    mantisTactic: '下定决心挡住巨镰。',
   },
   'zh-Hant': {
     queenBeeTactic: '用一句話驅散前方兩隻工蜂。',
     elderSpiderTactic: '看清目前露出的蛛腿弱點，精準刺中。',
-    mantisTactic: '寫完句子的墨水不足時，也要補上生命擋住巨鐮。',
+    mantisTactic: '下定決心擋住巨鐮。',
   },
 }
 

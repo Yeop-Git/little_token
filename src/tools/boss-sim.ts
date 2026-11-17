@@ -13,6 +13,7 @@
  */
 import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf } from '@core/compiler'
 import { rankedStat } from '@core/combatRules'
+import { inkExceedsLimit, selectionInkCost, sentenceInkAvailable } from '@core/ink'
 import { conflictReason } from '@core/validator'
 import type { Intent, Selection, Word } from '@core/types'
 import { startingPlayer, applyItemReward } from '@core/run'
@@ -129,6 +130,7 @@ function candidates(
   const out: Candidate[] = []
   const walk = (i: number, sel: Selection) => {
     if (i === order.length) {
+      if (inkExceedsLimit(selectionInkCost(sel), sentenceInkAvailable(0, player))) return
       const selected = Object.values(sel)
       const stats = {
         ...player.stats,
@@ -153,6 +155,9 @@ function candidates(
     }
   }
   walk(0, {})
+  // 실제 손패는 남은 덱에서 완성 가능한 카드를 복구한다. 선행 슬롯을 한꺼번에
+  // 추첨하는 시뮬레이터도 첫 세 장에 조합이 없으면 같은 경로를 보장한다.
+  if (!out.length && rng) return candidates(player, null, sealedWordIds, null, maxSealed, battleState)
   return out
 }
 

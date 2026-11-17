@@ -1,3 +1,4 @@
+import { NO_PROGRESS_SAVE } from '@/core/progressStorage'
 import { TITLE } from '@/assets'
 import { GameAudio } from '@/audio/GameAudio'
 import { GraphicsSettings } from '@/ui/GameSettings'
@@ -118,7 +119,9 @@ export class TitleView {
           <h1 class="sr-only">Little Token</h1>
           <nav class="title-menu" aria-label="${t('titleMenu', '타이틀 메뉴')}">
             ${
-              this.opts.hasSave
+              NO_PROGRESS_SAVE
+                ? `<button class="tmenu-btn" type="button" data-act="new">${t('newGame', '새로하기')}</button>`
+                : this.opts.hasSave
                 ? `<button class="tmenu-btn" type="button" data-act="continue">${t('continue', '이어하기')}</button>
             <button class="tmenu-btn" type="button" data-act="fresh">${t('newGame', '새로하기')}</button>`
                 : `<button class="tmenu-btn" type="button" data-act="continue">${t('start', '시작하기')}</button>`
@@ -242,6 +245,7 @@ export class TitleView {
    */
 
   private onAct(act: string) {
+    if (act === 'new') return this.start(true)
     if (act === 'continue') return this.start(false)
     if (act === 'fresh') return this.askFresh()
     if (act === 'guide') return this.opts.onGuide?.()

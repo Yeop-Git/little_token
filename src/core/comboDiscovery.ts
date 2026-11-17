@@ -1,3 +1,4 @@
+import { progressStorage } from './progressStorage'
 import { IS_DEMO } from '@/config/edition'
 import { currentLocale, type LocaleCode } from '@/localization'
 
@@ -7,7 +8,7 @@ type DiscoveryState = Partial<Record<LocaleCode, string[]>>
 
 function readState(): DiscoveryState {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
+    const parsed: unknown = JSON.parse(progressStorage()!.getItem(STORAGE_KEY) ?? '{}')
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
     const state: DiscoveryState = {}
     for (const [locale, values] of Object.entries(parsed)) {
@@ -22,7 +23,7 @@ function readState(): DiscoveryState {
 
 function writeState(state: DiscoveryState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    progressStorage()!.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch {
     // Discovery still works for the current battle when storage is unavailable.
   }
@@ -51,7 +52,7 @@ export function discoverCombos(ids: readonly string[], locale: LocaleCode = curr
 
 export function clearComboDiscoveries(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    progressStorage()!.removeItem(STORAGE_KEY)
   } catch {
     // Restricted storage already behaves like an empty codex.
   }

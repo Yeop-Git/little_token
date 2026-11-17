@@ -136,6 +136,7 @@ function initializeStoredSettings() {
 
 export const GraphicsSettings = {
   get: savedQuality,
+  reset() { this.set(recommendedQuality()) },
   getAntiAliasing: savedAntiAliasing,
   getResolution: savedResolution,
   getFps: savedFps,

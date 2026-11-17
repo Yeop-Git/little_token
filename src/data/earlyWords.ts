@@ -59,9 +59,7 @@ const ELDER_SPIDER_TACTIC: Word = {
 /**
  * 사마귀 전용 방어 카드.
  *
- * 동사만으로 잉크 6을 쓰므로 주어·수식어 비용이 초과분이 되어 체력으로 공개 지불되고,
- * 방어 ×4를 세운다. 카드에 별도 자해를 넣지 않아 잉크 이월로 대가를 줄일 수 있고,
- * 화면의 예상 체력 지불과 실제 결과도 어긋나지 않는다.
+ * 강한 방어를 제공하며, 문장에 필요한 잉크는 다른 단어와 함께 계산한다.
  */
 const MANTIS_TACTIC: Word = {
   id: 'mantisTactic',
@@ -73,11 +71,11 @@ const MANTIS_TACTIC: Word = {
   statMult: 4,
   kind: 'guard',
   targetCount: 1,
-  inkCost: 6,
+  inkCost: 4,
   art: '3021',
   rarity: 'rare',
   note: '방어 ×4',
-  lore: '문장을 마칠 잉크가 모자라면 체력을 보태서라도 큰낫을 받아 낸다.',
+  lore: '큰낫을 받아 낼 굳은 결심을 세운다.',
 }
 
 /**

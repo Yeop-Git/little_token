@@ -1,3 +1,4 @@
+import { progressStorage } from './progressStorage'
 /**
  * tokenPolicy — 토큰이 "지금 어떻게 있을까"를 고르는 정책.
  *
@@ -349,7 +350,7 @@ export class TokenPolicy {
 
 function defaultStorage() {
   try {
-    return typeof localStorage === 'undefined' ? null : localStorage
+    return progressStorage()
   } catch {
     return null
   }

@@ -290,7 +290,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
       "heal": 0,
       "luck": 0
     },
-    "flavor": "끝난 문장 뒤에서 작은 의심 하나가 고개를 든다.",
+    "flavor": "물음표 뒤에도 이야기를 이어 쓸 잉크가 남는다.",
     "passive": "doubt"
   },
   "olymCarrot": {
@@ -350,7 +350,7 @@ export const RULE_ITEMS: Record<string, ItemDef> = {
       "heal": 0,
       "luck": 0
     },
-    "flavor": "작은 불꽃이 문장의 칸마다 차례로 옮겨붙는다.",
+    "flavor": "작은 불씨가 문장을 쓸 잉크를 환하게 밝힌다.",
     "passive": "matchFire"
   },
   "pigBbq": {

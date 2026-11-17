@@ -19,6 +19,7 @@ import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
 import { reinforceWord } from '@core/run'
+import { STAT_NAME } from '@core/compiler'
 import { EARLY_WORDS, makeEarlyTables } from '@data/earlyWords'
 import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
@@ -31,6 +32,7 @@ import { availableCombos } from '@core/deckInsights'
 import { DISPLAY_FLOORS } from '@/config/edition'
 import { discoveredComboIds } from '@core/comboDiscovery'
 import { wordInkCost } from '@core/ink'
+import type { WordKeywordId } from '@core/wordKeywords'
 import { TooltipLayer } from '@/ui/TooltipLayer'
 
 interface Opts {
@@ -125,11 +127,6 @@ function roleLabel(opt: RewardOption): string {
   return text('rewardRoleTactic', '전술')
 }
 
-function roleHtml(opt: RewardOption): string {
-  if (opt.kind === 'word' && opt.word) return wordActionInline(opt.word) || roleLabel(opt)
-  return roleLabel(opt)
-}
-
 function acquireLabel(opt: RewardOption): string {
   if (opt.reinforce) return text('rewardAcquireReinforce', '반복강화 +1')
   if (opt.kind === 'item') return text('rewardAcquireItem', '새 아이템')
@@ -182,17 +179,6 @@ function mainEffect(opt: RewardOption): string {
     : note
 }
 
-function rewardFactsHtml(opt: RewardOption): string {
-  const price = rewardPrice(opt)
-  const currency = text('rewardCurrencyInspiration', '영감')
-  return `<div class="rd-facts">
-    <span><small>${text('rewardFactRarity', '등급')}</small><b class="rarity-${opt.rarity}">${RARITY_LABEL[opt.rarity]}</b></span>
-    <span><small>${text('rewardFactRole', '역할')}</small><span class="rd-fact-value">${roleHtml(opt)}</span></span>
-    <span><small>${text('rewardFactAcquire', '획득')}</small><b>${acquireLabel(opt)}</b></span>
-    <span><small>${text('rewardFactCost', '비용')}</small><b>${currency} ${price}</b></span>
-  </div>`
-}
-
 function rewardWordMeta(opt: RewardOption): string {
   if (opt.kind !== 'word' || !opt.word) return ''
   const emotion = emotionOrNeutral(opt.word.emotion)
@@ -201,15 +187,6 @@ function rewardWordMeta(opt: RewardOption): string {
     ${emotionIconBadge(emotion, 'rp-emotion')}
     <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
   </div>`
-}
-
-function influenceNote(w: Word): string {
-  const parts: string[] = []
-  if (w.kind === 'heal' || w.effects?.heal) parts.push('회복')
-  if (w.kind === 'guard' || w.effects?.guard) parts.push('방어')
-  if (w.kind === 'attack' || w.power) parts.push('공격')
-  if (w.crit || w.fail) parts.push('룰렛(맥락 스탯+운)')
-  return parts.length ? `<div class="wd-inf">영향 스탯: ${parts.join(' · ')}</div>` : ''
 }
 
 function reinforceDeltas(w: Word): string {
@@ -225,16 +202,18 @@ function reinforceDeltas(w: Word): string {
   if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.statMult != null) rows.push(`계수 ×${w.statMult} → <b>×${after.statMult}</b>`)
+  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${w.statMult} → <b>×${after.statMult}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
   if (w.variance) rows.push(`${gambleText(w.variance)} → <b>${gambleText(after.variance!)}</b>`)
   if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)
-  if (w.crit != null) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
-  return `<div class="rf-deltas"><div class="rf-h">강화하면</div>${rows.map((row) => `<div class="rf-row">${row}</div>`).join('')}</div>`
+  if (w.crit != null && w.crit !== after.crit) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
+  if (w.effects?.castScale != null && w.effects.castScale !== after.effects?.castScale) {
+    rows.push(`${text('rewardRepeatStrength', '반복 위력')} ${Math.round(w.effects.castScale * 100)}% → <b>${Math.round(after.effects!.castScale! * 100)}%</b>`)
+  }
+  return `<div class="rf-deltas"><div class="rf-h">강화 시</div>${rows.map((row) => `<div class="rf-row">${row}</div>`).join('')}</div>`
 }
 
 function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
-  const facts = rewardFactsHtml(opt)
   if (opt.kind === 'item' && opt.item) {
     const item = opt.item
     const rows = STAT_ORDER.filter((key) => item.base[key])
@@ -244,26 +223,29 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     return `
       <div class="wd-name">${item.name}</div>
       <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[item.rarity]}</div>
-      ${facts}
       ${passive ? `<div class="id-passive"><b>${passive.name}</b><span>${passive.desc}</span></div>` : ''}
       <div class="id-stats">${rows}</div>
-      <div class="wd-inf">${passive ? '스탯은 오르지 않는다. 문장 규칙이 바뀐다.' : '제련 문장을 조립해 추가 스탯이 붙는다.'}</div>
       <div class="wd-flavor">${item.flavor}</div>
       <div class="id-art">${itemArt(item.art)}</div>`
   }
   const word = opt.word!
-  // 고유 수치와 키워드 설명을 나눈다. 아래 keyword detail이 이름과 규칙을 보여 주므로
-  // 수치 칩에 같은 「흡혈」 등을 한 번 더 반복하지 않는다.
+  // 키워드 설명은 상세 카드에 표시하므로 수치 칩에는 넣지 않는다.
   const values = wordValueLines(word, undefined, false)
+  const after = opt.reinforce ? { ...word, tags: [...word.tags], effects: word.effects ? { ...word.effects } : undefined, variance: word.variance ? { ...word.variance } : undefined } : null
+  if (after) reinforceWord(after)
+  // 강화로 변하는 값은 아래 전후 비교에만 표시한다. 변하지 않는 부가 정보는 남긴다.
+  const unchanged = after ? new Set(wordValueLines(after, undefined, false).map((value) => value.text)) : null
+  const visibleValues = unchanged ? values.filter((value) => unchanged.has(value.text)) : values
+  const comparedKeywords = new Set<WordKeywordId>()
+  if (after && after.crit !== word.crit) comparedKeywords.add('critical')
+  if (after && after.effects?.castScale !== word.effects?.castScale) comparedKeywords.add('repeat')
   return `
     <div class="wd-title-row">${emotionIconBadge(emotionOrNeutral(word.emotion), 'wd-emotion')}<div class="wd-name">${word.text}</div></div>
-    <div class="wd-grade">✦ ${typeLabel(opt)}${opt.reinforce ? ` · 강화 Lv.${word.level ?? 1}` : ' · 새 단어'}</div>
-    ${facts}
-    <div class="wd-values">${values.map((value) => `<div class="v ${value.cls}">${value.text}</div>`).join('')}</div>
-    ${wordKeywordDetailsHtml(word)}
-    ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}
+    <div class="wd-grade">✦ ${typeLabel(opt)}</div>
+    ${visibleValues.length ? `<div class="wd-values">${visibleValues.map((value) => `<div class="v ${value.cls}">${value.text}</div>`).join('')}</div>` : ''}
     ${opt.reinforce ? reinforceDeltas(word) : ''}
-    ${influenceNote(word)}`
+    ${wordKeywordDetailsHtml(word, comparedKeywords)}
+    ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}`
 }
 
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채운다. 아직 그림이 없는 단어도 공용 아이콘을
@@ -384,16 +366,16 @@ export class RewardView {
             </div>
             ${shop ? '' : `<div class="reward-controls">
               <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
-              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
+              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
               <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
             </div>`}
           </div>
           ${shop ? '<div class="reward-side">' : ''}
             <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
-              <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 효과·키워드·상세 규칙이 여기 표시된다.')}</div>
+              <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 상세 정보가 표시된다.')}</div>
             </aside>
             ${shop ? `<button class="reward-deck" type="button" style="min-height:48px">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
-            <button class="reward-refresh" type="button" style="min-height:48px;justify-content:center" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('shopRefresh', '상품 새로고침')} <small>${text('rewardRefreshCount', '{count}회째', { count: opts.refreshes + 1 })}</small><b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>` : ''}
+            <button class="reward-refresh" type="button" style="min-height:48px;justify-content:center" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('shopRefresh', '상품 새로고침')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>` : ''}
             ${shop ? `<button class="reward-skip" type="button" title="${text('shopLeaveHint', '구매를 마치고 다음 스테이지로 간다.')}"><img src="${REWARD_ART.exit}" alt="" aria-hidden="true" /><span>${text('shopLeave', '상점 나가기')}</span></button>` : ''}
           ${shop ? '</div>' : ''}
         </div>

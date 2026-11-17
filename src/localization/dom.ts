@@ -31,9 +31,9 @@ const ROWS: Row[] = [
   ['맥락','Context','文脈','Контекст','语境','語境'], ['공명','Resonance','共鳴','Резонанс','共鸣','共鳴'], ['문맥에 맞는 멋진 단어를 만들면 보너스!','Match words to the context for a bonus!','文脈に合う言葉でボーナス！','Подбирайте слова по контексту и получайте бонус!','搭配符合语境的词语即可获得奖励！','搭配符合語境的詞語即可獲得獎勵！'], ['같은 감정을 모아 증폭시키면 보너스!','Gather matching emotions to amplify them!','同じ感情を集めて増幅！','Собирайте одинаковые эмоции для усиления!','聚集相同情绪即可增强！','聚集相同情緒即可增強！'], ['다양한 동사로 다채로운 동작을!','Use different verbs for different actions!','動詞を変えて多彩な行動！','Разные глаголы — разные действия!','用不同动词施展丰富行动！','用不同動詞施展豐富行動！'], ['초과 데미지는 짜릿한 오버킬을 선사!','Excess damage becomes a thrilling overkill!','余剰ダメージで爽快オーバーキル！','Лишний урон превращается в эффектный оверкилл!','溢出伤害会带来爽快的过量击杀！','溢出傷害會帶來爽快的過量擊殺！'], ['전투 도움말 열기','Open battle help','戦闘ヘルプを開く','Открыть справку боя','打开战斗帮助','開啟戰鬥說明'],
   ['보유 영감','Inspiration','所持ひらめき','Вдохновение','持有灵感','持有靈感'], ['이번 클리어','This clear','今回のクリア','За эту победу','本次通关','本次通關'], ['기록하기 →','Record →','記録する →','Записать →','记录 →','記錄 →'], ['다른 발상 떠올리기','Think of something else','別の発想を思いつく','Придумать другое','换个想法','換個想法'], ['그냥 넘어가기','Continue without recording','何も記録せず進む','Продолжить без записи','直接跳过','直接跳過'], ['영감이 부족해 다른 발상을 떠올릴 수 없다.','Not enough Inspiration to think of something else.','ひらめきが足りず、別の発想を思いつけない。','Не хватает вдохновения для новой идеи.','灵感不足，无法换个想法。','靈感不足，無法換個想法。'], ['상세보기','Details','詳細','Подробнее','详情','詳情'], ['새 단어','New word','新しい言葉','Новое слово','新词语','新詞語'], ['아이템','Item','アイテム','Предмет','道具','道具'],
   ['내 단어장에 기록!','Added to my wordbook!','自分の単語帳に記録！','Записано в мой словарь!','已记入我的词册！','已記入我的詞冊！'], ['강화 완료!','Upgrade complete!','強化完了！','Усиление завершено!','强化完成！','強化完成！'], ['내 소품으로 결정!','This prop is mine!','自分の小道具に決定！','Этот предмет — мой!','决定作为我的道具！','決定作為我的道具！'],
-  ['제련할 아이템','Item to forge','鍛えるアイテム','Предмет для ковки','待锻造道具','待鍛造道具'], ['제련 스탯','Forge stats','鍛錬能力','Параметры ковки','锻造属性','鍛造屬性'], ['제련 완료','Forge complete','鍛錬完了','Ковка завершена','锻造完成','鍛造完成'], ['세 마디의 힘이 아이템에 새겨졌다','The power of three words was forged into the item','三つの言葉の力が刻まれた','Сила трёх слов вплавлена в предмет','三句话的力量已刻入道具','三句話的力量已刻入道具'], ['제련 문장','Forge sentence','鍛錬の文','Фраза ковки','锻造句子','鍛造句子'], ['세 마디를 골라 아이템에 힘을 새긴다','Choose three words to forge power into the item','三つの言葉で力を刻む','Выберите три слова и вложите силу в предмет','选择三句话，将力量刻入道具','選擇三句話，將力量刻入道具'], ['등급 보너스 +1점','Rarity bonus +1','等級ボーナス +1','Бонус редкости +1','稀有度奖励 +1','稀有度獎勵 +1'],
+  ['제련할 아이템','Item to forge','鍛えるアイテム','Предмет для ковки','待锻造道具','待鍛造道具'], ['제련 스탯','Forge stats','鍛錬能力','Параметры ковки','锻造属性','鍛造屬性'], ['제련 완료','Forge complete','鍛錬完了','Ковка завершена','锻造完成','鍛造完成'], ['세 마디의 힘이 아이템에 새겨졌다','The power of three words was forged into the item','三つの言葉の力が刻まれた','Сила трёх слов вплавлена в предмет','三句话的力量已刻入道具','三句話的力量已刻入道具'], ['제련 문장','Forge sentence','鍛錬の文','Фраза ковки','锻造句子','鍛造句子'], ['세 단어를 선택하세요','Choose three words','言葉を三つ選んでください','Выберите три слова','请选择三个词语','請選擇三個詞語'], ['등급 보너스 +1점','Rarity bonus +1','等級ボーナス +1','Бонус редкости +1','稀有度奖励 +1','稀有度獎勵 +1'],
   ['새 일기 시작','Start a new diary','新しい日記を始める','Начать новый дневник','开始新日记','開始新日記'], ['타이틀로','To title','タイトルへ','В главное меню','返回标题','返回標題'], ['계속 쓰기','Keep writing','書き続ける','Продолжить писать','继续书写','繼續書寫'],
-  ['닫기','Close','閉じる','Закрыть','关闭','關閉'], ['강화하면','After upgrade','強化すると','После усиления','强化后','強化後'], ['전체','All','全体','Все','全部','全部'],
+  ['닫기','Close','閉じる','Закрыть','关闭','關閉'], ['강화 시','On upgrade','強化時','При усилении','强化时','強化時'], ['전체','All','全体','Все','全部','全部'],
   ['전투 도움말 닫기','Close battle help','戦闘ヘルプを閉じる','Закрыть справку боя','关闭战斗帮助','關閉戰鬥說明'],
   ['일반전 한 턴의 순서','Regular-battle turn order','通常戦のターン順','Порядок хода в обычном бою','普通战斗回合顺序','普通戰鬥回合順序'],
   ['선공 아군 행동','Preemptive ally action','味方の先制行動','Опережающее действие союзника','我方先攻行动','我方先攻行動'],
@@ -232,38 +232,43 @@ function translateUnits(value: string, locale: ForeignLocale): string {
     .replace(/(\d+)일/g, (_, n) => locale === 'ja' ? `${n}日` : locale === 'ru' ? `${n} дн.` : locale.startsWith('zh') ? `${n}天` : `${n} days`)
 }
 
-function translateElement(root: Node, locale: ForeignLocale): void {
+// 문구의 구분자는 화면에서 쉼표로 통일한다. 번역 키와 콘텐츠 데이터는 그대로 둔다.
+function displayText(value: string, locale: ForeignLocale | null): string {
+  return (locale ? translateText(value, locale) : value).replace(/\s*·\s*/g, ', ')
+}
+
+function translateElement(root: Node, locale: ForeignLocale | null): void {
   const nodes: Node[] = []
   if (root.nodeType === Node.TEXT_NODE) nodes.push(root)
   const parent = root instanceof Element || root instanceof Document || root instanceof DocumentFragment ? root : null
   if (root instanceof Element) root.childNodes.forEach((node) => { if (node.nodeType === Node.TEXT_NODE) nodes.push(node) })
   parent?.querySelectorAll('*').forEach((element) => element.childNodes.forEach((node) => { if (node.nodeType === Node.TEXT_NODE) nodes.push(node) }))
-  for (const node of nodes) if (node.nodeValue) {
-    const translated = translateText(node.nodeValue, locale)
+  for (const node of nodes) if (node.nodeValue && !node.parentElement?.closest('script, style, textarea, [contenteditable]')) {
+    const translated = displayText(node.nodeValue, locale)
     if (translated !== node.nodeValue) node.nodeValue = translated
   }
   if (root instanceof Element) translateAttributes(root, locale)
   parent?.querySelectorAll<HTMLElement>('[aria-label],[title],[placeholder],[alt]').forEach((element) => translateAttributes(element, locale))
 }
 
-function translateAttributes(element: Element, locale: ForeignLocale): void {
+function translateAttributes(element: Element, locale: ForeignLocale | null): void {
   for (const attribute of ['aria-label','title','placeholder','alt']) {
     const value = element.getAttribute(attribute)
     if (value) {
-      const translated = translateText(value, locale)
+      const translated = displayText(value, locale)
       if (translated !== value) element.setAttribute(attribute, translated)
     }
   }
 }
 
 export function installDomLocalization(): void {
-  if (currentLocale === 'ko' || typeof document === 'undefined') return
-  const locale = currentLocale as ForeignLocale
+  if (typeof document === 'undefined') return
+  const locale = currentLocale === 'ko' ? null : currentLocale as ForeignLocale
   translateElement(document.body, locale)
   const observer = new MutationObserver((records) => {
     for (const record of records) {
-      if (record.type === 'characterData' && record.target.nodeValue) {
-        const translated = translateText(record.target.nodeValue, locale)
+      if (record.type === 'characterData' && record.target.nodeValue && !record.target.parentElement?.closest('script, style, textarea, [contenteditable]')) {
+        const translated = displayText(record.target.nodeValue, locale)
         if (translated !== record.target.nodeValue) record.target.nodeValue = translated
       }
       if (record.type === 'attributes' && record.target instanceof Element) translateAttributes(record.target, locale)

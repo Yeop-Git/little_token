@@ -20,8 +20,12 @@ const EARLY_STORY_BOSS_HP_MULT = 0.9
 const EARLY_STORY_BOSS_ATK_MULT = 0.75
 const EARLY_STORY_QUEEN_ATK_MULT = 0.69
 const FIRST_STORY_MANTIS_ATK_MULT = 0.45
-const FIRST_STORY_SPIDER_HP_MULT = 1.06
-const FIRST_STORY_SPIDER_ATK_MULT = 0.12
+// 잉크 5 기준으로 보스가 예고·파훼를 보여 주면서 목표 턴에 들어오도록
+// 첫 이야기의 막 체력만 조정한다. 반복 보스 성장 곡선은 그대로 둔다.
+const FIRST_STORY_MANTIS_HP_MULT = 0.68
+const FIRST_STORY_QUEEN_HP_MULT = 0.72
+const FIRST_STORY_SPIDER_HP_MULT = 0.76
+const FIRST_STORY_SPIDER_ATK_MULT = 0.55
 
 /** 15층짜리 한 권 안의 보스 배치. 엔드리스에서는 이 한 권을 더 강하게 반복한다. */
 export const BOSS_BY_FLOOR: Record<number, string> = {
@@ -87,11 +91,15 @@ export function stageFor(day: number): Stage {
   const hpMult = (1 + (day - 1) * 0.26)
     * (earlyStory ? EARLY_STORY_HP_MULT : 1)
     * (earlyBoss ? EARLY_STORY_BOSS_HP_MULT : 1)
+    * (earlyBoss && boss === 'mantis' ? FIRST_STORY_MANTIS_HP_MULT : 1)
+    * (earlyBoss && boss === 'queenBee' ? FIRST_STORY_QUEEN_HP_MULT : 1)
     * (firstStorySpider ? FIRST_STORY_SPIDER_HP_MULT : 1)
   // 압력은 뒤로 갈수록 가팔라진다(초반은 완만, 후반에 조여든다).
   const atkMult = (1 + Math.pow(day - 1, 1.3) * 0.1)
     * (field.enemyAtkMult ?? 1)
     * (earlyStory ? EARLY_STORY_ATK_MULT : 1)
+    // 첫 정예 구간은 11층에서 서서히 상승해 14층에서 정점에 닿는다.
+    * (endlessCycle === 0 && floor >= 11 && !isBoss ? 1.35 + (floor - 11) * 0.15 : 1)
     * (earlyBoss ? earlyBossAtkMult : 1)
     * (firstStorySpider ? FIRST_STORY_SPIDER_ATK_MULT : 1)
   if (boss) return {

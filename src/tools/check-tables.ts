@@ -218,9 +218,9 @@ function checkBudget(): string[] {
         out.push(`${pool}/${w.text}: modifier has more than two functions`)
         console.log(`  VIOLATION  ${pool} · ${w.text} — modifiers may have at most two functions`)
       }
-      if ((w.effects?.magicShield ?? 0) > 0 && (w.inkCost ?? 0) < 4) {
+      if ((w.effects?.magicShield ?? 0) > 0 && (w.inkCost ?? 0) < 3) {
         out.push(`${pool}/${w.text}: magic shield modifier costs less than 4 ink`)
-        console.log(`  VIOLATION  ${pool} · ${w.text} — magic shield modifiers cost at least 4 ink`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — magic shield modifiers cost at least 3 ink`)
       }
       if ((w.effects?.inkDiscount ?? 0) > 0 && (w.inkCost ?? 0) >= (w.effects?.inkDiscount ?? 0)) {
         out.push(`${pool}/${w.text}: ink discount does not exceed its own cost`)

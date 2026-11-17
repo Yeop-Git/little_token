@@ -1,15 +1,14 @@
 import { compile, effectiveBase, isDamageIntent, rouletteOdds } from '@core/compiler'
-import { selectionInkCost } from '@core/ink'
+import { selectionInkCost, sentenceInkAvailable } from '@core/ink'
 import { BEANSTALK_GROWTH, beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor, type PassiveId } from '@core/passives'
 import { startingPlayer } from '@core/run'
 import type { PlayerState } from '@core/player'
 import type { Selection } from '@core/types'
 import { conflictReason } from '@core/validator'
-import { makeEarlyTables } from '@data/earlyWords'
+import { ALL_REWARD_WORDS, makeEarlyTables } from '@data/earlyWords'
 import { ITEMS, PASSIVE_ITEMS, type ItemDef, type StatKey } from '@data/items'
 
 const BENCHMARK_STATS = { hp: 80, atk: 24, guard: 12, heal: 12, luck: 12 }
-const MAX_SAFE_INK = 10
 
 interface ItemBenchmark {
   item: ItemDef | null
@@ -29,6 +28,11 @@ function expectedRoulette(player: PlayerState, intent: ReturnType<typeof compile
 function benchmark(item: ItemDef | null, combinedItems: ItemDef[] = []): ItemBenchmark {
   const player = startingPlayer()
   player.stats = { ...BENCHMARK_STATS }
+  // 획득한 단어와의 상호작용을 보아야 잉크 확장 효과가 실제 선택지를 여는지 알 수 있다.
+  for (const id of ['nado', 'oneul', 'michin', 'nunmullo', 'focusStrike', 'pierceStrike', 'scatterThree']) {
+    const word = ALL_REWARD_WORDS.find((candidate) => candidate.id === id)
+    if (word && player.deck[word.slot]) player.deck[word.slot].push(word)
+  }
   const equipped = item ? [item] : combinedItems
   player.items = equipped.filter((entry) => entry.passive).map((entry) => ({
     id: entry.id, name: entry.name, rarity: entry.rarity, art: entry.art, line: '', stats: {}, passive: entry.passive,
@@ -39,7 +43,7 @@ function benchmark(item: ItemDef | null, combinedItems: ItemDef[] = []): ItemBen
 
   const visit = (index: number, selection: Selection): void => {
     if (index >= order.length) {
-      if (selectionInkCost(selection) > MAX_SAFE_INK) return
+      if (selectionInkCost(selection) > sentenceInkAvailable(0, player)) return
       const intent = compile(selection, tables, player.stats, modsFor(player, 3))
       const luck = 1 + player.stats.luck * 0.02
       const doubt = intent.doubtCount > 0 ? 1.15 ** intent.doubtCount : 1
@@ -73,6 +77,10 @@ const baselineMax = percentile(baseline.attacks, 1)
 const rows = Object.values(PASSIVE_ITEMS).map((item) => benchmark(item))
 const combined = benchmark(null, Object.values(PASSIVE_ITEMS))
 const violations: string[] = []
+for (const id of ['pinoDoubt', 'redMatch']) {
+  const row = rows.find((entry) => entry.item?.id === id)!
+  if (row.attacks.length <= baseline.attacks.length) violations.push(`${id}: 추가 잉크가 공격 문장을 열지 못함`)
+}
 
 const beanstalk = PASSIVE_ITEMS.beanSprout
 const beanstalkPlayer = startingPlayer()
@@ -103,7 +111,7 @@ if (new Set(rareProfiles).size !== rareItems.length) violations.push('희귀 아
 if (rareStatsCovered.size !== statKeys.length) violations.push('희귀 아이템 성장축이 다섯 스탯을 모두 다루지 않음')
 if (rareFocused < 3 || rareHybrid < 3) violations.push('희귀 아이템의 단일 집중과 혼합 성장축이 각각 3종 미만임')
 
-console.log('아이템 패시브 기대값 · 후반 대표 스탯 · 잉크 10 이하 전수 문장')
+console.log('아이템 패시브 기대값 · 후반 대표 스탯 · 보유 아이템의 잉크 한도 내 전수 문장')
 console.log(`기준 문장 p75 ${baselineP75.toFixed(1)} · max ${baselineMax.toFixed(1)}`)
 for (const row of rows) {
   const p75 = percentile(row.attacks, 0.75)

@@ -8,6 +8,7 @@
  * 컷보다 먼저 걷히는 게 핵심이라 페이드는 재생이 끝나기 FADE_MS 전에 시작한다.
  */
 
+import { GameAudio } from '@/audio/GameAudio'
 import { VIDEO } from '@/assets'
 import { reportResourceFailure } from '@/ui/ResourceFailures'
 
@@ -113,6 +114,7 @@ export class CinematicIntro {
     this.fireflies = this.el.querySelector('canvas')!
     this.video = this.el.querySelector('video')!
     this.video.playbackRate = SPEED
+    this.video.volume = GameAudio.getCinematicVolume()
     host.appendChild(this.el)
 
     // 아무 입력이나 들어오면 건너뛴다 — 두 번째부터는 기다리고 싶지 않다.

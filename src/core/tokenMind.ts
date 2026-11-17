@@ -1,3 +1,4 @@
+import { progressStorage } from './progressStorage'
 /**
  * tokenMind — 요정 토큰의 자아.
  *
@@ -344,7 +345,7 @@ export class TokenMind {
 
 function defaultStorage(): MindStorage | null {
   try {
-    return typeof localStorage === 'undefined' ? null : localStorage
+    return progressStorage()
   } catch {
     return null
   }

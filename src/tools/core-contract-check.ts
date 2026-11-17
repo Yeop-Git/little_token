@@ -9,8 +9,11 @@ import {
   spendInspiration,
 } from '@core/run'
 import { deserializeRun, serializeRun } from '@core/save'
-import { inkExceedsLimit, inkOverdraw, selectionInkCost, SENTENCE_BASE_INK, wordInkCost } from '@core/ink'
-import { EARLY_COMBOS, EARLY_WORDS, SPECIAL_REWARD_WORDS } from '@data/earlyWords'
+import { inkExceedsLimit, inkOverdraw, selectionInkCost, SENTENCE_BASE_INK, sentenceInkAvailable, wordInkCost } from '@core/ink'
+import { ALL_REWARD_WORDS, EARLY_COMBOS, EARLY_WORDS, makeEarlyTables, SPECIAL_REWARD_WORDS } from '@data/earlyWords'
+import { canCompleteSentence } from '@core/validator'
+import { modsFor } from '@core/passives'
+import { compile, effectiveBase, resolveMultiplier } from '@core/compiler'
 import { applyInkOverdraw, type BattleState } from '@/sim/reference'
 import { availableCombos } from '@core/deckInsights'
 import { floorsForEdition, isEditionFinalFloor, strictResourceError } from '@/config/edition'
@@ -82,19 +85,55 @@ const starterSentence = {
   verb: EARLY_WORDS.verb[0],
 }
 assert(selectionInkCost(starterSentence) <= SENTENCE_BASE_INK, 'a starter sentence must fit in base ink')
+
+const inkPlayer = newRun().player
+const inkItem = (id: string, passive: 'doubt' | 'matchFire') => ({ id, name: id, rarity: 'epic' as const, art: '', line: '', stats: {}, passive })
+assert.equal(sentenceInkAvailable(0, inkPlayer), 5, 'the base sentence starts with five ink')
+inkPlayer.items.push(inkItem('pinoDoubt', 'doubt'))
+assert.equal(sentenceInkAvailable(0, inkPlayer), 6, 'the question mark adds one ink')
+inkPlayer.items.push(inkItem('redMatch', 'matchFire'))
+assert.equal(sentenceInkAvailable(0, inkPlayer), 8, 'both ink items stack once per sentence')
+assert.equal(inkExceedsLimit(8, sentenceInkAvailable(0, inkPlayer)), false, 'added ink permits an eight-ink sentence')
+assert.equal(inkExceedsLimit(9, sentenceInkAvailable(0, inkPlayer)), true, 'items do not allow spending above the new limit')
+
+assert.equal(modsFor(inkPlayer).doubt, false, 'ink item no longer adds a random multiplier')
+assert.equal(modsFor(inkPlayer).bonusEach, 0, 'ink item no longer adds a multiplier-pool bonus')
+const lateLine = {
+  subj: ALL_REWARD_WORDS.find((word) => word.id === 'naman')!,
+  adv: ALL_REWARD_WORDS.find((word) => word.id === 'michin')!,
+  verb: ALL_REWARD_WORDS.find((word) => word.id === 'focusStrike')!,
+}
+const lateStats = { hp: 120, atk: 70, guard: 30, heal: 30, luck: 20 }
+const lateIntent = compile(lateLine, makeEarlyTables(), lateStats)
+const lateMult = resolveMultiplier(lateIntent, { luck: lateStats.luck, statBias: lateStats.atk }, 0).mult
+assert(selectionInkCost(lateLine) <= sentenceInkAvailable(0, inkPlayer), 'late combo fits with ink items')
+assert(lateIntent.combos.length > 0 && Math.floor(effectiveBase(lateIntent) * lateMult * lateIntent.castScale) >= 1000,
+  'a high-growth critical combo can still exceed 1000 damage in one hit')
+
+// 모든 보상 단어가 시작 덱과 기본 잉크만으로 실제 문장 하나에는 들어간다.
+for (const word of ALL_REWARD_WORDS) {
+  const player = newRun().player
+  if (!['subj', 'adv', 'verb'].includes(word.slot)) continue
+  player.deck[word.slot] = [...player.deck[word.slot], word]
+  const tables = makeEarlyTables(player.deck, player)
+  assert(canCompleteSentence(tables, { [word.slot]: word }, sentenceInkAvailable(0, player), () => false),
+    `${word.text} must fit a sentence with the starting deck`)
+}
+
+
 assert.equal(wordInkCost({ ...EARLY_WORDS.subj[0], bonus: 1 }), wordInkCost(EARLY_WORDS.subj[0]), 'explicit card cost must not rise after reinforcement')
 const implicitSubject = { ...EARLY_WORDS.subj[0], inkCost: undefined }
 assert(wordInkCost({ ...implicitSubject, bonus: 1 }) > wordInkCost(implicitSubject), 'implicit fallback cost follows expected strength')
 assert.equal(inkOverdraw(6, 6), 0, 'base six ink must be safe')
 assert.equal(inkOverdraw(7, 6), 1, 'the first ink above the available pool costs one health')
 assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even beyond the selectable limit')
-assert.equal(inkExceedsLimit(9, 6), true, 'more than two overdraw is not selectable')
+assert.equal(inkExceedsLimit(6, 5), true, 'sentences cannot exceed five ink')
 assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost != null), 'reward verbs expose Ink cost as part of their identity')
 const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word) => word.id === id)!)
-assert.equal(specialCost('magicVeil'), 5, 'guard-to-damage echo pays for its conversion coefficient')
+assert.equal(specialCost('magicVeil'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
-assert.equal(specialCost('overflowingHeart'), 5, 'overheal-to-damage pays for its conversion coefficient')
-assert.equal(specialCost('stainedTomorrow'), 5, 'high-ratio lifesteal pays by its healing ratio')
+assert.equal(specialCost('overflowingHeart'), 4, 'overheal-to-damage pays for its conversion coefficient')
+assert.equal(specialCost('stainedTomorrow'), 4, 'high-ratio lifesteal pays by its healing ratio')
 const earlyModifierOffers = genRewards(original.player, 5, EARLY_BUILD_REWARD_DAY, 'subject', () => 0.5)
 assert.deepEqual(
   new Set(earlyModifierOffers.map((option) => option.word?.id)),

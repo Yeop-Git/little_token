@@ -176,6 +176,7 @@ function deckScore(player: PlayerState, focus: BuildFocus, locale: LocaleCode): 
   let sentenceCount = 0
   const walk = (i: number, sel: Selection) => {
     if (i === order.length) {
+      if (inkExceedsLimit(selectionInkCost(sel), sentenceInkAvailable(0, player))) return
       sentenceCount++
       const intent = compile(sel, t, player.stats, mods)
       const m = resolveMultiplier(intent, { luck: player.stats.luck, statBias: statBiasOf(intent, player.stats) }, 0.5).mult
@@ -593,9 +594,9 @@ function fightStage(
           const intent = compile(selection, tables, rankedCombatStats(player, state, selection), modsFor(player, killsThisBattle))
           return isDamageIntent(intent) && effectiveBase(intent) > 0
         }
-        const wasAttackPossible = canCompleteSentence(tables, {}, sentenceInkAvailable(carriedInk), (word) => sealed.has(word.id), canDealDamage)
+        const wasAttackPossible = canCompleteSentence(tables, {}, sentenceInkAvailable(carriedInk, player), (word) => sealed.has(word.id), canDealDamage)
         const sealable = usable.filter((candidate) => usable.some((remaining) => remaining !== candidate && canCompleteSentence(
-          tables, { [slotKey]: remaining }, sentenceInkAvailable(carriedInk), (word) => sealed.has(word.id) || word.id === candidate.id,
+          tables, { [slotKey]: remaining }, sentenceInkAvailable(carriedInk, player), (word) => sealed.has(word.id) || word.id === candidate.id,
           wasAttackPossible ? canDealDamage : undefined,
         )))
         if (usable.length > 1 && sealable.length) sealed.add(sealable[Math.floor(rng() * sealable.length)].id)
@@ -624,7 +625,7 @@ function fightStage(
       drawsLeft--
     }
 
-    const availableInk = sentenceInkAvailable(carriedInk)
+    const availableInk = sentenceInkAvailable(carriedInk, player)
     let hand = enumerate(player, state, tables, hands, sealed, killsThisBattle, availableInk)
     if (log && boss.def.webPattern && turn === 1) {
       const all = enumerate(player, state, tables, hands.map((cards, i) => [...cards, ...piles[i]]), sealed, killsThisBattle, availableInk)
@@ -747,7 +748,8 @@ function fightStage(
           || candidateDamage(b, state) - candidateDamage(a, state)
           || (b.heal + b.guard) - (a.heal + a.guard))[0]
         : null
-      const lowHp = state.playerHp < state.playerMax * 0.5
+      // 방어를 무시하는 예고 앞에서는 체력을 절반까지 방치하지 않는다.
+      const lowHp = state.playerHp < state.playerMax * (willBeHit && incomingPierce ? 0.7 : 0.5)
       const queenClearsEscort = !!queenAnswer && workerClear(queenAnswer) >= escorts
       if (incoming && bestGuard) pick = bestGuard
       else if (queenClearsEscort) pick = queenAnswer

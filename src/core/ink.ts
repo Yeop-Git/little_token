@@ -1,8 +1,10 @@
 import type { Selection, Word } from './types'
+import type { PlayerState } from './player'
+import { bonusInkFor } from './passives'
 
-export const SENTENCE_BASE_INK = 6
-export const SENTENCE_CARRY_LIMIT = 2
-export const SENTENCE_OVERDRAW_LIMIT = 2
+export const SENTENCE_BASE_INK = 5
+export const SENTENCE_CARRY_LIMIT = 0
+export const SENTENCE_OVERDRAW_LIMIT = 0
 export const SENTENCE_MAX_INK = SENTENCE_BASE_INK + SENTENCE_CARRY_LIMIT + SENTENCE_OVERDRAW_LIMIT
 export const SENTENCE_INK = SENTENCE_BASE_INK + SENTENCE_CARRY_LIMIT
 
@@ -19,13 +21,13 @@ export function expectedMultiplier(word: Word): number {
  * 더 비싸며, 명시 비용은 `check-tables`에서 이 값과 정확히 일치해야 한다.
  */
 export function recommendedWordInkCost(word: Word): number {
-  if (word.growHp) return 3
+  if (word.growHp) return word.slot === 'subj' || word.slot === 'subj2' ? 2 : 3
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
     const expected = expectedMultiplier(word)
     const cost = Math.ceil((expected - 1.2) / 0.3)
       + (word.aoe === 'all' ? 1 : 0)
-    return Math.max(0, Math.min(4, cost))
+    return Math.max(0, Math.min(2, cost))
   }
 
   if (word.slot === 'verb' || word.slot === 'verb2') {
@@ -40,7 +42,7 @@ export function recommendedWordInkCost(word: Word): number {
     cost += Math.ceil(Math.max(0, effects?.guardAttackMultiplier ?? 0))
     cost += Math.ceil(Math.max(0, effects?.overhealDamageMultiplier ?? 0))
     cost += Math.ceil(Math.max(0, effects?.lifeStealRate ?? 0) / .5)
-    return Math.max(1, Math.min(6, cost))
+    return Math.max(1, Math.min(4, cost))
   }
 
   let power = 0
@@ -64,7 +66,7 @@ export function recommendedWordInkCost(word: Word): number {
   power += Math.abs(effects?.guardRank ?? 0)
   power -= Math.max(0, effects?.inkDiscount ?? 0)
 
-  return Math.max(0, Math.min(4, Math.floor(power + 1e-6)))
+  return Math.max(0, Math.min(3, Math.floor(power + 1e-6)))
 }
 
 export function wordInkCost(word: Word): number {
@@ -84,8 +86,8 @@ export function selectionInkCost(selection: Selection): number {
   return Math.max(0, listed - discount)
 }
 
-export function sentenceInkAvailable(carry = 0): number {
-  return SENTENCE_BASE_INK + Math.min(SENTENCE_CARRY_LIMIT, Math.max(0, Math.floor(carry)))
+export function sentenceInkAvailable(carry = 0, player?: PlayerState): number {
+  return SENTENCE_BASE_INK + bonusInkFor(player) + Math.min(SENTENCE_CARRY_LIMIT, Math.max(0, Math.floor(carry)))
 }
 
 export function inkOverdraw(cost: number, available = SENTENCE_INK): number {

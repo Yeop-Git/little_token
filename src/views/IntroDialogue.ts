@@ -10,7 +10,7 @@ import { TOKEN_FACES, TUTORIAL_CARD_ART } from '@/assets'
 import type { Emotion, Word } from '@core/types'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 import { currentLocale, t, type LocaleCode } from '@/localization'
-import { SENTENCE_BASE_INK, SENTENCE_CARRY_LIMIT, SENTENCE_MAX_INK, SENTENCE_OVERDRAW_LIMIT } from '@core/ink'
+import { SENTENCE_BASE_INK } from '@core/ink'
 
 export interface IntroDialogueHandlers {
   /** 마지막 대사 후(또는 SKIP) 딤이 걷히고 대화창이 사라진 뒤 호출된다. */
@@ -54,7 +54,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '좋아! 주어, 수식어, 동사를 차례로 고르면 한 문장이 완성돼.',
     '앞뒤 단어가 잘 맞으면 좋은 「맥락」이 생기고, 같은 색 감정이 모이면 「공명」해서 더 강해져!',
     '마지막 동사는 때릴지, 막을지, 회복할지를 정해.',
-    `문장마다 기본 잉크는 ${SENTENCE_BASE_INK}이야. 남은 건 최대 ${SENTENCE_CARRY_LIMIT}까지 이월하고, 체력으로 ${SENTENCE_OVERDRAW_LIMIT}만큼 더 써서 최대 ${SENTENCE_MAX_INK}까지 쓸 수 있어. 잉크병이 미리 알려 줄 거야!`,
+    `문장마다 잉크 ${SENTENCE_BASE_INK}으로 시작해. 단어를 고르면 잉크를 쓰니까 잉크병을 살펴봐!`,
     '피해가 남으면 앞의 벌레를 넘어 다음 녀석까지 이어져!',
     '그럼 눈앞에서 이야기를 갉아먹는 녀석들부터 쫓아내자!',
   ],
@@ -69,7 +69,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'Good! Choose a subject, modifier, and verb in order to complete one sentence.',
     'When neighboring words fit, they create Context; words of the same emotion color Resonate and become even stronger!',
     'The final verb decides whether you attack, guard, or heal.',
-    `Each sentence starts with ${SENTENCE_BASE_INK} Ink. Carry up to ${SENTENCE_CARRY_LIMIT}, then pay up to ${SENTENCE_OVERDRAW_LIMIT} Health to write as much as ${SENTENCE_MAX_INK}. The ink bottle will warn you first!`,
+    `Each sentence starts with ${SENTENCE_BASE_INK} Ink. Words spend Ink, so keep an eye on the bottle!`,
     'Any damage left over carries past the front bug into the next one!',
     'Now let us chase away the bugs gnawing at the story in front of us!',
   ],
@@ -84,7 +84,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'そう！主語、修飾語、動詞の順に選べば、一つの文が完成するよ。',
     '前後の言葉が合えば「文脈」になり、同じ色の感情が集まれば「共鳴」してもっと強くなる！',
     '最後の動詞が、攻撃するか、防ぐか、回復するかを決めるんだ。',
-    `文ごとの基本インクは${SENTENCE_BASE_INK}。残りは最大${SENTENCE_CARRY_LIMIT}まで繰り越せて、体力で${SENTENCE_OVERDRAW_LIMIT}まで追加し、最大${SENTENCE_MAX_INK}まで書けるよ。インク瓶が先に知らせてくれる！`,
+    `文ごとにインク${SENTENCE_BASE_INK}で始まるよ。単語を選ぶとインクを使うから、インク瓶を見てね！`,
     '余ったダメージは前の虫を越えて、次の虫まで届くよ！',
     'さあ、目の前で物語をかじる虫たちを追い払おう！',
   ],
@@ -99,7 +99,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'Отлично! Выбирай по порядку подлежащее, определение и глагол, чтобы закончить фразу.',
     'Соседние слова создают Контекст, а эмоции одного цвета входят в Резонанс и усиливают фразу!',
     'Последний глагол решает, атаковать, защищаться или лечиться.',
-    `На каждую фразу даётся ${SENTENCE_BASE_INK} чернил. Можно перенести до ${SENTENCE_CARRY_LIMIT} и оплатить здоровьем ещё до ${SENTENCE_OVERDRAW_LIMIT}, чтобы использовать максимум ${SENTENCE_MAX_INK}. Чернильница предупредит заранее!`,
+    `Каждая фраза начинается с ${SENTENCE_BASE_INK} чернил. Слова расходуют их, так что следи за чернильницей!`,
     'Лишний урон пройдёт сквозь первого жука и попадёт в следующего!',
     'А теперь прогоним жуков, которые пожирают историю прямо перед нами!',
   ],
@@ -114,7 +114,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '很好！依次选择主语、修饰语和动词，就能完成一句话。',
     '前后词语契合会形成“语境”，同色情感聚集则会“共鸣”，让句子更强！',
     '最后的动词决定攻击、防御还是治疗。',
-    `每句话有${SENTENCE_BASE_INK}点基础墨水，最多结转${SENTENCE_CARRY_LIMIT}点，再用体力超写${SENTENCE_OVERDRAW_LIMIT}点，最多可用${SENTENCE_MAX_INK}点。墨水瓶会提前提醒你！`,
+    `每句话从${SENTENCE_BASE_INK}点墨水开始。选择词语会消耗墨水，留意墨水瓶哦！`,
     '多余的伤害会越过前面的虫子，继续打到下一只！',
     '那么，先赶走眼前这些啃食故事的虫子吧！',
   ],
@@ -129,7 +129,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '很好！依次選擇主語、修飾語和動詞，就能完成一句話。',
     '前後詞語契合會形成「語境」，同色情感聚集則會「共鳴」，讓句子更強！',
     '最後的動詞決定攻擊、防禦還是治療。',
-    `每句話有${SENTENCE_BASE_INK}點基礎墨水，最多結轉${SENTENCE_CARRY_LIMIT}點，再用體力超寫${SENTENCE_OVERDRAW_LIMIT}點，最多可用${SENTENCE_MAX_INK}點。墨水瓶會提前提醒你！`,
+    `每句話從${SENTENCE_BASE_INK}點墨水開始。選擇詞語會消耗墨水，留意墨水瓶喔！`,
     '多餘的傷害會越過前面的蟲子，繼續打到下一隻！',
     '那麼，先趕走眼前這些啃食故事的蟲子吧！',
   ],

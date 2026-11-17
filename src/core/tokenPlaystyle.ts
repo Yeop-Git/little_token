@@ -1,3 +1,4 @@
+import { progressStorage } from './progressStorage'
 /**
  * tokenPlaystyle — 토큰이 "이 사람이 어떻게 쓰는가"를 지켜본 기록.
  *
@@ -225,7 +226,7 @@ export class TokenPlaystyle {
 
 function defaultStorage(): MindStorage | null {
   try {
-    return typeof localStorage === 'undefined' ? null : localStorage
+    return progressStorage()
   } catch {
     return null
   }

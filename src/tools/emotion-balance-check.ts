@@ -1,4 +1,4 @@
-import { selectionInkCost } from '@core/ink'
+import { selectionInkCost, SENTENCE_BASE_INK } from '@core/ink'
 import { compile, effectiveBase, rouletteOdds, statBiasOf } from '@core/compiler'
 import { TARGET_FALLOFF } from '@core/combatRules'
 import type { Emotion, IntentKind, Selection, Word } from '@core/types'
@@ -16,9 +16,7 @@ interface CostSummary {
   min: number
   median: number
   max: number
-  atMost6: number
-  atMost8: number
-  atMost10: number
+  affordable: number
 }
 
 interface PowerSummary {
@@ -71,9 +69,7 @@ function summarizeCosts(costs: number[]): CostSummary {
     min: sorted[0],
     median: median(sorted),
     max: sorted[sorted.length - 1],
-    atMost6: sorted.filter((cost) => cost <= 6).length,
-    atMost8: sorted.filter((cost) => cost <= 8).length,
-    atMost10: sorted.filter((cost) => cost <= 10).length,
+    affordable: sorted.filter((cost) => cost <= SENTENCE_BASE_INK).length,
   }
 }
 
@@ -211,10 +207,10 @@ for (const emotion of EMOTIONS) {
         const selection: Selection = { subj, adv, verb }
         const inkCost = selectionInkCost(selection)
         costs.push(inkCost)
-        if (inkCost <= 10) [subj, adv, verb].forEach((word) => affordableCardIds.add(word.id))
+        if (inkCost <= SENTENCE_BASE_INK) [subj, adv, verb].forEach((word) => affordableCardIds.add(word.id))
         if (ACTION_KINDS.includes(verb.kind as CheckedAction)) actions.add(verb.kind as CheckedAction)
-        if (verb.kind === 'attack' && compile(selection, tables).combos.length > 0) attackCombos++
-        if (inkCost <= 8) {
+        if (inkCost <= SENTENCE_BASE_INK && verb.kind === 'attack' && compile(selection, tables).combos.length > 0) attackCombos++
+        if (inkCost <= SENTENCE_BASE_INK) {
           const power = primaryPower(selection)
           if (power) {
             if (power.value > best[power.kind]) {
@@ -247,37 +243,23 @@ for (const emotion of EMOTIONS) {
   console.log(`\n${emotion}`)
   console.log(`  combinations: ${costs.length} (${subjects.length} x ${modifiers.length} x ${verbs.length})`)
   console.log(`  cost min/median/max: ${cost.min}/${cost.median}/${cost.max}`)
-  console.log(`  cost <=6/<=8/<=10: ${cost.atMost6}/${cost.atMost8}/${cost.atMost10}`)
+  console.log(`  cost <=${SENTENCE_BASE_INK}: ${cost.affordable}/${costs.length}`)
   console.log(`  actions: ${ACTION_KINDS.map((kind) => `${kind}=${actions.has(kind) ? 'yes' : 'no'}`).join(', ')}`)
   console.log(`  subjects: stable=${stableSubjects}, variance=${varianceSubjects}`)
   console.log(`  modifier tactics (${tactics.size}): ${[...tactics].sort().join(', ') || 'none'}`)
   console.log(`  signature: ${signatureReady ? 'yes' : 'missing'}`)
   console.log(`  same-color attack combos: ${attackCombos}`)
-  console.log(`  best <=8 power: attack=${best.attack.toFixed(1)}, guard=${best.guard.toFixed(1)}, heal=${best.heal.toFixed(1)}`)
-  console.log(`  best <=8 power/ink: attack=${bestEfficiency.attack.toFixed(1)}, guard=${bestEfficiency.guard.toFixed(1)}, heal=${bestEfficiency.heal.toFixed(1)}`)
+  console.log(`  best <=${SENTENCE_BASE_INK} power: attack=${best.attack.toFixed(1)}, guard=${best.guard.toFixed(1)}, heal=${best.heal.toFixed(1)}`)
+  console.log(`  best <=${SENTENCE_BASE_INK} power/ink: attack=${bestEfficiency.attack.toFixed(1)}, guard=${bestEfficiency.guard.toFixed(1)}, heal=${bestEfficiency.heal.toFixed(1)}`)
   for (const kind of ACTION_KINDS) console.log(`    ${kind}: ${bestLine[kind]}`)
   powerSummaries.push({ emotion, best, bestEfficiency })
 
-  if (cost.atMost10 < Math.ceil(costs.length * 0.8)) {
-    console.error(`  [FAIL] fewer than 80% of combinations fit the absolute 10-ink ceiling (${cost.atMost10}/${costs.length})`)
+  if (cost.affordable < Math.ceil(costs.length * 0.1)) {
+    console.error(`  [FAIL] fewer than 10% fit ${SENTENCE_BASE_INK} ink (${cost.affordable}/${costs.length})`)
     failed = true
   }
   if (cardsWithoutAffordableLine.length > 0) {
-    console.error(`  [FAIL] cards without any same-color <=10 line: ${cardsWithoutAffordableLine.map((word) => word.text).join(', ')}`)
-    failed = true
-  }
-  if (cost.atMost6 < Math.ceil(costs.length * 0.1)) {
-    if (emotion === 'sorrow') {
-      // TODO(balance): 슬픔의 현재 정체성을 잉크 이월 중심으로 유지할지, 기본 6잉크 선택지를
-      // 다시 열지 플레이테스트로 결정한다. 출시 직전 수치를 흔들지 않되 측정은 계속 남긴다.
-      console.warn(`  [WARN] fewer than 10% of combinations fit the base 6 ink (${cost.atMost6}/${costs.length})`)
-    } else {
-      console.error(`  [FAIL] fewer than 10% of combinations fit the base 6 ink (${cost.atMost6}/${costs.length})`)
-      failed = true
-    }
-  }
-  if (cost.atMost8 < Math.ceil(costs.length * 0.5)) {
-    console.error(`  [FAIL] only ${cost.atMost8}/${costs.length} combinations fit a fresh turn's 8-point ceiling`)
+    console.error(`  [FAIL] no same-color line at ${SENTENCE_BASE_INK} ink: ${cardsWithoutAffordableLine.map((word) => word.text).join(', ')}`)
     failed = true
   }
   if (missingActions.length > 0) {
@@ -317,12 +299,12 @@ for (const kind of ACTION_KINDS) {
   // 초반 적 한 번에 대응할 최소치와 최강 감정의 20%는 남겨 완전한 죽은 선택만 막는다.
   const absoluteFloor: Record<CheckedAction, number> = { attack: 30, guard: 10, heal: 20 }
   if (ratio < 0.2) {
-    console.error(`  [FAIL] one emotion's best <=8 ${kind} answer is below 20% of the strongest emotion`)
+    console.error(`  [FAIL] one emotion's best <=${SENTENCE_BASE_INK} ${kind} answer is below 20% of the strongest emotion`)
     failed = true
   }
   // 기대값은 표시용 소수점과 룰렛 확률을 곱하므로 0.5 미만 차이는 전투의 정수 반올림 범위다.
   if (weakest + 0.5 < absoluteFloor[kind]) {
-    console.error(`  [FAIL] one emotion's best <=8 ${kind} answer is below the ${absoluteFloor[kind]}-point starting-stat floor`)
+    console.error(`  [FAIL] one emotion's best <=${SENTENCE_BASE_INK} ${kind} answer is below the ${absoluteFloor[kind]}-point starting-stat floor`)
     failed = true
   }
 }

@@ -51,20 +51,20 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const player = startingPlayer()
   const base = makeEarlyTables(player.deck, player)
   const subject = { ...base.words.subj![0], id: 'cheap-subject', inkCost: 0 }
-  const costlySubject = { ...subject, id: 'costly-subject', inkCost: 2 }
-  const modifier = { ...base.words.adv![0], inkCost: 2 }
+  const costlySubject = { ...subject, id: 'costly-subject', inkCost: 1 }
+  const modifier = { ...base.words.adv![0], inkCost: 1 }
   const verb = { ...base.words.verb![0], inkCost: 3 }
   const tables = { ...base, template: { ...base.template, slots: [base.template.slots[0], { ...base.template.slots[0], key: 'subj2' }, ...base.template.slots.slice(1)] },
     words: { ...base.words, subj: [subject, costlySubject], subj2: [subject, costlySubject], adv: [modifier], verb: [verb] } }
-  assert(canCompleteSentence(tables, {}, 6, () => false), 'two-subject sentence fits before its cheap card is sealed')
-  assert(!canCompleteSentence(tables, {}, 6, (word) => word.id === subject.id), 'sealing the shared cheap subject cannot strand the sentence above its ink limit')
-  assert(canCompleteSentence(tables, {}, 6, (word) => word.id === costlySubject.id), 'other cards may still be sealed when a complete sentence remains')
+  assert(canCompleteSentence(tables, {}, 5, () => false), 'two-subject sentence fits before its cheap card is sealed')
+  assert(!canCompleteSentence(tables, {}, 5, (word) => word.id === subject.id), 'sealing the shared cheap subject cannot strand the sentence above its ink limit')
+  assert(canCompleteSentence(tables, {}, 5, (word) => word.id === costlySubject.id), 'other cards may still be sealed when a complete sentence remains')
   const healingVerb = { ...base.words.verb!.find((word) => word.kind === 'heal')!, inkCost: 2 }
   const mixed = { ...tables, words: { ...tables.words, verb: [verb, healingVerb] } }
   const attacks = (selection: Record<string, Word | undefined>) => selection.verb?.kind === 'attack'
-  assert(canCompleteSentence(mixed, {}, 6, () => false, attacks), 'an attack is possible before the cheap subject is sealed')
-  assert(canCompleteSentence(mixed, {}, 6, (word) => word.id === subject.id), 'healing can remain possible even when offense is stranded')
-  assert(!canCompleteSentence(mixed, {}, 6, (word) => word.id === subject.id, attacks), 'seal safety detects loss of every attack even if healing still fits')
+  assert(canCompleteSentence(mixed, {}, 5, () => false, attacks), 'an attack is possible before the cheap subject is sealed')
+  assert(canCompleteSentence(mixed, {}, 5, (word) => word.id === subject.id), 'healing can remain possible even when offense is stranded')
+  assert(!canCompleteSentence(mixed, {}, 5, (word) => word.id === subject.id, attacks), 'seal safety detects loss of every attack even if healing still fits')
 }
 {
   const cards = [{ id: 'sealed', usable: false }, { id: 'blocked', usable: false }, { id: 'valid', usable: true }]
@@ -87,7 +87,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const before = JSON.stringify(player)
   const tables = makeEarlyTables(player.deck, player)
   const recovered = recoverBattleTables(tables, player)
-  assert(canCompleteSentence(recovered, {}, 6, () => false), 'a legacy blocked deck can complete a sentence with temporary loans')
+  assert(canCompleteSentence(recovered, {}, 5, () => false), 'a legacy blocked deck can complete a sentence with temporary loans')
   assert(Object.values(recovered.words).flat().some((word) => word.recoveryLoan), 'recovery cards are explicitly marked as borrowed')
   assert(JSON.stringify(player) === before, 'recovery never mutates or persists the player deck')
   const normal = startingPlayer()
@@ -110,6 +110,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   for (const passive of ['twinSubj', 'twinVerb', 'punct'] as const) {
     player.items.push({ id: `protect-${passive}`, name: passive, rarity: 'legendary', art: '', line: '', stats: {}, passive })
   }
+  player.deck.verb = player.deck.verb.map((word) => ({ ...word, inkCost: 1 }))
   const incoming = { ...original, id: 'incoming-costly', inkCost: 4 }
   assert(hasCompletableDeck(player), 'the cheap subject keeps the expanded deck playable')
   const choice = registerWord(player, incoming)
@@ -121,7 +122,8 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 }
 {
   const player = startingPlayer()
-  player.deck.adv = player.deck.adv.map((word) => ({ ...word, inkCost: 3, effects: undefined }))
+  player.deck.adv = player.deck.adv.map((word) => ({ ...word, inkCost: 1, effects: undefined }))
+  player.deck.verb = player.deck.verb.map((word) => ({ ...word, inkCost: 4 }))
   for (const passive of ['twinSubj', 'punct'] as const) {
     player.items.push({ id: `item-guard-${passive}`, name: passive, rarity: 'legendary', art: '', line: '', stats: {}, passive })
   }
@@ -503,7 +505,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 {
   const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'mantis')
   const tactic = tables.words.verb.find((word) => word.id === 'mantisTactic')!
-  assert(tactic.kind === 'guard' && tactic.stat === 'guard' && tactic.statMult === 4 && tactic.inkCost === 6, 'mantis tactic spends the full base Ink budget on a large guard action')
+  assert(tactic.kind === 'guard' && tactic.stat === 'guard' && tactic.statMult === 4 && tactic.inkCost === 4, 'mantis tactic leaves room for a starting modifier')
   const intent = compile({ subj: tables.words.subj[0], adv: tables.words.adv[0], verb: tactic }, tables, { atk: 1, guard: 3, heal: 1, luck: 0 })
   assert(intent.guard === 12 && intent.base === 0, 'mantis tactic builds guard instead of dealing unexplained conditional damage')
 }
@@ -589,13 +591,13 @@ assert(ENEMIES.queenBee.every === 1 && ENEMIES.elderSpider.every === 1, 'queen b
   // 본편 첫 장로거미는 밸런스 배율상 상한보다 약하므로, 상한 자체를 검증할 때는
   // 충분히 큰 원시 공격력을 주어 반드시 제한선에 닿게 한다.
   const spider = makeEnemy({ ...ENEMIES.elderSpider, atk: 200 }, stage.atkMult, stage.hpMult, stage.bossHealthBars)
-  const s = state([spider]); s.playerHp = s.playerMax = 100; s.guard = 400
+  const s = state([spider]); s.playerHp = s.playerMax = 100; s.guard = 10000
   const r = enemyTurn(s, () => .999, 'first')[0]
-  assert(r.piercedGuard && r.absorbed === 0 && s.guard === 400, 'spider web goes over the shield instead of consuming it')
+  assert(r.piercedGuard && r.absorbed === 0 && s.guard === 10000, 'spider web goes over the shield instead of consuming it')
   assert(r.dealt === 20 && s.playerHp === 80, 'a single spider strike is capped at a fifth of max hp')
   s.turn = spider.nextAttackTurn
   const plain = enemyTurn(s, () => .999, 'second')[0]
-  assert(!plain.piercedGuard && plain.dealt === 0 && plain.absorbed > 20 && s.guard < 400, 'spider foreleg sweep is blockable and consumes guard normally')
+  assert(!plain.piercedGuard && plain.dealt === 0 && plain.absorbed > 20 && s.guard < 10000, 'spider foreleg sweep is blockable and consumes guard normally')
 }
 {
   const spider = makeEnemy(ENEMIES.elderSpider, 1, 1, 5)
