@@ -5,6 +5,7 @@
  *  · 하단: 감탄/정도/평가 선택지를 "텍스트"로 순차 선택(버튼 아님, 인게임 스타일)
  */
 
+import { formatNumber } from '@core/numberFormat'
 import type { ItemDef, StatKey } from '@data/items'
 import type { ExclaimWord } from '@data/items'
 import { EXCLAIM_SLOTS, ITEM_BLESS_CHANCE_PER_GRADE, ITEM_BLESS_POOL, STAT_LABEL, exclaimModsFor, rollExclaimChoices, rollExclaimMultipliers } from '@data/items'
@@ -149,7 +150,7 @@ export class ItemExclaimView {
       const value = gains[stat] ?? 0
       const mote = document.createElement('span')
       mote.className = `forge-mote forge-mote-${stat}`
-      mote.innerHTML = `<i>+</i><b>${STAT_LABEL[stat]} +${value}</b>`
+      mote.innerHTML = `<i>+</i><b>${STAT_LABEL[stat]} +${formatNumber(value)}</b>`
       mote.style.left = `${from.left + from.width / 2 - 34 + index * 12}px`
       mote.style.top = `${from.top + from.height * 0.34 + index * 14}px`
       document.body.append(mote)
@@ -302,7 +303,7 @@ export class ItemExclaimView {
     this.q('#stats').innerHTML = STAT_ORDER.map((k) => {
       const up = totals[k] - this.opts.item.base[k]
       return `<div class="stat" data-stat="${k}"><span class="sl">${STAT_LABEL[k]}</span>
-        <span class="sv">${totals[k]}${up ? `<span class="up">▲${up}</span>` : ''}</span></div>`
+        <span class="sv">${formatNumber(totals[k])}${up ? `<span class="up">▲${formatNumber(up)}</span>` : ''}</span></div>`
     }).join('')
 
     // 슬롯 스텝 — 지금 어느 마디를 고르는 중인지만 알린다. 고른 마디는 되돌리지 않는다.
@@ -326,7 +327,7 @@ export class ItemExclaimView {
         const rarityMultiplier = this.rarityMultipliers[this.slotIndex]
         const effectiveMods = exclaimModsFor(rarityMultiplier, w.mods)
         const effectiveNote = Object.entries(effectiveMods)
-          .map(([stat, value]) => `${STAT_LABEL[stat as StatKey]} +${value}`)
+          .map(([stat, value]) => `${STAT_LABEL[stat as StatKey]} +${formatNumber(value)}`)
           .join(' · ')
         const extraNote = bless ? `${STAT_LABEL[bless.stat]} +${bless.n}` : ''
         const cardNote = `<span class="item-card-main-stat">${effectiveNote}</span>${extraNote

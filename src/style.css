@@ -5382,6 +5382,14 @@ html[data-postprocessing='off'] .tip-bubble {
   top: 0;
   height: 230px;
   perspective: 1100px;
+  /* 호버 카드 확대 — BattleView.anchorDetail이 이 두 값을 읽어 상세를 카드 곁에 붙인다. */
+  --hand-hover-scale: 1.42;
+  --hand-hover-lift: 96px;
+}
+.card-hand .word-card:hover:not(.blocked):not(.drawing) .card-lift,
+.card-hand .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift,
+.card-hand .word-card.touch-previewing .card-lift {
+  transform: translateY(calc(var(--hand-hover-lift) * -1)) scale(var(--hand-hover-scale));
 }
 .word-card {
   position: absolute;
@@ -6450,6 +6458,12 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   margin-top: auto;
   padding: 20px 26px 22px;
 }
+/* 손패 호버 상세 — 우측 끝 패널 대신 크게 떠오른 카드 바로 곁에 선다(BattleView.anchorDetail).
+   일러스트는 커진 카드가 이미 보여 주므로 빼고, 글만 담은 좁은 쪽지로 바꾼다. */
+.info-dock.word-detail.anchored { top: auto; right: auto; width: 300px; overflow-y: auto; pointer-events: none; background: rgba(14, 10, 18, .9); }
+.anchored .wd-art,
+.anchored .wd-scrim { display: none; }
+.anchored .wd-body { margin-top: 0; padding: 16px 18px; }
 .cast-head { flex: none; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
 .cast-kicker { color: var(--gold); font-size: 11px; font-weight: 900; letter-spacing: 3px; }
 .cast-head h2 { margin-top: 2px; color: #fff6e2; font-size: 24px; line-height: 1.2; }
@@ -8840,6 +8854,10 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   gap: 2px;
   line-height: 1.12;
 }
+/* 제련 카드는 감탄사(제목)보다 무엇이 오르는지(효과)가 선택의 근거다.
+   제목은 한 단계 낮추고 효과 수치를 카드에서 가장 큰 글자로 세운다. */
+.iforge-word-card .card-front.art .card-title { font-size: min(var(--card-title-size, 27px), 17px); }
+.iforge-word-card .card-front.art .card-note { font-size: 19px; color: #fff; }
 .item-card-main-stat {
   color: inherit;
 }

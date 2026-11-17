@@ -10,7 +10,9 @@ const limits: Record<string, { raw: number; gzip: number }> = {
   '.js': { raw: 700 * 1024, gzip: 190 * 1024 },
   // 원본 CSS는 gzip 예산 안에 있지만 구성상 270KB를 조금 넘는다. 압축 예산은 유지하고
   // 현재 원본 크기와 출시 직전 오류 복구 UI를 정직하게 포함하도록 원본 한도만 올린다.
-  '.css': { raw: 274 * 1024, gzip: 60 * 1024 },
+  // v_0.14.7: main이 이미 274KB를 0.15KB 넘은 상태에서 손패 호버 상세·제련 카드 글자
+  // 규칙이 더해져 276KB로 올린다. gzip 예산은 그대로 지킨다.
+  '.css': { raw: 276 * 1024, gzip: 60 * 1024 },
 }
 
 const files: string[] = []

@@ -8,6 +8,7 @@
  *  · 우상단: 설정 · 도감 · 홈
  */
 
+import { formatNumber } from '@core/numberFormat'
 import {
   compile,
   effectiveBase,
@@ -181,6 +182,8 @@ const SWORD_HIT_GAP_MS = 85
 // 레일의 가로 자리와 간격은 배경마다 다르되, 일반 전투 배우는 모두 같은
 // 바닥선·크기로 세운다(data/backgrounds.ts의 FieldStage).
 const MAX_VISIBLE_ENEMIES = 3
+/** 손패 상세를 호버 카드와 화면 가장자리에서 띄우는 간격. */
+const HAND_DETAIL_GAP = 16
 /** 배경이 갈리는 판 — 와이프(1.7초 + 0.15 지연)가 지나간 뒤 적이 들어온다. */
 const ENEMY_ENTER_AFTER_SWAP_MS = 1500
 /** 첫 판처럼 갈릴 배경이 없으면 한 박자만 두고 바로 들어온다. */
@@ -825,9 +828,10 @@ export class BattleView {
       },
       onHover: (word) => this.previewInkSpend(word),
       onHoverEnd: () => this.clearInkPreview(),
-      onPreview: (word) => {
+      onPreview: (word, anchor) => {
         this.keepDock()
         this.renderDetail(word)
+        this.anchorDetail(anchor)
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
@@ -2010,6 +2014,7 @@ export class BattleView {
   private renderCharacterDetail(id: CharacterVisualDef['id'], enemyIndex: number | null) {
     const visual = CHARACTER_VISUALS[id]
     const host = this.q('#detail')
+    this.unanchorDetail(host)
     const enemy = enemyIndex == null ? null : this.state.enemies[enemyIndex]
     const displayName = enemy?.def.name ?? visual.name
     let stats: string
@@ -2019,10 +2024,10 @@ export class BattleView {
       const guardRank = this.state.playerGuardRank ?? 0
       stats = [
         ['체력', `${Math.max(0, this.state.playerHp)} / ${this.state.playerMax}`],
-        ['공격', `${p.atk}${attackRank ? ` (${attackRank > 0 ? '↑' : '↓'}${Math.abs(attackRank)})` : ''}`],
-        ['방어', `${p.guard}${guardRank ? ` (${guardRank > 0 ? '↑' : '↓'}${Math.abs(guardRank)})` : ''}`],
-        ['회복', String(p.heal)],
-        ['운', String(p.luck)],
+        ['공격', `${formatNumber(p.atk)}${attackRank ? ` (${attackRank > 0 ? '↑' : '↓'}${Math.abs(attackRank)})` : ''}`],
+        ['방어', `${formatNumber(p.guard)}${guardRank ? ` (${guardRank > 0 ? '↑' : '↓'}${Math.abs(guardRank)})` : ''}`],
+        ['회복', formatNumber(p.heal)],
+        ['운', formatNumber(p.luck)],
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
     } else {
       const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
@@ -2074,6 +2079,7 @@ export class BattleView {
 
   private clearDetailDock() {
     const host = this.q('#detail')
+    this.unanchorDetail(host)
     host.className = 'info-dock detail-idle'
     host.innerHTML = ''
   }
@@ -2196,7 +2202,7 @@ export class BattleView {
     // 동사를 아직 안 골라 깡수치가 없으면 배율만 보여준다("위력 0 ×1.4"는 오해를 부른다).
     host.classList.toggle('no-flat', flat <= 0)
     host.querySelector<HTMLElement>('.mn-lane')!.textContent = flat > 0 ? lane : '지금 배율'
-    host.querySelector<HTMLElement>('.mn-flat')!.textContent = String(flat)
+    host.querySelector<HTMLElement>('.mn-flat')!.textContent = formatNumber(flat)
     void this.spinMult(host.querySelector<HTMLElement>('.mn-mult')!, mult, host)
   }
 
@@ -2484,6 +2490,7 @@ export class BattleView {
   // 단계별로 보여준다: 이 단어가 더하는 값(적용) + 현재 문장 총합(최종).
   private renderDetail(word: Word | null) {
     const detail = this.q('#detail')
+    this.unanchorDetail(detail)
     const key = this.order()[this.slotIndex]
     const w = word ?? this.sel[key] ?? null
     if (!w) {
@@ -2522,6 +2529,47 @@ export class BattleView {
         ${warn}
       </div>
       ${sealed ? `<span class="card-web-overlay" aria-hidden="true" style="--card-web-seal-image:url('${SPRITES.effect_card_web_seal}')"><i></i><b>거미줄 봉인</b><small>사용 불가</small></span>` : ''}`
+  }
+
+  /**
+   * 손패 카드 상세를 그 카드 바로 곁에 붙인다. 카드는 호버로 크게 떠오르고(CSS),
+   * 상세는 떠오른 카드 옆에 서서 시선이 화면 반대편 패널로 갈라지지 않게 한다.
+   * 오른쪽에 자리가 없으면 카드 왼쪽에 선다.
+   */
+  private anchorDetail(anchor?: HTMLElement) {
+    const detail = this.q('#detail')
+    const parent = detail.offsetParent as HTMLElement | null
+    if (!anchor || !parent || !anchor.isConnected || detail.classList.contains('detail-idle')) return
+    const parentRect = parent.getBoundingClientRect()
+    const scale = parentRect.width / parent.offsetWidth || 1
+    const card = anchor.getBoundingClientRect()
+    const left = (card.left - parentRect.left) / scale
+    const right = (card.right - parentRect.left) / scale
+    const bottom = (card.bottom - parentRect.top) / scale
+    const width = parent.offsetWidth
+    const height = parent.offsetHeight
+    const cardWidth = right - left
+    // 호버 카드가 커지는 배율과 뜨는 높이는 CSS(.card-hand)가 단일 출처다.
+    const hover = getComputedStyle(anchor)
+    const hoverScale = parseFloat(hover.getPropertyValue('--hand-hover-scale')) || 1
+    const hoverLift = parseFloat(hover.getPropertyValue('--hand-hover-lift')) || 0
+    const grown = (cardWidth * (hoverScale - 1)) / 2
+    detail.classList.add('anchored')
+    const panelWidth = detail.offsetWidth || 300
+    let x = right + grown + HAND_DETAIL_GAP
+    if (x + panelWidth > width - HAND_DETAIL_GAP) x = left - grown - HAND_DETAIL_GAP - panelWidth
+    x = Math.max(HAND_DETAIL_GAP, x)
+    const panelBottom = Math.max(HAND_DETAIL_GAP, height - (bottom - hoverLift))
+    detail.style.left = `${Math.round(x)}px`
+    detail.style.bottom = `${Math.round(panelBottom)}px`
+    detail.style.maxHeight = `${Math.round(height - panelBottom - 96)}px`
+  }
+
+  private unanchorDetail(detail: HTMLElement) {
+    detail.classList.remove('anchored')
+    detail.style.removeProperty('left')
+    detail.style.removeProperty('bottom')
+    detail.style.removeProperty('max-height')
   }
 
   private multCtx(intent: Intent, selection: Selection = this.sel) {
@@ -2629,10 +2677,10 @@ export class BattleView {
           const value = m.key === 'hp'
             ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}${this.state.guard ? ` ◈${this.state.guard}` : ''}${this.state.playerMagicShield ? ' ✦1' : ''}`
             : m.key === 'atk'
-              ? `${this.combatStats().atk}${this.state.playerAttackRank ? ` ${this.state.playerAttackRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerAttackRank)}` : ''}`
+              ? `${formatNumber(this.combatStats().atk)}${this.state.playerAttackRank ? ` ${this.state.playerAttackRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerAttackRank)}` : ''}`
               : m.key === 'guard'
-                ? `${this.combatStats().guard}${this.state.playerGuardRank ? ` ${this.state.playerGuardRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerGuardRank)}` : ''}`
-                : String(this.player.stats[m.key])
+                ? `${formatNumber(this.combatStats().guard)}${this.state.playerGuardRank ? ` ${this.state.playerGuardRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerGuardRank)}` : ''}`
+                : formatNumber(this.player.stats[m.key])
           return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>
@@ -3299,8 +3347,8 @@ export class BattleView {
     let base = 0
     for (const f of tally.flats) {
       base += f.value
-      baseBox.querySelector('b')!.textContent = String(base)
-      this.tallyChip(flatFeed, `${f.label} +${f.value}`, f.cls)
+      baseBox.querySelector('b')!.textContent = formatNumber(base)
+      this.tallyChip(flatFeed, `${f.label} +${formatNumber(f.value)}`, f.cls)
       this.fitTallyToStage(el)
       this.bump(baseBox)
       // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.

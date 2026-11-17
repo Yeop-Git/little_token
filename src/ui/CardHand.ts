@@ -123,7 +123,8 @@ interface CardHandOptions {
   onConfirm: (word: Word) => void
   onHover?: (word: Word) => void
   onHoverEnd?: () => void
-  onPreview: (word: Word) => void
+  /** anchor: 미리보기를 띄운 손패 카드. 상세는 이 카드 곁에 붙어 시선을 한곳에 모은다. */
+  onPreview: (word: Word, anchor?: HTMLElement) => void
   onPreviewEnd: () => void
   onDraw?: () => void
 }
@@ -173,7 +174,7 @@ export class CardHand {
     const card = this.cardFor(button)
     if (card) {
       this.opts.onHover?.(card.word)
-      this.opts.onPreview(card.word)
+      this.opts.onPreview(card.word, button)
     }
   }
   private readonly onHandPointerOut = (event: PointerEvent) => {
@@ -184,12 +185,12 @@ export class CardHand {
     const touchPreview = state?.hand.find((item) => item.instanceId === this.touchPreviewId)
     if (touchPreview) {
       this.opts.onHover?.(touchPreview.word)
-      this.opts.onPreview(touchPreview.word)
+      this.opts.onPreview(touchPreview.word, this.buttonFor(touchPreview.instanceId))
       return
     }
     this.opts.onHoverEnd?.()
     const selected = state?.hand.find((item) => item.instanceId === this.selectedId)
-    if (selected) this.opts.onPreview(selected.word)
+    if (selected) this.opts.onPreview(selected.word, this.buttonFor(selected.instanceId))
     else this.opts.onPreviewEnd()
   }
   private readonly onHandClick = (event: MouseEvent) => {
@@ -201,7 +202,7 @@ export class CardHand {
     if (isTouch && this.touchPreviewId !== card.instanceId) {
       this.touchPreviewId = card.instanceId
       this.opts.onHover?.(card.word)
-      this.opts.onPreview(card.word)
+      this.opts.onPreview(card.word, button)
       this.opts.handRoot.querySelectorAll<HTMLButtonElement>('.word-card').forEach((candidate) => {
         candidate.classList.toggle('touch-previewing', candidate === button)
       })
@@ -223,7 +224,7 @@ export class CardHand {
   private readonly onHandFocusIn = (event: FocusEvent) => {
     const button = this.cardButton(event.target)
     const card = button ? this.cardFor(button) : undefined
-    if (card) this.opts.onPreview(card.word)
+    if (card && button) this.opts.onPreview(card.word, button)
   }
 
   constructor(private readonly opts: CardHandOptions) {
@@ -546,6 +547,10 @@ export class CardHand {
 
   private cardButton(target: EventTarget | null): HTMLButtonElement | null {
     return target instanceof Element ? target.closest<HTMLButtonElement>('.word-card') : null
+  }
+
+  private buttonFor(instanceId: string): HTMLElement | undefined {
+    return this.opts.handRoot.querySelector<HTMLElement>(`[data-instance-id="${instanceId}"]`) ?? undefined
   }
 
   private cardFor(button: HTMLButtonElement): CardInstance | undefined {
