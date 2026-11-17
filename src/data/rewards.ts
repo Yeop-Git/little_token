@@ -10,6 +10,7 @@ import type { Emotion, Rarity, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
 import type { RewardPhase } from '@core/run'
 import { GRADE_MAX, startGrade } from '@core/grade'
+import { canAddItemWithoutLock } from '@core/deckSafety'
 import { floorInCycle, STORY_FLOORS } from './stages'
 import { ALL_REWARD_WORDS } from './earlyWords'
 import { ITEMS, PASSIVE_ITEMS, type ItemDef } from './items'
@@ -22,6 +23,8 @@ export interface RewardOption {
   desc: string
   art: string
   reinforce?: boolean
+  /** 보스 보상 단계에서 지갑 부족분만큼 낮춘 실제 가격. */
+  bossPrice?: number
   word?: Word
   item?: ItemDef
 }
@@ -44,7 +47,7 @@ export function rewardRefreshCost(refreshes: number): number {
 }
 
 export function rewardPrice(option: RewardOption): number {
-  return REWARD_PRICE[option.rarity]
+  return option.bossPrice ?? REWARD_PRICE[option.rarity]
 }
 
 const SLOT_LABEL: Record<string, string> = { subj: '주어', adv: '수식어', verb: '동사', obj: '목적어', end: '어미' }
@@ -216,7 +219,7 @@ function itemOptions(player: PlayerState): RewardOption[] {
   // 아이템은 슬롯 제한 없이 영구 누적되므로 같은 정의를 다시 주면 감탄사 스탯만
   // 무한히 쌓인다. 한 런에서는 일반 스탯 아이템과 규칙 아이템 모두 한 번만 등장한다.
   return [...Object.values(ITEMS), ...Object.values(PASSIVE_ITEMS)]
-    .filter((item) => !owned.has(item.id))
+    .filter((item) => !owned.has(item.id) && canAddItemWithoutLock(player, item))
     .map(toItemOption)
 }
 
@@ -335,6 +338,12 @@ export function genRewards(
   const picks = phase === 'item'
     ? generateItemRewards(player, effectiveGrade, day, rng)
     : generateWordRewards(player, effectiveGrade, day, phase, rng)
+  // 보스를 이긴 보상은 각 단계의 세 선택지를 모두 고를 수 있어야 한다.
+  // 지갑이 부족하면 현재 잔액까지만 받으며 할인 가격을 카드와 결제에 같이 쓴다.
+  if (bossRewardRarity(day) && Number.isFinite(availableInspiration)) {
+    const budget = Math.max(0, Math.floor(availableInspiration))
+    return picks.map((option) => REWARD_PRICE[option.rarity] > budget ? { ...option, bossPrice: budget } : option)
+  }
   if (!picks.length || picks.some((option) => rewardPrice(option) <= availableInspiration)) return picks
 
   // 구매 불가 카드를 고급 선택지로 보여 줄 수는 있지만 셋 전부 잠기지는 않는다.

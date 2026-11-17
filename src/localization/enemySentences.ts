@@ -14,7 +14,7 @@ const KO = {
   throughShield: '방패의 틈으로', fromFront: '정면에서', queenSting: '독침을 찌른다', surroundedByWorkers: '{workers}에게 둘러싸여', queenHide: '모습을 감춘다',
   bodyInvulnerable: '본체 무적', areaPierce: '범위·관통: 빠른 전멸', angerSingle: '분노 단일: 퇴치 반동 ×2', guardPierce: '방어 관통',
   spiderSubject: '장로거미가', beyondGuard: '방패 너머까지', tightenWeb: '거미줄을 조인다', sealCount: '봉인 {current}/{max}', currentWeakness: '현재 약점 {weakness}', weaknessAction: '약점 행동: 봉인 -1', weaknessComboPierce: '약점+관용구 공격: 다음 부위 관통', bodyNoWeakness: '본체에는 약점 없음',
-  spiderEnding: '결말을 고쳐 쓴다', spiderErase: '{weakness}을 지우고', spiderSwallow: '{weakness}을 삼키고', spiderEntangle: '{weakness}을 얽고', spiderBind: '{weakness}을 묶고',
+  spiderEnding: '결말을 고쳐 쓴다', spiderErase: '{weakness} 지우고', spiderSwallow: '{weakness} 삼키고', spiderEntangle: '{weakness} 얽고', spiderBind: '{weakness} 묶고',
   manuscriptAria: '장로거미가 훼손 중인 문장', damagedLongSentence: '훼손 중인 긴 문장', executeSoon: '곧 실행', endingRevision: '결말 수정', enemyIntent: '적의 의도', roleSubject: '주어', roleModifier: '수식', roleObject: '목적', roleAction: '행동', bossBattleInfo: '{boss} 전투 정보',
   sealCard: '장로거미가 네 문장에서 「{word}」 카드를 실로 묶었다.', sealSlot: '장로거미가 다음 {slot} 카드를 묶으려 한다.', webMiss: '선택 가능한 단어를 남기기 위해 거미줄이 빗나갔다.', releaseSeals: '현재 다리의 약점을 문장에 담아 카드 봉인 {count}개를 풀었다.', weakenWeb: '약점에 맞는 문장이 거미줄 한 겹을 고쳐 썼다.', shakeClause: '약점에 맞는 문장이 장로거미의 구절을 흔들었다.',
   weaknessShift: '다음 다리의 약점이 「{weakness}」으로 바뀌었다.', nextLegRecover: '한 구절을 지웠다. 다음에는 {weakness} 되찾아야 한다.', allClausesErased: '네 감정을 묶던 네 구절을 모두 지웠다.', workersGone: '일벌이 모두 흩어져 공격 문장이 지워졌다.', workersErased: '일벌 {count}마리가 문장에서 지워졌다.', mantisFailed: '「내려벤다」를 막지 못해 사마귀가 상처의 먹물을 빨아들였다.', mantisCorrected: '「큰낫을 내려벤다」를 지우고 「휘청거린다」로 고쳐 썼다.',

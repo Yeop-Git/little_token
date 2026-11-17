@@ -11,6 +11,7 @@
 
 import type { Conflict, Selection, SlotDef, Tables, Word } from './types'
 import { currentLocale } from '@/localization'
+import { inkExceedsLimit, selectionInkCost } from './ink'
 
 function tagsBefore(sel: Selection, slotIndex: number, order: string[]): string[] {
   const out: string[] = []
@@ -65,3 +66,20 @@ export function pruneConflicts(sel: Selection, changedIndex: number, t: Tables):
 
 // 위 Conflict re-export(편의).
 export type { Conflict }
+
+/** 현재 선택과 봉인을 유지하면서 잉크 한도 안에서 문장을 완성할 수 있는가. */
+export function canCompleteSentence(
+  tables: Tables, selection: Selection, availableInk: number, excluded: (word: Word) => boolean,
+  accept: (selection: Selection) => boolean = () => true,
+): boolean {
+  const slots = tables.template.slots
+  const walk = (index: number, chosen: Selection): boolean => {
+    if (index === slots.length) return !inkExceedsLimit(selectionInkCost(chosen), availableInk) && accept(chosen)
+    const slot = slots[index]
+    const fixed = selection[slot.key]
+    const candidates = fixed ? [fixed] : (tables.words[slot.key] ?? []).filter((word) => !excluded(word))
+    return candidates.some((word) => !conflictReason(word, index, chosen, tables)
+      && walk(index + 1, { ...chosen, [slot.key]: word }))
+  }
+  return walk(0, {})
+}

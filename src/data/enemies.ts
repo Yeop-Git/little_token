@@ -91,7 +91,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',
     sprite: 'enemy_termite', weakEmotion: null,
-    note: '특별한 능력 없이 종이 섬유를 차근차근 갉아 먹는다.',
+    note: '종이 섬유를 차근차근 갉아 먹는다.',
   },
   moth: {
     id: 'moth',
@@ -101,7 +101,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     every: 1,
     initiative: 'second',
     sprite: 'enemy_moth', weakEmotion: 'sorrow',
-    note: '특별한 능력 없이 먼지 묻은 솔로 문장 가장자리를 털어 지운다.',
+    note: '먼지 묻은 솔로 문장 가장자리를 털어 지운다.',
   },
   flea: {
     id: 'flea', name: '좀나방', hp: 7, atk: 3, every: 1, initiative: 'first',

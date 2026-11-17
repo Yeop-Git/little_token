@@ -1,3 +1,4 @@
+import { recoverBattleTables } from '@core/deckSafety'
 /**
  * 풀런 밸런스 검수 — `npm run run:sim`(`-- --verbose`로 층별 기록).
  *
@@ -12,7 +13,7 @@
  * 실게임과 같은 compile/resolveMultiplier/applyIntent/enemyTurn을 그대로 호출한다.
  */
 import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf } from '@core/compiler'
-import { conflictReason } from '@core/validator'
+import { canCompleteSentence, conflictReason } from '@core/validator'
 import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { clearRewardValue, gradeForElapsedTurns, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
@@ -25,6 +26,7 @@ import {
   inkExceedsLimit,
   inkOverdraw,
   selectionInkCost,
+  wordInkCost,
   sentenceInkAvailable,
 } from '@core/ink'
 import { makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
@@ -36,7 +38,6 @@ import {
   EARLY_STAT_VERB_IDS,
   genRewards,
   REWARD_PRICE,
-  rewardRefreshCost,
   rewardPrice,
   type RewardOption,
 } from '@data/rewards'
@@ -47,6 +48,7 @@ import {
   aliveIdx,
   allDead,
   applyIntent,
+  predictSummonDefeats,
   applyInkOverdraw,
   applyOverkillTransfer,
   applyPendingAttack,
@@ -275,17 +277,18 @@ function exclaimStats(rarity: Rarity, grade: number, skill: RewardSkill, focus: 
 const scoreMods = (mods: Partial<Record<StatKey, number>>, weight: Record<StatKey, number>): number =>
   Object.entries(mods).reduce((s, [k, v]) => s + (v ?? 0) * weight[k as StatKey], 0)
 
-function applyOption(player: PlayerState, opt: RewardOption, grade: number, skill: RewardSkill, focus: BuildFocus, rng: () => number): void {
+function applyOption(player: PlayerState, opt: RewardOption, grade: number, skill: RewardSkill, focus: BuildFocus, rng: () => number): boolean {
   if (opt.kind === 'word' && opt.word) {
     const res = registerWord(player, opt.word)
     if (res.kind === 'needs-discard') {
       // 상한을 넘겼으면 가장 덜 자란 카드를 버린다.
       const worst = [...res.candidates].sort((a, b) => (a.level ?? 1) - (b.level ?? 1))[0]
+      if (!worst) return false
       registerWord(player, opt.word, worst.id)
     }
-    return
+    return true
   }
-  if (!opt.item) return
+  if (!opt.item) return false
   const base = opt.item.base
   const gained = exclaimStats(opt.rarity, grade, skill, focus, rng)
   const stats: Partial<PlayerStats> = { ...gained }
@@ -301,6 +304,7 @@ function applyOption(player: PlayerState, opt: RewardOption, grade: number, skil
     stats,
     passive: opt.item.passive,
   })
+  return true
 }
 
 /** 한 층 클리어 보상 3단계를 실제 genRewards로 뽑아 고른다. */
@@ -320,7 +324,8 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
   const plannedVerb = plannedVerbId ? REWARD_PRICE.rare : 0
   for (const phase of ['subject', 'verb', 'item'] as const) {
     const spendable = phase === 'verb' ? wallet.inspiration : Math.max(0, wallet.inspiration - plannedVerb)
-    const options = genRewards(player, grade, day, phase, rng).filter((option) => rewardPrice(option) <= spendable)
+    // 실제 화면의 전체 잔액으로 진열을 만들고, 봇이 따로 정한 다음 단계 예산만 남긴다.
+    const options = genRewards(player, grade, day, phase, rng, wallet.inspiration).filter((option) => rewardPrice(option) <= spendable)
     if (!options.length) continue
     let chosen = options[Math.floor(rng() * options.length)]
     if (skill !== 'random') {
@@ -359,61 +364,7 @@ function takeRewards(player: PlayerState, grade: number, unusedDraws: number, da
       // 무작위로 버리지는 않는다. 그 선택은 실수가 아니라 규칙을 읽지 않은 플레이가 된다.
       if (skill === 'ok' && !tacticalOptions.length && rng() < 0.1) chosen = options[Math.floor(rng() * options.length)]
     }
-    wallet.inspiration -= rewardPrice(chosen)
-    applyOption(player, chosen, grade, skill, focus, rng)
-  }
-}
-
-/** 보스 뒤 3×3 상점 — 아끼는 기량일수록 남긴 영감을 추가 성장으로 적극 환전한다. */
-function takeBossShop(player: PlayerState, grade: number, unusedDraws: number, day: number, skill: RewardSkill, focus: BuildFocus, rng: () => number, wallet: { inspiration: number }): void {
-  wallet.inspiration += clearRewardValue(grade, unusedDraws, day)
-  let refreshes = 0
-  let bought = 0
-  while (refreshes < 8 && wallet.inspiration > 0) {
-    const stock = (['subject', 'verb', 'item'] as const).flatMap((phase) =>
-      genRewards(player, grade, day, phase, rng).filter((option) => rewardPrice(option) <= wallet.inspiration),
-    )
-    if (!stock.length) break
-    while (stock.length && wallet.inspiration > 0) {
-      const affordable = stock.filter((option) => rewardPrice(option) <= wallet.inspiration)
-      if (!affordable.length) break
-      if (skill === 'random' && bought > 0 && rng() < 0.28) return
-      if (skill === 'ok' && wallet.inspiration <= 2) return
-      let chosen = affordable[Math.floor(rng() * affordable.length)]
-      if (skill !== 'random') {
-        // 상점에서는 조합 전수 탐색을 매 구매마다 되풀이하지 않는다. 슬롯/행동 적합도와
-        // 아이템의 실제 기본 스탯을 사용해, 단순히 가장 비싼 보상을 사던 이전 치팅을 없앤다.
-        const weight = focus === 'balanced' ? EXCLAIM_WEIGHT[skill] : FOCUS_EXCLAIM_WEIGHT[focus]
-        const utility = (option: RewardOption): number => {
-          let score = rewardPrice(option) * 0.6 + (option.reinforce ? 1 : 0)
-          if (option.item) {
-            score += scoreMods(option.item.base, weight)
-            if (option.item.passive) score += 1.5
-          }
-          const word = option.word
-          if (!word) return score
-          const desiredKind = focus === 'attack' ? 'attack' : focus === 'guard' ? 'guard' : focus === 'heal' ? 'heal' : null
-          if (desiredKind && word.kind === desiredKind) score += 4
-          if (focus === 'combo') score += word.tags.length * 0.45 + (word.bonus ?? 0) * 3
-          const desiredStat = focus === 'attack' ? 'atk' : focus === 'guard' ? 'guard' : focus === 'heal' ? 'heal' : null
-          if (desiredStat && word.stat === desiredStat) score += 2 + (word.statMult ?? 0)
-          score += (word.effects?.counter ? focus === 'guard' ? 2 : 0.3 : 0)
-          score += (word.effects?.lifeStealRate ?? 0) * (focus === 'heal' ? 3 : 1)
-          score += (word.effects?.guardAttackMultiplier ?? 0) * (focus === 'guard' ? 2 : 0.5)
-          score += (word.effects?.overhealDamageMultiplier ?? 0) * (focus === 'heal' ? 2 : 0.5)
-          return score
-        }
-        chosen = [...affordable].sort((a, b) => utility(b) - utility(a))[0]
-      }
-      wallet.inspiration -= rewardPrice(chosen)
-      applyOption(player, chosen, grade, skill, focus, rng)
-      stock.splice(stock.indexOf(chosen), 1)
-      bought++
-    }
-    const refreshCost = rewardRefreshCost(refreshes)
-    if (wallet.inspiration < refreshCost) break
-    wallet.inspiration -= refreshCost
-    refreshes++
+    if (applyOption(player, chosen, grade, skill, focus, rng)) wallet.inspiration -= rewardPrice(chosen)
   }
 }
 
@@ -443,7 +394,7 @@ function drawHands(
   // 보스 전용 단어는 **후보에 넣되 손패에 보장하지 않는다.** 실제 게임과 같은 조건이다 —
   // 그 판에 존재하고, 뽑히면 쓴다. boss-sim이 전용 카드를 아예 빼는 것과 다른 이유는 재는
   // 것이 다르기 때문이다. 저기는 보스 자신의 속도를, 여기는 한 판이 끝까지 굴러가는지를 잰다.
-  const t = tablesForEncounter(makeEarlyTables(player.deck, player, locale), enemyId)
+  const t = tablesForEncounter(recoverBattleTables(makeEarlyTables(player.deck, player, locale), player, locale), enemyId)
   const order = t.template.slots.map((s) => s.key)
   const piles: Word[][] = []
   const hands = order.map((key) => {
@@ -454,13 +405,14 @@ function drawHands(
     }
     const size = key.startsWith('verb') ? VERB_HAND_SIZE : HAND_SIZE
     if (key.startsWith('verb')) pool = ensureVerbRoles(pool, size)
-    const hand = pool.slice(0, size)
-    piles.push(pool.slice(size))
-    if (hand.every((w) => sealed.has(w.id))) {
-      const replacement = pool.slice(size).find((w) => !sealed.has(w.id))
-      if (replacement) hand[hand.length - 1] = replacement
+    if (pool.slice(0, size).every((w) => sealed.has(w.id))) {
+      const replacementIndex = pool.findIndex((w, index) => index >= size && !sealed.has(w.id))
+      if (replacementIndex >= 0 && size > 0) {
+        ;[pool[size - 1], pool[replacementIndex]] = [pool[replacementIndex], pool[size - 1]]
+      }
     }
-    return hand
+    piles.push(pool.slice(size))
+    return pool.slice(0, size)
   })
   return { hands, piles, tables: t }
 }
@@ -488,7 +440,7 @@ function enumerate(
       out.push({
         sel,
         intent,
-        dmg: isDamageIntent(intent) ? Math.round(effectiveBase(intent) * m * intent.castScale) : 0,
+        dmg: isDamageIntent(intent) ? Math.floor(effectiveBase(intent) * m * intent.castScale) : 0,
         guard: Math.round(intent.guard * m * intent.castCount * intent.castScale),
         heal: Math.round(intent.heal * m * intent.castCount * intent.castScale),
         inkCost,
@@ -543,8 +495,8 @@ function candidateDamage(c: Candidate, state: BattleState): number {
   const missingHp = Math.max(0, state.playerMax - state.playerHp)
   const projectedGuard = Math.min(playerGuardLimit(state.playerMax), state.guard + c.guard)
   return c.dmg
-    + Math.round(projectedGuard * c.intent.guardAttackMultiplier)
-    + Math.round(Math.max(0, c.heal - missingHp) * c.intent.overhealDamageMultiplier)
+    + Math.floor(projectedGuard * c.intent.guardAttackMultiplier)
+    + Math.floor(Math.max(0, c.heal - missingHp) * c.intent.overhealDamageMultiplier)
 }
 
 function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): number {
@@ -568,6 +520,7 @@ function candidateValue(c: Candidate, state: BattleState, focus: BuildFocus): nu
 
 interface StageResult {
   won: boolean
+  stopReason: 'death' | 'timeout' | 'no-action' | null
   killedBy: string | null
   hp: number
   guard: number
@@ -616,6 +569,7 @@ function fightStage(
   let turn = 0
   let carriedInk = 0
   let drawsLeft = FREE_DRAWS_PER_STAGE
+  let noAction = false
   const actions = emptyActions()
 
   while (turn < MAX_TURNS_PER_STAGE && state.playerHp > 0 && !allDead(state)) {
@@ -633,9 +587,18 @@ function fightStage(
       const slotKey = spiderSealSlotForTurn(tables.template.slots.map((s) => s.key), turn)
       const idx = tables.template.slots.findIndex((s) => s.key === slotKey)
       const max = boss.def.webPattern?.maxSealedCards ?? 0
-      if (idx >= 0 && sealed.size < max) {
-        const sealable = hands[idx].filter((w) => !sealed.has(w.id))
-        if (sealable.length > 1) sealed.add(sealable[Math.floor(rng() * sealable.length)].id)
+      if (slotKey && idx >= 0 && sealed.size < max) {
+        const usable = hands[idx].filter((w) => !sealed.has(w.id))
+        const canDealDamage = (selection: Selection) => {
+          const intent = compile(selection, tables, rankedCombatStats(player, state, selection), modsFor(player, killsThisBattle))
+          return isDamageIntent(intent) && effectiveBase(intent) > 0
+        }
+        const wasAttackPossible = canCompleteSentence(tables, {}, sentenceInkAvailable(carriedInk), (word) => sealed.has(word.id), canDealDamage)
+        const sealable = usable.filter((candidate) => usable.some((remaining) => remaining !== candidate && canCompleteSentence(
+          tables, { [slotKey]: remaining }, sentenceInkAvailable(carriedInk), (word) => sealed.has(word.id) || word.id === candidate.id,
+          wasAttackPossible ? canDealDamage : undefined,
+        )))
+        if (usable.length > 1 && sealable.length) sealed.add(sealable[Math.floor(rng() * sealable.length)].id)
       }
     }
 
@@ -662,8 +625,36 @@ function fightStage(
     }
 
     const availableInk = sentenceInkAvailable(carriedInk)
-    const hand = enumerate(player, state, tables, hands, sealed, killsThisBattle, availableInk)
-    if (!hand.length) break
+    let hand = enumerate(player, state, tables, hands, sealed, killsThisBattle, availableInk)
+    if (log && boss.def.webPattern && turn === 1) {
+      const all = enumerate(player, state, tables, hands.map((cards, i) => [...cards, ...piles[i]]), sealed, killsThisBattle, availableInk)
+      log.push(`  전수 진단: 잉크 ${availableInk}, 손패 공격 ${hand.filter((candidate) => candidateDamage(candidate, state) > 0).length}, 전체 덱 공격 ${all.filter((candidate) => candidateDamage(candidate, state) > 0).length}/${all.length}; 봉인 ${[...sealed].join(',')}; ${tables.template.slots.map((slot, i) => `${slot.key}=[${[...hands[i], ...piles[i]].map((word) => `${word.id}:${wordInkCost(word)}:${word.kind ?? '-'}${sealed.has(word.id) ? ':sealed' : ''}`).join(',')}]`).join(' ')}`)
+    }
+    if (!hand.length) {
+      // 실제 손패는 슬롯을 열 때 현재 문맥에서 선택 가능한 카드를 보장한다.
+      // 시뮬레이터는 모든 슬롯을 미리 뽑으므로, 조합이 없으면 남은 덱까지
+      // 살펴 완성 가능한 문장 한 개를 손패에 복원한다. 이는 순차 추첨의 근사다.
+      const complete = enumerate(player, state, tables, hands.map((cards, i) => [...cards, ...piles[i]]), sealed, killsThisBattle, availableInk)[0]
+      if (complete) {
+        tables.template.slots.forEach((slot, i) => {
+          const word = complete.sel[slot.key]!
+          if (hands[i].some((card) => card.id === word.id)) return
+          const index = piles[i].findIndex((card) => card.id === word.id)
+          if (index >= 0) {
+            const displaced = hands[i].pop()
+            hands[i].push(piles[i].splice(index, 1)[0])
+            if (displaced) piles[i].push(displaced)
+          }
+        })
+        hand = enumerate(player, state, tables, hands, sealed, killsThisBattle, availableInk)
+        log?.push(`  손패 보정: 미리 뽑은 카드에 완성 문장이 없어 남은 덱에서 복원`)
+      }
+    }
+    if (!hand.length) {
+      log?.push(`  선택 불가 ${day}층 ${turn}턴: 잉크 ${availableInk}, 봉인 ${[...sealed].join(',') || '-'}; 덱 ${tables.template.slots.map((slot, i) => `${slot.key}=[${[...hands[i], ...piles[i]].map((word) => `${word.id}:${wordInkCost(word)}`).join(',')}]`).join(' ')}`)
+      noAction = true
+      break
+    }
     const attackScore = (candidate: Candidate) => skill === 'average'
       ? candidateValue(candidate, state, focus)
       : railValue(candidate, state)
@@ -737,13 +728,9 @@ function fightStage(
         || !!boss.def.pierceGuard
         || (!!boss.def.summonPattern?.pierceWhileEscorted && escorts > 0)
       const threat = boss.def.atk * boss.atkMult * (incoming ? 1.2 : 1)
-      const workerClear = (c: Candidate) => {
-        const reachable = c.intent.pierceGuard || c.intent.targetCount === 'all'
-          ? escorts
-          : Math.min(escorts, c.intent.targetCount as number)
-        const perWorker = candidateDamage(c, state)
-        return Math.min(reachable, Math.floor(perWorker / (boss.def.summonPattern?.hp ?? 1)))
-      }
+      const workerClear = (c: Candidate) => predictSummonDefeats(
+        boss, candidateDamage(c, state), c.intent.targetCount, c.intent.pierceGuard,
+      )
       const queenAnswer = boss.def.summonPattern && escorts > 0
         ? hand
           .filter((c) => candidateDamage(c, state) > 0)
@@ -764,9 +751,9 @@ function fightStage(
       const queenClearsEscort = !!queenAnswer && workerClear(queenAnswer) >= escorts
       if (incoming && bestGuard) pick = bestGuard
       else if (queenClearsEscort) pick = queenAnswer
-      else if (willBeHit && incomingPierce && bestMagicShield) pick = bestMagicShield
-      else if (queenAnswer) pick = queenAnswer
+      else if (willBeHit && incomingPierce && bestMagicShield && !(state.playerMagicShield ?? 0)) pick = bestMagicShield
       else if (lowHp && bestHeal) pick = bestHeal
+      else if (queenAnswer) pick = queenAnswer
       else if (weakAnswer) pick = weakAnswer
       else if (willBeHit && threat > state.guard + state.playerHp * 0.4 && bestGuard) pick = bestGuard
     }
@@ -775,6 +762,12 @@ function fightStage(
     if (skill !== 'greedy' && pick?.overdraw) {
       const safe = hand
         .filter((candidate) => candidate.overdraw === 0 && candidate.intent.kind === pick!.intent.kind)
+        // 잉크를 아끼더라도 선택한 대응 수단을 버리면 안 된다. 특히 방어 관통 앞에서
+        // 마법실드를 일반 방어로 바꾸거나 일벌 전멸을 포기하는 것은 다른 행동이다.
+        .filter((candidate) => candidate.intent.magicShield >= pick!.intent.magicShield)
+        .filter((candidate) => !boss.def.summonPattern || escorts <= 0
+          || predictSummonDefeats(boss, candidateDamage(candidate, state), candidate.intent.targetCount, candidate.intent.pierceGuard)
+            >= predictSummonDefeats(boss, candidateDamage(pick!, state), pick!.intent.targetCount, pick!.intent.pierceGuard))
         .sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
       if (safe && candidateValue(safe, state, focus) >= candidateValue(pick, state, focus) * 0.75) pick = safe
     }
@@ -904,6 +897,7 @@ function fightStage(
   const frontAlive = state.enemies.find((e) => !e.dead)
   return {
     won: allDead(state) && state.playerHp > 0,
+    stopReason: state.playerHp <= 0 ? 'death' : allDead(state) ? null : noAction ? 'no-action' : 'timeout',
     killedBy: frontAlive ? frontAlive.def.name : null,
     hp: Math.max(0, state.playerHp),
     guard: state.guard,
@@ -918,8 +912,9 @@ function fightStage(
 // ─────────────────────────────────────────── 런
 
 interface RunResult {
-  reachedFloor: number // 도달해서 클리어한 마지막 층(0 = 1층에서 사망)
-  diedOn: number | null
+  clearedFloor: number // 마지막 클리어 층(0 = 1층을 클리어하지 못함)
+  stoppedOn: number | null
+  stopReason: StageResult['stopReason']
   killedBy: string | null
   hpTrace: { floor: number; hpBefore: number; hpAfter: number; max: number; turns: number; groggies: number; groggyBonusDamage: number }[]
   finalStats: PlayerStats
@@ -956,20 +951,20 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
         groggyBonusDamage: result.actions.groggyBonusDamage,
       })
       if (verbose) {
-        log.push(`  ${String(day).padStart(2)}층 ${result.won ? '승' : '패'} · ${result.turns}턴 · HP ${hpBefore}→${result.hp}/${result.maxHp}`)
+        const outcome = result.won ? '승' : result.stopReason === 'death' ? '사망' : result.stopReason === 'timeout' ? '시간 초과' : '선택 불가'
+        log.push(`  ${String(day).padStart(2)}층 ${outcome} · ${result.turns}턴 · HP ${hpBefore}→${result.hp}/${result.maxHp}`)
       }
       if (!result.won) {
-        return { reachedFloor: day - 1, diedOn: day, killedBy: result.killedBy, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
+        return { clearedFloor: day - 1, stoppedOn: day, stopReason: result.stopReason, killedBy: result.stopReason === 'death' ? result.killedBy : null, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
       }
       carried.hp = result.hp
       carried.guard = result.guard
-      if (stageFor(day).isBoss) takeBossShop(player, result.grade, result.unusedDraws, day, reward, focus, rng, wallet)
-      else takeRewards(player, result.grade, result.unusedDraws, day, reward, focus, locale, rng, wallet)
+      takeRewards(player, result.grade, result.unusedDraws, day, reward, focus, locale, rng, wallet)
       const ownedWords = Object.values(player.deck).flat()
       if (engineAcquireFloor.guard === null && ownedWords.some((word) => (word.effects?.guardAttackMultiplier ?? 0) > 0)) engineAcquireFloor.guard = day
       if (engineAcquireFloor.heal === null && ownedWords.some((word) => (word.effects?.overhealDamageMultiplier ?? 0) > 0)) engineAcquireFloor.heal = day
     }
-    return { reachedFloor: STORY_FLOORS, diedOn: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
+    return { clearedFloor: STORY_FLOORS, stoppedOn: null, stopReason: null, killedBy: null, hpTrace, finalStats: { ...player.stats }, log, actions, engineAcquireFloor, finalInspiration: wallet.inspiration }
   } finally {
     Math.random = realRandom
   }
@@ -1010,6 +1005,7 @@ interface ProfileMetrics {
   floor5Bonus: number
   midDeaths: number
   lateDeaths: number
+  noActions: number
 }
 const metrics: ProfileMetrics[] = []
 
@@ -1018,12 +1014,13 @@ for (const profile of SKILL_PROFILES) {
     { length: RUNS },
     (_, i) => playRun((i + 1) * 7919 + 13, profile.reward, profile.combat, 'balanced', verbose),
   )
-  const cleared = runs.filter((r) => r.diedOn === null).length
-  const reach10 = runs.filter((r) => r.reachedFloor >= 10).length
-  const reach5 = runs.filter((r) => r.reachedFloor >= 5).length
-  const clear5 = runs.filter((r) => r.diedOn === null || r.diedOn > 5).length
-  const avgFloor = runs.reduce((s, r) => s + r.reachedFloor, 0) / runs.length
-  const clearedWallets = runs.filter((r) => r.diedOn === null).map((r) => r.finalInspiration)
+  const cleared = runs.filter((r) => r.stoppedOn === null).length
+  const reach10 = runs.filter((r) => r.hpTrace.some((trace) => trace.floor === 10)).length
+  const clear10 = runs.filter((r) => r.clearedFloor >= 10).length
+  const reach5 = runs.filter((r) => r.hpTrace.some((trace) => trace.floor === 5)).length
+  const clear5 = runs.filter((r) => r.stoppedOn === null || r.stoppedOn > 5).length
+  const avgFloor = runs.reduce((s, r) => s + r.clearedFloor, 0) / runs.length
+  const clearedWallets = runs.filter((r) => r.stoppedOn === null).map((r) => r.finalInspiration)
   const avgFinalInspiration = clearedWallets.length
     ? clearedWallets.reduce((sum, value) => sum + value, 0) / clearedWallets.length
     : 0
@@ -1032,9 +1029,10 @@ for (const profile of SKILL_PROFILES) {
   console.log(
     `  15층 클리어 ${cleared}/${RUNS} (${pct(cleared, RUNS)})`
     + ` · 10층 도달 ${pct(reach10, RUNS)}`
+    + ` · 10층 클리어 ${pct(clear10, RUNS)}`
     + ` · 5층 도달 ${pct(reach5, RUNS)}`
     + ` · 5층 클리어 ${pct(clear5, RUNS)}`
-    + ` · 평균 도달 ${avgFloor.toFixed(1)}층`
+    + ` · 평균 클리어 ${avgFloor.toFixed(1)}층`
     + ` · 클리어 잔여 영감 ${avgFinalInspiration.toFixed(1)}`,
   )
 
@@ -1042,9 +1040,9 @@ for (const profile of SKILL_PROFILES) {
   const attempts = new Array(STORY_FLOORS + 1).fill(0)
   const deaths = new Array(STORY_FLOORS + 1).fill(0)
   for (const r of runs) {
-    const last = r.diedOn ?? STORY_FLOORS
+    const last = r.stoppedOn ?? STORY_FLOORS
     for (let f = 1; f <= last; f++) attempts[f]++
-    if (r.diedOn) deaths[r.diedOn]++
+    if (r.stoppedOn && r.stopReason === 'death') deaths[r.stoppedOn]++
   }
   const bars = []
   for (let f = 1; f <= STORY_FLOORS; f++) {
@@ -1053,6 +1051,7 @@ for (const profile of SKILL_PROFILES) {
     bars.push(`${f}층 ${(rate * 100).toFixed(0)}%${[5, 10, 15].includes(f) ? '*' : ''}`)
   }
   console.log(`  층별 사망률(도전 대비): ${bars.join(' · ')}   (*=보스)`)
+  console.log(`  시간 초과: ${runs.filter((r) => r.stopReason === 'timeout').length}/${RUNS}회 · 선택 불가: ${runs.filter((r) => r.stopReason === 'no-action').length}/${RUNS}회`)
 
   // 층 진입 시 체력 비율 — 소모전 압력을 본다.
   const entering: number[][] = Array.from({ length: STORY_FLOORS + 1 }, () => [])
@@ -1074,8 +1073,8 @@ for (const profile of SKILL_PROFILES) {
     + ` · 파훼 런 평균 그로기 추가 피해 ${floor5Bonus.toFixed(1)}`,
   )
 
-  const survivors = runs.filter((r) => r.diedOn === null)
-  const sample = survivors[0] ?? runs.sort((a, b) => b.reachedFloor - a.reachedFloor)[0]
+  const survivors = runs.filter((r) => r.stoppedOn === null)
+  const sample = survivors[0] ?? runs.sort((a, b) => b.clearedFloor - a.clearedFloor)[0]
   const s = sample.finalStats
   console.log(`  대표 런 최종 스탯: HP ${s.hp} · 공 ${s.atk} · 방 ${s.guard} · 회 ${s.heal} · 운 ${s.luck}`)
   const turns = runs.flatMap((r) => r.hpTrace.map((t) => t.turns))
@@ -1087,16 +1086,22 @@ for (const profile of SKILL_PROFILES) {
     reach5,
     clear5,
     avgFloor,
-    earlyDeaths: runs.filter((r) => r.diedOn !== null && r.diedOn <= 4).length,
-    firstFloorDeaths: runs.filter((r) => r.diedOn === 1).length,
+    earlyDeaths: runs.filter((r) => r.stopReason === 'death' && r.stoppedOn !== null && r.stoppedOn <= 4).length,
+    firstFloorDeaths: runs.filter((r) => r.stopReason === 'death' && r.stoppedOn === 1).length,
     avgTurns,
     avgFinalInspiration,
     floor5Solved: floor5Solved.length,
     floor5Bonus,
-    midDeaths: runs.filter((run) => run.diedOn !== null && run.diedOn >= 6 && run.diedOn <= 10).length,
-    lateDeaths: runs.filter((run) => run.diedOn !== null && run.diedOn >= 11).length,
+    midDeaths: runs.filter((run) => run.stopReason === 'death' && run.stoppedOn !== null && run.stoppedOn >= 6 && run.stoppedOn <= 10).length,
+    lateDeaths: runs.filter((run) => run.stopReason === 'death' && run.stoppedOn !== null && run.stoppedOn >= 11).length,
+    noActions: runs.filter((run) => run.stopReason === 'no-action').length,
   })
-  if (verbose) sample.log.forEach((l) => console.log(l))
+  if (verbose) {
+    sample.log.forEach((l) => console.log(l))
+    runs.filter((run) => run !== sample && run.stopReason === 'no-action').forEach((run) => {
+      run.log.filter((line) => line.includes('선택 불가')).forEach((line) => console.log(line))
+    })
+  }
 }
 
 if (economyOnly) process.exit(0)
@@ -1151,11 +1156,11 @@ for (const focus of BUILD_FOCUSES) {
   }
   const metric: BuildMetrics = {
     focus,
-    cleared: runs.filter((run) => run.diedOn === null).length,
-    reach5: runs.filter((run) => run.reachedFloor >= 5).length,
-    reach10: runs.filter((run) => run.reachedFloor >= 10).length,
-    clear5: runs.filter((run) => run.diedOn === null || run.diedOn > 5).length,
-    avgFloor: runs.reduce((sum, run) => sum + run.reachedFloor, 0) / runs.length,
+    cleared: runs.filter((run) => run.stoppedOn === null).length,
+    reach5: runs.filter((run) => run.hpTrace.some((trace) => trace.floor === 5)).length,
+    reach10: runs.filter((run) => run.clearedFloor >= 10).length, // 기존 게이트는 10층 클리어 기준
+    clear5: runs.filter((run) => run.stoppedOn === null || run.stoppedOn > 5).length,
+    avgFloor: runs.reduce((sum, run) => sum + run.clearedFloor, 0) / runs.length,
     actionRates,
     damagePerSentence: totals.damage / sentences,
     averageTurns: runs.flatMap((run) => run.hpTrace).reduce((sum, trace) => sum + trace.turns, 0)
@@ -1169,9 +1174,9 @@ for (const focus of BUILD_FOCUSES) {
       floors[engine] = acquired.length ? acquired.reduce((sum, floor) => sum + floor, 0) / acquired.length : null
       return floors
     }, { guard: null, heal: null } as { guard: number | null; heal: number | null }),
-    deathFloors: [...new Set(runs.map((run) => run.diedOn).filter((floor): floor is number => floor !== null))]
+    deathFloors: [...new Set(runs.map((run) => run.stoppedOn).filter((floor): floor is number => floor !== null))]
       .sort((a, b) => a - b)
-      .map((floor) => `${floor}:${runs.filter((run) => run.diedOn === floor).length}`)
+      .map((floor) => `${floor}:${runs.filter((run) => run.stoppedOn === floor).length}`)
       .join(', ') || '-',
     averageStats: (['hp', 'atk', 'guard', 'heal', 'luck'] as const).reduce((stats, key) => {
       stats[key] = runs.reduce((sum, run) => sum + run.finalStats[key], 0) / runs.length
@@ -1181,28 +1186,29 @@ for (const focus of BUILD_FOCUSES) {
   buildMetrics.push(metric)
   console.log(
     `  ${focus.padEnd(6)} clear ${metric.cleared}/${BUILD_RUNS} (${pct(metric.cleared, BUILD_RUNS)})`
-    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | reach10 ${pct(metric.reach10, BUILD_RUNS)}`
+    + ` | reach5 ${pct(metric.reach5, BUILD_RUNS)} | clear10 ${pct(metric.reach10, BUILD_RUNS)}`
     + ` | clear5 ${pct(metric.clear5, BUILD_RUNS)} | avg ${metric.avgFloor.toFixed(1)}`
     + ` | action A${pct(actionRates.attack, 1)} G${pct(actionRates.guard, 1)}`
     + ` H${pct(actionRates.heal, 1)} C${pct(actionRates.combo, 1)}`
     + ` | dmg/sentence ${metric.damagePerSentence.toFixed(1)} · ${metric.averageTurns.toFixed(1)} turns`,
   )
   console.log(
-    `           deaths ${metric.deathFloors} | avg stats`
+    `           stopped floors ${metric.deathFloors} | avg stats`
     + ` HP${metric.averageStats.hp.toFixed(0)} A${metric.averageStats.atk.toFixed(0)}`
     + ` G${metric.averageStats.guard.toFixed(0)} H${metric.averageStats.heal.toFixed(0)}`
     + ` L${metric.averageStats.luck.toFixed(0)}`
     + ` | wide ${pct(actionRates.wide, 1)} guard-engine ${pct(actionRates.guardEngine, 1)}`
     + ` heal-engine ${pct(actionRates.healEngine, 1)}`,
   )
+  console.log(`           stop reasons death ${runs.filter((run) => run.stopReason === 'death').length} · timeout ${runs.filter((run) => run.stopReason === 'timeout').length} · no-action ${runs.filter((run) => run.stopReason === 'no-action').length}`)
   const acquire = metric.averageEngineAcquireFloor
   console.log(
     `           engine damage guard ${pct(metric.engineDamageShare.guard, 1)} · heal ${pct(metric.engineDamageShare.heal, 1)}`
     + ` | first acquired guard ${acquire.guard?.toFixed(1) ?? '-'}F · heal ${acquire.heal?.toFixed(1) ?? '-'}F`,
   )
   if (traceBuild === focus) {
-    const sample = runs.find((run) => run.diedOn !== null) ?? runs[0]
-    console.log(`           trace seed result: died ${sample.diedOn ?? '-'} · reached ${sample.reachedFloor}`)
+    const sample = runs.find((run) => run.stoppedOn !== null) ?? runs[0]
+    console.log(`           trace seed result: ${sample.stopReason ?? 'clear'} ${sample.stoppedOn ?? '-'} · cleared ${sample.clearedFloor}`)
     sample.log.forEach((line) => console.log(line))
   }
 }
@@ -1215,12 +1221,12 @@ const localeMetrics = (skipLocales ? [] : SUPPORTED_LOCALES).map((locale) => {
     { length: LOCALE_RUNS },
     (_, i) => playRun((i + 1) * 65537 + 211, 'ok', 'average', 'balanced', false, locale),
   )
-  const cleared = runs.filter((run) => run.diedOn === null).length
-  const reach5 = runs.filter((run) => run.reachedFloor >= 5).length
-  const clear5 = runs.filter((run) => run.diedOn === null || run.diedOn > 5).length
-  const avgFloor = runs.reduce((sum, run) => sum + run.reachedFloor, 0) / runs.length
-  console.log(`  locale ${locale.padEnd(7)} clear ${pct(cleared, LOCALE_RUNS)} | reach5 ${pct(reach5, LOCALE_RUNS)} | clear5 ${pct(clear5, LOCALE_RUNS)} | avg ${avgFloor.toFixed(1)}`)
-  return { locale, cleared, reach5, clear5, avgFloor, firstFloorDeaths: runs.filter((run) => run.diedOn === 1).length }
+  const cleared = runs.filter((run) => run.stoppedOn === null).length
+  const reach5 = runs.filter((run) => run.hpTrace.some((trace) => trace.floor === 5)).length
+  const clear5 = runs.filter((run) => run.stoppedOn === null || run.stoppedOn > 5).length
+  const avgFloor = runs.reduce((sum, run) => sum + run.clearedFloor, 0) / runs.length
+  console.log(`  locale ${locale.padEnd(7)} clear ${pct(cleared, LOCALE_RUNS)} | reach5 ${pct(reach5, LOCALE_RUNS)} | clear5 ${pct(clear5, LOCALE_RUNS)} | avg cleared ${avgFloor.toFixed(1)} | timeout ${runs.filter((run) => run.stopReason === 'timeout').length} | no-action ${runs.filter((run) => run.stopReason === 'no-action').length}`)
+  return { locale, cleared, reach5, clear5, avgFloor, firstFloorDeaths: runs.filter((run) => run.stopReason === 'death' && run.stoppedOn === 1).length }
 })
 
 if (check) {
@@ -1229,6 +1235,7 @@ if (check) {
   const beginner = byLabel.beginner
   const expert = byLabel.expert
   const violations: string[] = []
+  if (metrics.some((metric) => metric.noActions > 0)) violations.push('시뮬레이터가 남은 덱을 포함해 완성 가능한 문장을 찾지 못했다')
   if (metrics.some((metric) => metric.firstFloorDeaths > 0)) violations.push('초반 학습 구간인 1층에서 사망이 발생했다')
   // 완전 무작위 입력도 첫 네 층에서는 죽지 않는다. 보상을 무작위로 골랐더라도 전투 상황을
   // 조금 읽는 초심자는 사마귀를 쓰러뜨려 첫 전술 보상까지 반드시 경험해야 한다.
@@ -1252,7 +1259,7 @@ if (check) {
   for (const metric of buildMetrics) {
     // 특화 빌드는 15층 목표 승률의 대리값이 아니다. 초반 보스 보장, 두 번째 구간 진입,
     // 평균 진행도와 실제 행동 정체성으로 카드풀이 플레이 가능한지를 검증한다.
-    if (metric.reach10 / BUILD_RUNS < 0.9) violations.push(`${metric.focus} build reaches floor 10 in fewer than 90% of runs`)
+    if (metric.reach10 / BUILD_RUNS < 0.9) violations.push(`${metric.focus} build clears floor 10 in fewer than 90% of runs`)
     if (metric.avgFloor < 12) violations.push(`${metric.focus} build averages below floor 12`)
   }
   const stableSupportClears = Math.max(builds.guard.cleared, builds.heal.cleared, builds.combo.cleared)

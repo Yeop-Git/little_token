@@ -98,6 +98,8 @@ export interface StatBlock {
 }
 
 export interface Word {
+  /** 막힌 저장을 복구할 때 이번 전투에만 빌려준 기본 단어. 덱에 저장하지 않는다. */
+  recoveryLoan?: boolean
   id: string
   text: string
   slot: SlotKey

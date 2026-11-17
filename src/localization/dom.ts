@@ -4,6 +4,17 @@ type ForeignLocale = Exclude<LocaleCode, 'ko'>
 type Row = readonly [ko: string, en: string, ja: string, ru: string, zhHans: string, zhHant: string]
 
 const ROWS: Row[] = [
+  ['호위 중 : 본체 무적','Escorted: body invulnerable','護衛中：本体無敵','Под охраной: тело неуязвимо','护卫中：本体无敌','護衛中：本體無敵'],
+  ['일벌','Worker bee','働き蜂','Рабочая пчела','工蜂','工蜂'],
+  ['토큰과의 유대','Bond with Token','トークンとの絆','Связь с Токеном','与词元的羁绊','與詞元的羈絆'],
+  ['속도 등급 환산','Speed grade value','速度等級の換算','За скорость','速度等级换算','速度等級換算'],
+  ['추가 보너스','Additional bonus','追加ボーナス','Дополнительный бонус','额外奖励','額外獎勵'],
+  ['스테이지','Stage','ステージ','Этап','关卡','關卡'],
+  ['공략 팁','Strategy tip','攻略ヒント','Совет','攻略提示','攻略提示'],
+  ['단계가 오를수록 세진다','Gets stronger as its stage rises','段階が上がるほど強くなる','Усиливается с повышением стадии','阶段越高越强','階段越高越強'],
+  ['부하가 늘수록 세진다','Gets stronger with more escorts','護衛が増えるほど強くなる','Усиливается с числом охранников','护卫越多越强','護衛越多越強'],
+  ['지금','Currently','現在','Сейчас','当前','目前'],
+  ['호위','Escort','護衛','Охрана','护卫','護衛'],
   ['방어막 한도: 최대 체력의 50%','Guard limit: 50% of Max HP','防御上限：最大体力の50%','Предел Защиты: 50% от макс. здоровья','防御上限：最大生命的50%','防禦上限：最大生命的50%'],
   ['이월분을 포함해','including carried Guard','持ち越し分を含め','включая перенесённую Защиту','包括结转的防御','包括結轉的防禦'],
   ['최대 체력의 50%','50% of Max HP','最大体力の50%','50% от макс. здоровья','最大生命的50%','最大生命的50%'],
@@ -212,6 +223,7 @@ function translateUnits(value: string, locale: ForeignLocale): string {
   return value
     .replace(/(\d+)턴 뒤/g, (_, n) => locale === 'ja' ? `${n}ターン後` : locale === 'ru' ? `через ${n} ход.` : locale.startsWith('zh') ? `${n}回合后` : `in ${n} turns`)
     .replace(/(\d+)턴/g, (_, n) => locale === 'ja' ? `${n}ターン` : locale === 'ru' ? `${n} ход.` : locale.startsWith('zh') ? `${n}回合` : `${n} turns`)
+    .replace(/(\d+)회/g, (_, n) => locale === 'ja' ? `${n}回` : locale === 'ru' ? `${n} раз` : locale.startsWith('zh') ? `${n}次` : `${n} times`)
     .replace(/(\d+)장/g, (_, n) => locale === 'ja' ? `${n}枚` : locale === 'ru' ? `${n} карт.` : locale.startsWith('zh') ? `${n}张` : `${n} cards`)
     .replace(/(\d+)마리/g, (_, n) => locale === 'ja' ? `${n}匹` : locale === 'ru' ? `${n}` : locale.startsWith('zh') ? `${n}只` : `${n}`)
     .replace(/(\d+)막/g, (_, n) => locale === 'ja' ? `${n}本` : locale === 'ru' ? `${n} полос.` : locale.startsWith('zh') ? `${n}条` : `${n} bars`)

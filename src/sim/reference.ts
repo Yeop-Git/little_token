@@ -325,6 +325,7 @@ export interface ApplyResult {
   combos: string[]
   hits: HitFx[]
   selfDmg: number
+  /** 최대 체력 한도 적용 후 실제로 회복한 체력. */
   heal: number
   convertedDamage?: number
   lifeStolen?: number
@@ -333,6 +334,8 @@ export interface ApplyResult {
   /** 문장이 보스 곁에서 퇴치한 호위 소환물 수. */
   summonsDispersed: number
   summonDamage: number
+  /** 각 소환물에 실제로 적용된 피해. */
+  summonHits?: number[]
   /** 쓰러진 호위가 소환자 본체에 되돌려 준 직접 피해. */
   summonBacklashDamage: number
   /** 지정 감정의 단일 공격으로 호위 퇴치 반동이 강화되었는가. */
@@ -458,7 +461,7 @@ function damageEnemy(
     : !!enemy.def.weakEmotion && emotions.includes(enemy.def.weakEmotion)
   const groggyMult = state.turn <= enemy.groggyUntilTurn ? enemy.groggyDamageMult : 1
   const weakMult = weak ? (part ? PART_WEAKNESS_MULT : WEAKNESS_MULT) : 1
-  const raw = Math.max(0, Math.round(dmg * weakMult * groggyMult))
+  const raw = Math.max(0, Math.floor(dmg * weakMult * groggyMult))
   if (enemy.def.summonPattern && summonCount(enemy) > 0) {
     return {
       target,
@@ -578,7 +581,7 @@ export function applyOverkillTransfer(
   context: OverkillTransferContext = {},
 ): OverkillTransferResult {
   const enemy = state.enemies[target]
-  const incoming = Math.max(0, Math.round(damage))
+  const incoming = Math.max(0, Math.floor(damage))
   if (!enemy || enemy.dead || incoming <= 0) return { dealt: 0, killed: false, overflow: 0 }
 
   const before = Math.max(0, enemy.hp)
@@ -647,7 +650,7 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
     const target = targets[rank]
     const before = state.enemies[target].hp
     const scale = plan.targetCount === 1 || plan.targetCount === 'all' ? 1 : TARGET_FALLOFF[rank] ?? TARGET_FALLOFF[2]
-    const hit = damageEnemy(state, target, Math.round(plan.dmg * scale), plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
+    const hit = damageEnemy(state, target, Math.floor(plan.dmg * scale), plan.pierceGuard, plan.emotions, plan.tags, plan.comboMatched)
     record(hit)
     if (hit && state.enemies[target].dead) {
       targetOverflow.set(target, Math.max(0, hit.dmg - before))
@@ -667,11 +670,37 @@ function resolveAttack(state: BattleState, plan: AttackPlan): { hits: HitFx[]; k
 interface SummonDisperseResult {
   count: number
   damage: number
+  hits: number[]
   remainingDamage: number
   backlashDamage: number
   focusedBacklash: boolean
   groggyTriggered: boolean
   killed: boolean
+}
+
+/** 일벌을 맞히는 순서는 실제 타격과 전술 평가가 함께 사용한다. */
+function summonTargets(enemy: EnemyInst, targetCount: TargetCount, pierceGuard: boolean): { hpList: number[]; index: number; side: 'left' | 'right' }[] {
+  const available = summonCount(enemy)
+  const reachable = targetCount === 'all' ? available : Math.min(available, Math.max(1, targetCount) * (pierceGuard ? 2 : 1))
+  let leftRemaining = enemy.summonsLeft
+  let rightRemaining = enemy.summonsRight
+  const targets: { hpList: number[]; index: number; side: 'left' | 'right' }[] = []
+  for (let i = 0; i < reachable; i++) {
+    const useRight = rightRemaining >= leftRemaining && rightRemaining > 0
+    if (useRight) targets.push({ hpList: enemy.summonHpRight, index: --rightRemaining, side: 'right' })
+    else targets.push({ hpList: enemy.summonHpLeft, index: --leftRemaining, side: 'left' })
+  }
+  return targets
+}
+
+/** 현재 호위 체력과 대상별 감쇠를 반영한 한 문장의 예상 처치 수. 상태를 바꾸지 않는다. */
+export function predictSummonDefeats(enemy: EnemyInst, damage: number, targetCount: TargetCount, pierceGuard = false): number {
+  const pattern = enemy.def.summonPattern
+  if (!pattern || enemy.dead) return 0
+  return summonTargets(enemy, targetCount, pierceGuard).filter(({ hpList, index }, reached) => {
+    const scale = targetCount === 1 || targetCount === 'all' ? 1 : TARGET_FALLOFF[reached] ?? TARGET_FALLOFF[2]
+    return Math.max(0, Math.floor(damage * scale)) >= (hpList[index] ?? pattern.hp ?? 1)
+  }).length
 }
 
 function disperseTargetSummons(
@@ -684,35 +713,34 @@ function disperseTargetSummons(
 ): SummonDisperseResult {
   const enemy = state.enemies[target]
   if (!enemy || enemy.dead || !enemy.def.summonPattern) {
-    return { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+    return { count: 0, damage: 0, hits: [], remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   }
   const pattern = enemy.def.summonPattern
-  const available = summonCount(enemy)
-  const reachable = targetCount === 'all'
-    ? available
-    : Math.min(available, Math.max(1, targetCount) * (pierceGuard ? 2 : 1))
+  const targets = summonTargets(enemy, targetCount, pierceGuard)
+  const reachable = targets.length
   let remainingDamage = Math.max(0, dmg)
   let damage = 0
+  const hits: number[] = []
   let dispersed = 0
   let allReachedDefeated = reachable > 0
   // 범위 피해는 일반 적 레일과 같은 대상 감쇠를 각 일벌에 적용한다.
   for (let reached = 0; reached < reachable; reached++) {
-    const useRight = enemy.summonsRight >= enemy.summonsLeft && enemy.summonsRight > 0
-    const hpList = useRight ? enemy.summonHpRight : enemy.summonHpLeft
-    const hp = hpList[hpList.length - 1] ?? pattern.hp ?? 1
+    const { hpList, index, side } = targets[reached]
+    const hp = hpList[index] ?? pattern.hp ?? 1
     const scale = targetCount === 1 || targetCount === 'all'
       ? 1
       : TARGET_FALLOFF[reached] ?? TARGET_FALLOFF[2]
-    const targetDamage = Math.max(0, Math.round(dmg * scale))
+    const targetDamage = Math.max(0, Math.floor(dmg * scale))
     const applied = Math.min(hp, targetDamage)
     damage += applied
-    hpList[hpList.length - 1] = hp - applied
-    if (hpList[hpList.length - 1] > 0) {
+    hits.push(applied)
+    hpList[index] = hp - applied
+    if (hpList[index] > 0) {
       allReachedDefeated = false
       continue
     }
-    hpList.pop()
-    if (useRight) enemy.summonsRight--
+    hpList.splice(index, 1)
+    if (side === 'right') enemy.summonsRight--
     else enemy.summonsLeft--
     dispersed++
   }
@@ -744,16 +772,16 @@ function disperseTargetSummons(
     enemy.summonRespawnTurn = state.turn + 2
     enemy.nextAttackTurn += 1
   }
-  return { count: dispersed, damage, remainingDamage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
+  return { count: dispersed, damage, hits, remainingDamage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
 }
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
   const dealsDirectDamage = isDamageIntent(intent)
-  const guardDamage = Math.round(state.guard * intent.guardAttackMultiplier)
-  const baseDamage = Math.round(effectiveBase(intent) * mult * intent.castScale)
+  const guardDamage = Math.floor(state.guard * intent.guardAttackMultiplier)
+  const baseDamage = Math.floor(effectiveBase(intent) * mult * intent.castScale)
   const healAmt = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
   const actualHeal = Math.min(healAmt, Math.max(0, state.playerMax - state.playerHp))
-  const convertedDamage = Math.round(Math.max(0, healAmt - actualHeal) * intent.overhealDamageMultiplier)
+  const convertedDamage = Math.floor(Math.max(0, healAmt - actualHeal) * intent.overhealDamageMultiplier)
   // 생명력 폭발은 회복 행동의 결과를 받아 이어지는 공격이다. 먼저 실제 체력을 채운 뒤
   // 최대 체력을 넘어 담기지 못한 양만 피해로 넘긴다.
   state.playerHp += actualHeal
@@ -781,7 +809,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
   const summonDisperse = dealsDamage
     ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions)
-    : { count: 0, damage: 0, remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+    : { count: 0, damage: 0, hits: [] as number[], remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   // 일벌과 본체는 한 줄의 킬체인이다. 같은 피해를 본체에 한 번 더 복제하지 않고,
   // 일벌 체력을 차례로 소모하고 남은 초과분만 그로기된 본체까지 이어 보낸다.
   const bodyPlan = { ...plan, dmg: summonDisperse.remainingDamage }
@@ -798,24 +826,34 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     Math.max(0, Math.round(hpDamage * intent.lifeStealRate)),
   )
   state.playerHp += lifeStolen
-  const label = dealsDamage ? `${dmg} 피해` : healAmt > 0 ? `${healAmt} 회복` : '준비 완료'
+  // 각 적에게 실제 표시된 수치를 기록한다. 약점·방어·면역 적용 전 공격 위력을
+  // 피해로 적으면 같은 공격의 적중 숫자와 전투 기록이 서로 달라진다.
+  const displayedHits = [...summonDisperse.hits, ...attack.hits.map((hit) => hit.dmg)]
+  const label = dealsDamage ? `${displayedHits.length ? displayedHits.join(' + ') : '0'} 피해` : healAmt > 0 ? `${actualHeal} 회복` : '준비 완료'
   return {
     text: `${intent.sentence} → ${label}` + (selfDmg ? ` · 자신 ${selfDmg}` : ''),
     combos: intent.combos,
     hits: attack.hits,
     selfDmg,
-    heal: healAmt,
+    heal: actualHeal,
     convertedDamage,
     lifeStolen,
     killed: summonDisperse.killed && !attack.killed.includes(target) ? [target, ...attack.killed] : attack.killed,
     overflow: attack.overflow,
     summonsDispersed: summonDisperse.count,
     summonDamage: summonDisperse.damage,
+    summonHits: summonDisperse.hits,
     summonBacklashDamage: summonDisperse.backlashDamage,
     summonFocusedBacklash: summonDisperse.focusedBacklash,
     summonGroggyTriggered: summonDisperse.groggyTriggered,
     supportWebCut,
   }
+}
+
+/** 전투 상태를 바꾸지 않고 실제 본행동과 같은 대상별 적중 결과를 계산한다. */
+export function previewIntentHits(state: BattleState, intent: Intent, mult: number, target: number): number[] {
+  const result = applyIntent(structuredClone(state), intent, mult, target)
+  return [...(result.summonHits ?? []), ...result.hits.map((hit) => hit.dmg)]
 }
 
 export function applyPendingAttack(state: BattleState): ApplyResult | null {
@@ -837,6 +875,7 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
     overflow: attack.overflow,
     summonsDispersed: summonDisperse.count,
     summonDamage: summonDisperse.damage,
+    summonHits: summonDisperse.hits,
     summonBacklashDamage: summonDisperse.backlashDamage,
     summonFocusedBacklash: summonDisperse.focusedBacklash,
     summonGroggyTriggered: summonDisperse.groggyTriggered,
@@ -1010,7 +1049,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
   enemy.hp += lifeStolen
   const counterBase = magicShieldBroken ? raw : dealt + absorbed
   const counterHit = counterBase > 0 && state.counter
-    ? damageEnemy(state, front, Math.round(counterBase * (state.counterFull ? 1 : .5)), false, [])
+    ? damageEnemy(state, front, Math.floor(counterBase * (state.counterFull ? 1 : .5)), false, [])
     : null
   const groggyEntered = !!attackStep?.groggyDamageMult
     && (!attackStep.groggyRequiresGuardShatter || guardShattered)

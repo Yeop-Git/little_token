@@ -2,10 +2,12 @@ import { emotionOrNeutral, type Word } from '@core/types'
 import { BACKGROUNDS, TOKEN_FACES } from '@/assets'
 import { wordNoteText } from '@core/wordText'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
+import { protectedCardsText } from '@/localization/deckProtection'
 
 interface Opts {
   incoming: Word
   candidates: Word[]
+  protectedCount?: number
   onDiscard: (word: Word) => void
   onDiscardIncoming: () => void
 }
@@ -57,6 +59,7 @@ export class DeckDiscardView {
           <div class="discard-incoming">
             새 카드 <b>「${opts.incoming.text}」</b>와 교체할 보유 카드 중 하나를 고르거나, 새 카드를 버린다.
           </div>
+          ${opts.protectedCount ? `<div class="discard-incoming">${protectedCardsText()}</div>` : ''}
           <div class="discard-body">
             <div class="reward-grid discard-grid" tabindex="0" aria-label="버릴 보유 카드 목록">
               ${opts.candidates.map(candidateHtml).join('')}

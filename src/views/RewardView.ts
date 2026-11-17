@@ -25,6 +25,7 @@ import { comboHintHtml } from '@/ui/ComboHint'
 import { GameAudio } from '@/audio/GameAudio'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { t } from '@/localization'
+import { bossRewardDiscountText } from '@/localization/rewardSupport'
 import { stageFor } from '@data/stages'
 import { availableCombos } from '@core/deckInsights'
 import { DISPLAY_FLOORS } from '@/config/edition'
@@ -371,6 +372,7 @@ export class RewardView {
                 <span class="reward-wallet-balance"><small>${text('rewardWalletOwned', '보유 영감')}</small><b>${opts.inspiration}</b></span>
                 <span class="reward-wallet-earned">${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} <b>${shop ? opts.purchases ?? 0 : `+${opts.earned}`}</b></span>
               </div>
+              ${!shop && opts.options.some((option) => option?.bossPrice !== undefined) ? `<div class="reward-boss-discount">${bossRewardDiscountText()}</div>` : ''}
               ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase === 'subject' ? `
                 <div class="reward-build-preview">
                   ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 희귀 빌드 동사 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}

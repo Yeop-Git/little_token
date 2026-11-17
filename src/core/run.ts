@@ -6,6 +6,7 @@
 import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerState, type PlayerStats } from './player'
 import type { Word } from './types'
 import { EARLY_WORDS } from '@data/earlyWords'
+import { hasCompletableDeck } from './deckSafety'
 
 /**
  * 런 한 판의 기록 — 결과 화면의 찢어진 종이에 촘촘히 적히는 값들이다.
@@ -238,8 +239,13 @@ export type RegisterWordResult =
   | { kind: 'needs-discard'; candidates: Word[] }
 
 /** 상한을 넘기면 같은 문법으로 보유한 모든 카드 중에서 교체 대상을 고른다. */
-export function discardCandidates(player: PlayerState, slotKey: string): Word[] {
-  return [...(player.deck[slotKey] ?? [])]
+export function discardCandidates(player: PlayerState, slotKey: string, incoming?: Word): Word[] {
+  const owned = player.deck[slotKey] ?? []
+  if (!incoming || !hasCompletableDeck(player)) return [...owned]
+  return owned.filter((candidate) => {
+    const deck = { ...player.deck, [slotKey]: [...owned.filter((word) => word.id !== candidate.id), incoming] }
+    return hasCompletableDeck({ ...player, deck })
+  })
 }
 
 export function registerWord(player: PlayerState, word: Word, discardId?: string): RegisterWordResult {
@@ -253,7 +259,7 @@ export function registerWord(player: PlayerState, word: Word, discardId?: string
   } else {
     const limit = DECK_LIMITS[word.slot]
     if (limit != null && slot.length >= limit) {
-      const candidates = discardCandidates(player, word.slot)
+      const candidates = discardCandidates(player, word.slot, word)
       const discardIndex = discardId ? slot.findIndex((w) => w.id === discardId) : -1
       if (discardIndex < 0 || !candidates.some((w) => w.id === discardId)) {
         return { kind: 'needs-discard', candidates }

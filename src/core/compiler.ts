@@ -56,7 +56,8 @@ const sameEmotionHint = (count: number): string => currentLocale === 'ko'
 // 단어 하나가 만드는 깡수치. 스탯 비례 단어는 "스탯 × 계수", 아니면 고정 위력.
 // 성냥팔이 소녀의 망토(verbLuck)를 들면 어떤 동사든 운 스탯만큼을 더 받는다.
 export function wordFlat(w: Word, stats: StatBlock, mods: CompileMods = {}): number {
-  const base = w.stat && w.statMult != null ? Math.round(stats[w.stat] * w.statMult) : w.power || 0
+  const scaled = w.stat && w.statMult != null ? stats[w.stat] * w.statMult : w.power || 0
+  const base = w.kind === 'guard' || w.kind === 'heal' ? Math.round(scaled) : scaled
   // 깡수치를 내는 단어(동사·목적어)에만 운을 얹는다. 주어·수식은 애초에 0이라 대상이 아니다.
   const luck = mods.verbLuck && (w.stat != null || w.power) ? Math.round(stats.luck * mods.verbLuck) : 0
   return Math.max(0, base + luck)

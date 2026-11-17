@@ -19,6 +19,7 @@ import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
 import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
+import { canAddItemWithoutLock, recoverBattleTables } from '@core/deckSafety'
 import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import { sharedTokenMind } from '@core/tokenMind'
 import packageInfo from '../package.json'
@@ -591,7 +592,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
     player: run.player,
     record: run.record,
     resources: run.combat,
-    tables: makeEarlyTables(run.player.deck, run.player),
+    tables: recoverBattleTables(makeEarlyTables(run.player.deck, run.player), run.player),
     debugCombat: debugCombatModes,
     onWin: handleBattleWin,
     onLose: (cause) => {
@@ -695,14 +696,8 @@ function beginReward(grade: number, earned: number = grade) {
   openPreparedReward(grade)
 }
 
-/** 일반전은 3단계 보상, 보스전은 그 자리를 무제한 영감 상점으로 바꾼다. */
+/** 새 보상은 일반전과 보스전 모두 세 단계로 선택한다. */
 function openPreparedReward(grade: number) {
-  if (stageFor(run.day).isBoss) {
-    if (run.reward) run.reward.phase = 'shop'
-    saveRun(run)
-    goInspirationShop(grade)
-    return
-  }
   goReward(grade, 'subject')
 }
 
@@ -718,7 +713,7 @@ function shopOptionFromRef(ref: RewardPickRef | null): RewardOption | null {
   if (!ref) return null
   if (ref.kind === 'item') {
     const item = ALL_ITEMS[ref.id]
-    if (!item || run.player.items.some((owned) => owned.id === item.id)) return null
+    if (!item || run.player.items.some((owned) => owned.id === item.id) || !canAddItemWithoutLock(run.player, item)) return null
     return {
       kind: 'item', rarity: item.rarity, name: item.name, desc: item.flavor,
       art: 'gift', item,
@@ -866,6 +861,7 @@ function goDiscard(incoming: Word, candidates: Word[], onDone: () => void, onDis
   current = new DeckDiscardView(stage, {
     incoming,
     candidates,
+    protectedCount: Math.max(0, (run.player.deck[incoming.slot]?.length ?? 0) - candidates.length),
     onDiscard: (discarded) => {
       const result = registerWord(run.player, incoming, discarded.id)
       if (result.kind === 'needs-discard') return

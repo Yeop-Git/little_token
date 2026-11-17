@@ -93,8 +93,8 @@ const LENT_WORD_IDS = new Set([QUEEN_BEE_TACTIC.id, ELDER_SPIDER_TACTIC.id, MANT
 export const BOSS_TACTIC_WORDS: Word[] = [QUEEN_BEE_TACTIC, ELDER_SPIDER_TACTIC, MANTIS_TACTIC]
 
 /** 이 카드는 토큰이 이번 전투에만 빌려준 것인가. 손패의 전용 표시가 이 판정을 쓴다. */
-export function isLentWord(word: Pick<Word, 'id'>): boolean {
-  return LENT_WORD_IDS.has(word.id)
+export function isLentWord(word: Pick<Word, 'id' | 'recoveryLoan'>): boolean {
+  return !!word.recoveryLoan || LENT_WORD_IDS.has(word.id)
 }
 
 /** 보스별로 토큰이 빌려주는 전용 단어 한 장. 여기 없는 적에게는 아무것도 끼워 넣지 않는다. */

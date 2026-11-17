@@ -27,7 +27,7 @@ export function cardTitleStyle(text: string, illustrated = false): string {
   return `style="--card-title-size:${fittedSize.toFixed(1)}px"`
 }
 
-/** 카드 색감(--wglow): 공격=붉음 · 방어=파랑 · 회복=초록 · 도박=보라. */
+/** 카드의 행동 종류 분류. 색상은 감정이 결정한다. */
 export function wordMood(word: Word): string {
   if (word.variance) return 'gamble'
   if (word.kind === 'heal' || word.effects?.heal) return 'heal'

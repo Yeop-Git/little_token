@@ -25,12 +25,11 @@ import {
   inkExceedsLimit,
   inkOverdraw,
   selectionInkCost,
-  SENTENCE_OVERDRAW_LIMIT,
   sentenceInkAvailable,
   wordInkCost,
 } from '@core/ink'
-import { eul } from '@core/josa'
-import { conflictReason, pruneConflicts } from '@core/validator'
+import { eul, josa } from '@core/josa'
+import { canCompleteSentence, conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
 import { emotionOrNeutral, EMOTION_LABEL, RARITY_LABEL, type Combo, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
@@ -47,6 +46,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  previewIntentHits,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
   enemyAttackForecast,
@@ -99,6 +99,7 @@ import {
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
+import { combatPreviewText } from '@/localization/combatPreview'
 
 const BUILD_EFFECT_TEXT = {
   ko: { magic: '매직실드', magicTip: '다음 적 공격을 관통 여부와 무관하게 막음', magicReady: '매직실드 1겹 준비', magicBlocked: '매직실드가 적의 공격을 통째로 막고 사라졌다.', blocked: '매직실드 방어!', healed: '흡혈로 체력 {value} 회복', overflow: '넘친 회복이 피해 {value}(으)로 바뀌었다.', healPop: '회복+{value}' },
@@ -323,6 +324,8 @@ interface Tally {
   mult: number
   total: number
   kind: 'dmg' | 'guard' | 'heal'
+  adjustment?: number
+  applied?: boolean
 }
 
 export class BattleView {
@@ -2320,15 +2323,13 @@ export class BattleView {
         const normalMult = resolveMultiplier(intent, this.multCtx(intent), .99).mult
         const guardPreview = Math.round(intent.guard * normalMult * intent.castScale * intent.castCount)
         const healPreview = Math.round(intent.heal * normalMult * intent.castScale * intent.castCount)
-        const overhealDamage = Math.round(
+        const overhealDamage = Math.floor(
           Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
             * intent.overhealDamageMultiplier,
         )
         const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
-        const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
-        const damageValue = Math.round(
-          (effectiveBase(intent) * normalMult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount,
-        )
+        const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+        const damageValue = (Math.floor(effectiveBase(intent) * normalMult * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
         const value = isDamageIntent(intent)
           ? damageValue
           : intent.guard > 0
@@ -2360,7 +2361,7 @@ export class BattleView {
       const tally = this.lastResolvedTally
       sentenceLabel = bossText('forecastLastSentence')
       sentenceValue = bossText('forecastExact', {
-        base: tally.base,
+        base: Number(tally.base.toFixed(4)),
         mult: tally.mult.toFixed(2),
         total: tally.total,
       })
@@ -2422,7 +2423,17 @@ export class BattleView {
     // 화면에 없는 거미가 거미줄만 날리면 어디서 날아온 건지 읽을 수가 없다.
     if (!this.spiderCastReady) return
     this.pendingSpiderSeal = null
-    const sealed = this.cardHand.sealRandom(pending.maxSealed)
+    const canDealDamage = (selection: Selection) => {
+      const intent = compile(selection, this.t, this.combatStats(selection), this.mods())
+      return isDamageIntent(intent) && effectiveBase(intent) > 0
+    }
+    const wasAttackPossible = canCompleteSentence(this.t, this.sel, this.currentInkAvailable(),
+      (word) => this.cardHand.isSealed(word), canDealDamage)
+    const sealed = this.cardHand.sealRandom(pending.maxSealed, Math.random, (candidate, remaining) =>
+      remaining.some((word) => canCompleteSentence(this.t, { ...this.sel, [slotKey]: word }, this.currentInkAvailable(),
+        (other) => other.id === candidate.id || this.cardHand.isSealed(other),
+        wasAttackPossible ? canDealDamage : undefined)),
+    )
     if (sealed) this.playSpiderWebProjectile(pending.enemyIdx, sealed.instanceId)
     this.log(
       sealed
@@ -2619,10 +2630,10 @@ export class BattleView {
     const baseGuard = Math.round(intent.guard * m * castPower)
     const baseHeal = Math.round(intent.heal * m * castPower)
     const missingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
-    const overhealDamage = Math.round(Math.max(0, baseHeal - missingHp) * intent.overhealDamageMultiplier)
+    const overhealDamage = Math.floor(Math.max(0, baseHeal - missingHp) * intent.overhealDamageMultiplier)
     const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + baseGuard)
-    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
-    const dmg = Math.round((effectiveBase(intent) * m * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
+    const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+    const dmg = (Math.floor(effectiveBase(intent) * m * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
     const guard = baseGuard
     const heal = baseHeal
     if (intent.targetMode === 'both') return { dmg, heal, guard, self: intent.recoil + Math.round(dmg * 0.4), multiplier: m }
@@ -2658,8 +2669,9 @@ export class BattleView {
     if (!rows) return '' // 순수 보정 단어(회피/지연 등)는 프로젝션 없이 고유 효과만
     const multLine = now.multiplier !== 1 ? `<span class="pj-mult">위력 ×${now.multiplier.toFixed(2)}</span>` : ''
     return `<div class="wd-proj">
-      <div class="pj-head"><span>이 단어 적용</span><span>문장 최종</span>${multLine}</div>
+      <div class="pj-head"><span>이 단어 적용</span><span>${combatPreviewText().estimate}</span>${multLine}</div>
       <div class="pj-rows">${rows}</div>
+      <div class="pj-caveat">${combatPreviewText().caveat}</div>
     </div>`
   }
 
@@ -3177,23 +3189,11 @@ export class BattleView {
     const projected = { ...this.sel, [key]: word }
     const projectedCost = selectionInkCost(projected)
     if (inkExceedsLimit(projectedCost, this.currentInkAvailable())) return '현재 잉크 한도 초과'
-    const remainingFloor = this.minimumRemainingInkCost(this.slotIndex, projected)
-    return projectedCost + remainingFloor > this.currentInkAvailable() + SENTENCE_OVERDRAW_LIMIT
-      ? '남은 문장을 완성할 잉크 부족'
-      : null
-  }
-
-  private minimumRemainingInkCost(afterIndex: number, selection: Selection): number {
-    let floor = 0
-    for (let i = afterIndex + 1; i < this.order().length; i++) {
-      const key = this.order()[i]
-      const costs = (this.t.words[key] ?? this.player.deck[key] ?? [])
-        .filter((candidate) => !conflictReason(candidate, i, selection, this.t))
-        .map((candidate) => Math.max(0, wordInkCost(candidate) - (candidate.effects?.inkDiscount ?? 0)))
-      if (!costs.length) return Number.POSITIVE_INFINITY
-      floor += Math.min(...costs)
-    }
-    return floor
+    const prefix: Selection = {}
+    this.order().slice(0, this.slotIndex + 1).forEach((slot) => { prefix[slot] = projected[slot] })
+    return canCompleteSentence(this.t, prefix, this.currentInkAvailable(), (candidate) => this.cardHand.isSealed(candidate))
+      ? null
+      : '남은 문장을 완성할 잉크 부족'
   }
 
   private scheduleAutoComplete(): void {
@@ -3261,7 +3261,7 @@ export class BattleView {
   }
 
   // ── 점수 분해 — 깡 점수(더하기)와 배율(곱하기)을 출처별로 쪼갠다 ──
-  // execute와 같은 규칙으로 계산하므로 여기 총합은 실제로 꽂히는 수치와 일치한다.
+  // 문장 자체의 계산값이다. 적의 약점·방어와 선공으로 바뀐 자원은 본행동에서 반영한다.
   private buildTally(intent: Intent, resolved: ResolvedMult, dealsDamage: boolean): Tally {
     // 피해·실드·회복 어느 문장이든 같은 배율 정산을 보여 준다.
     // 순수 효과형 카드도 실제 적용값과 일치하도록 아래에서 깡수치를 보충한다.
@@ -3312,8 +3312,8 @@ export class BattleView {
     const mult = mults.reduce((m, x) => m * x.value, 1)
     const repeats = dealsDamage ? intent.hitCount * intent.castCount : 1
     const total = dealsDamage && repeats > 1
-      ? Math.round((base / repeats) * mult) * repeats
-      : Math.round(base * mult)
+      ? Math.floor((base / repeats) * mult) * repeats
+      : dealsDamage ? Math.floor(base * mult) : Math.round(base * mult)
     return { flats, mults, base, mult, total, kind }
   }
 
@@ -3331,6 +3331,7 @@ export class BattleView {
       <div class="tally-feed tally-flat-feed"></div>
       <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
       <div class="tally-feed tally-mult-feed"></div>
+      <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? combatPreviewText().applied : combatPreviewText().actual) : combatPreviewText().calculation}</div>
       <div class="tally-total"></div>`
     this.q('#pbox').appendChild(el)
     this.fitTallyToStage(el)
@@ -3382,6 +3383,12 @@ export class BattleView {
       el.classList.add('mult-settled')
       await sleep(240)
       el.classList.remove('mult-settled')
+    }
+
+    if (tally.adjustment) {
+      const sign = tally.adjustment > 0 ? '+' : ''
+      this.tallyChip(multFeed, `${combatPreviewText().adjustment} ${sign}${tally.adjustment}`, tally.adjustment > 0 ? 'buff' : 'down')
+      this.fitTallyToStage(el)
     }
 
     // 깡 × 배율이 다 모이면 잠깐 멈춰 읽을 시간을 준다 — 호버 중이면 더 기다리고, 클릭하면 즉시.
@@ -3589,7 +3596,10 @@ export class BattleView {
       }
     }
     this.carriedInk = carryInkAfterSpend(inkCost, availableInk)
-    const dealsDamage = isDamageIntent(intent) && intent.base > 0
+    // 방어·회복 동사도 자원 전환 효과가 있으면 본행동에서 피해를 낼 수 있다.
+    // 실제 피해가 0인지 여부는 선공을 마친 뒤 previewIntentHits가 결정한다.
+    const dealsDamage = (isDamageIntent(intent) && intent.base > 0)
+      || intent.guardAttackMultiplier > 0 || intent.overhealDamageMultiplier > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
     const resolved = resolveMultiplier(
       intent,
@@ -3600,11 +3610,11 @@ export class BattleView {
     )
     const mult = resolved.mult
     const baseHealPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
-    const overhealDamage = Math.round(Math.max(0, baseHealPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
+    const overhealDamage = Math.floor(Math.max(0, baseHealPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
     const guardPreview = Math.round(intent.guard * mult * intent.castScale * intent.castCount)
     const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
-    const resourceDamage = Math.round(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
-    const dmg = Math.round((effectiveBase(intent) * mult * intent.castScale + resourceDamage) * intent.hitCount * intent.castCount)
+    const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
+    let dmg = (Math.floor(effectiveBase(intent) * mult * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
@@ -3643,16 +3653,22 @@ export class BattleView {
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
     //    이 숫자를 들고 준비 효과 → 선공 → 내 공격까지 이어가므로 중간에 다시 계산하지 않는다.
-    this.noteSentence(intent.sentence, mult, dealsDamage ? dmg : 0)
+    this.noteSentence(intent.sentence, mult, 0)
     const tally = this.buildTally(intent, resolved, dealsDamage)
     this.lastResolvedTally = tally
-    if (tally.total > 0) await this.playTally(tally)
-
     // 보상 카드의 성장과 하늘나물의 첫 문장 성장을 한 번에 보여 준다.
     const passiveGrowth = beanstalkGrowthFor(this.player, !this.beanstalkGrownThisBattle)
     if (passiveGrowth > 0) this.beanstalkGrownThisBattle = true
     const totalGrowth = intent.growHp + passiveGrowth
     if (totalGrowth > 0) await this.growUp(totalGrowth)
+
+    if (!dealsDamage && tally.kind === 'guard' && tally.total > 0) {
+      const applied = applyPreparation(structuredClone(this.state), intent, mult).guardGain
+      tally.adjustment = applied - tally.total
+      tally.total = applied
+      tally.applied = true
+      await this.playTally(tally)
+    }
 
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
@@ -3698,7 +3714,34 @@ export class BattleView {
       }
     }
 
-    // 7) 본인 캐릭터 행동 — 아까 띄워 둔 총합이 그대로 적에게 꽂힌다.
+    // 선공 상대가 준비한 방어를 소모하거나 체력을 깎았을 수 있다. 연출의 예상치는
+    // 본행동 직전의 자원으로 다시 계산해 실제 applyIntent와 같은 시점을 사용한다.
+    const currentMissingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
+    const currentResourceDamage = Math.floor(this.state.guard * intent.guardAttackMultiplier)
+      + Math.floor(Math.max(0, baseHealPreview - currentMissingHp) * intent.overhealDamageMultiplier)
+    dmg = (Math.floor(effectiveBase(intent) * mult * intent.castScale) + currentResourceDamage) * intent.hitCount * intent.castCount
+
+    // 공격 집계는 선공 이후의 상태에서 같은 전투 로직으로 적중을 계산한다.
+    // 대상별 약점·방어·호위와 현재 자원을 합산하되 지연 공격은 예약 위력으로 둔다.
+    if (dealsDamage) {
+      if (intent.timing !== 'delayed') {
+        const applied = previewIntentHits(this.state, intent, mult, this.target).reduce((sum, hit) => sum + hit, 0)
+        tally.adjustment = applied - tally.total
+        tally.total = applied
+        tally.applied = true
+      }
+      if (tally.total > 0 || tally.applied) await this.playTally(tally)
+    }
+
+    if (!dealsDamage && tally.kind === 'heal' && tally.total > 0) {
+      const applied = Math.min(tally.total, Math.max(0, this.state.playerMax - this.state.playerHp))
+      tally.adjustment = applied - tally.total
+      tally.total = applied
+      tally.applied = true
+      await this.playTally(tally)
+    }
+
+    // 7) 본인 캐릭터 행동
     this.setPhase('본인 캐릭터 행동')
 
     // 강타 등급 — 이 판을 크게 깎아내는 일격에만 붙는다. 남은 적을 전부 쓸어버리면 2번 컷.
@@ -3728,6 +3771,9 @@ export class BattleView {
     // 실제 본행동 발동 + 꽂힘 연출
     const hpBeforeIntent = this.state.playerHp
     const res = applyIntent(this.state, intent, mult, this.target)
+    // 최고 한 방은 준비 시점의 예상 총합이 아니라 실제 각 적중 숫자로 남긴다.
+    for (const hit of res.hits) this.noteBestHit(intent.sentence, hit.dmg)
+    for (const damage of res.summonHits ?? []) this.noteBestHit(intent.sentence, damage)
     // 만피에서 회복 문장을 써도 실제로 오른 건 없다 — 그럴 땐 토큰도 기뻐하지 않는다.
     if (this.state.playerHp > hpBeforeIntent) this.token?.feel('healed')
     const missedSpiderWeakness = dealsDamage && res.hits.some((hit) =>
@@ -3810,8 +3856,11 @@ export class BattleView {
     await this.enemyPhase('second')
 
     if (this.state.pending) {
+      const pendingSentence = this.state.pending.sentence
       const result = applyPendingAttack(this.state)
       if (result) {
+        for (const hit of result.hits) this.noteBestHit(pendingSentence, hit.dmg)
+        for (const damage of result.summonHits ?? []) this.noteBestHit(pendingSentence, damage)
         for (const hit of result.hits) {
           const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
           if (hit.summonShieldBlocked) this.popAt(hit.target, '일벌 호위 · 본체 무적', 'guard big')
@@ -3933,6 +3982,8 @@ export class BattleView {
     await sleep(420)
 
     const res = applyIntent(this.state, intent, mult, this.target)
+    for (const hit of res.hits) this.noteBestHit(intent.sentence, hit.dmg)
+    for (const damage of res.summonHits ?? []) this.noteBestHit(intent.sentence, damage)
     // 메아리는 예비 동작을 다시 밟지 않는다 — 칼을 두 번 들어올리면 늘어진다.
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
     await this.strike(res, sweep, heavy)
@@ -4468,6 +4519,10 @@ export class BattleView {
     this.lastSentence = sentence
     this.record.sentences += 1
     if (mult > this.record.bestMult) this.record.bestMult = mult
+    this.noteBestHit(sentence, dmg)
+  }
+
+  private noteBestHit(sentence: string, dmg: number) {
     if (dmg > (this.record.bestHit?.dmg ?? 0)) this.record.bestHit = { dmg, sentence }
   }
 
@@ -5018,7 +5073,7 @@ export class BattleView {
       this.showBossSentenceEvent(bossText('workersErased', { count }))
     }
     if (renderAfter) this.renderActors()
-    if (!groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
+    if (count > 0 && !groggyTriggered) this.resolveBossPattern(TOKEN_BOSS_HINTS.queenBeeDispersed)
   }
 
   /** 마지막 일벌에서 여왕 본체까지 남은 피해가 같은 검기로 이어지는 경로를 그린다. */
@@ -5164,7 +5219,7 @@ export class BattleView {
       }
       if (st.groggyEntered) {
         this.popAt(st.idx, '그로기!', 'buff big')
-        this.log(`${this.state.enemies[st.idx].def.name}이 빈틈을 보였다 — 받는 피해 ×${st.groggyDamageMult.toFixed(1)} · 예정된 다음 공격을 한 턴 거른다`)
+        this.log(`${josa(this.state.enemies[st.idx].def.name, '이', '가')} 빈틈을 보였다 — 받는 피해 ×${st.groggyDamageMult.toFixed(1)} · 예정된 다음 공격을 한 턴 거른다`)
         if (this.state.enemies[st.idx]?.def.id === 'mantis') {
           this.resolveBossPattern(TOKEN_BOSS_HINTS.mantisGroggy)
           this.showBossSentenceEvent(bossText('mantisCorrected'))

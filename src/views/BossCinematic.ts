@@ -42,19 +42,25 @@ export class BossCinematic {
   private timers: number[] = []
   private finished = false
   private opts: Opts
+  private stage: HTMLElement | null
+  private stageWasInert: boolean
 
   constructor(opts: Opts) {
     this.opts = opts
+    this.stage = document.querySelector<HTMLElement>('#stage')
+    this.stageWasInert = this.stage?.inert ?? false
+    if (this.stage) this.stage.inert = true
     this.el = document.createElement('div')
     this.el.className = 'boss-cine'
-    this.el.setAttribute('aria-hidden', 'true')
     this.el.innerHTML = '<button class="boss-cine-skip" type="button">건너뛰기</button>'
     // 영상 요소는 공용 자원 풀에서 받는다 — 마크업에 직접 박으면 장면이 바뀔 때마다
     // 미디어 파이프라인을 새로 열게 되고, resources:check도 그걸 막는다.
     this.video = acquireVideo({ key: 'boss-cinematic-1', src: opts.src, type: 'video/webm' })
     this.video.className = 'boss-cine-video'
+    this.video.setAttribute('aria-hidden', 'true')
     this.el.prepend(this.video)
     document.body.appendChild(this.el)
+    this.el.querySelector<HTMLButtonElement>('.boss-cine-skip')?.focus()
     // 자동재생 정책에 막히지 않게 음소거로 시작한다. 배경음은 게임이 따로 깐다.
     this.video.muted = true
 
@@ -73,6 +79,16 @@ export class BossCinematic {
     // 다음 회차에 다시 쓸 수 있게 풀로 돌려준다.
     releaseVideo(this.video)
     this.el.remove()
+    if (this.stage) {
+      this.stage.inert = this.stageWasInert
+      if (!this.stageWasInert) {
+        const previousTabIndex = this.stage.getAttribute('tabindex')
+        this.stage.tabIndex = -1
+        this.stage.focus({ preventScroll: true })
+        if (previousTabIndex === null) this.stage.removeAttribute('tabindex')
+        else this.stage.setAttribute('tabindex', previousTabIndex)
+      }
+    }
   }
 
   /** 사용자가 끊으면 남은 재생을 버리고 곧바로 전장을 연다. */
