@@ -557,6 +557,10 @@ export class RewardView {
     if (dock && opt.kind === 'word' && opt.word) {
       dock.className = `info-dock glass reward-dock is-word-card mood-${moodOf(opt.word)}`
       dock.innerHTML = wordDockHtml(opt, this.opts.deck)
+    } else if (dock) {
+      // 상점에서 아이템에 올리면 앞서 본 단어 카드를 남겨 두지 않는다.
+      dock.className = 'info-dock glass reward-dock empty'
+      dock.innerHTML = `<div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 상세 정보가 표시된다.')}</div>`
     }
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
       pick.classList.remove('detailing')
