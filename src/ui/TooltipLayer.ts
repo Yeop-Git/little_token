@@ -59,9 +59,11 @@ export function tipBulletsHtml(text: string): string {
 /** '혹은 …'으로 시작하는 줄은 다른 선택지라서 머리말을 따로 강조한다. */
 function tipBulletHtml(item: string): string {
   const alt = /^(혹은)\s+(.+)$/.exec(item)
-  return alt
-    ? `<li class="is-alt"><b class="tip-or">${alt[1]}</b> ${tipLineHtml(alt[2])}</li>`
-    : `<li>${tipLineHtml(item)}</li>`
+  if (alt) return `<li class="is-alt"><b class="tip-or">${alt[1]}</b> ${tipLineHtml(alt[2])}</li>`
+  // '예시 …' 줄은 바로 윗줄의 부연이라 들여 쓰고 머리말을 파랗게 둔다(11/20 피드백).
+  const example = /^(예시)(?:\s*카드)?\s+(.+)$/.exec(item)
+  if (example) return `<li class="is-example"><b class="tip-or">${example[1]}</b> ${tipLineHtml(example[2])}</li>`
+  return `<li>${tipLineHtml(item)}</li>`
 }
 
 /** 쪽지 본문 — •목록과 키워드·카드 태그. tipBulletsHtml이 모든 글자를 이스케이프한다. */

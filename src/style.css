@@ -1387,6 +1387,17 @@ button {
 /* 다른 선택지(혹은 …) 줄 — 머리말만 하늘색으로 짚어 둘째 방법이 눈에 띄게. */
 .tip-bullets li.is-alt::before { color: #9fd0ff; }
 .tip-bullets .tip-or { color: #9fd0ff; font-weight: 1000; }
+/* 예시 줄 — 윗줄의 부연. ↳로 들여 써 윗줄에 딸린 설명임을 보인다. */
+.tip-bullets li.is-example { padding-left: 30px; }
+.tip-bullets li.is-example::before { content: '↳'; left: 12px; color: #9fd0ff; }
+/* 계산식 숫자 — 점선 밑줄 숫자. 올리면 그 값이 나온 계산을 옆 쪽지로 보여 준다. */
+.trait-tag.is-calc {
+  padding: 0 5px;
+  --trait-tag-color: #9fd0ff;
+  border-bottom: 1.5px dashed rgba(159, 208, 255, .8);
+  border-radius: 5px 5px 2px 2px;
+  cursor: help;
+}
 .tip-bubble.is-rich { white-space: normal; min-width: 280px; }
 .tip-bubble.is-rich .tip-bubble-body { display: grid; gap: 8px; }
 /* 보유 아이템 쪽지 — 특성 한 칸과 올라가는 스탯 칩. 전부 큰 글씨로 한눈에. */

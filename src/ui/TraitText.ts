@@ -154,10 +154,22 @@ export function traitDescHtml(desc: string, inline = false): string {
  * 입력은 평문, 출력은 이스케이프된 HTML.
  */
 export function tipLineHtml(line: string): string {
-  return line.split(/(「[^」]+」)/).map((part) => {
+  return line.split(/(「[^」]+」|⟦[^⟧]+⟧)/).map((part) => {
     const card = /^「([^」]+)」$/.exec(part)
-    return card ? cardTagHtml(card[1]) : traitLineHtml(part)
+    if (card) return cardTagHtml(card[1])
+    const calc = /^⟦([^|⟧]+)\|([^⟧]+)⟧$/.exec(part)
+    if (calc) return calcTagHtml(calc[1], calc[2])
+    return traitLineHtml(part)
   }).join('')
+}
+
+/**
+ * ⟦보이는 값|계산 줄; 계산 줄⟧ — 점선 밑줄 숫자. 올리면 그 값이 나온 계산식을 옆 쪽지로 보여 준다.
+ * 본문은 "최대 체력 절반 + 방어×2"처럼 말로 두고, 실제 숫자 계산은 여기로 미룬다(11/20 피드백).
+ */
+function calcTagHtml(shown: string, lines: string): string {
+  const tipText = lines.split(/\s*;\s*/).filter(Boolean).join('\n')
+  return `<span class="trait-tag is-calc" data-tip-title="${currentLocale === 'ko' ? '계산식' : 'Formula'}" data-tooltip="${escapeHtml(tipText)}"><b>${escapeHtml(shown)}</b></span>`
 }
 
 /** 「카드 이름」 태그 — 카드 모양 딱지. 올리면 TooltipLayer가 옆에 실제 카드 앞면을 띄운다. */

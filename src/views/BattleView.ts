@@ -1779,7 +1779,7 @@ export class BattleView {
       max: s.playerMax,
       guard: s.guard,
       guardLimit,
-      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도는 방어 스탯에 비례해 오른다 (현재 ${guardLimit})`),
+      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도는 방어 스탯에 비례해 오른다 (현재 ⟦${guardLimit}|최대 체력 ${s.playerMax} 절반 → ${Math.floor(s.playerMax / 2)}; 방어 ${formatNumber(s.playerGuardStat ?? 0)} × ${PLAYER_GUARD_LIMIT_PER_GUARD_STAT} → ${formatNumber((s.playerGuardStat ?? 0) * PLAYER_GUARD_LIMIT_PER_GUARD_STAT)}; 합계 ${guardLimit}⟧)`),
       magic: s.playerMagicShield ? 1 : 0,
       magicTip: BUILD_EFFECT_TEXT.magicTip,
     })
@@ -2993,14 +2993,14 @@ export class BattleView {
       )
     } else if (key === 'atk') {
       lines.push(
-        '피해 = 스탯 × 카드 계수',
+        '피해 = 공격 × 카드 계수',
         examples((w) => w.slot === 'verb' && w.kind === 'attack' && w.stat === 'atk'),
       )
     } else if (key === 'guard') {
       const limit = stateGuardLimit(s)
       lines.push(
-        '방어도 = 스탯 × 카드 계수',
-        `한도 ${limit} = 체력 절반 ${Math.floor(s.playerMax / 2)} + 스탯 ${formatNumber(stats.guard)}×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}`,
+        '방어도 = 방어 × 카드 계수',
+        `한도 ⟦${limit}|최대 체력 ${s.playerMax} 절반 → ${Math.floor(s.playerMax / 2)}; 방어 ${formatNumber(stats.guard)} × ${PLAYER_GUARD_LIMIT_PER_GUARD_STAT} → ${formatNumber(stats.guard * PLAYER_GUARD_LIMIT_PER_GUARD_STAT)}; 합계 ${limit}⟧ = 최대 체력 절반 + 방어×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}`,
         '피해를 먼저 막고 막은 만큼만 줄어든다',
         examples((w) => w.slot === 'verb' && w.kind === 'guard' && !(w.effects?.guardAttackMultiplier)),
         '방패치기: 지금 쌓인 만큼 피해를 더한다 (소모 없음)',
@@ -3009,7 +3009,7 @@ export class BattleView {
       )
     } else if (key === 'heal') {
       lines.push(
-        '회복량 = 스탯 × 카드 계수',
+        '회복량 = 회복 × 카드 계수',
         '생명력 폭발: 넘친 회복을 피해로 바꾼다',
         examples((w) => w.slot === 'verb' && w.kind === 'heal' && !(w.effects?.overhealDamageMultiplier)),
         examples((w) => (w.effects?.overhealDamageMultiplier ?? 0) > 0, 2),
