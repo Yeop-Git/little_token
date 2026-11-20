@@ -36,6 +36,7 @@ import { discoveredComboIds } from '@core/comboDiscovery'
 import { wordInkCost } from '@core/ink'
 import type { WordKeywordId } from '@core/wordKeywords'
 import { TooltipLayer } from '@/ui/TooltipLayer'
+import { tagLuckChances, wordLuckChances } from '@/ui/luckChance'
 
 interface Opts {
   day: number
@@ -208,11 +209,11 @@ function mainEffect(opt: RewardOption): string {
         : word.bonus
           ? `×${(1 + word.bonus).toFixed(2)}`
           : ''
-    return `${action}${prefix ? `<span class="rp-effect-copy">${cardNoteTagsHtml(prefix)}</span>` : ''}${keywords}`
+    return `${action}${prefix ? `<span class="rp-effect-copy">${cardNoteTagsHtml(prefix, wordLuckChances(word))}</span>` : ''}${keywords}`
   }
   return action
-    ? `${action}<span class="rp-effect-copy">${cardNoteTagsHtml(note)}</span>`
-    : `<span class="rp-effect-copy">${cardNoteTagsHtml(note)}</span>`
+    ? `${action}<span class="rp-effect-copy">${cardNoteTagsHtml(note, wordLuckChances(word))}</span>`
+    : `<span class="rp-effect-copy">${cardNoteTagsHtml(note, wordLuckChances(word))}</span>`
 }
 
 function rewardWordMeta(opt: RewardOption): string {
@@ -240,9 +241,9 @@ function reinforceDeltas(w: Word): string {
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
   if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatNumber(w.statMult)} → <b>×${formatNumber(after.statMult!)}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
-  if (w.variance) rows.push(`${gambleText(w.variance)} → <b>${gambleText(after.variance!)}</b>`)
+  if (w.variance) rows.push(`${tagLuckChances(gambleText(w.variance), wordLuckChances(w))} → <b>${tagLuckChances(gambleText(after.variance!), wordLuckChances(after))}</b>`)
   if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)
-  if (w.crit != null && w.crit !== after.crit) rows.push(`${critText(w.crit)} → <b>${critText(after.crit!)}</b>`)
+  if (w.crit != null && w.crit !== after.crit) rows.push(`${tagLuckChances(critText(w.crit), wordLuckChances(w))} → <b>${tagLuckChances(critText(after.crit!), wordLuckChances(after))}</b>`)
   if (w.effects?.castScale != null && w.effects.castScale !== after.effects?.castScale) {
     rows.push(`${text('rewardRepeatStrength', '반복 위력')} ${Math.round(w.effects.castScale * 100)}% → <b>${Math.round(after.effects!.castScale! * 100)}%</b>`)
   }

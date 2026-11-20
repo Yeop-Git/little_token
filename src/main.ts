@@ -4,6 +4,7 @@
  * 런: 하루 전투 클리어 → 보상(문장=스킬업 / 아이템=스펙업) → 다음날(더 강한 스테이지).
  */
 
+import { setCardLuck } from '@core/luck'
 import './style.css'
 import type { BattleView as BattleViewType } from '@views/BattleView'
 import { DeckDiscardView } from '@views/DeckDiscardView'
@@ -810,6 +811,8 @@ async function goInspirationShop(
   saveRun(run)
   const { RewardView } = await import('@views/RewardView')
   if (request !== battleRequest) return
+  // 카드 문구의 확률은 운 반영 값으로 적는다 — 보상·상점에서도 전투와 같은 운을 쓴다.
+  setCardLuck(run.player.stats.luck)
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
@@ -946,6 +949,8 @@ async function goReward(
   }
   const { RewardView } = await import('@views/RewardView')
   if (request !== battleRequest) return
+  // 카드 문구의 확률은 운 반영 값으로 적는다 — 보상·상점에서도 전투와 같은 운을 쓴다.
+  setCardLuck(run.player.stats.luck)
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
