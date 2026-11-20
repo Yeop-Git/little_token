@@ -19,7 +19,7 @@ import {
   statBiasOf,
   type ResolvedMult,
 } from '@core/compiler'
-import { gambleFailLine, wordNoteText, wordValueLines } from '@core/wordText'
+import { wordDetailNoteLine, wordNoteText, wordValueLines } from '@core/wordText'
 import {
   carryInkAfterSpend,
   inkExceedsLimit,
@@ -76,7 +76,7 @@ import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } fro
 import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
-import { TooltipLayer } from '@/ui/TooltipLayer'
+import { TooltipLayer, tipBulletsHtml } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
 import { PART_WEAKNESS_MULT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
 import { defaultPlayer, itemTooltipHtml, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
@@ -2172,7 +2172,7 @@ export class BattleView {
           <h3>${visual.title}</h3>
           ${enemy ? '' : `<p>${visual.description}</p>`}
           <div class="character-stats">${stats}</div>
-          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${this.state.enemies[enemyIndex ?? 0]?.def.note ?? ''}</div>`}
+          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${tipBulletsHtml(this.state.enemies[enemyIndex ?? 0]?.def.note ?? '')}</div>`}
         </div>
       </article>`
   }
@@ -2795,7 +2795,7 @@ export class BattleView {
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
   private wordOwnValues(w: Word, includeKeywords = true): { text: string; cls: string }[] {
     const lines = wordValueLines(w, this.combatStats(), includeKeywords)
-    const fail = gambleFailLine(w)
+    const fail = wordDetailNoteLine(w)
     return fail ? [...lines, fail] : lines
   }
 
@@ -3175,7 +3175,7 @@ export class BattleView {
           const sprite = SPRITES[enemy.sprite]
           return `<article class="codex-portrait-entry${discovered ? ' discovered codex-selectable' : ' missing'}"${discovered ? ` data-detail-kind="enemy" data-enemy="${enemy.id}"` : ''}>
             <div class="codex-portrait-art">${discovered && sprite ? `<img src="${sprite}" alt="">` : '<span>?</span>'}</div>
-            <div><b>${discovered ? enemy.name : '미발견 벌레'}</b><span>${discovered ? enemy.note : '전장에서 만나면 기록된다.'}</span></div>
+            <div><b>${discovered ? enemy.name : '미발견 벌레'}</b><span>${discovered ? tipBulletsHtml(enemy.note ?? '') : '전장에서 만나면 기록된다.'}</span></div>
             <dl><div><dt>체력</dt><dd>${discovered ? enemy.hp : '—'}</dd></div><div><dt>공격</dt><dd>${discovered ? enemy.atk : '—'}</dd></div><div><dt>행동</dt><dd>${discovered ? `${enemy.every}턴` : '—'}</dd></div></dl>
           </article>`
         }).join('')}
@@ -3307,7 +3307,7 @@ export class BattleView {
           <div><span>공격</span><b>${enemy.atk}</b></div>
           <div><span>행동 주기</span><b>${enemy.every}턴</b></div>
         </div>
-        <div class="character-note">${enemy.note}</div>
+        <div class="character-note">${tipBulletsHtml(enemy.note ?? '')}</div>
       </div>
     </article>`
   }

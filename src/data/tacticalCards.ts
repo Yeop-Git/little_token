@@ -32,14 +32,14 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: '',
     rewardFloors: [2],
     title: '방패치기',
-    tooltip: '2층 희귀 동사 「밀어냈다」는 새로 얻은 방어를 포함한 현재 방어도 100%를 피해로 바꾸고 방어도는 소모하지 않는다. 「꾹 참고」로 방어 성장을 시작할 수 있다.',
+    tooltip: '「밀어냈다」: 현재 방어도 100%를 피해로 준다.\n방어도는 줄지 않는다.\n「꾹 참고」로 방어를 먼저 쌓자.',
     cardIds: ['kkuk'],
   },
   {
     id: 'pierce',
     enemyId: 'roach',
     title: '관통 수식어',
-    tooltip: '단단한 방어에는 「힘껏」·「이판사판」 같은 관통 수식어를 공격 동사에 붙여 체력을 바로 노린다.',
+    tooltip: '단단한 방어에는 관통 수식어(「힘껏」·「이판사판」)를 공격에 붙이자.\n방어를 무시하고 체력을 바로 깎는다.',
     cardIds: ['himkkeot', 'ipan', 'bangeopge'],
   },
   {
@@ -47,7 +47,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'pillbug',
     rewardFloors: [3],
     title: '반복 수식어',
-    tooltip: '매직실드는 타격마다 한 겹을 막는다. 「미친 듯이」로 동사를 두 번 발동해 빠르게 벗긴다.',
+    tooltip: '매직실드는 타격 한 번마다 한 겹씩 막는다.\n「미친 듯이」로 동사를 두 번 발동해 빠르게 벗기자.',
     cardIds: ['michin'],
   },
   {
@@ -55,7 +55,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'mosquito',
     rewardFloors: [5],
     title: '매직실드',
-    tooltip: '모기의 침은 방어를 건너뛴다. 「꾹 참고」를 방어 동사에 붙여 얻는 매직실드는 공격 한 번을 완전히 막는다.',
+    tooltip: '모기의 침은 방어를 무시한다.\n「꾹 참고」를 방어 동사에 붙이면 매직실드가 공격 한 번을 완전히 막는다.',
     cardIds: ['kkuk'],
   },
   {
@@ -63,7 +63,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'mantis',
     rewardFloors: [4],
     title: '카운터 방어',
-    tooltip: '사마귀의 큰 베기는 「다정히」·「못 이기는 척」 같은 카운터 수식어를 붙인 방어로 막으면 그로기에 빠뜨릴 수 있다.',
+    tooltip: '큰 베기 예고가 뜨면 카운터 수식어(「다정히」·「못 이기는 척」)를 붙여 방어하자.\n막아 내면 사마귀가 그로기에 빠진다.',
     cardIds: ['dandanhi', 'motdohage', 'sseulsseulhi'],
   },
   {
@@ -71,7 +71,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'queenBee',
     rewardFloors: [9],
     title: '범위 수식어·분노 집중',
-    tooltip: '「웃으며」·「거칠게」·「신나게」로 일벌을 함께 정리하거나, 분노 단일 공격으로 한 마리씩 노려 본체 반동 피해를 2배로 준다.',
+    tooltip: '「웃으며」·「거칠게」·「신나게」로 일벌을 함께 정리한다.\n또는 분노 단일 공격으로 한 마리씩 노려 반동 피해를 2배로 준다.',
     cardIds: ['useumyeo', 'geochilge', 'sinnage'],
   },
   {
@@ -79,22 +79,22 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'elderSpider',
     rewardFloors: [14],
     title: '반복·관통 수식어',
-    tooltip: '장로거미의 매직실드는 「미친 듯이」로 벗기고, 두꺼운 방어는 관통 수식어로 넘긴다. 다리 약점 감정도 함께 맞춘다.',
+    tooltip: '매직실드는 「미친 듯이」로 벗긴다.\n두꺼운 방어는 관통 수식어로 넘긴다.\n지금 다리의 약점 감정을 맞추자.',
     cardIds: ['michin', 'himkkeot', 'ipan', 'bangeopge'],
   },
   {
     id: 'elite-warded', enemyId: '*', rewardFloors: [10], title: '겹실드 정예',
-    tooltip: '희귀 이상 겹실드 정예는 추가 매직실드를 두른다. 「미친 듯이」로 동사를 반복해 겹을 먼저 벗긴다.',
+    tooltip: '희귀 이상 겹실드 정예는 매직실드를 더 두른다.\n「미친 듯이」로 동사를 반복해 겹부터 벗기자.',
     cardIds: ['michin'],
   },
   {
     id: 'elite-leeching', enemyId: '*', rewardFloors: [11], title: '흡묵 정예',
-    tooltip: '흡묵 정예는 체력에 준 피해 일부를 회복한다. 「꾹 참고」의 매직실드로 한 번 완전히 막아 흡혈도 끊는다.',
+    tooltip: '흡묵 정예는 준 피해 일부를 회복한다.\n「꾹 참고」의 매직실드로 한 번 완전히 막으면 흡혈도 끊긴다.',
     cardIds: ['kkuk'],
   },
   {
     id: 'elite-raging', enemyId: '*', rewardFloors: [12, 13], title: '격문 정예',
-    tooltip: '격문 정예는 약한 견제와 강한 돌진을 번갈아 쓴다. 기세를 낮춰 큰 공격을 누른다.',
+    tooltip: '약한 견제와 강한 돌진을 번갈아 쓴다.\n기세를 낮춰 큰 공격을 누른다.',
     cardIds: ['aesseo', 'motdohage'],
   },
 ]

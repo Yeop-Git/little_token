@@ -1308,7 +1308,7 @@ export const GROW_WORDS: Word[] = [
     "growHp": 2,
     "rarity": "legendary",
     "art": "9001",
-    "note": "최대 체력 +2 · 배율을 받지 않는다",
+    "note": "최대 체력 +2",
     "lore": "그냥 자란다. 아무것도 하지 않고, 자라기만 한다."
   }
 ]

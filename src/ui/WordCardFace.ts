@@ -10,6 +10,7 @@ import { INK_UI, SKILL_ART } from '@/assets'
 import { currentLocale, t, type LocaleCode } from '@/localization'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import { icon } from '@/ui/Icons'
+import { tipBulletsHtml } from '@/ui/TooltipLayer'
 import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
@@ -139,7 +140,7 @@ export function wordKeywordDetailsHtml(word: Word, omitValues?: ReadonlySet<Word
     <h3>${heading}</h3>
     <div class="word-keyword-list">${keywords.map((keyword) => `
       <div class="word-keyword-detail keyword-${keyword.id}">
-        <b>${keyword.label}</b><span>${keyword.detail}</span>
+        <b>${keyword.label}</b><span>${tipBulletsHtml(keyword.detail)}</span>
       </div>`).join('')}</div>
   </section>`
 }

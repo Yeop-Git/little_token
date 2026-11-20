@@ -16,7 +16,7 @@ interface KeywordCopy { label: string; detail: string }
  * 이 카드 한 장이 이번 전투에서 몇 % 올리는지 숫자로 바로 적는다.
  */
 const RANK_DETAIL: Record<LocaleCode, (stat: 'attack' | 'guard', rank: number, pct: number) => string> = {
-  ko: (stat, rank, pct) => `이번 전투 동안 기준 ${stat === 'attack' ? '공격' : '방어'} +${pct}%. 이 카드를 쓴 턴에 ${stat === 'attack' ? '공격' : '방어'} 랭크가 ${rank} 오르고 현재 스테이지 동안 유지됩니다(랭크 1마다 +25%).`,
+  ko: (stat, rank, pct) => `이번 전투 동안 기준 ${stat === 'attack' ? '공격' : '방어'} +${pct}%\n쓴 턴에 랭크 +${rank}, 현재 스테이지 동안 유지\n랭크 1마다 +25%`,
   en: (stat, rank, pct) => `+${pct}% base ${stat === 'attack' ? 'Attack' : 'Guard'} for this battle. Raises the rank by ${rank} on the turn it is played (each rank +25%).`,
   ja: (stat, rank, pct) => `この戦闘中、基本${stat === 'attack' ? '攻撃' : '防御'}+${pct}%。使ったターンにランクが${rank}上がります（1ランクごとに+25%）。`,
   ru: (stat, rank, pct) => `+${pct}% к базовой ${stat === 'attack' ? 'атаке' : 'защите'} до конца боя. Ранг растёт на ${rank} в ход розыгрыша (каждый ранг +25%).`,
@@ -27,7 +27,7 @@ const RANK_DETAIL: Record<LocaleCode, (stat: 'attack' | 'guard', rank: number, p
 const COPY: Record<LocaleCode, Record<WordKeywordId, KeywordCopy>> = {
   ko: {
     pierce: { label: '관통', detail: '공격이 일반 실드와 매직실드를 무시합니다.' },
-    counter: { label: '카운터', detail: '이번 턴에 받은 피해의 50%를 반격합니다. 방어·회복 문장은 100%를 반격합니다.' },
+    counter: { label: '카운터', detail: '이번 턴에 받은 피해의 50%를 되돌립니다.\n방어·회복 문장이면 100%.' },
     preempt: { label: '선공', detail: '선공하는 상대보다 먼저 행동합니다.' },
     critical: { label: '대성공', detail: '표시된 확률로 최종 배율이 1.5배가 됩니다.' },
     renewal: { label: '재생', detail: '다음 피격으로 잃은 체력의 표시 비율만큼 회복합니다. 회복 동사와 조합하면 비율이 두 배가 됩니다.' },

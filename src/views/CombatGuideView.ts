@@ -1,3 +1,4 @@
+import { tipBulletsHtml } from '@/ui/TooltipLayer'
 /**
  * 로비(타이틀)에서만 여는 전투 설명서. 전투 화면을 가리지 않는 독립 씬이다.
  *
@@ -503,7 +504,7 @@ export class CombatGuideView {
 
       <h3 class="g-h3">길에서 만나는 벌레</h3>
       <ul class="g-foes">
-        ${normals.map((def) => `<li><b>${def.name}</b><i>체력 ${def.hp} · 공격 ${def.atk}</i><span>${def.note ?? ''}</span></li>`).join('')}
+        ${normals.map((def) => `<li><b>${def.name}</b><i>체력 ${def.hp} · 공격 ${def.atk}</i><span>${tipBulletsHtml(def.note ?? '')}</span></li>`).join('')}
       </ul>
 
       <div class="g-split">

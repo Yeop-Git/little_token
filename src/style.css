@@ -1266,7 +1266,7 @@ button {
   box-sizing: border-box;
   width: max-content;
   /* 자리는 JS가 무대 안으로 밀어 넣는다 — 잘려 못 읽느니 줄이 한 줄 느는 쪽이 낫다. */
-  max-width: 390px;
+  max-width: 500px;
   padding: 0;
   border: 1px solid rgba(255, 221, 153, .58);
   border-radius: 11px;
@@ -1314,7 +1314,7 @@ button {
   color: #2a1a0c;
   background: linear-gradient(140deg, #ffdc9a, #f0b45f);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
-  font: 900 11px/1.35 Georgia, serif;
+  font: 900 14px/1.35 Georgia, serif;
   letter-spacing: .11em;
   text-shadow: none;
 }
@@ -1322,7 +1322,7 @@ button {
 .tip-bubble-title {
   min-width: 0;
   color: #ffe1a1;
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 1000;
   line-height: 1.25;
   letter-spacing: .01em;
@@ -1331,12 +1331,16 @@ button {
 .tip-bubble-title[hidden] { display: none; }
 .tip-bubble-body {
   display: block;
-  padding: 10px 13px;
+  padding: 10px 14px 12px;
   color: #f4ead7;
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.48;
+  line-height: 1.45;
 }
+/* 설명은 문장마다 •항목으로 나눠 한눈에 훑게 한다. */
+.tip-bullets { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.tip-bullets li { position: relative; padding-left: 18px; }
+.tip-bullets li::before { content: '•'; position: absolute; left: 2px; color: #ffcf7a; font-weight: 1000; }
 .tip-bubble.is-rich { white-space: normal; min-width: 280px; }
 .tip-bubble.is-rich .tip-bubble-body { display: grid; gap: 8px; }
 /* 보유 아이템 쪽지 — 특성 한 칸과 올라가는 스탯 칩. 전부 큰 글씨로 한눈에. */
@@ -1372,9 +1376,9 @@ button {
 .relic-tip-line { color: #bfb3a0; font-size: 14px; font-style: italic; line-height: 1.35; }
 .tip-bubble.has-title .tip-bubble-body {
   padding-top: 0;
-  color: #d9cebc;
-  font-size: 15px;
-  font-weight: 650;
+  color: #e6dccb;
+  font-size: 20px;
+  font-weight: 700;
 }
 .tip-bubble[data-kind='keyword'] {
   border-color: rgba(255, 208, 108, .72);
@@ -7366,23 +7370,23 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .character-stats b { color: #fff2da; }
 /* 적 호버 상세는 스크롤 없이 한 화면에 — 초상을 줄이고 넘치는 글은 잘라 낸다. */
-.character-dock.is-enemy .character-portrait { height: 180px; }
-.character-dock.is-enemy .character-portrait img { height: 168px; }
-.character-dock.is-enemy .character-copy { padding: 12px 18px 14px; overflow: hidden; }
+.character-dock.is-enemy .character-portrait { height: 150px; }
+.character-dock.is-enemy .character-portrait img { height: 140px; }
+/* 보스 기믹 •목록이 다 들어가도록 적 상세는 카드 뽑기 더미 위까지 아래로 늘린다. */
+.info-dock.character-dock.is-enemy { bottom: 262px; }
+.character-dock.is-enemy .character-copy { padding: 12px 18px 14px; overflow-y: auto; scrollbar-width: thin; }
 .character-dock.is-enemy .character-copy h2 { margin-top: 0; font-size: 26px; }
 .character-dock.is-enemy .character-copy h3 { font-size: 14px; }
 .character-dock.is-enemy .character-stats { gap: 5px; margin-top: 10px; }
 .character-dock.is-enemy .character-stats > div { gap: 8px; padding: 5px 8px; font-size: 12.5px; }
 .character-dock.is-enemy .character-stats b { text-align: right; }
 .character-dock.is-enemy .character-stats > div > span { flex: none; white-space: nowrap; }
+/* 기믹 설명은 •항목으로 나눠 다 보여 준다. 잘라 내면 보스 규칙 절반이 사라졌다(11/20 피드백). */
 .character-dock.is-enemy .character-note {
   margin-top: 10px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  overflow: hidden;
+  color: #eadfca;
+  font-size: 16px;
+  line-height: 1.4;
 }
 .character-stats .enemy-weakness { display: inline-flex; align-items: center; gap: 4px; color: var(--emotion-color); }
 .character-stats .enemy-weakness .emotion-face { width: 18px; height: 18px; }
@@ -7391,9 +7395,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   padding-left: 11px;
   border-left: 3px solid var(--gold-deep);
   color: var(--ink-faint);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.55;
 }
+.character-note .tip-bullets li { padding-left: 15px; }
 
 /* ==========================================================================
    보상 뷰 · 아이템 뷰 — 같은 배경 + 유리 톤으로 통일

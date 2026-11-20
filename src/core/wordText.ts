@@ -69,7 +69,9 @@ const GAMBLE_FAIL_LABEL = {
  * 도박 카드의 실패 쪽 결과 — "실패 시 배율 ×1.00". 카드 앞면은 짧게 성공 쪽만 적고,
  * 상세 팝업에서는 붉은 줄로 실패하면 어떻게 되는지 함께 밝힌다(11/20 피드백).
  */
-export function gambleFailLine(w: Word): ValueLine | null {
+export function wordDetailNoteLine(w: Word): ValueLine | null {
+  // 무럭무럭처럼 배율을 받지 않는 규칙도 앞면이 아니라 상세 설명에서 밝힌다(11/20 피드백).
+  if (w.growHp) return { text: L.noMult, cls: 'rule' }
   if (!w.variance) return null
   return { text: `${GAMBLE_FAIL_LABEL} ×${w.variance.lo.toFixed(2)}`, cls: 'gamble-fail' }
 }
@@ -164,7 +166,7 @@ export function wordNoteText(w: Word): string {
 
 function noteParts(w: Word): string[] {
   // 성장 카드와 문장부호는 수치 대신 규칙을 적는다 — 같은 값에서 같은 문구를 다시 만든다.
-  if (w.growHp) return [`${L.hp} +${w.growHp}`, L.noMult]
+  if (w.growHp) return [`${L.hp} +${w.growHp}`]
   if (w.slot === 'punct') {
     const punct: string[] = []
     if (w.tags.includes(PREEMPT_TAG)) punct.push(currentLocale === 'ko' ? `${L.preempt}한다` : L.preempt)
