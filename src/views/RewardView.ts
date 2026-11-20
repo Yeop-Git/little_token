@@ -404,7 +404,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
         <span class="rp-foil" aria-hidden="true"></span>
         <span class="reward-card-sticker ${p.reinforce ? 'is-reinforce' : 'is-new'}" aria-hidden="true">${sticker}</span>
         <span class="rp-owned-stamp" aria-hidden="true">${ownedLabel}</span>
-        <span class="reward-card-back" aria-hidden="true"><i></i><i></i><b>그림일기</b></span>
+        <span class="reward-card-back" aria-hidden="true"><i></i><i></i></span>
         ${rewardWordMeta(p)}
         <span class="rp-unavailable" aria-hidden="true">
           <b>${text('rewardUnavailable', '구매 불가')}</b>

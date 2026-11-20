@@ -11701,7 +11701,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   position: relative;
   width: 96px;
   height: 96px;
-  margin-top: 34px;
   border: 3px double #d9ad63;
   transform: rotate(45deg);
   background: radial-gradient(circle, rgba(255, 214, 128, .22), transparent 70%);
@@ -11728,20 +11727,10 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
     radial-gradient(circle at 12px calc(100% - 12px), #e8bf72 0 3px, transparent 4px),
     radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #e8bf72 0 3px, transparent 4px);
 }
-.reward-card-back b {
-  font-family: var(--font);
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: 6px;
-  color: #f6d796;
-  -webkit-text-stroke: .6px currentColor;
-  text-shadow: 0 2px 0 #160f1e, 0 2px 8px #000, 0 0 16px rgba(255, 210, 122, .55);
-}
 .reward-shop-card .reward-card-back { gap: 14px; }
-.reward-shop-card .reward-card-back i:first-child { width: 54px; height: 54px; margin-top: 12px; }
+.reward-shop-card .reward-card-back i:first-child { width: 54px; height: 54px; }
 .reward-shop-card .reward-card-back i:first-child::before { inset: 12px; }
 .reward-shop-card .reward-card-back i:nth-child(2) { inset: 10px; border-radius: 8px; }
-.reward-shop-card .reward-card-back b { font-size: 14px; letter-spacing: 3px; }
 .reward-choice .reward-kindline { animation: reward-kindline-in .7s linear backwards; }
 @keyframes reward-kindline-in {
   0%, 37% { opacity: 0; }
