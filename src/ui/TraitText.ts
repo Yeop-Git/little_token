@@ -7,6 +7,7 @@
 import { INK_UI } from '@/assets'
 import { currentLocale } from '@/localization'
 import { EMOTION_LABEL, type Emotion } from '@core/types'
+import { keywordDetailByLabel } from '@core/wordKeywords'
 import { emotionIconContent } from './EmotionBadge'
 import { icon } from './Icons'
 
@@ -58,19 +59,58 @@ function termsForLocale(): Array<[string, TagSpec]> {
     .sort((a, b) => b[0].length - a[0].length)
 }
 
+/** 한국어 설명 속 태그 툴팁. 전투 키워드는 카드 키워드 설명(wordKeywords)을 먼저 쓴다. */
+const TAG_TIPS_KO: Record<string, string> = {
+  공격: '적의 체력을 깎는 행동이에요.\n공격 동사로 문장을 끝내면 피해를 줘요.',
+  방어: '실드를 쌓아 받는 피해를 줄여요.\n방어 동사로 문장을 끝내면 실드가 생겨요.',
+  회복: '잃은 체력을 되찾아요.\n회복 동사로 문장을 끝내면 체력이 차요.',
+  '운 스탯': '확률 효과가 터질 가능성을 높여요.',
+  잉크: '카드를 낼 때 쓰는 자원이에요.\n카드마다 잉크 비용이 있어요.',
+  '최대 잉크': '한 문장에 쓸 수 있는 잉크의 최대치예요.',
+  '잉크 최대치': '한 문장에 쓸 수 있는 잉크의 최대치예요.',
+  관용구: '정해진 카드 조합으로 문장을 완성하면 붙는 보너스예요.\n관용구 배율이 곱해져요.',
+  공명: '같은 감정 카드를 한 문장에 모으면 일어나요.\n공명 배율이 곱해져요.',
+  '공명 배율': '같은 감정 카드가 모였을 때 곱해지는 배율이에요.',
+  '관용구 배율': '관용구를 완성했을 때 곱해지는 배율이에요.',
+  '배율 풀': '여러 보너스를 더해서 한 번에 곱하는 배율이에요.',
+  배율: '문장의 기본 점수에 곱해지는 값이에요.',
+  '최대 체력': '체력이 차오를 수 있는 최대치예요.',
+  그로기: '큰 기믹이 막히면 빠지는 상태예요.\n주는 피해가 커지고 예정된 공격을 한 턴 걸러요.',
+  봉인: '거미줄에 묶인 카드는 풀릴 때까지 쓸 수 없어요.',
+  '카드 뽑기': '손패를 새로 채우는 행동이에요.',
+  주어: '문장의 주인공 카드를 놓는 칸이에요.',
+  수식어: '동사를 꾸며 효과를 더하는 카드를 놓는 칸이에요.',
+  동사: '문장의 행동을 정하는 칸이에요.\n공격·방어·회복은 동사가 정해요.',
+  서술어: '문장의 행동을 정하는 칸이에요.\n공격·방어·회복은 서술어가 정해요.',
+  문장부호: '문장 끝에 붙는 부호 카드를 놓는 칸이에요.',
+}
+
+function tagTip(term: string, spec: TagSpec): string {
+  if (spec.kind === 'emotion') return currentLocale === 'ko' ? `${term} 감정 카드예요.\n적의 약점 감정으로 공격하면 피해가 커져요.` : ''
+  if (currentLocale !== 'ko') return keywordDetailByLabel(term) ?? ''
+  return TAG_TIPS_KO[term] ?? TAG_TIPS_KO[term.replace(/ 칸$/, '')] ?? keywordDetailByLabel(term) ?? ''
+}
+
+/** 태그 툴팁 속성 — 이름은 제목, 설명은 본문. TooltipLayer가 읽는다. */
+function tagTipAttrs(term: string, spec: TagSpec): string {
+  const tipText = tagTip(term, spec)
+  return tipText ? ` data-tip-title="${escapeHtml(term)}" data-tooltip="${escapeHtml(tipText)}"` : ''
+}
+
 function tagHtml(term: string, spec: TagSpec): string {
   const label = escapeHtml(term)
+  const tipAttrs = tagTipAttrs(term, spec)
   if (spec.kind === 'emotion') {
-    return `<span class="trait-tag is-emotion emotion-${spec.emotion}">${emotionIconContent(spec.emotion)}<b>${label}</b></span>`
+    return `<span class="trait-tag is-emotion emotion-${spec.emotion}"${tipAttrs}>${emotionIconContent(spec.emotion)}<b>${label}</b></span>`
   }
   if (spec.kind === 'ink') {
-    return `<span class="trait-tag is-ink"><img class="trait-tag-ink" src="${INK_UI.costBadge}" alt="" aria-hidden="true" draggable="false"><b>${label}</b></span>`
+    return `<span class="trait-tag is-ink"${tipAttrs}><img class="trait-tag-ink" src="${INK_UI.costBadge}" alt="" aria-hidden="true" draggable="false"><b>${label}</b></span>`
   }
   if (spec.kind === 'stat') {
-    return `<span class="trait-tag is-stat stat-${spec.stat}"><i aria-hidden="true">${icon(STAT_ICON[spec.stat])}</i><b>${label}</b></span>`
+    return `<span class="trait-tag is-stat stat-${spec.stat}"${tipAttrs}><i aria-hidden="true">${icon(STAT_ICON[spec.stat])}</i><b>${label}</b></span>`
   }
-  if (spec.kind === 'slot') return `<span class="trait-tag is-slot"><b>${label}</b></span>`
-  return `<span class="trait-tag is-keyword"><b>${label}</b></span>`
+  if (spec.kind === 'slot') return `<span class="trait-tag is-slot"${tipAttrs}><b>${label}</b></span>`
+  return `<span class="trait-tag is-keyword"${tipAttrs}><b>${label}</b></span>`
 }
 
 /** 한 줄 안의 키워드를 태그로 감싼다. 입력은 평문, 출력은 이스케이프된 HTML. */
@@ -113,6 +153,12 @@ export function traitDescHtml(desc: string, inline = false): string {
 export function tipLineHtml(line: string): string {
   return line.split(/(「[^」]+」)/).map((part) => {
     const card = /^「([^」]+)」$/.exec(part)
-    return card ? `<span class="trait-tag is-card"><b>${escapeHtml(card[1])}</b></span>` : traitLineHtml(part)
+    return card ? cardTagHtml(card[1]) : traitLineHtml(part)
   }).join('')
+}
+
+/** 「카드 이름」 태그 — 카드 모양 딱지. 올리면 TooltipLayer가 옆에 실제 카드 앞면을 띄운다. */
+function cardTagHtml(name: string): string {
+  const safe = escapeHtml(name)
+  return `<span class="trait-tag is-card" data-tip-card="${safe}" data-tip-title="${safe}" data-tooltip="${safe}"><i class="trait-card-glyph" aria-hidden="true"></i><b>${safe}</b></span>`
 }

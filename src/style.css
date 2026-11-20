@@ -1302,6 +1302,42 @@ button {
 .tip-bubble[data-actual-place='below']::after { top: -6px; transform: translateX(-50%) rotate(225deg); }
 .tip-bubble[data-actual-place='above'] { transform: translateY(4px); }
 .tip-bubble.show { opacity: 1; transform: translateY(0); }
+/* 툴팁 달린 태그가 든 쪽지는 마우스로 들어가 태그를 짚어 볼 수 있다. 아이콘과 쪽지 사이 틈은
+   투명한 다리로 메워, 옮겨 가는 길에 아래 다른 아이콘을 스쳐 쪽지가 바뀌지 않게 한다. */
+.tip-bubble.show.is-interactive { pointer-events: auto; }
+.tip-bubble.is-interactive::before { content: ''; position: absolute; left: 0; right: 0; height: 14px; }
+.tip-bubble.is-interactive[data-actual-place='below']::before { top: -14px; }
+.tip-bubble.is-interactive[data-actual-place='above']::before { bottom: -14px; }
+.tip-bubble.is-interactive .trait-tag[data-tooltip] { cursor: help; }
+.tip-bubble.is-interactive .trait-tag[data-tooltip]:hover { filter: brightness(1.25); }
+/* 옆 쪽지 — 본 쪽지 안 태그의 설명, 카드 태그면 실제 카드 앞면. */
+.tip-sub {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1501;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 340px;
+  padding: 12px 16px 14px;
+  border: 1px solid rgba(255, 221, 153, .58);
+  border-radius: 11px;
+  color: #f8efdf;
+  background: linear-gradient(155deg, rgba(31, 23, 39, .97), rgba(13, 10, 19, .97));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .62);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+.tip-sub.show { opacity: 1; }
+.tip-sub-title { display: block; margin-bottom: 6px; color: #ffd991; font-size: 20px; font-weight: 1000; }
+.tip-sub-body { display: block; font-size: 18px; line-height: 1.45; }
+:lang(ko) .tip-sub-body { word-break: keep-all; }
+.tip-sub[data-kind='card'] { padding: 10px; background: rgba(13, 10, 19, .9); }
+.tip-sub-card { position: relative; width: 221px; height: 305px; }
+.tip-sub-card .word-card { position: absolute; left: 0; top: 0; transform: scale(1.4); transform-origin: 0 0; pointer-events: none; }
+.tip-sub-card .word-card .card-lift { transform: none !important; }
 .tip-bubble-head {
   display: flex;
   align-items: center;
@@ -11388,7 +11424,29 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .trait-tag.is-keyword { padding-left: 6px; --trait-tag-color: #ffd991; }
 .trait-tag.is-slot { padding-left: 6px; --trait-tag-color: #d7a6ff; }
 /* 팁 안의 「카드 이름」 — 종이색 태그로 카드 자체를 가리킨다. */
-.trait-tag.is-card { padding-left: 6px; --trait-tag-color: #f3e3c2; }
+/* 「카드 이름」 태그 — 작은 카드 한 장처럼: 양피지 바탕, 금테, 앞에 카드 모양 딱지. */
+.trait-tag.is-card {
+  gap: 4px;
+  padding: 0 7px 0 4px;
+  border: 1px solid #d9a44a;
+  border-radius: 4px;
+  background: linear-gradient(170deg, #fff4d8, #ead2a0);
+  color: #4a2a12;
+  text-shadow: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 2px 5px rgba(0, 0, 0, .45);
+  --trait-tag-color: #f3e3c2;
+}
+.trait-tag.is-card b { color: #4a2a12; }
+.trait-card-glyph {
+  display: inline-block;
+  flex: none;
+  width: .62em;
+  height: .86em;
+  border: 1.5px solid #b07a2a;
+  border-radius: 2px;
+  background: linear-gradient(160deg, #ffe6a8, #d39a3e);
+  transform: rotate(-8deg);
+}
 .tip-bullets .trait-tag { margin: 0 1px; }
 
 /* 효과가 둘 이상인 카드는 효과마다 줄을 나눈다(11/20 피드백): 주행동·수치 한 줄, 키워드 효과는 한 줄씩. */

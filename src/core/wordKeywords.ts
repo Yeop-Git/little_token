@@ -116,3 +116,8 @@ export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>
   }
   return keywords
 }
+
+/** 설명 글 속 키워드 태그 툴팁 — 화면에 적힌 이름(예: '카운터')으로 현재 언어의 설명을 찾는다. */
+export function keywordDetailByLabel(label: string): string | undefined {
+  return Object.values(COPY[currentLocale]).find((copy) => copy.label === label)?.detail
+}
