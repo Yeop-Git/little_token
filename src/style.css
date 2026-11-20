@@ -9541,7 +9541,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 
 .intro-dlg-box-inner {
   position: relative;
-  max-width: 720px;
+  max-width: 1080px; /* 대사 36px에 맞춰 720→1080 */
   margin: 0 auto;
 }
 
@@ -9582,7 +9582,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 /* 토큰의 이름 — 샛노란 발광 */
 .intro-dlg-name {
   text-align: center;
-  font-size: 30px;
+  font-size: 38px;
   font-weight: 900;
   letter-spacing: 0.06em;
   color: #fff1a0;
@@ -9603,8 +9603,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 
 .intro-dlg-text {
   text-align: center;
-  font-size: 24px;
-  line-height: 1.65;
+  /* 피드백(11/20): 대사는 크게 크게 — 부스 거리에서도 읽히게. */
+  font-size: 36px;
+  line-height: 1.5;
   color: #fdf6e0;
   min-height: 2.6em;
   text-shadow:
@@ -9623,6 +9624,11 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .intro-dlg-box.is-player-line .intro-dlg-divider {
   background: linear-gradient(to right, transparent, rgba(255, 245, 218, 0.85), transparent);
   box-shadow: 0 0 8px rgba(255, 238, 190, 0.5);
+}
+
+.intro-dlg-word {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .intro-dlg-char {
@@ -9884,10 +9890,10 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .intro-word-chip.is-next::before {
   content: attr(data-hint-label);
   bottom: calc(100% + 36px);
-  padding: 7px 16px 8px;
+  padding: 9px 20px 10px;
   border-radius: 999px;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -9902,16 +9908,16 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .intro-word-chip.is-next::after {
   content: '';
   bottom: calc(100% + 29px);
-  width: 12px;
-  height: 12px;
-  margin-left: -6px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
   background: #ffd98a;
   border-radius: 2px;
   box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.25);
   animation-name: intro-hint-bob-tail;
 }
 /* 이 런의 첫 선택은 한 번 더 크게 숨쉬게 한다. */
-.intro-word-chip[data-hint].is-next::before { font-size: 17px; padding: 8px 18px 9px; }
+.intro-word-chip[data-hint].is-next::before { font-size: 25px; padding: 10px 22px 11px; }
 
 /* 차례가 된 칩 둘레의 금빛 고리 — 어느 카드를 눌러야 하는지 화살표와 함께 못 박는다.
    호버 때 카드면(.card-lift)이 떠오르므로 고리도 그 상자에 붙여 같이 움직이게 한다. */

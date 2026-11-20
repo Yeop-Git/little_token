@@ -135,6 +135,9 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
   ],
 }
 
+/** 한자·가나처럼 띄어쓰기 없이 글자마다 줄을 바꿔도 되는 문자. */
+const CJK_CHAR = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/
+
 /** 인덱스를 전역에서 소모하지 않고 매 튜토리얼마다 같은 앞뒤 관계로 대사를 만든다. */
 function tutorialScript(locale: LocaleCode): ScriptLine[] {
   const p = PLAYER_LINES[locale]
@@ -194,6 +197,8 @@ export class IntroDialogue {
   private readonly choiceEl: HTMLElement
 
   private skipTyping: (() => void) | null = null
+  /** 타자 중인 단어 묶음 — 띄어쓰기 언어에서 단어 단위 줄바꿈을 위해. */
+  private wordEl: HTMLSpanElement | null = null
   private advanceNow: (() => void) | null = null
   private advanceForce: (() => void) | null = null
   private currentPortrait: Portrait | null = null
@@ -320,6 +325,7 @@ export class IntroDialogue {
 
   /** 글자별 팝인 타자 — 클릭 시 남은 글자 즉시 완성. */
   private typeText(text: string): Promise<void> {
+    this.wordEl = null
     let revealed = 0
     let fastForward = false
     return new Promise<void>((resolve) => {
@@ -330,11 +336,24 @@ export class IntroDialogue {
         const target = fastForward ? text.length : revealed + 1
         while (revealed < target) {
           // 드러나는 순간 글자마다 span을 붙여 "다라라락 띠용띠용" 바운스를 낸다.
+          const ch = text[revealed]
           const span = document.createElement('span')
           span.className = 'intro-dlg-char'
           // inline-block은 낱개 공백을 자기 포맷 문맥의 여백으로 지워버린다 — nbsp로 보존.
-          span.textContent = text[revealed] === ' ' ? ' ' : text[revealed]
-          this.textEl.appendChild(span)
+          span.textContent = ch === ' ' ? '\u00a0' : ch
+          // 글자마다 inline-block이면 줄이 단어 한가운데서 끊긴다("р / ядом").
+          // 띄어쓰기가 있는 언어는 단어 묶음 안에 글자를 넣어 단어 단위로만 줄바꿈한다.
+          if (ch === ' ' || CJK_CHAR.test(ch)) {
+            this.wordEl = null
+            this.textEl.appendChild(span)
+          } else {
+            if (!this.wordEl || !this.wordEl.isConnected) {
+              this.wordEl = document.createElement('span')
+              this.wordEl.className = 'intro-dlg-word'
+              this.textEl.appendChild(this.wordEl)
+            }
+            this.wordEl.appendChild(span)
+          }
           revealed++
         }
         if (revealed >= text.length) {
