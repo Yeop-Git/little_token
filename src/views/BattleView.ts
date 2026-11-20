@@ -505,6 +505,8 @@ export class BattleView {
   private bossSentenceEvent: string | null = null
   private bossSentenceEventTimer = 0
   private bossSentenceSignature = ''
+  /** 보스 옆 행동 표식의 툴팁(후공·예상 피해·소환 안내). 문장판에서 옮겨 왔다(11/20). */
+  private bossIntent: { tip: string; tone: string } | null = null
   /** 프롬 곁을 자유롭게 나는 토큰. 일반전·보스전이 같은 한 몸을 쓴다. */
   private token: TokenActor | null = null
   /** 현재 층. 토큰이 런의 끝을 기억할 때 "몇 층까지 갔는지"로 남긴다. */
@@ -795,6 +797,7 @@ export class BattleView {
         }
         ${this.isBoss ? '<div class="boss-entry-fade" aria-hidden="true"></div>' : ''}
         <div class="vignette"></div>
+        <div class="enemy-first-wash" aria-hidden="true"></div>
         <div class="weather-wash"></div>
         <div class="field-clarity" aria-hidden="true"></div>
         <div class="field-sun" aria-hidden="true"></div>
@@ -1472,6 +1475,9 @@ export class BattleView {
       if (next) next.active = true
     }
 
+    // 11/20 피드백: 적이 선공이면 좌측 화면에 은은한 붉은 경고를 깔아 행동 순서로 눈이 가게 한다.
+    const enemyFirst = entries[0]?.side === 'enemy' && entries[0].timing === 'first'
+    this.root.querySelector<HTMLElement>('.scene.battle')?.toggleAttribute('data-enemy-first', enemyFirst)
     const signature = JSON.stringify(entries.map(({ key, name, timing, note, active }) => [key, name, timing, note, active]))
     if (signature === this.actionOrderSignature) return
     this.actionOrderSignature = signature
@@ -1586,12 +1592,39 @@ export class BattleView {
     host.setAttribute('aria-label', view.label)
     host.innerHTML = `
       <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
-      <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
       ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
+    // 11/20 피드백: 후공·예상 피해·소환 같은 보조 정보는 판에서 빼 보스 옆 표식의 설명으로 띄운다.
+    const bossName = this.state.enemies.find((enemy) => enemy.def.boss)?.def.name ?? '보스'
+    this.bossIntent = view.meta.length ? { tip: tip(`${bossName}의 다음 행동`, view.meta.join('\n')), tone: view.tone } : null
+    this.syncBossIntentSigil()
     host.hidden = false
     host.classList.remove('is-writing')
     void host.offsetWidth
     host.classList.add('is-writing')
+  }
+
+  /** 보스 몸 옆의 행동 표식 — 올리면 이번 보스 문장의 후공·예상 피해·소환 안내를 읽는다. */
+  private syncBossIntentSigil() {
+    const actor = this.root.querySelector<HTMLElement>('#actors .actor.foe.boss')
+    if (!actor) return
+    let sigil = actor.querySelector<HTMLElement>(':scope > .boss-intent-sigil')
+    if (!this.bossIntent) {
+      sigil?.remove()
+      return
+    }
+    if (!sigil) {
+      sigil = document.createElement('span')
+      sigil.className = 'boss-intent-sigil'
+      sigil.setAttribute('role', 'img')
+      sigil.tabIndex = 0
+      sigil.dataset.tipPlace = 'above'
+      sigil.innerHTML = `<i aria-hidden="true">${icon('initiative')}</i><b>다음 행동</b>`
+      actor.appendChild(sigil)
+    }
+    sigil.dataset.boss = this.state.enemies.find((enemy) => enemy.def.boss)?.def.id ?? ''
+    sigil.dataset.tooltip = this.bossIntent.tip
+    sigil.setAttribute('aria-label', this.bossIntent.tip.replace(/\n/g, '. '))
+    sigil.classList.toggle('tone-danger', this.bossIntent.tone === 'danger')
   }
 
   /** 봉인·파훼·실패처럼 상태 한 장으로는 사라지는 사건만 짧게 문장 여백에 남긴다. */
@@ -1910,6 +1943,7 @@ export class BattleView {
     this.updateSummonedAllies(el, e)
     const strikesFirst = front && !e.dead && e.initiativePhase === 'first'
     this.updateEnemyIntel(el, e, strikesFirst)
+    if (e.def.boss) this.syncBossIntentSigil()
 
     // 대기 적도 이름과 체력을 즉시 읽을 수 있도록 이름표 투명도를 낮추지 않는다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
