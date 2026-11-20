@@ -31,7 +31,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
-import { selectionInkCost, SENTENCE_MAX_INK } from '@core/ink'
+
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -196,8 +196,6 @@ export class CombatGuideView {
     }).join('<span class="g-plus" aria-hidden="true">+</span>')
 
     const sentence = slots.map((slot) => slotWord(slot.key, EXAMPLE_IDS[slot.key])?.text ?? '____').join(' ')
-    const exampleSelection = Object.fromEntries(slots.map((slot) => [slot.key, slotWord(slot.key, EXAMPLE_IDS[slot.key]) ?? undefined]))
-    const exampleInk = selectionInkCost(exampleSelection)
 
     const phases: [string, string, string][] = [
       ['1', '단어 고르기', `${slots.map((s) => s.label).join(' → ')} 순서로 카드를 한 장씩 확정한다`],
@@ -217,7 +215,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
-      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · ${t('guideInkRule', '문장마다 잉크 {max}로 시작하며, 단어를 고르면 잉크를 사용한다.').replace('{max}', String(SENTENCE_MAX_INK))}</p>
+      <p class="g-note"><b>${t('hudInkLabel', '잉크')}</b> · ${t('guideInkRule', '문장을 쓸 때마다 잉크는 가득 찬 채로 시작한다. 단어를 고르면, 적힌 만큼 잉크가 줄어든다.')}</p>
 
       <h3 class="g-h3">일반전 한 턴의 순서</h3>
       <ol class="g-flow">

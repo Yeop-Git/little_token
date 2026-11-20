@@ -96,9 +96,9 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   const accessibilityText = overdraw > 0
     ? inkText('hudInkOverdrawAria', `잉크 ${spent}/${max}, 초과 체력 피해 ${overdraw}`, { spent, max, overdraw })
     : inkText('hudInkAria', `남은 잉크 ${remaining}/${max}`, { remaining, max })
-  const baseTooltip = inkText('hudInkTip', '잉크 {remaining}/{max}\n문장마다 잉크 {max}로 시작하며 선택한 단어가 잉크를 사용합니다.', { remaining, max })
+  const baseTooltip = inkText('hudInkTip', '잉크 {remaining}/{max}\n문장을 쓸 때마다 잉크는 가득 찬 채로 시작한다.\n단어를 고르면, 적힌 만큼 잉크가 줄어든다.\n모자라면 그 단어는 쓸 수 없다.', { remaining, max })
   const tooltip = refill > 0
-    ? `${baseTooltip}\n${inkText('hudInkRefillTip', '리필 +{refill}: 이번 문장에서 쓴 잉크를 {refill}만큼 다시 채웁니다.', { refill })}`
+    ? `${baseTooltip}\n${inkText('hudInkRefillTip', '리필 +{refill}: 쓴 잉크가 그만큼 다시 차오른다.', { refill })}`
     : baseTooltip
   meter.setAttribute('aria-label', accessibilityText)
   meter.dataset.tooltip = tooltip
