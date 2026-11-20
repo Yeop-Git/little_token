@@ -11411,3 +11411,25 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .reward-card:not(.reward-shop-card) .reward-pick.has-long-name .rp-name { font-size: 28px; }
 .reward-card:not(.reward-shop-card) .reward-type-label { font-size: 17px; padding: 6px 16px; }
 .reward-card:not(.reward-shop-card) .reward-rarity-label { font-size: 14px; }
+
+/* 카드 요약 수치 태그(11/20 피드백): "44% 확률"·"배율 ×3.30"·"방어 +2"를 키워드와 같은 네모 태그로. */
+.card-note-text { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 4px; }
+.card-value-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .7);
+  color: #51483f;
+  font-weight: 1000;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.card-front.art .card-value-tag { color: #f4ead8; background: rgba(5, 5, 10, .62); }
+.card-value-tag.is-chance { color: #2f6b3c; }
+.card-front.art .card-value-tag.is-chance { color: #b8f5c4; }
+.rp-effect .card-value-tag { padding: 4px 9px; border-radius: 7px; color: #f4ead8; background: rgba(7, 5, 12, .72); }
+.rp-effect .card-value-tag.is-chance { color: #b8f5c4; }
+.rp-effect-copy { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 6px; }

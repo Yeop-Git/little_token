@@ -14,7 +14,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
+import { cardNoteTagsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
@@ -208,11 +208,11 @@ function mainEffect(opt: RewardOption): string {
         : word.bonus
           ? `×${(1 + word.bonus).toFixed(2)}`
           : ''
-    return `${action}${prefix ? `<span class="rp-effect-copy">${prefix}</span>` : ''}${keywords}`
+    return `${action}${prefix ? `<span class="rp-effect-copy">${cardNoteTagsHtml(prefix)}</span>` : ''}${keywords}`
   }
   return action
-    ? `${action}<span class="rp-effect-copy">${note}</span>`
-    : note
+    ? `${action}<span class="rp-effect-copy">${cardNoteTagsHtml(note)}</span>`
+    : `<span class="rp-effect-copy">${cardNoteTagsHtml(note)}</span>`
 }
 
 function rewardWordMeta(opt: RewardOption): string {

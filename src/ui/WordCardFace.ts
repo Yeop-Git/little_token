@@ -156,13 +156,32 @@ export function emphasizeCardNumbers(text: string): string {
   )
 }
 
+const CHANCE_LABEL: Record<LocaleCode, string> = { ko: '확률', en: 'chance', ja: '確率', ru: 'шанс', 'zh-Hans': '概率', 'zh-Hant': '機率' }
+const MULT_LABEL: Record<LocaleCode, string> = { ko: '배율', en: 'Multiplier', ja: '倍率', ru: 'Множитель', 'zh-Hans': '倍率', 'zh-Hant': '倍率' }
+
+/**
+ * 카드 요약 문구를 키워드와 같은 네모 태그로 쪼갠다(11/20 피드백).
+ * "44% 확률로 배율 ×3.30"은 [44% 확률][배율 ×3.30] 두 장으로, "배율 ×1.20"·"방어 +2" 같은
+ * 점수는 한 장씩. 행동 태그 옆의 맨 값("×1.5")은 키워드 값처럼 태그 밖에 그대로 둔다.
+ */
+export function cardNoteTagsHtml(note: string): string {
+  const tag = (text: string, cls = '') => `<span class="card-value-tag${cls}">${emphasizeCardNumbers(text)}</span>`
+  return note.split(' · ').map((part) => part.trim()).filter(Boolean).map((part) => {
+    if (!/\d/.test(part)) return `<span class="card-value-plain">${escapeCardText(part)}</span>`
+    if (/^[×x]\s?\d/.test(part)) return `<span class="card-value-bare">${emphasizeCardNumbers(part)}</span>`
+    const gamble = part.match(/^(\d+(?:\.\d+)?%)\D*?(×\s?\d+(?:\.\d+)?)$/)
+    if (gamble) return tag(`${gamble[1]} ${CHANCE_LABEL[currentLocale]}`, ' is-chance') + tag(`${MULT_LABEL[currentLocale]} ${gamble[2]}`)
+    return tag(part)
+  }).join('')
+}
+
 function wordCardNoteHtml(word: Word, note: string): string {
   const action = wordActionInline(word)
   // 선택 불가 사유처럼 호출부가 갈아 끼운 문구는 그대로 보여 주고, 정상 카드만
   // 주행동과 키워드를 분리한다. 키워드 이름을 요약 줄과 칩에 두 번 쓰지 않는다.
   const displayNote = note === wordNoteText(word) ? wordCardPrimaryNote(word, note) : note
   const keywordHtml = wordKeywordChipsHtml(word)
-  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${note === wordNoteText(word) ? cardNoteTagsHtml(displayNote) : emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
 }
 
 
