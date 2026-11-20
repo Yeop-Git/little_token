@@ -8553,7 +8553,11 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   flex: none;
   align-self: stretch;
   min-height: 468px;
-  max-height: 80vh;
+  /* 높이는 옆 보상 판에 맞춰 늘어나고(stretch), 내용이 길면 그 안에서 스크롤한다.
+     예전 max-height: 80vh는 실제 창 높이 기준이라, 1920×1080 무대를 축소해 보여 주는
+     1080px 미만 창에서는 무대 단위로 576px쯤에서 잘려 옆 판보다 짧아졌다(11/21).
+     contain: size로 내용이 행 높이를 밀어 올리지 못하게 한다. */
+  contain: size;
   padding: 26px 24px;
   overflow: auto;
 }
