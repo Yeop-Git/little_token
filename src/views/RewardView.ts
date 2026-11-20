@@ -457,7 +457,7 @@ export class RewardView {
               <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
             </div>`}
             <header class="reward-head">
-              <div class="k">${shop ? text('shopEyebrow', '보스 클리어 · 영감 상점') : `${stageProgressLabel(opts.day)} 클리어`}</div>
+              <div class="k">${shop ? text('shopEyebrow', '보스 클리어 · 영감 상점') : text('rewardStageCleared', '{stage} 클리어', { stage: stageProgressLabel(opts.day) })}</div>
               <div class="t hand">${shop ? text('shopTitle', '모아 둔 영감을 마음껏 쓰자!') : PHASE_TITLE[opts.phase]}</div>
               ${shop ? `<div class="shop-row-guide">${text('shopRowGuide', '1행 주어·수식어 · 2행 동사 · 3행 아이템')}</div>` : `<div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
@@ -468,7 +468,7 @@ export class RewardView {
                 ${walletHtml}
                 <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" /><span>${text('rewardRefresh', '새로고침')}</span><b class="reward-refresh-cost"><i aria-hidden="true">◈</i>${rewardRefreshCost(opts.refreshes)}</b></button>
                 </div>
-                <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
+                <button class="reward-skip" type="button" title="${text('rewardSkipHint', '이번 단계에서 아무것도 기록하지 않고 넘어갑니다.')}">${text('rewardSkip', '그냥 넘어가기')}</button>
               </div>`}
               ${!shop && opts.options.some((option) => option?.bossPrice !== undefined) ? `<div class="reward-boss-discount">${bossRewardDiscountText()}</div>` : ''}
               ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase !== 'verb' ? `

@@ -36,7 +36,7 @@ import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 import { CustomCursor } from '@/ui/CustomCursor'
 import { ClickScribble } from '@/ui/ClickScribble'
-import { applyLocaleToDocument, currentLocale } from '@/localization'
+import { applyLocaleToDocument, currentLocale, t } from '@/localization'
 import { applyContentLocalization } from '@/localization/content'
 import { applyDetailedContentLocalization } from '@/localization/contentDetails'
 import { installDomLocalization } from '@/localization/dom'
@@ -321,7 +321,7 @@ function mountDevCheat(active: SceneName) {
   const corner = document.createElement('button')
   corner.className = 'dev-cheat-corner'
   corner.type = 'button'
-  corner.setAttribute('aria-label', '개발 치트 열기')
+  corner.setAttribute('aria-label', t('devCheatOpen', '개발자 도구 열기'))
   corner.addEventListener('click', () => {
     cornerClicks++
     if (cornerClicks < 5) return

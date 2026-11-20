@@ -20,6 +20,26 @@ const L = {
   'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', adapt:'套用目前部位弱點', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', casts:'次動詞發動', each:'每次', counter:'反擊', inkDiscount:'句子費用', all:'全部', noMult:'不受倍率影響', pool:'倍率池', safe:'穩妥一手', immediate:'立即發動' },
 }[currentLocale]
 
+/** 대상 수는 언어마다 어순이 달라 단어 조각을 이어 붙이지 않고 문장째 만든다. */
+function targetLabel(count: TargetCount): string {
+  if (currentLocale === 'ko') return count === 'all' ? '대상 전체' : `대상 ${count}명`
+  if (currentLocale === 'en') return count === 'all' ? 'All targets' : `${count} targets`
+  if (currentLocale === 'ja') return count === 'all' ? '対象：敵全体' : `対象：${count}体`
+  if (currentLocale === 'ru') return count === 'all' ? 'Все цели' : `Целей: ${count}`
+  return count === 'all'
+    ? currentLocale === 'zh-Hans' ? '目标：全部' : '目標：全部'
+    : currentLocale === 'zh-Hans' ? `目标：${count}个` : `目標：${count}個`
+}
+
+const INVALID_SUBJECT_NOTE = {
+  ko: '주어로 쓸 수 없다 — 일기의 주어는 나·우리',
+  en: 'Cannot be used as the subject — this diary only uses I or we as its subject',
+  ja: '主語には使えない — この日記の主語は「ぼく・ぼくたち」',
+  ru: 'Нельзя поставить в подлежащее — этот дневник пишется от лица «я» или «мы»',
+  'zh-Hans': '不能用作主语——这本日记的主语只能是“我”或“我们”',
+  'zh-Hant': '不能用作主語——這本日記的主語只能是「我」或「我們」',
+}[currentLocale]
+
 export const DRAW_COUNT_UNIT = {
   ko: '회', en: '', ja: '回', ru: '', 'zh-Hans': '次', 'zh-Hant': '次',
 }[currentLocale]
@@ -132,7 +152,7 @@ export function wordValueLines(w: Word, stats?: StatBlock, includeKeywords = tru
   if (w.targetMode === 'both') out.push({ text: L.self, cls: 'self' })
   if (w.tags.includes('adapt')) out.push({ text: L.adapt, cls: 'buff' })
   if (w.targetCount && w.targetCount !== 1) {
-    out.push({ text: `대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`, cls: 'dmg' })
+    out.push({ text: targetLabel(w.targetCount), cls: 'dmg' })
   }
   for (const keyword of includeKeywords ? wordKeywords(w) : []) {
     const cls = ['counter', 'magicShield', 'protect'].includes(keyword.id)
@@ -184,7 +204,7 @@ function noteParts(w: Word): string[] {
     return punct
   }
   // 일기의 주어는 나·우리뿐이라 다른 인칭은 수치가 아니라 차단 이유를 적는다.
-  if (w.person && w.person !== 'first') return []
+  if (w.person && w.person !== 'first') return [INVALID_SUBJECT_NOTE]
 
   const out: string[] = []
   if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}`)
@@ -195,7 +215,7 @@ function noteParts(w: Word): string[] {
   else if (w.bonus) out.push(multText(w.bonus))
   if (w.effects?.guard) out.push(`${L.guard} +${w.effects.guard}`)
   if (w.effects?.heal) out.push(`${L.heal} +${w.effects.heal}`)
-  if (w.targetCount && w.targetCount !== 1) out.push(`대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`)
+  if (w.targetCount && w.targetCount !== 1) out.push(targetLabel(w.targetCount))
   // 연타는 그 자체로 단일 대상이라 대상 수를 겹쳐 적지 않는다.
   out.push(...wordKeywords(w).map((keyword) => keyword.label))
   if (w.tags.includes('adapt')) out.push(L.adapt)

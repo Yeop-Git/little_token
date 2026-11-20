@@ -1490,7 +1490,7 @@ export class BattleView {
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
         data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
         <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
-        <div class="action-order-copy"><b>${entry.name}${entry.damage ? `<strong class="action-order-damage" aria-label="예상 피해 ${entry.damage}" data-tooltip="${tip('예상 피해', `이번 행동으로 받을 수 있는 피해 ${entry.damage}`)}" data-tip-place="above">${icon('sword')}${entry.damage}</strong>` : ''}</b><span>${entry.note}</span></div>
+        <div class="action-order-copy"><b>${entry.name}${entry.damage ? `<strong class="action-order-damage" aria-label="${t('battleExpectedDamage', '예상 피해 {value}').replace('{value}', String(entry.damage))}" data-tooltip="${tip(t('battleExpectedDamage', '예상 피해 {value}').replace(/[:：]?\s*\{value\}/, ''), t('battleExpectedDamageTip', '이번 행동으로 받을 수 있는 피해 {value}').replace('{value}', String(entry.damage)))}" data-tip-place="above">${icon('sword')}${entry.damage}</strong>` : ''}</b><span>${entry.note}</span></div>
       </li>`).join('')
     host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
       const before = previous.get(item.dataset.orderKey!)
