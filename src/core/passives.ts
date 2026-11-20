@@ -92,7 +92,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   },
   bbq: {
     id: 'bbq',
-    name: '바베큐',
+    name: '바비큐',
     desc: `이번 전투에서 잡은 적 1마리당 배율 +${Math.round(BBQ_PER_KILL * 100)}%`,
   },
   doubt: {

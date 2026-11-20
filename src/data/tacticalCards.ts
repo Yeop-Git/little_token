@@ -47,7 +47,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'pillbug',
     rewardFloors: [3],
     title: '반복 수식어',
-    tooltip: '매직실드는 타격마다 한 겹을 막는다. 「미친듯이」로 동사를 두 번 발동해 빠르게 벗긴다.',
+    tooltip: '매직실드는 타격마다 한 겹을 막는다. 「미친 듯이」로 동사를 두 번 발동해 빠르게 벗긴다.',
     cardIds: ['michin'],
   },
   {
@@ -79,12 +79,12 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'elderSpider',
     rewardFloors: [14],
     title: '반복·관통 수식어',
-    tooltip: '장로거미의 매직실드는 「미친듯이」로 벗기고, 두꺼운 방어는 관통 수식어로 넘긴다. 다리 약점 감정도 함께 맞춘다.',
+    tooltip: '장로거미의 매직실드는 「미친 듯이」로 벗기고, 두꺼운 방어는 관통 수식어로 넘긴다. 다리 약점 감정도 함께 맞춘다.',
     cardIds: ['michin', 'himkkeot', 'ipan', 'bangeopge'],
   },
   {
     id: 'elite-warded', enemyId: '*', rewardFloors: [10], title: '겹실드 정예',
-    tooltip: '희귀 이상 겹실드 정예는 추가 매직실드를 두른다. 「미친듯이」로 동사를 반복해 겹을 먼저 벗긴다.',
+    tooltip: '희귀 이상 겹실드 정예는 추가 매직실드를 두른다. 「미친 듯이」로 동사를 반복해 겹을 먼저 벗긴다.',
     cardIds: ['michin'],
   },
   {

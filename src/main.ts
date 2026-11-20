@@ -1055,7 +1055,7 @@ function prepareDemoResultFixture() {
   run.record.sentences = 18
   run.record.bestMult = 4.2
   run.record.bestCombo = 3
-  run.record.bestHit = { dmg: 86, sentence: '나는 미친듯이 때렸다' }
+  run.record.bestHit = { dmg: 86, sentence: '나는 미친 듯이 때렸다' }
   registerWord(run.player, ALL_REWARD_WORDS[0])
   registerWord(run.player, ALL_REWARD_WORDS[1])
   registerWord(run.player, run.player.deck.subj[0])

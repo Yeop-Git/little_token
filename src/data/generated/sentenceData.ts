@@ -514,7 +514,7 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "jangnan",
-    "text": "장난스런 나는",
+    "text": "장난스러운 나는",
     "slot": "subj",
     "tags": [
       "self",
@@ -690,7 +690,7 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "michin",
-    "text": "미친듯이",
+    "text": "미친 듯이",
     "slot": "adv",
     "tags": [
       "mad"
@@ -996,7 +996,7 @@ export const WORDS: Record<string, Word[]> = {
     },
     {
       "id": "mad",
-      "text": "미친듯이",
+      "text": "미친 듯이",
       "slot": "adv",
       "tags": [
         "mad"
@@ -1616,7 +1616,7 @@ export const EARLY_COMBOS: Combo[] = [
   },
   {
     "id": "ec31",
-    "name": "장난스런 파도",
+    "name": "장난스러운 파도",
     "need": [
       "play",
       "wide"

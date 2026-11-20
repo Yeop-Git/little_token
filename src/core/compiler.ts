@@ -44,7 +44,7 @@ const CORE_TEXT = currentLocale === 'en'
         ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪' }
         : currentLocale === 'zh-Hant'
           ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒' }
-          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바베큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
+          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
 
 const sameEmotionHint = (count: number): string => currentLocale === 'ko'
   ? `${CORE_TEXT.sameEmotion} ${count}장`
