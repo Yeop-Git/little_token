@@ -8367,6 +8367,28 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   overflow: auto;
 }
 .reward-dock.empty { align-items: center; justify-content: center; text-align: center; }
+/* 아이템 단계엔 상세 칸이 없다가, 단어 단계로 넘어오면 오른쪽에서 스르륵 들어온다(11/20). */
+.reward-dock.is-entering { animation: reward-dock-enter .55s cubic-bezier(.2, .8, .25, 1) both; }
+@keyframes reward-dock-enter {
+  from { opacity: 0; transform: translateX(46px); }
+  to { opacity: 1; transform: none; }
+}
+/* 단어 상세 — 카드 앞면을 크게, 그 밑에 하단 효과를 큰 글씨로. */
+.reward-dock.is-word-card { padding: 20px 22px 24px; }
+.rd-card { position: relative; flex: none; width: 316px; height: 436px; margin: 0 auto; }
+.rd-card .word-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(2);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.rd-card .word-card .card-lift { transform: none !important; }
+.rd-grade { margin-top: 14px; color: var(--ink-faint); font-size: 14px; font-weight: 800; text-align: center; }
+.reward-dock.is-word-card .word-keyword-detail b { font-size: 20px; }
+.reward-dock.is-word-card .word-keyword-detail span { font-size: 17px; line-height: 1.5; }
+.reward-dock.is-word-card .word-keyword-details h3 { font-size: 14px; }
 .rd-hint { color: var(--ink-faint); font-size: 15px; line-height: 1.6; }
 .rd-hint b { color: var(--gold); }
 .word-keyword-details { margin-top: 16px; padding-top: 14px; border-top: 1px dashed rgba(255, 236, 196, .2); }

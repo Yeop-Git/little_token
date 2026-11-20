@@ -284,6 +284,28 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}`
 }
 
+/**
+ * 우측 상세 칸(단어 전용) — 작은 글 대신 카드 앞면(일러스트와 하단 효과)을 두 배로 크게 세우고,
+ * 그 밑에 키워드·관용구 설명을 큰 글씨로 둔다.
+ * 아이템은 카드와 하단 줄에 이미 다 적혀 있어 상세 칸을 쓰지 않는다(11/20 피드백).
+ */
+function wordDockHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
+  const word = opt.word!
+  const comparedKeywords = new Set<WordKeywordId>()
+  if (opt.reinforce) {
+    const after = { ...word, tags: [...word.tags], effects: word.effects ? { ...word.effects } : undefined, variance: word.variance ? { ...word.variance } : undefined }
+    reinforceWord(after)
+    if (after.crit !== word.crit) comparedKeywords.add('critical')
+    if (after.effects?.castScale !== word.effects?.castScale) comparedKeywords.add('repeat')
+  }
+  return `
+    <div class="rd-card">${wordCardHtml(word)}</div>
+    <div class="rd-grade">✦ ${typeLabel(opt)} · ${RARITY_LABEL[opt.rarity]}</div>
+    ${opt.reinforce ? reinforceDeltas(word) : ''}
+    ${wordKeywordDetailsHtml(word, comparedKeywords)}
+    ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}`
+}
+
 // 풀 카드 배경 — 일러스트가 있으면 꽉 채운다. 아직 그림이 없는 단어도 공용 아이콘을
 // 크게 띄우지 않고 단어 자체를 옅은 필기 워터마크로 써서 완성된 카드처럼 보이게 한다.
 function bgHtml(opt: RewardOption): string {
@@ -411,9 +433,9 @@ export class RewardView {
             </div>`}
           </div>
           ${shop ? '<div class="reward-side">' : ''}
-            <aside class="info-dock glass reward-dock empty" id="rdetail" aria-live="polite">
+            ${!shop && opts.phase === 'item' ? '' : `<aside class="info-dock glass reward-dock empty${!shop && opts.phase === 'subject' ? ' is-entering' : ''}" id="rdetail" aria-live="polite">
               <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 상세 정보가 표시된다.')}</div>
-            </aside>
+            </aside>`}
             ${shop ? `<button class="reward-deck" type="button" style="min-height:48px">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
             <button class="reward-refresh" type="button" style="min-height:48px;justify-content:center" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('shopRefresh', '상품 새로고침')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>` : ''}
             ${shop ? `<button class="reward-skip" type="button" title="${text('shopLeaveHint', '구매를 마치고 다음 스테이지로 간다.')}"><img src="${REWARD_ART.exit}" alt="" aria-hidden="true" /><span>${text('shopLeave', '상점 나가기')}</span></button>` : ''}
@@ -530,10 +552,12 @@ export class RewardView {
   }
 
   private showDetail(opt: RewardOption, el: HTMLElement) {
-    const dock = this.root.querySelector<HTMLElement>('#rdetail')!
-    const mood = opt.kind === 'item' ? 'buff' : moodOf(opt.word!)
-    dock.className = `info-dock glass reward-dock mood-${mood}`
-    dock.innerHTML = detailHtml(opt, this.opts.deck)
+    const dock = this.root.querySelector<HTMLElement>('#rdetail')
+    // 아이템은 상세 표가 필요 없다 — 카드와 하단 특성 줄이 전부다.
+    if (dock && opt.kind === 'word' && opt.word) {
+      dock.className = `info-dock glass reward-dock is-word-card mood-${moodOf(opt.word)}`
+      dock.innerHTML = wordDockHtml(opt, this.opts.deck)
+    }
     this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
       pick.classList.remove('detailing')
     })
