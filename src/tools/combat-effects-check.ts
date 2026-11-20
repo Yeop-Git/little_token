@@ -827,14 +827,16 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(rarityCurve[4].epic > rarityCurve[4].rare && rarityCurve[5].epic > rarityCurve[5].legendary, 'floors ten to fifteen remain epic-dominant')
   assert(rarityCurve[3].epic > rarityCurve[2].epic && rarityCurve[5].legendary > rarityCurve[4].legendary, 'the next rarity rises within the rare and epic bands')
   assert(rarityCurve[1].rare > rarityCurve[0].rare, 'rare chance rises through floors one to four')
-  for (const [day, rarity] of [[5, 'rare'], [10, 'epic'], [15, 'legendary']] as const) {
+  assert(rarityCurve[0].epic === 0 && rarityCurve[0].legendary === 0, 'floor one stays free of epic and legendary rewards')
+  assert(rarityCurve[1].epic > 0 && rarityCurve[1].legendary > 0 && rarityCurve[2].legendary > 0, 'relaxed locks let epic and legendary appear before their home bands')
+  for (const [day, rarity] of [[5, 'epic'], [10, 'legendary'], [15, 'legendary']] as const) {
     assert(bossRewardRarity(day) === rarity, `boss floor ${day} uses its milestone rarity`)
     for (const phase of ['subject', 'verb'] as const) {
       const reward = genRewards(player, 5, day, phase)
       assert(reward.some((option) => option.kind === 'word' && option.rarity === rarity), `boss floor ${day} ${phase} reward includes a ${rarity} skill`)
     }
   }
-  for (const day of [1, 2, 3, 4, 16, 17, 18, 19]) {
+  for (const day of [1, 2, 16, 17]) {
     for (const phase of ['subject', 'item', 'verb'] as const) {
       assert(!genRewards(player, 10, day, phase).some((option) => option.rarity === 'legendary'), `early floor ${floorInCycle(day)} blocks legendary ${phase} rewards`)
     }

@@ -92,36 +92,43 @@ export const EARLY_STAT_VERB_IDS = ['storedResolve', 'doubleTap', 'pierceStrike'
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
   const floor = floorInCycle(day)
-  return floor === 5 ? 'rare' : floor === 10 ? 'epic' : floor === 15 ? 'legendary' : null
+  return floor === 5 ? 'epic' : floor === 10 || floor === 15 ? 'legendary' : null
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
 /**
  * 15층 희귀도 곡선.
- * 1~4층은 일반, 5~9층은 희귀, 10~15층은 영웅이 항상 가장 큰 가중치다.
- * 전투 등급은 각 구간의 중심을 뒤집지 않는 범위에서 다음 등급 확률만 조금 보탠다.
+ * 1~4층은 일반, 5~9층은 희귀, 10~15층은 영웅이 가장 큰 가중치라는 중심은 유지한다.
+ * 상위 등급 잠금은 완화했다: 1층만 영웅·전설을 막고, 2층부터 영웅, 3층부터 전설이 낮은 확률로 섞인다.
  */
 export function rewardRarityWeights(grade: number, day: number): Record<Rarity, number> {
   const floor = floorInCycle(day)
   const quality = clamp((grade - 5) / 5, -1, 1)
 
-  if (floor <= 4) {
-    const progress = (floor - 1) / 3
-    const rare = 20 + progress * 25 + quality * 3
+  if (floor <= 1) {
+    const rare = 22 + quality * 3
     return { common: 100 - rare, rare, epic: 0, legendary: 0 }
+  }
+  if (floor <= 4) {
+    const progress = (floor - 2) / 2
+    const rare = 26 + progress * 12 + quality * 3
+    const epic = 5 + progress * 7 + quality * 2
+    const legendary = floor >= 3 ? 1 + progress * 2 + quality : 0
+    return { common: 100 - rare - epic - legendary, rare, epic, legendary }
   }
   if (floor <= 9) {
     const progress = (floor - 5) / 4
-    const common = 20 - progress * 10
-    const epic = 5 + progress * 30 + quality * 5
-    return { common, rare: 100 - common - epic, epic, legendary: 0 }
+    const common = 18 - progress * 8
+    const epic = 14 + progress * 20 + quality * 4
+    const legendary = 4 + progress * 6 + quality * 2
+    return { common, rare: 100 - common - epic - legendary, epic, legendary }
   }
 
   const progress = (floor - 10) / 5
-  const common = 5 - progress * 2
-  const rare = 25 - progress * 15
-  const legendary = 2 + progress * 18 + quality * 3
+  const common = 4 - progress * 2
+  const rare = 22 - progress * 12
+  const legendary = 12 + progress * 23 + quality * 4
   return { common, rare, epic: 100 - common - rare - legendary, legendary }
 }
 
@@ -257,7 +264,7 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     if (option) picks.push(option)
   }
 
-  // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
+  // 5층 보상에는 영웅, 10·15층 보상에는 전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)
   if (bossRarity) {
     const option = pickOne(all, grade, day, used, rng, bossRarity)
