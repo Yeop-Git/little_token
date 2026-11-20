@@ -11574,3 +11574,11 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   -webkit-text-stroke: 0;
   text-shadow: 0 0 2px #1a1018;
 }
+/* 상점 카드 잉크 숫자: 더 두껍게, 원판 중앙(세로 52.5%)에 맞춤 — 3배 확대 측정으로 숫자 중심이 58%에 앉아 4~5px 아래였다(11/20 피드백). */
+.rp-ink-cost {
+  padding: 4px 1px 0 0;
+  font-size: 34px;
+  -webkit-text-stroke: 2.4px currentColor;
+  text-shadow: 0 3px 0 #171246, 2px 0 #171246, -2px 0 #171246, 0 -2px #171246, 2px 2px #171246, -2px 2px #171246, 0 0 8px rgba(255,255,255,.75);
+}
+.reward-shop-card .rp-ink-cost { padding: 3px 1px 0 0; font-size: 26px; -webkit-text-stroke: 1.8px currentColor; }
