@@ -127,7 +127,10 @@ export function sentenceTokens(sel: Selection, t: Tables, locale: LocaleCode = c
     const hasPreviousVerb = t.template.slots
       .slice(0, slotIndex)
       .some((previous) => previous.role === 'verb' && !!sel[previous.key])
-    return sentenceSlotText(locale, s.key, text, hasPreviousVerb)
+    const hasPreviousSubject = t.template.slots
+      .slice(0, slotIndex)
+      .some((previous) => previous.role === 'subject' && !!sel[previous.key])
+    return sentenceSlotText(locale, s.key, text, hasPreviousVerb, hasPreviousSubject)
   })
 }
 
@@ -142,7 +145,20 @@ export function joinTokens(tokens: string[], t: Tables, locale: LocaleCode = cur
 }
 
 export function sentenceText(sel: Selection, t: Tables, locale: LocaleCode = currentLocale): string {
-  return joinTokens(sentenceTokens(sel, t, locale), t, locale)
+  const tokens = sentenceTokens(sel, t, locale)
+  // 영어 3슬롯 문장은 부사를 동사 뒤에 두는 편이 모든 카드 조합에서 자연스럽다.
+  // 5슬롯 확장 문법(목적어·어미)은 별도 어순을 가지므로 여기서 재배열하지 않는다.
+  if (locale === 'en' && !t.template.slots.some((slot) => slot.role === 'object' || (slot.role === 'ending' && !slot.attach))) {
+    const priority = { subject: 0, verb: 1, modifier: 2, object: 3, ending: 4 } as const
+    const ordered = t.template.slots
+      .map((slot, index) => ({ slot, token: tokens[index], index }))
+      .sort((a, b) => priority[a.slot.role] - priority[b.slot.role] || a.index - b.index)
+    return ordered.reduce((out, entry) => {
+      if (!out) return entry.token
+      return entry.slot.attach ? out + entry.token : `${out} ${entry.token}`
+    }, '')
+  }
+  return joinTokens(tokens, t, locale)
 }
 
 /** 이 태그가 붙은 문장은 선공 상대보다 먼저 행동한다(문장부호 '!'). */

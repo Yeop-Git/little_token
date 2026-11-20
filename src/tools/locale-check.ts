@@ -4,7 +4,7 @@ import { combatPreviewText } from '@/localization/combatPreview'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { localizationCoverageErrors, wordTextFor } from '@/localization/content'
-import { TWIN_VERB_CONNECTOR } from '@/localization/sentenceGrammar'
+import { TWIN_SUBJECT_CONNECTOR, TWIN_VERB_CONNECTOR } from '@/localization/sentenceGrammar'
 import { growthText } from '@/localization/growth'
 import { ALL_REWARD_WORDS, EARLY_WORDS, makeEarlyTables, PUNCT_WORDS } from '@data/earlyWords'
 import { LOCALE_EARLY_COMBOS, WORDS } from '@data/generated/sentenceData'
@@ -131,11 +131,13 @@ function variableSentenceErrors(locale: (typeof SUPPORTED_LOCALES)[number]): str
   const early = makeEarlyTables(EARLY_WORDS, undefined, locale)
   const tablesFor = (order: string[]) => ({ ...early, template: buildTemplate(order) })
   const subj = EARLY_WORDS.subj[0]
+  const subj2 = EARLY_WORDS.subj[1]
   const adv = EARLY_WORDS.adv[0]
   const verb = EARLY_WORDS.verb[0]
   const verb2 = EARLY_WORDS.verb[1]
   const cases = [
     { name: 'early-3', tables: tablesFor(['subj', 'adv', 'verb']), selection: { subj, adv, verb } },
+    { name: 'twin-subject', tables: tablesFor(['subj', 'subj2', 'adv', 'verb']), selection: { subj, subj2, adv, verb } },
     { name: 'twin-verb', tables: tablesFor(['subj', 'adv', 'verb', 'verb2']), selection: { subj, adv, verb, verb2 } },
     { name: 'full-5', tables: tablesFor(['subj', 'adv', 'obj', 'verb', 'end']), selection: {
       subj: WORDS.subj[0], adv: WORDS.adv[0], obj: WORDS.obj[0], verb: WORDS.verb[0], end: WORDS.end[0],
@@ -151,18 +153,27 @@ function variableSentenceErrors(locale: (typeof SUPPORTED_LOCALES)[number]): str
   }
 
   const twinSentence = sentenceText(cases[1].selection, cases[1].tables, locale)
+  const subjectConnector = TWIN_SUBJECT_CONNECTOR[locale]
+  if (twinSentence.split(subjectConnector).length !== 2) errors.push(`${locale}: twin subject connector is missing or repeated`)
+
+  const twinVerbSentence = sentenceText(cases[2].selection, cases[2].tables, locale)
   const connector = TWIN_VERB_CONNECTOR[locale]
-  if (twinSentence.split(connector).length !== 2) errors.push(`${locale}: twin verb connector is missing or repeated`)
+  if (twinVerbSentence.split(connector).length !== 2) errors.push(`${locale}: twin verb connector is missing or repeated`)
   for (const word of [verb, verb2]) {
     const text = wordTextFor(locale, word)
-    if (twinSentence.split(text).length !== 2) errors.push(`${locale}: twin verb sentence repeats or loses '${text}'`)
+    if (twinVerbSentence.split(text).length !== 2) errors.push(`${locale}: twin verb sentence repeats or loses '${text}'`)
   }
 
-  const fullTokens = sentenceTokens(cases[2].selection, cases[2].tables, locale)
+  if (locale === 'en') {
+    const expected = `${wordTextFor(locale, subj)} ${wordTextFor(locale, verb)} ${wordTextFor(locale, adv)}`
+    if (sentenceText(cases[0].selection, cases[0].tables, locale) !== expected) errors.push('en: early sentence must use subject-verb-modifier order')
+  }
+
+  const fullTokens = sentenceTokens(cases[3].selection, cases[3].tables, locale)
   if (locale === 'ko' && !/[을를]$/.test(fullTokens[2])) errors.push('ko: object particle is missing from full sentence')
   if (locale === 'ja' && !fullTokens[2].endsWith('を')) errors.push('ja: object particle is missing from full sentence')
   const punctText = wordTextFor(locale, PUNCT_WORDS[0])
-  const punctSentence = sentenceText(cases[3].selection, cases[3].tables, locale)
+  const punctSentence = sentenceText(cases[4].selection, cases[4].tables, locale)
   if (!punctSentence.endsWith(punctText) || punctSentence.endsWith(` ${punctText}`)) errors.push(`${locale}: punctuation is not attached to the sentence`)
   return errors
 }
