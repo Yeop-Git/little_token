@@ -1,3 +1,4 @@
+import { formatNumber } from '@/core/numberFormat'
 import { tipBulletsHtml } from '@/ui/TooltipLayer'
 /**
  * 로비(타이틀)에서만 여는 전투 설명서. 전투 화면을 가리지 않는 독립 씬이다.
@@ -311,7 +312,7 @@ export class CombatGuideView {
     const damageOf = (m: number) => Math.round(base * m)
 
     const flats = intent.breakdown.flats.map((part) => `
-      <li><b>${part.label}</b><i>+${part.value}</i><span>${part.hint ?? '카드 고정 위력'}</span></li>`).join('')
+      <li><b>${part.label}</b><i>+${formatNumber(part.value)}</i><span>${part.hint ?? '카드 고정 위력'}</span></li>`).join('')
 
     const mults = intent.breakdown.mults.map((part) => `
       <li><b>${part.label}</b><i>${mult(part.value)}</i><span>${part.hint ?? ''}</span></li>`).join('')

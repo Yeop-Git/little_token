@@ -4456,9 +4456,12 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
 .tally.guard .tally-total { color: #fff2da; }
 .tally.guard .tally-box.base b { color: #fff2da; text-shadow: 0 0 22px rgba(255, 242, 218, .4); }
 .tally-total.slam { animation: tally-slam 0.4s cubic-bezier(0.2, 1.5, 0.35, 1); }
+/* 롤링이 이미 최종 숫자에 닿아 있으므로 사라졌다 다시 커지지 않고 제자리에서 한 번 쿵 한다.
+   (예전엔 opacity 0·scale 2.1에서 다시 들어와 숫자가 한 번 꺼졌다 튀는 것처럼 보였다.) */
 @keyframes tally-slam {
-  0% { transform: scale(2.1); opacity: 0; filter: blur(6px); }
-  55% { transform: scale(0.94); opacity: 1; filter: none; }
+  0% { transform: scale(1); }
+  35% { transform: scale(1.22); }
+  70% { transform: scale(0.97); }
   100% { transform: scale(1); }
 }
 /* 읽는 시간 — 이때만 패널이 마우스를 받아 호버로 붙잡을 수 있다 */

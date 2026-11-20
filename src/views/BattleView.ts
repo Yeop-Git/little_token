@@ -2236,7 +2236,7 @@ export class BattleView {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
         const known = this.discoveredCombos.has(c.id)
-        extra += `<span class="chain-word ctx perfect"><b class="cw-text">${known ? `「${c.name}」` : '?'}</b><em class="cw-note combo">${known ? `완벽한 맥락 ×${c.mult}` : '새로운 맥락?'}</em></span>`
+        extra += `<span class="chain-word ctx perfect"><b class="cw-text">${known ? `「${c.name}」` : '?'}</b><em class="cw-note combo">${known ? `완벽한 맥락 ×${formatMult(c.mult)}` : '새로운 맥락?'}</em></span>`
       }
       // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
       if (intent.doubtCount > 0) {
@@ -2813,7 +2813,7 @@ export class BattleView {
       { key: 'self', label: '자해' },
     ]
     const rows = metrics.filter((metric) => now[metric.key] > 0)
-      .map((metric) => `<div class="pj-row ${metric.key}"><span class="pj-l">${metric.label}</span><span class="pj-f">${now[metric.key]}</span></div>`).join('')
+      .map((metric) => `<div class="pj-row ${metric.key}"><span class="pj-l">${metric.label}</span><span class="pj-f">${formatNumber(now[metric.key])}</span></div>`).join('')
     if (!rows) return ''
     return `<div class="wd-proj"><div class="pj-head">${combatPreviewText().estimate}</div><div class="pj-rows">${rows}</div></div>`
   }
@@ -3696,7 +3696,9 @@ export class BattleView {
     el.dataset.fitFever = String(this.feverOf(tally.total))
     this.fitTallyToStage(el)
     el.dataset.fitLocked = '1'
-    baseBox.querySelector('b')!.textContent = '0'
+    // 점수 칸은 첫 깡 점수가 꽂힐 때 처음 숫자를 띄운다(빈칸 → 3 → 6.5). "0"부터 보이면
+    // 문장이 0점으로 계산된 것처럼 읽혔다. 폭은 위에서 잠가 두어 칸이 들썩이지 않는다.
+    baseBox.querySelector('b')!.textContent = tally.flats.length ? '\u00a0' : formatNumber(tally.base)
     multBox.querySelector('b')!.textContent = '1.00'
     totalEl.textContent = ''
     requestAnimationFrame(() => el.classList.add('in'))
@@ -3862,17 +3864,18 @@ export class BattleView {
     const total = el.querySelector<HTMLElement>('.tally-total')!
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
-    total.textContent = '0'
+    // 0부터 세지 않는다 — 첫 칸이 "0"으로 찍히면 점수가 0으로 나온 것처럼 읽혔다.
     const steps = Math.min(6, Math.max(4, Math.round(tally.total / 28)))
     for (let i = 1; i <= steps; i++) {
       const eased = 1 - Math.pow(1 - i / steps, 2)
       void this.flingSpark(i % 2 ? baseBox : multBox, total, el)
       await this.sleep(i === steps ? 100 : 55)
-      total.textContent = String(Math.round(tally.total * eased))
+      const shown = tally.total > 0 ? Math.max(1, Math.round(tally.total * eased)) : 0
+      total.textContent = String(shown)
       total.classList.remove('tick')
       void total.offsetWidth
       total.classList.add('tick')
-      this.applyHeatTier(el, Math.round(tally.total * eased))
+      this.applyHeatTier(el, shown)
     }
     total.textContent = String(tally.total)
     this.applyHeatTier(el, tally.total)
