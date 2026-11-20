@@ -2271,19 +2271,9 @@ html[data-postprocessing='off'] .tip-bubble {
 @keyframes spider-fleck {
   to { opacity: 0; transform: translate(var(--x), var(--y)) scale(.1); filter: blur(2px); }
 }
-.actor.foe.leg-dissolving > .model-shell::after {
-  content: '';
-  position: absolute;
-  inset: 14% 5%;
-  pointer-events: none;
-  background: repeating-radial-gradient(circle at 70% 70%, rgba(223, 211, 231, .8) 0 1px, transparent 2px 8px);
-  mix-blend-mode: screen;
-  animation: spider-model-dissolve .78s ease-out forwards;
-}
-@keyframes spider-model-dissolve {
-  from { opacity: .8; clip-path: inset(76% 0 0); }
-  to { opacity: 0; clip-path: inset(8% 0 0); }
-}
+/* 다리 절단 때 모델 박스 전체에 동심원 줄무늬(repeating-radial-gradient)를 덮던 효과는
+   무대를 가로지르는 거미줄처럼 보여 제거했다(11/20 피드백). 절단은 3D 다리 디졸브와
+   .leg-sever-fx 베기 섬광이 맡는다. */
 .scene.battle.spider-web-cast .card-hand::after {
   content: '';
   position: absolute;
@@ -11037,7 +11027,7 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .leg-sever-banner {
   position: absolute;
   left: 50%;
-  top: 44%;
+  top: 49%;
   z-index: 102;
   display: grid;
   justify-items: center;
