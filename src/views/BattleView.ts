@@ -2689,7 +2689,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
          ${this.projectionHtml(w, key)}
-         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => this.detailValueHtml(w, v)).join('')}</div>
+         <div class="wd-values">${values.map((v) => this.detailValueHtml(w, v)).join('')}</div>
          ${wordKeywordDetailsHtml(w)}
          ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
@@ -3647,6 +3647,7 @@ export class BattleView {
         <div class="tally-result">
           <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? text.applied : text.actual) : text.calculation}</div>
           <div class="tally-total"></div>
+          ${tally.kind === 'dmg' && tally.hits > 1 ? `<div class="tally-combo">${text.combo.replace('{count}', String(tally.hits))}</div>` : ''}
         </div>
         ${tally.lanes ? `<div class="tally-lanes pending">${tally.lanes.map((lane) => `<div class="tally-lane ${lane.kind}${lane.own ? ' own' : ''}"><span class="ll">${lane.label}</span><b>${lane.own ? String(tally.total) : lane.value}</b>${lane.note ? `<small>${lane.note}</small>` : ''}</div>`).join('')}</div>` : ''}
       </div>
@@ -4198,7 +4199,7 @@ export class BattleView {
       !hit.weak && this.state.enemies[hit.target]?.def.id === 'elderSpider',
     )
     this.releaseTally()
-    await this.strike(res, sweep, heavy)
+    await this.strike(res, sweep, heavy, Math.max(1, intent.hitCount * intent.castCount))
     if ((res.lifeStolen ?? 0) > 0) {
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       await this.flyToPlayer(buildEffectText('healPop', res.lifeStolen), 'heal', 'heal')
@@ -4406,7 +4407,7 @@ export class BattleView {
     for (const damage of res.summonHits ?? []) this.noteBestHit(intent.sentence, damage)
     // 메아리는 예비 동작을 다시 밟지 않는다 — 칼을 두 번 들어올리면 늘어진다.
     // 타격점·정지·검기만 그대로 물려받아 같은 등급의 일격으로 읽히게 한다.
-    await this.strike(res, sweep, heavy)
+    await this.strike(res, sweep, heavy, Math.max(1, intent.hitCount * intent.castCount))
     if (res.summonDamage > 0) {
       this.log(`메아리가 일벌에게 ${res.summonDamage} 피해${res.summonsDispersed > 0 ? ` · ${res.summonsDispersed}마리 퇴치` : ''}.`)
     }
@@ -4424,6 +4425,8 @@ export class BattleView {
     res: ApplyResult,
     sweep = false,
     heavy: AttackCut | null = null,
+    /** 문장이 꽂는 타격 수(연타 × 반복 발동). 한 숫자로 합쳐 들어가면 그 옆에 "2연타"를 붙인다. */
+    comboCount = 1,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
     // 생명력 폭발은 회복 뒤에 넘친 힘이 적에게 향하는 연속 동작이다.
@@ -4523,6 +4526,9 @@ export class BattleView {
     let remainingSwordHits = res.hits.filter((hit) =>
       hit.dmg > 0 && !hit.summonShieldBlocked && !hit.magicShieldBroken,
     ).length
+    // 연타는 적 머리 위 숫자마다 몇 번째 타격인지 붙인다 — 작은 숫자가 여러 번 들어가는 게 읽히게.
+    const comboHits = res.hits.filter((hit) => !hit.summonShieldBlocked && !hit.magicShieldBroken).length
+    let hitNo = 0
     for (const h of res.hits) {
       if (h.summonShieldBlocked) {
         this.popAt(h.target, QUEEN_ESCORT_IMMUNITY_LABEL, 'guard big')
@@ -4546,7 +4552,11 @@ export class BattleView {
         this.hitOne(el)
       }
       // 막·부위 경계에서 잘린 몫까지 포함한 타격 수치를 띄운다 — 체력바는 실제로 깎인 만큼만 준다.
-      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
+      hitNo++
+      const hitTag = comboHits > 1
+        ? combatPreviewText().hitNo.replace('{n}', String(hitNo))
+        : comboCount > 1 ? combatPreviewText().combo.replace('{count}', String(comboCount)) : ''
+      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`, hitTag)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
       if ((h.barsBroken ?? 0) > 0) this.playBossBarBreak(h.target, h.barsBroken ?? 1, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
@@ -5852,19 +5862,26 @@ export class BattleView {
     const { x, y } = this.toStage(el.getBoundingClientRect())
     this.spawnPop(x, y - 4, txt, cls)
   }
-  private popAt(enemyIdx: number, txt: string, cls: string) {
+  private popAt(enemyIdx: number, txt: string, cls: string, sub = '') {
     const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
     if (!el) return
     const { x, y } = this.toStage(el.getBoundingClientRect())
-    this.spawnPop(x, y + 30, txt, cls)
+    this.spawnPop(x, y + 30, txt, cls, sub)
   }
   private popPlayer(txt: string, cls: string) {
     this.spawnPop(320, 120, txt, cls)
   }
-  private spawnPop(x: number, y: number, txt: string, cls: string) {
+  private spawnPop(x: number, y: number, txt: string, cls: string, sub = '') {
     const p = document.createElement('div')
     p.className = `pop ${cls}`
     p.textContent = (cls.includes('heal') ? '+' : '') + txt
+    // 연타 딱지("2연타"·"1타")는 숫자 아래 작은 줄로 붙인다 — 숫자 크기는 그대로 둔다.
+    if (sub) {
+      const tag = document.createElement('small')
+      tag.className = 'pop-sub'
+      tag.textContent = sub
+      p.appendChild(tag)
+    }
     p.style.left = `${x - 24}px`
     p.style.top = `${Math.max(10, y)}px`
     this.q('#pbox').appendChild(p)
