@@ -69,9 +69,11 @@ export function bossTurnPressureMultiplier(
   )
 }
 
-/** 방어막은 이월분을 포함해 최대 체력의 절반까지만 비축할 수 있다. */
+/** 방어막은 이월분을 포함해 최대 체력의 절반에 방어 스탯 비례분을 더한 만큼만 비축할 수 있다. */
 export const PLAYER_GUARD_LIMIT_RATIO = 0.5
+/** 방어 스탯 1마다 방어도 한도가 이만큼 더 오른다. */
+export const PLAYER_GUARD_LIMIT_PER_GUARD_STAT = 2
 
-export function playerGuardLimit(playerMax: number): number {
-  return Math.max(0, Math.floor(playerMax * PLAYER_GUARD_LIMIT_RATIO))
+export function playerGuardLimit(playerMax: number, guardStat = 0): number {
+  return Math.max(0, Math.floor(playerMax * PLAYER_GUARD_LIMIT_RATIO + Math.max(0, guardStat) * PLAYER_GUARD_LIMIT_PER_GUARD_STAT))
 }

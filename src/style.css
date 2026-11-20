@@ -11834,3 +11834,49 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .rf-old * { color: inherit !important; }
 .rf-arrow { color: #ffcf5a; font-style: normal; text-shadow: 0 0 8px rgba(255, 190, 70, .9); }
 .rf-new { color: #ffe066; font-size: 1.12em; font-weight: 1000; text-shadow: 0 0 10px rgba(255, 196, 70, .7), 0 2px 0 rgba(0, 0, 0, .7); }
+
+/* 체력·방어도 읽기 줄 — 플레이어·적·보스 공용(11/20 피드백: 숫자와 기호가 겹쳐 읽혔다).
+   체력은 따뜻한 흰색 본문 글꼴, 방어도는 파란 알약, 마법실드는 보라 알약으로 갈라 자리를 띄운다. */
+.hp-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.hp-readout-hp { display: inline-flex; align-items: baseline; gap: 2px; color: #fff1dc; }
+.hp-readout-hp > b { font-size: 1.12em; font-weight: 900; }
+.hp-readout-hp > i { font-style: normal; opacity: .55; margin: 0 1px; }
+.hp-readout-hp > span { font-size: .9em; font-weight: 800; opacity: .78; }
+.hp-readout-hp > em { margin-left: 5px; font-style: normal; font-size: .8em; opacity: .75; }
+.hp-readout-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 1.45em;
+  padding: 0 7px 0 5px;
+  border-radius: 999px;
+  font-size: .86em;
+  font-weight: 900;
+  text-shadow: none;
+  cursor: help;
+  pointer-events: auto;
+}
+.hp-readout-chip svg { width: 1.05em; height: 1.05em; }
+.hp-readout-chip > span { font-size: .82em; font-weight: 800; opacity: .75; }
+.hp-readout-chip > i { font-style: normal; }
+.hp-readout-chip.guard {
+  color: #e6f3ff;
+  background: rgba(34, 92, 168, .86);
+  box-shadow: inset 0 0 0 1px rgba(150, 206, 255, .7), 0 2px 5px rgba(0, 0, 0, .45);
+}
+.hp-readout-chip.magic {
+  color: #f6eaff;
+  background: rgba(112, 52, 168, .88);
+  box-shadow: inset 0 0 0 1px rgba(214, 170, 255, .7), 0 2px 5px rgba(0, 0, 0, .45);
+}
+/* 보스 HUD는 체력 숫자가 14px라 방어도 알약이 작게 읽혔다. 보스 쪽만 한 단계 키운다. */
+.boss-health-heading .hpn .hp-readout { font-size: 16px; gap: 7px; }
+.boss-health-heading .hpn .hp-readout-chip { font-size: .9em; padding: 0 8px 0 6px; }

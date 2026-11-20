@@ -53,6 +53,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  stateGuardLimit,
   enemyTurn,
   engageFront,
   engageInitialFront,
@@ -499,7 +500,7 @@ function railValue(c: Candidate, state: BattleState): number {
 
 function candidateDamage(c: Candidate, state: BattleState): number {
   const missingHp = Math.max(0, state.playerMax - state.playerHp)
-  const projectedGuard = Math.min(playerGuardLimit(state.playerMax), state.guard + c.guard)
+  const projectedGuard = state.guard + c.guard
   // 플레이어는 체력바 옆 약점 배지를 보고 공격 속성을 맞춘다.
   const weakMult = intentWeaknessMult(state.enemies[frontIdx(state)], c.intent)
   return Math.floor(c.dmg * weakMult)
@@ -561,7 +562,8 @@ function fightStage(
   const state: BattleState = {
     playerHp: Math.max(0, Math.min(maxHp, carried.hp)),
     playerMax: maxHp,
-    guard: Math.max(0, Math.min(playerGuardLimit(maxHp), carried.guard)),
+    playerGuardStat: player.stats.guard,
+    guard: Math.max(0, Math.min(playerGuardLimit(maxHp, player.stats.guard), carried.guard)),
     counter: false,
     counterFull: false,
     turn: 1,
@@ -697,7 +699,7 @@ function fightStage(
       const focused = [...hand].sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
       if (focus === 'attack') pick = bestAttack ?? focused
       else if (focus === 'guard' && state.turn <= boss.groggyUntilTurn) pick = bestAttack ?? focused
-      else if (focus === 'guard' && !guardIgnored && state.guard < playerGuardLimit(state.playerMax) * 0.65 && bestGuard) pick = bestGuard
+      else if (focus === 'guard' && !guardIgnored && state.guard < stateGuardLimit(state) * 0.65 && bestGuard) pick = bestGuard
       else if (focus === 'guard' && bestGuardEngine) pick = bestGuardEngine
       else if (focus === 'guard') {
         const guardOffense = hand

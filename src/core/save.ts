@@ -369,7 +369,7 @@ export function deserializeRun(raw: string): RunState | null {
       migrated = true
     } else {
       const hp = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.hp))
-      const guard = Math.max(0, Math.min(playerGuardLimit(parsed.player.stats.hp), parsed.combat.guard))
+      const guard = Math.max(0, Math.min(playerGuardLimit(parsed.player.stats.hp, parsed.player.stats.guard), parsed.combat.guard))
       if (hp !== parsed.combat.hp || guard !== parsed.combat.guard) {
         parsed.combat = { hp, guard }
         migrated = true

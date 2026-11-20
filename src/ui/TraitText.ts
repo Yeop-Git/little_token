@@ -25,6 +25,8 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
   ko: [
     ['최대 잉크', { kind: 'ink' }], ['잉크 최대치', { kind: 'ink' }], ['잉크', { kind: 'ink' }],
     ['공격', { kind: 'stat', stat: 'atk' }], ['방어', { kind: 'stat', stat: 'guard' }],
+    // '방어도'가 '방어'+'도'로 쪼개져 태그되던 것을 한 덩어리로 묶는다.
+    ['방어도', { kind: 'stat', stat: 'guard' }], ['방어 스탯', { kind: 'stat', stat: 'guard' }],
     ['회복', { kind: 'stat', stat: 'heal' }], ['운 스탯', { kind: 'stat', stat: 'luck' }],
     ['대성공', { kind: 'keyword' }], ['관용구', { kind: 'keyword' }], ['공명', { kind: 'keyword' }],
     ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['배율 풀', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],

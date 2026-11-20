@@ -49,6 +49,8 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  shieldBashGuard,
+  stateGuardLimit,
   previewIntentResult,
   previewIntentShownHits,
   BOSS_ATTACK_MULTIPLIER,
@@ -80,7 +82,7 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer, tipBulletsHtml } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
-import { PART_WEAKNESS_MULT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
+import { PART_WEAKNESS_MULT, PLAYER_GUARD_LIMIT_PER_GUARD_STAT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
 import { defaultPlayer, itemTooltipHtml, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
@@ -283,6 +285,32 @@ const TOKEN_COACH_LINES: Record<CombatCoachHint, TokenLine> = {
  * 개행은 CSS(white-space: pre-line)가 살린다.
  */
 const tip = (title: string, detail: string): string => `${title}\n${detail}`
+
+const escapeAttr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
+/**
+ * 체력 숫자와 방어도·마법실드를 한 줄 알약으로 그린다. 플레이어·적·보스가 같은 양식을 쓴다.
+ * 예전 `38/52 ◈14/26✦1`처럼 한 덩어리 세리프 글자로 붙여 쓰면 기호와 숫자가 겹쳐 읽혔다(11/20 피드백).
+ */
+function hpReadoutHtml(o: {
+  hp: number
+  max: number
+  suffix?: string
+  guard: number
+  guardLimit?: number
+  guardTip: string
+  magic: number
+  magicTip: string
+}): string {
+  const hp = `<span class="hp-readout-hp"><b>${Math.max(0, o.hp)}</b><i>/</i><span>${o.max}</span>${o.suffix ? `<em>${o.suffix}</em>` : ''}</span>`
+  const guard = o.guard > 0
+    ? `<span class="hp-readout-chip guard" role="img" tabindex="0" aria-label="${escapeAttr(o.guardTip)}" data-tooltip="${escapeAttr(o.guardTip)}" data-tip-place="above">${icon('shield')}<b>${o.guard}</b>${o.guardLimit ? `<span>/${o.guardLimit}</span>` : ''}</span>`
+    : ''
+  const magic = o.magic > 0
+    ? `<span class="hp-readout-chip magic" role="img" tabindex="0" aria-label="${escapeAttr(o.magicTip)}" data-tooltip="${escapeAttr(o.magicTip)}" data-tip-place="above"><i>✦</i><b>${o.magic}</b></span>`
+    : ''
+  return `<span class="hp-readout">${hp}${guard}${magic}</span>`
+}
 
 const TOKEN_BOSS_HINTS = {
   mantisStart: bossTokenLine('mantisStart'),
@@ -515,7 +543,8 @@ export class BattleView {
     this.state = {
       playerHp: Math.max(0, Math.min(maxHp, savedHp)),
       playerMax: maxHp,
-      guard: Math.max(0, Math.min(playerGuardLimit(maxHp), savedGuard)),
+      playerGuardStat: this.player.stats.guard,
+      guard: Math.max(0, Math.min(playerGuardLimit(maxHp, this.player.stats.guard), savedGuard)),
       counter: false,
       counterFull: false,
       playerMagicShield: 0,
@@ -1705,9 +1734,16 @@ export class BattleView {
 
   private updatePlayer(el: HTMLElement) {
     const s = this.state
-    const guardLimit = playerGuardLimit(s.playerMax)
-    el.querySelector<HTMLElement>('.hpn')!.innerHTML =
-      `${Math.max(0, s.playerHp)}/${s.playerMax} ${s.guard ? `<span class="shield-chip" title="방어막 한도: 최대 체력의 50%">◈${s.guard}/${guardLimit}</span>` : ''}${s.playerMagicShield ? `<span class="shield-chip magic" title="${BUILD_EFFECT_TEXT.magicTip}">✦1</span>` : ''}`
+    const guardLimit = stateGuardLimit(s)
+    el.querySelector<HTMLElement>('.hpn')!.innerHTML = hpReadoutHtml({
+      hp: s.playerHp,
+      max: s.playerMax,
+      guard: s.guard,
+      guardLimit,
+      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도 ${guardLimit}\n최대 체력 절반 ${Math.floor(s.playerMax / 2)} + 방어 스탯 ${formatNumber(s.playerGuardStat ?? 0)}×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}\n넘친 몫도 그 턴 방패치기 피해엔 들어간다`),
+      magic: s.playerMagicShield ? 1 : 0,
+      magicTip: BUILD_EFFECT_TEXT.magicTip,
+    })
     this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
   }
 
@@ -1945,8 +1981,7 @@ export class BattleView {
       // `transform: translate(-50%, -50%)`이 36px 뱃지에 걸려 (-18, -18)만큼 밀렸다.
       add(`attack-stage attack-stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `보스 공격 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)}\n단계가 오를수록 세진다`))
     }
-    if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
-    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다\n연타로 벗긴다`))
+    // 방어도·마법실드는 뱃지 줄이 아니라 체력 숫자 옆(hpReadoutHtml)에 선다 — 플레이어와 같은 자리·양식.
     // 보스의 관통·소환·거미줄은 문장판 태그(방어 관통·봉인 n/3)와 무대 위 일벌이 이미 보여 준다.
     if (!e.def.boss && (e.def.pierceGuard || e.def.attackPattern?.some((step) => step.pierceGuard))) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
     if (summonPattern && !e.def.boss) add(
@@ -1964,7 +1999,7 @@ export class BattleView {
     if (this.state.turn <= e.groggyUntilTurn) {
       const mult = formatMult(e.groggyDamageMult)
       const until = e.groggyUntilTurn > this.state.turn ? '다음 내 턴까지 유지' : '이번 턴까지 유지'
-      add('groggy groggy-chip', `<b>✦</b><em>그로기 ×${mult}</em>`, tip(`그로기 · 받는 피해 ×${mult}`, [
+      add('groggy groggy-chip', `<b>✦</b><em>그로기</em>`, tip(`그로기 · 받는 피해 ×${mult}`, [
         `내 공격 피해 ×${mult}`,
         '약점 배율과 곱으로 겹친다',
         '예정된 공격을 한 턴 거른다',
@@ -2027,9 +2062,16 @@ export class BattleView {
         }
       }
     }
-    plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
-      ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
-      : `${Math.max(0, e.hp)}/${e.maxHp}`
+    // 방어도·마법실드는 플레이어와 같은 양식으로 체력 숫자 바로 옆에 둔다(11/20 피드백).
+    plate.querySelector<HTMLElement>('.hpn')!.innerHTML = hpReadoutHtml({
+      hp: e.hp,
+      max: e.maxHp,
+      suffix: e.healthBars > 1 && !bossHud ? `${remainingBars}막` : undefined,
+      guard: e.guard,
+      guardTip: tip(`방어도 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다\n관통 공격은 무시한다`),
+      magic: e.magicShield,
+      magicTip: tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다\n연타로 벗긴다`),
+    })
     const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
     hpbar.hidden = false
     this.paintGuardedHpBar(hpbar, e.hp, e.maxHp, e.guard)
@@ -2462,7 +2504,7 @@ export class BattleView {
           Math.max(0, healPreview - Math.max(0, this.state.playerMax - this.state.playerHp))
             * intent.overhealDamageMultiplier,
         )
-        const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
+        const projectedGuard = this.state.guard + guardPreview
         const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
         const damageValue = (Math.floor(effectiveBase(intent) * normalMult * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
         const value = isDamageIntent(intent)
@@ -2803,7 +2845,7 @@ export class BattleView {
     const baseHeal = Math.round(intent.heal * m * castPower)
     const missingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
     const overhealDamage = Math.floor(Math.max(0, baseHeal - missingHp) * intent.overhealDamageMultiplier)
-    const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + baseGuard)
+    const projectedGuard = this.state.guard + baseGuard
     const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     const dmg = (Math.floor(effectiveBase(intent) * m * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
     const guard = baseGuard
@@ -4023,7 +4065,7 @@ export class BattleView {
     const baseHealPreview = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
     const overhealDamage = Math.floor(Math.max(0, baseHealPreview - Math.max(0, this.state.playerMax - this.state.playerHp)) * intent.overhealDamageMultiplier)
     const guardPreview = Math.round(intent.guard * mult * intent.castScale * intent.castCount)
-    const projectedGuard = Math.min(playerGuardLimit(this.state.playerMax), this.state.guard + guardPreview)
+    const projectedGuard = this.state.guard + guardPreview
     const resourceDamage = Math.floor(projectedGuard * intent.guardAttackMultiplier) + overhealDamage
     let dmg = (Math.floor(effectiveBase(intent) * mult * intent.castScale) + resourceDamage) * intent.hitCount * intent.castCount
 
@@ -4103,8 +4145,8 @@ export class BattleView {
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
     }
     if (prep.guardAttempted > prep.guardGain) {
-      this.popPlayer(`실드 한도 ${playerGuardLimit(this.state.playerMax)}`, 'guard')
-      this.log(`방어막은 최대 체력의 50%까지만 비축한다 — ${this.state.guard}/${playerGuardLimit(this.state.playerMax)}`)
+      this.popPlayer(`방어도 한도 ${stateGuardLimit(this.state)}`, 'guard')
+      this.log(`방어도는 최대 체력의 절반 + 방어 스탯×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}까지만 비축한다 — ${this.state.guard}/${stateGuardLimit(this.state)}`)
     }
     if (prep.magicShieldGain > 0) {
       GameAudio.play('shield')
@@ -4136,7 +4178,7 @@ export class BattleView {
     // 선공 상대가 준비한 방어를 소모하거나 체력을 깎았을 수 있다. 연출의 예상치는
     // 본행동 직전의 자원으로 다시 계산해 실제 applyIntent와 같은 시점을 사용한다.
     const currentMissingHp = Math.max(0, this.state.playerMax - this.state.playerHp)
-    const currentResourceDamage = Math.floor(this.state.guard * intent.guardAttackMultiplier)
+    const currentResourceDamage = Math.floor(shieldBashGuard(this.state) * intent.guardAttackMultiplier)
       + Math.floor(Math.max(0, baseHealPreview - currentMissingHp) * intent.overhealDamageMultiplier)
     dmg = (Math.floor(effectiveBase(intent) * mult * intent.castScale) + currentResourceDamage) * intent.hitCount * intent.castCount
 
@@ -5435,7 +5477,7 @@ export class BattleView {
   private combatResources(): { hp: number; guard: number } {
     return {
       hp: Math.max(0, Math.min(this.state.playerMax, this.state.playerHp)),
-      guard: Math.max(0, Math.min(playerGuardLimit(this.state.playerMax), this.state.guard)),
+      guard: Math.max(0, Math.min(stateGuardLimit(this.state), this.state.guard)),
     }
   }
 

@@ -30,6 +30,7 @@ import {
   engageFront,
   makeEnemy,
   playerGuardLimit,
+  stateGuardLimit,
   spiderWebAtTurnStart,
   spiderSealSlotForTurn,
   spiderWebTension,
@@ -369,6 +370,23 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const r = applyPreparation(s, attack({ guard: 10 }), 1)
   assert(playerGuardLimit(s.playerMax) === 15 && r.guardAttempted === 10 && r.guardGain === 2 && s.guard === 15, 'player guard is capped at half max hp and reports the applied gain')
   assert(playerGuardLimit(31) === 15, 'an odd max hp guard limit rounds down without exceeding half max hp')
+}
+{
+  const s = state([makeEnemy(foe('guard-cap-stat'))])
+  s.playerGuardStat = 3
+  s.guard = 13
+  const r = applyPreparation(s, attack({ guard: 10 }), 1)
+  assert(stateGuardLimit(s) === 21 && playerGuardLimit(s.playerMax, 3) === 21 && r.guardGain === 8 && s.guard === 21, 'guard limit rises by two per guard stat point')
+}
+{
+  const s = state([makeEnemy(foe('guard-bash-overflow', { hp: 100 }))])
+  s.guard = 13
+  const intent = attack({ kind: 'guard', base: 0, guard: 10, guardAttackMultiplier: 1 })
+  const prep = applyPreparation(s, intent, 1)
+  const r = applyIntent(s, intent, 1, 0)
+  assert(prep.guardGain === 2 && s.guard === 15 && r.hits[0].dmg === 23 && (s.guardOverflow ?? 0) === 0, 'shield bash uses the guard total before the limit clamp, then the overflow is spent')
+  const next = applyIntent(s, attack({ base: 0, guardAttackMultiplier: 1 }), 1, 0)
+  assert(next.hits[0].dmg === 15, 'guard overflow does not carry into a later sentence')
 }
 {
   const s = state()

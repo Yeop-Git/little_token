@@ -172,7 +172,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
   const t = makeEarlyTables(player.deck, player)
   const ceiling = candidates(player, null, new Set(), null, 0)
   const state: BattleState = {
-    playerHp: player.stats.hp, playerMax: player.stats.hp, guard: 0, counter: false, counterFull: false,
+    playerHp: player.stats.hp, playerMax: player.stats.hp, playerGuardStat: player.stats.guard, guard: 0, counter: false, counterFull: false,
     turn: 1, enemies: [boss], pending: null,
   }
   engageInitialFront(state)

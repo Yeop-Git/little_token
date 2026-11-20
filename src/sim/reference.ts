@@ -118,6 +118,10 @@ export interface BattleState {
   playerGuardRank?: number
   /** 한 겹이 다음 적 공격 한 번을 관통 여부와 무관하게 지운다. */
   playerMagicShield?: number
+  /** 방어도 한도에 더해지는 방어 스탯(기본 스탯 기준). 없으면 0. */
+  playerGuardStat?: number
+  /** 이번 턴 준비에서 한도에 걸려 담기지 못한 방어도. 방패치기는 이 몫까지 피해로 쓴다. */
+  guardOverflow?: number
   /** 개발 치트: 적 행동은 진행하되 플레이어 피해와 방어 소모는 막는다. */
   damageImmune?: boolean
   turn: number
@@ -126,6 +130,16 @@ export interface BattleState {
 }
 
 /** Ink overdraw bypasses guard and directly spends health once per completed sentence. */
+/** 이 전투에서 플레이어가 비축할 수 있는 방어도 한도(최대 체력 50% + 방어 스탯 비례). */
+export function stateGuardLimit(state: Pick<BattleState, 'playerMax' | 'playerGuardStat'>): number {
+  return playerGuardLimit(state.playerMax, state.playerGuardStat ?? 0)
+}
+
+/** 방패치기가 피해로 바꾸는 방어도 — 한도 때문에 담기지 못한 이번 턴 몫까지 포함한다. */
+export function shieldBashGuard(state: Pick<BattleState, 'guard' | 'guardOverflow'>): number {
+  return Math.max(0, state.guard) + Math.max(0, state.guardOverflow ?? 0)
+}
+
 export function applyInkOverdraw(state: BattleState, inkCost: number, availableInk?: number): number {
   const damage = inkOverdraw(inkCost, availableInk)
   state.playerHp = Math.max(0, state.playerHp - damage)
@@ -435,7 +449,9 @@ export interface OverkillTransferContext {
 export function applyPreparation(state: BattleState, intent: Intent, mult = 1): PreparationResult {
   const castPower = intent.castCount * intent.castScale
   const guardAttempted = intent.tags.includes('enemy') ? 0 : Math.max(0, Math.round(intent.guard * mult * castPower))
-  const guardGain = Math.min(guardAttempted, Math.max(0, playerGuardLimit(state.playerMax) - state.guard))
+  const guardGain = Math.min(guardAttempted, Math.max(0, stateGuardLimit(state) - state.guard))
+  // 한도에 걸린 몫은 비축되지 않지만, 같은 턴 방패치기는 이 몫까지 피해로 쓴다.
+  state.guardOverflow = guardAttempted - guardGain
   // 남은 방어막은 피해로 흡수한 만큼만 줄고, 새 방어는 그 위에 누적한다.
   // 방어가 없는 문장을 준비했다는 이유만으로 기존 방어막을 지우지 않는다.
   if (guardGain > 0) state.guard += guardGain
@@ -959,7 +975,8 @@ function executeAttackPlan(state: BattleState, plan: AttackPlan): AttackExecutio
 
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
   const dealsDirectDamage = isDamageIntent(intent)
-  const guardDamage = Math.floor(state.guard * intent.guardAttackMultiplier)
+  const guardDamage = Math.floor(shieldBashGuard(state) * intent.guardAttackMultiplier)
+  state.guardOverflow = 0
   const baseDamage = Math.floor(effectiveBase(intent) * mult * intent.castScale)
   const healAmt = Math.round(intent.heal * mult * intent.castScale * intent.castCount)
   const actualHeal = Math.min(healAmt, Math.max(0, state.playerMax - state.playerHp))
