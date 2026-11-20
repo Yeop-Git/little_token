@@ -55,6 +55,7 @@ import emotionJoy from './sprites/emotions/emotion_joy.webp'
 import emotionAnger from './sprites/emotions/emotion_anger.webp'
 import emotionSorrow from './sprites/emotions/emotion_sorrow.webp'
 import emotionPleasure from './sprites/emotions/emotion_pleasure.webp'
+import emotionNeutral from './sprites/emotions/emotion_neutral.webp'
 import skill1001 from './sprites/skills/skill_1001.webp'
 import skill1002 from './sprites/skills/skill_1002.webp'
 import skill1003 from './sprites/skills/skill_1003.webp'
@@ -259,6 +260,8 @@ export const EMOTION_FACES: Record<string, string> = {
   anger: emotionAnger,
   sorrow: emotionSorrow,
   pleasure: emotionPleasure,
+  // 무속성 — 회색 「._.」 얼굴. 감정이 실리지 않은 카드·공격 속성에 쓴다.
+  neutral: emotionNeutral,
 }
 
 // 스프라이트 키 → URL (엔티티 데이터의 sprite 필드가 이 키를 참조)

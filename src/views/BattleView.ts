@@ -69,6 +69,7 @@ import {
   type TurnSummon,
   type BattleState,
   type EnemyInst,
+  weaknessEmotions,
 } from '@/sim/reference'
 import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
 import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
@@ -335,6 +336,8 @@ interface Tally {
   applied?: boolean
   /** 체력·실드 한도를 넘겨 실제로는 담기지 않은 몫. 총합은 그대로 두고 칩으로만 알린다. */
   excess?: { label: string; value: number }
+  /** 피해 문장의 공격 속성. 롤링이 끝나면 총합 숫자가 이 감정색으로 물든다. 없으면 무속성. */
+  attackEmotion?: Emotion | null
 }
 
 export class BattleView {
@@ -1941,15 +1944,16 @@ export class BattleView {
     // 매번 번역해야 해서, 카드 모서리와 같은 감정 얼굴과 이름을 그대로 세운다.
     const weakBadge = plate.querySelector<HTMLElement>('.weak-badge')
     if (weakBadge) {
-      const signature = affinity === 'neutral' ? '' : `${affinity}-${weakMult}`
-      weakBadge.hidden = affinity === 'neutral'
+      const signature = `${affinity}-${weakMult}`
+      weakBadge.hidden = false
       if (weakBadge.dataset.signature !== signature) {
         weakBadge.dataset.signature = signature
-        weakBadge.className = affinity === 'neutral' ? 'weak-badge' : `weak-badge emotion-${affinity}`
+        weakBadge.className = `weak-badge emotion-${affinity}`
+        // 무속성 적은 회색 「._.」 얼굴로 약점이 없다는 사실도 같은 자리에서 보여 준다.
         weakBadge.innerHTML = affinity === 'neutral'
-          ? ''
+          ? `${emotionIconContent('neutral')}<b>무속성</b>`
           : `${emotionIconContent(affinity)}<b>약점</b><small>×${formatNumber(weakMult)}</small>`
-        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
+        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '무속성, 약점 없음' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
       }
     }
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
@@ -2106,7 +2110,7 @@ export class BattleView {
             ...(!currentPart
               ? [[enemy.def.weakEmotion ? '약점' : '속성', enemy.def.weakEmotion
                 ? `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`
-                : '무속성 · 감정 추가 피해 없음']]
+                : `<span class="enemy-weakness emotion-neutral">${emotionBadgeContent('neutral')}</span>`]]
               : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
@@ -3534,6 +3538,15 @@ export class BattleView {
     // 총합 롤업 — 깡·배율 상자에서 불꽃이 중앙으로 날아가 꽂힐 때마다 숫자가 뽀로롱 오른다.
     await this.rollUpTotal(el, tally)
 
+    // 피해 숫자는 롤링이 끝난 뒤 이 문장의 공격 속성색으로 사라락 물든다 — 약점에 들어갈
+    // 감정이 무엇인지 숫자 자체가 말해 준다. 감정 카드가 없으면 무속성 회색이다.
+    if (tally.kind === 'dmg') {
+      const attr = tally.attackEmotion ?? 'neutral'
+      totalEl.classList.add('attr-tint', `emotion-${attr}`)
+      totalEl.dataset.attr = attr
+      totalEl.setAttribute('aria-label', `${tally.total}, 공격 속성 ${attr === 'neutral' ? '무속성' : EMOTION_LABEL[attr]}`)
+    }
+
     // 여기서 지우지 않는다 — 준비 효과·선공을 지나 내 공격이 꽂힐 때까지 이 숫자가 머문다.
     el.classList.add('parked')
     this.parkedTally = el
@@ -3802,6 +3815,7 @@ export class BattleView {
       guard: Math.floor(projectedGuard * intent.guardAttackMultiplier),
       overheal: overhealDamage,
     })
+    if (tally.kind === 'dmg') tally.attackEmotion = intent.attackEmotion ?? null
     this.lastResolvedTally = tally
     // 보상 카드의 성장과 하늘나물의 첫 문장 성장을 한 번에 보여 준다.
     const passiveGrowth = beanstalkGrowthFor(this.player, !this.beanstalkGrownThisBattle)
@@ -4838,7 +4852,7 @@ export class BattleView {
     overflow: number,
     sweep = false,
     heavy: AttackCut | null = null,
-    intent?: Pick<Intent, 'emotions' | 'tags' | 'combos'>,
+    intent?: Pick<Intent, 'emotions' | 'attackEmotion' | 'tags' | 'combos'>,
   ): Promise<number> {
     const actors = this.q('#actors')
     if (sweep) actors.classList.add('rail-rush')
@@ -4869,7 +4883,7 @@ export class BattleView {
       // 오버킬 전이는 일반 방어막과 매직실드를 소모하지 않고 체력에 직접 꽂힌다.
       // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
       const transfer = applyOverkillTransfer(this.state, front, overflow, {
-        emotions: intent?.emotions,
+        emotions: intent ? weaknessEmotions(intent) : undefined,
         tags: intent?.tags,
         comboMatched: (intent?.combos.length ?? 0) > 0,
       })

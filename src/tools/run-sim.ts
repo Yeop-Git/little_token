@@ -18,7 +18,7 @@ import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@cor
 import { clearRewardValue, gradeForElapsedTurns, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
 import { playerGuardLimit, rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
-import type { Intent, Rarity, Selection, Word } from '@core/types'
+import type { Emotion, Intent, Rarity, Selection, Word } from '@core/types'
 import type { PlayerState, PlayerStats } from '@core/player'
 import { applyItemReward, registerWord, startingPlayer } from '@core/run'
 import {
@@ -65,6 +65,7 @@ import {
   summonCount,
   activeEnemyPart,
   type BattleState,
+  weaknessEmotions,
 } from '../sim/reference'
 
 const rngSeeded = (seed: number) => () => {
@@ -740,7 +741,7 @@ function fightStage(
       const weakness = activeEnemyPart(boss)?.def.weakness
       const matchesWeak = (c: Candidate) => !weakness
         || (weakness.kind === 'emotion'
-          ? c.intent.emotions.includes(weakness.value as typeof c.intent.emotions[number])
+          ? weaknessEmotions(c.intent).includes(weakness.value as Emotion)
           : c.intent.tags.includes(weakness.value))
       const weakAnswer = boss.def.webPattern
         ? hand.filter(matchesWeak).sort((a, b) =>
@@ -833,7 +834,7 @@ function fightStage(
         const front = frontIdx(state)
         if (front < 0) break
         const transfer = applyOverkillTransfer(state, front, overflow, {
-          emotions: intent.emotions,
+          emotions: weaknessEmotions(intent),
           tags: intent.tags,
           comboMatched: intent.combos.length > 0,
         })

@@ -442,6 +442,15 @@ export function bossMultiBarDamageRequirement(enemy: Pick<EnemyInst, 'def' | 'he
   return enemy.hpPerBar * BOSS_MULTI_BAR_HIT_BARS
 }
 
+/**
+ * 약점 판정에 쓰는 감정. 컴파일된 문장은 공격 속성 하나만 쓴다. 속성 필드가 없는
+ * 손으로 만든 의도(검사 도구)는 예전처럼 문장에 실린 감정 전체를 본다.
+ */
+export function weaknessEmotions(intent: Pick<Intent, 'emotions' | 'attackEmotion'>): Emotion[] {
+  if (intent.attackEmotion === undefined) return intent.emotions
+  return intent.attackEmotion ? [intent.attackEmotion] : []
+}
+
 function activePartWeak(enemy: EnemyInst, emotions: readonly Emotion[], tags: readonly string[]): boolean {
   const weakness = activeEnemyPart(enemy)?.def.weakness
   if (!weakness) return false
@@ -455,7 +464,7 @@ function cutSpiderWebWithSupport(state: BattleState, target: number, intent: Int
   const enemy = state.enemies[target]
   const supportsPlayer = intent.guard > 0 || intent.heal > 0
   if (!enemy || enemy.dead || !enemy.def.webPattern || !supportsPlayer) return null
-  if (!activePartWeak(enemy, intent.emotions, intent.tags)) return null
+  if (!activePartWeak(enemy, weaknessEmotions(intent), intent.tags)) return null
 
   const tensionBefore = spiderWebTension(enemy)
   enemy.webTurns = Math.max(brokenSpiderLegs(enemy), enemy.webTurns - 1)
@@ -862,7 +871,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     targetCount: intent.targetCount,
     hitCount: intent.hitCount * intent.castCount,
     pierceGuard: intent.pierceGuard,
-    emotions: intent.emotions,
+    emotions: weaknessEmotions(intent),
     tags: intent.tags,
     comboMatched: intent.combos.length > 0,
   }

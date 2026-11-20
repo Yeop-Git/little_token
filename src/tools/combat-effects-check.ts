@@ -986,3 +986,17 @@ console.log('combat effects: ok')
   const { selectionInkCost } = await import('@core/ink')
   assert(selectionInkCost({ subj: zero, subj2: zero }) === 0, 'choosing the same zero-ink card in both subject slots costs exactly its printed ink')
 }
+
+// 공격 속성 — 가장 많이 쓴 감정, 동률이면 잉크 비용 합(영향)이 큰 감정이 약점 판정에 쓰인다.
+{
+  const { sentenceAttackEmotion } = await import('@core/compiler')
+  const w = (id: string, slot: Word['slot'], emotion: Word['emotion'], inkCost: number): Word => ({ ...EARLY_WORDS.verb[0], id, slot, emotion, inkCost })
+  const order = ['subj', 'adv', 'verb']
+  assert(sentenceAttackEmotion({ subj: w('a', 'subj', 'joy', 0), adv: w('b', 'adv', 'joy', 1), verb: w('c', 'verb', 'anger', 4) }, order) === 'joy', 'the most used emotion is the attack attribute')
+  assert(sentenceAttackEmotion({ subj: w('a', 'subj', 'joy', 0), adv: w('b', 'adv', 'sorrow', 2), verb: w('c', 'verb', 'neutral', 2) }, order) === 'sorrow', 'a tie goes to the emotion with more influence (ink)')
+  assert(sentenceAttackEmotion({ subj: w('a', 'subj', 'neutral', 0), verb: w('c', 'verb', 'neutral', 2) }, order) === null, 'a sentence without emotion cards is neutral')
+  const s = state([makeEnemy(foe('weak-joy', { weakEmotion: 'joy', hp: 100 }))])
+  const minority = previewIntentHits(s, attack({ base: 20, emotions: ['joy', 'anger', 'anger'], attackEmotion: 'anger' }), 1, 0)
+  const majority = previewIntentHits(s, attack({ base: 20, emotions: ['joy', 'joy', 'anger'], attackEmotion: 'joy' }), 1, 0)
+  assert(minority[0] === 20 && majority[0] === 25, 'only the attack attribute triggers weakness')
+}

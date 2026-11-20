@@ -4448,6 +4448,12 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 문턱을 넘을 때 글자 크기가 아니라 scale로 키운다 — 레이아웃이 변하지 않아 판이 튀지 않는다. */
   transition: scale 0.3s cubic-bezier(0.2, 1.2, 0.3, 1);
 }
+/* 공격 속성 물들임 — 롤링이 끝난 피해 숫자가 문장의 공격 속성색으로 천천히 번진다. */
+.tally .tally-total.attr-tint {
+  color: color-mix(in srgb, var(--emotion-color) 82%, #fff);
+  transition: color .7s ease, text-shadow .7s ease, scale 0.3s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+.tally .tally-total.attr-tint.emotion-neutral { color: #d9d6cf; }
 .tally.heal .tally-total { color: #fff2da; }
 .tally.guard .tally-total { color: #fff2da; }
 .tally.guard .tally-box.base b { color: #fff2da; text-shadow: 0 0 22px rgba(255, 242, 218, .4); }

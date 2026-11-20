@@ -10,6 +10,7 @@ import { formatNumber } from './numberFormat'
 import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
+import { wordInkCost } from './ink'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -308,6 +309,7 @@ export function compile(
   const baseResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
   // 아이템 특성(공명) — 공명이 실제로 일어났을 때만 공명 배율을 키운다.
   const emotionResonance = baseResonance !== 1 ? baseResonance + (mods.traitResonance ?? 0) : 1
+  const attackEmotion = sentenceAttackEmotion(sel, order)
   if (emotionResonance !== 1) {
     mults.push({
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} ${CORE_TEXT.resonance}`,
@@ -354,6 +356,7 @@ export function compile(
     attackRank: sumEffect('attackRank'),
     guardRank: sumEffect('guardRank'),
     emotions,
+    attackEmotion,
     emotionResonance,
     tags: allTags,
     combos: combos.map((c) => c.name),
@@ -455,4 +458,29 @@ export function finalMultiplier(intent: Intent, roll: number | null = null): num
   let m = intent.multiplier
   if (intent.variance && roll !== null) m *= roll < intent.variance.p ? intent.variance.hi : intent.variance.lo
   return m
+}
+
+/**
+ * 문장의 공격 속성 — 적 약점에 들어갈지는 이 감정 하나로 정한다.
+ * 1. 문장에 가장 많이 쓴 감정(무감정 카드는 세지 않는다)
+ * 2. 장수가 같으면 영향이 큰 감정 — 그 감정 카드들의 잉크 비용 합(카드 세기의 정본)
+ * 3. 그래도 같으면 동사(행동을 정하는 카드)의 감정, 그다음은 문장에서 뒤에 놓인 카드
+ * 감정 카드가 하나도 없으면 무속성(null)이다.
+ */
+export function sentenceAttackEmotion(sel: Selection, order: readonly string[]): Emotion | null {
+  const score = new Map<Emotion, { count: number; influence: number; verb: number; last: number }>()
+  order.forEach((key, index) => {
+    const word = sel[key]
+    const emotion = emotionOrNeutral(word?.emotion)
+    if (!word || emotion === 'neutral') return
+    const entry = score.get(emotion) ?? { count: 0, influence: 0, verb: 0, last: -1 }
+    entry.count += 1
+    entry.influence += wordInkCost(word)
+    if (word.slot === 'verb' || word.slot === 'verb2') entry.verb = 1
+    entry.last = index
+    score.set(emotion, entry)
+  })
+  const ranked = [...score.entries()].sort(([, a], [, b]) =>
+    b.count - a.count || b.influence - a.influence || b.verb - a.verb || b.last - a.last)
+  return ranked[0]?.[0] ?? null
 }

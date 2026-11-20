@@ -15,7 +15,7 @@ import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf }
 import { rankedStat } from '@core/combatRules'
 import { inkExceedsLimit, selectionInkCost, sentenceInkAvailable } from '@core/ink'
 import { conflictReason } from '@core/validator'
-import type { Intent, Selection, Word } from '@core/types'
+import type { Emotion, Intent, Selection, Word } from '@core/types'
 import { startingPlayer, applyItemReward } from '@core/run'
 import { ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { registerWord } from '@core/run'
@@ -36,6 +36,7 @@ import {
   activeEnemyPart,
   summonCount,
   type BattleState,
+  weaknessEmotions,
 } from '../sim/reference'
 
 const rngSeeded = (seed: number) => () => {
@@ -220,7 +221,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
       const weakness = activeEnemyPart(boss)?.def.weakness
       const matchesWeakness = (candidate: Candidate) => !weakness
         || (weakness.kind === 'emotion'
-          ? candidate.intent.emotions.includes(weakness.value as typeof candidate.intent.emotions[number])
+          ? weaknessEmotions(candidate.intent).includes(weakness.value as Emotion)
           : candidate.intent.tags.includes(weakness.value))
       const weakAnswer = boss.def.webPattern
         ? hand.filter(matchesWeakness).sort((a, b) => (b.dmg > 0 ? 1 : 0) - (a.dmg > 0 ? 1 : 0) || b.dmg - a.dmg || b.heal + b.guard - a.heal - a.guard)[0]

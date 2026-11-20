@@ -196,6 +196,8 @@ export interface Intent {
   attackRank: number
   guardRank: number
   emotions: Emotion[]
+  /** 문장의 공격 속성(가장 많이 쓴 감정, 동률이면 영향이 큰 감정). 약점 판정은 이것 하나로 한다. */
+  attackEmotion?: Emotion | null
   emotionResonance: number
   tags: string[]
   combos: string[] // 발동 관용구 이름
