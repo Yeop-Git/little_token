@@ -2019,60 +2019,31 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 보스가 쓰는 다음 문장 — 규칙 툴팁이 아니라 플레이어가 매 턴 읽는 주된 의도판이다. */
 .boss-sentence-board {
   position: absolute;
-  /* 보스 HUD 아래 뱃지 줄(선공·TIP·능력)이 한 줄을 온전히 차지한 뒤 문장판을 연다.
-     예전 122px에서는 뱃지의 아래 2/3가 종이 밑으로 깔려 못 읽었다. */
-  top: 158px;
+  /* 보스 HUD 아래 뱃지 줄(최대 체력·TIP·능력)이 한 줄을 온전히 차지한 뒤 문장판을 연다.
+     158px에서는 뱃지 아래쪽이 판 밑으로 깔렸다. */
+  top: 186px;
   left: 50%;
   z-index: 88;
   /* 피드백(11/20): 공격창이 무대를 가릴 만큼 컸다. 내용은 그대로 두고 판만 줄인다. */
-  width: min(760px, 58vw);
-  padding: 8px 24px 10px;
+  width: max-content;
+  max-width: min(640px, 56vw);
+  padding: 6px 18px 7px;
   color: #38251d;
-  transform: translateX(-50%) rotate(-.15deg);
-  clip-path: polygon(0 6%, 2% 0, 6% 3%, 11% 0, 17% 2%, 24% 0, 31% 3%, 39% 0, 47% 2%, 55% 0, 63% 3%, 71% 0, 78% 2%, 85% 0, 92% 3%, 98% 0, 100% 7%, 99% 24%, 100% 43%, 99% 64%, 100% 83%, 98% 100%, 91% 97%, 84% 100%, 76% 97%, 68% 100%, 60% 98%, 52% 100%, 44% 97%, 35% 100%, 27% 98%, 19% 100%, 11% 97%, 3% 100%, 0 94%, 1% 76%, 0 58%, 1% 37%);
-  background:
-    linear-gradient(92deg, rgba(224, 196, 145, .96), rgba(251, 235, 195, .98) 48%, rgba(224, 194, 143, .96)),
-    repeating-linear-gradient(0deg, transparent 0 18px, rgba(92, 61, 39, .08) 18px 19px);
-  box-shadow: 0 14px 34px rgba(8, 3, 8, .56), inset 0 0 0 1px rgba(89, 51, 33, .32);
+  transform: translateX(-50%);
+  /* 11/20 피드백: 찢긴 종이 테두리·양옆 점선·기울기 같은 장식을 걷고 작은 판 하나로 둔다. */
+  border-radius: 10px;
+  background: rgba(250, 236, 204, .95);
+  box-shadow: 0 8px 22px rgba(8, 3, 8, .45), inset 0 0 0 1px rgba(89, 51, 33, .28);
   pointer-events: none;
 }
 .boss-sentence-board[hidden] { display: none; }
-.boss-sentence-board::before,
-.boss-sentence-board::after {
-  content: '';
-  position: absolute;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  opacity: .38;
-  background: repeating-linear-gradient(180deg, #6d4430 0 6px, transparent 6px 11px);
-}
-.boss-sentence-board::before { left: 10px; }
-.boss-sentence-board::after { right: 10px; }
 .boss-sentence-board.tone-danger {
-  box-shadow: 0 14px 34px rgba(8, 3, 8, .62), inset 0 -4px rgba(151, 38, 29, .22), 0 0 24px rgba(186, 43, 31, .22);
+  box-shadow: 0 8px 22px rgba(8, 3, 8, .5), inset 0 0 0 2px rgba(151, 38, 29, .55);
 }
 .boss-sentence-board.tone-relief {
-  background: linear-gradient(92deg, rgba(212, 206, 157, .97), rgba(247, 239, 196, .98) 48%, rgba(211, 205, 157, .97));
-  box-shadow: 0 14px 34px rgba(8, 3, 8, .48), inset 0 -4px rgba(60, 120, 74, .2), 0 0 22px rgba(111, 197, 111, .18);
+  background: rgba(240, 238, 200, .96);
+  box-shadow: 0 8px 22px rgba(8, 3, 8, .45), inset 0 0 0 2px rgba(60, 120, 74, .45);
 }
-.boss-sentence-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
-  color: #6f4a37;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .12em;
-}
-.boss-sentence-heading b {
-  color: #8b302b;
-  font-size: 11px;
-  transform: rotate(1.2deg);
-}
-.boss-sentence-board.tone-relief .boss-sentence-heading b { color: #317247; }
 .boss-sentence-line {
   display: flex;
   align-items: flex-end;
@@ -2080,8 +2051,7 @@ html[data-postprocessing='off'] .tip-bubble {
   gap: 8px;
   min-width: 0;
 }
-.boss-sentence-line > i,
-.boss-manuscript-line > i {
+.boss-sentence-line > i {
   flex: none;
   color: rgba(82, 50, 36, .38);
   font: italic 800 24px Georgia, serif;
@@ -2092,8 +2062,7 @@ html[data-postprocessing='off'] .tip-bubble {
   flex-direction: column;
   align-items: center;
   min-width: 0;
-  padding: 1px 8px 4px;
-  border-bottom: 2px solid rgba(78, 47, 34, .28);
+  padding: 1px 4px 2px;
 }
 .boss-sentence-token b {
   overflow: hidden;
@@ -2107,17 +2076,6 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-sentence-token.role-verb b { color: #852f28; }
 .tone-relief .boss-sentence-token.role-verb b { color: #276c41; }
 .boss-sentence-main { position: relative; }
-.boss-sentence-board.tone-danger .boss-sentence-main::after {
-  content: '';
-  position: absolute;
-  right: 7%;
-  bottom: -1px;
-  width: 28%;
-  height: 5px;
-  border-bottom: 3px solid rgba(155, 37, 30, .7);
-  border-radius: 50%;
-  transform: rotate(-1deg);
-}
 .boss-sentence-meta {
   display: flex;
   justify-content: center;
@@ -2130,83 +2088,21 @@ html[data-postprocessing='off'] .tip-bubble {
   color: #f7e8c7;
   border-radius: 999px;
   background: rgba(61, 37, 31, .82);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
 }
 .tone-danger > .boss-sentence-meta span:first-child { background: #8e2d28; }
-.boss-sentence-context {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  margin: 0 4% 5px;
-  padding: 3px 9px;
-  border-bottom: 1px dashed rgba(87, 54, 37, .34);
-  opacity: .84;
-}
-.boss-sentence-context .boss-sentence-line { justify-content: flex-start; }
-.boss-sentence-context .boss-sentence-token b { font-size: 13px; }
-.boss-sentence-context .boss-sentence-meta { justify-content: flex-end; margin: 0; }
-.boss-sentence-side-label {
-  color: #76513e;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  white-space: nowrap;
-}
-.boss-manuscript {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 7px;
-  padding-top: 5px;
-  border-top: 1px dashed rgba(87, 54, 37, .34);
-}
-.boss-manuscript-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 0;
-  flex: 1;
-}
-.boss-manuscript-clause {
-  position: relative;
-  color: rgba(56, 35, 27, .34);
-  font-size: 10px;
-  white-space: nowrap;
-}
-.boss-manuscript-clause.is-active {
-  color: var(--emotion-color, #6f3027);
-  font-size: 12px;
-  text-shadow: 0 0 10px color-mix(in srgb, var(--emotion-color, #85412e) 24%, transparent);
-}
-.boss-manuscript-clause.is-active::after {
-  content: '현재';
-  position: absolute;
-  left: 50%;
-  bottom: -11px;
-  color: #852f28;
-  font-size: 7px;
-  transform: translateX(-50%) rotate(-3deg);
-}
-.boss-manuscript-clause.is-crossed {
-  color: rgba(56, 35, 27, .25);
-  text-decoration: line-through 3px rgba(130, 36, 29, .72);
-  text-decoration-thickness: 3px;
-}
 .boss-sentence-event {
   /* 문장판의 찢긴 종이 clip-path가 판 밖(bottom:-28px)에 둔 말풍선을 통째로 잘라
      안내 문구가 아예 보이지 않았다. 판 안쪽 마지막 줄로 넣는다. */
   position: relative;
-  left: 50%;
   width: max-content;
-  margin-top: 7px;
+  margin: 6px auto 0;
   display: flex;
   align-items: center;
   gap: 7px;
-  max-width: 86%;
+  max-width: 100%;
   padding: 4px 13px;
   color: #f7e9c9;
   border: 1px solid rgba(245, 221, 171, .28);
@@ -2215,7 +2111,6 @@ html[data-postprocessing='off'] .tip-bubble {
   box-shadow: 0 8px 18px rgba(0, 0, 0, .4);
   font-size: 13px;
   font-weight: 800;
-  transform: translateX(-50%) rotate(.4deg);
   white-space: normal;
 }
 .boss-sentence-event b { color: #ffd27e; font-size: 15px; }
@@ -3747,26 +3642,6 @@ html[data-postprocessing='off'] .tip-bubble {
 .scene.battle[data-boss='true'] .actor.foe.boss .first-mark {
   display: none;
 }
-.boss-first-mark {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 27px;
-  padding: 2px 9px 2px 5px;
-  color: #ff9a70;
-  border: 1px solid rgba(255, 126, 78, .72);
-  border-radius: 999px;
-  background: rgba(55, 13, 13, .82);
-  box-shadow: 0 0 12px rgba(255, 74, 34, .28);
-  text-shadow: 0 0 9px rgba(255, 94, 48, .8), 0 2px 4px rgba(0, 0, 0, .9);
-  white-space: nowrap;
-  pointer-events: none;
-}
-.boss-first-mark[hidden] { display: none; }
-.boss-first-mark svg { width: 20px; height: 20px; fill: currentColor; }
-.boss-first-mark svg .bang { stroke: #351008; stroke-width: 2.6; stroke-linecap: round; fill: none; }
-.boss-first-mark b { color: #fff1d9; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
 .scene.battle[data-boss='true'] .actor.foe.boss .guard-hint { display: none; }
 /* 이름표가 사라진 뒷줄은 기준이 없어 허공에 뜨므로, 줄어든 캐릭터 머리 위로 내려 붙인다. */
 .nameplate.gone ~ .first-mark {
@@ -11572,3 +11447,21 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 @media (prefers-reduced-motion: reduce) {
   .ink-meter-vial.is-refilled img { animation: none; }
 }
+
+/* 보스 최대 체력 태그 — 뱃지 줄 맨 앞. 숫자가 주인공이라 아이콘 뱃지보다 납작한 알약형으로 둔다. */
+.boss-maxhp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 33px;
+  padding: 0 11px 0 8px;
+  color: #ffd9cf;
+  border: 1px solid rgba(255, 150, 130, .45);
+  border-radius: 999px;
+  background: linear-gradient(150deg, rgba(92, 30, 30, .95), rgba(40, 14, 16, .95));
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .45);
+  pointer-events: auto;
+  cursor: help;
+}
+.boss-maxhp-tag svg, .boss-maxhp-tag .baked-stat-icon { width: 18px; height: 18px; }
+.boss-maxhp-tag > b { color: #fff1e6; font-size: 15px; font-weight: 900; letter-spacing: .02em; }

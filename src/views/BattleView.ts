@@ -1530,22 +1530,13 @@ export class BattleView {
     // 보스 공격창은 한눈에 "무엇을 언제 얼마나"만 읽히면 된다. 예전의 이어지는
     // 문장 줄은 본문과 같은 내용을 한 번 더 써서 창만 키웠으므로, 그 규칙 태그만
     // 본문 태그 줄에 합친다.
-    const metaTags = [...view.meta, ...(view.context?.meta ?? [])]
-    const manuscript = view.manuscript?.length
-      ? `<div class="boss-manuscript" aria-label="${bossText('manuscriptAria')}">
-          <span class="boss-sentence-side-label">${bossText('damagedLongSentence')}</span>
-          <div class="boss-manuscript-line">${view.manuscript.map((clause) => `
-            <span class="boss-manuscript-clause${clause.active ? ' is-active' : ''}${clause.crossed ? ' is-crossed' : ''}${clause.emotion ? ` emotion-${clause.emotion}` : ''}" data-clause-id="${clause.id}">
-              <b>${clause.text}</b>
-            </span>`).join('<i aria-hidden="true">/</i>')}</div>
-        </div>`
-      : ''
+    // 11/20 피드백: 판에는 "언제·얼마나·무엇을"만 남긴다. 머리 줄(다음 보스 문장/곧 실행),
+    // 이어지는 문장의 공략 태그(TIP 쪽지와 중복), 장로거미의 훼손 문장(체력바 막과 중복)은 걷어 냈다.
     host.className = `boss-sentence-board tone-${view.tone}`
+    host.setAttribute('aria-label', view.label)
     host.innerHTML = `
-      <div class="boss-sentence-heading"><span>${view.label}</span><b>${bossText(view.tone === 'danger' ? 'executeSoon' : view.tone === 'relief' ? 'endingRevision' : 'enemyIntent')}</b></div>
       <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
-      <div class="boss-sentence-meta">${metaTags.map((text) => `<span>${text}</span>`).join('')}</div>
-      ${manuscript}
+      <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
       ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
     host.hidden = false
     host.classList.remove('is-writing')
@@ -1594,9 +1585,6 @@ export class BattleView {
           </div>
         </div>
         <div class="boss-badge-row">
-          <span class="boss-first-mark" hidden title="선공 — 내 문장 직후, 나보다 먼저 때린다">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/><path class="bang" d="M12 9v5M12 17.2v.1"/></svg><b>선공</b>
-          </span>
           <div class="boss-intel enemy-intel" aria-label="${bossText('bossBattleInfo', { boss: bossName })}" hidden></div>
         </div>
       </section>`
@@ -1867,12 +1855,8 @@ export class BattleView {
       const bossHud = this.root.querySelector<HTMLElement>('#boss-health-hud')
       if (bossHud) this.updateFoePlate(bossHud, e, true)
     }
-    // 일반 적은 캐릭터 옆 경고를, 보스는 상단 체력 HUD에 통합된 표식을 같은 상태값으로 갱신한다.
+    // 일반 적은 캐릭터 옆 경고로 선공을 알린다. 보스는 문장판의 첫 태그(선공·후공)가 같은 값을 말한다.
     el.classList.toggle('strikes-first', strikesFirst)
-    if (e.def.boss) {
-      const bossFirst = this.root.querySelector<HTMLElement>('#boss-health-hud .boss-first-mark')
-      if (bossFirst) bossFirst.hidden = !strikesFirst
-    }
   }
 
   /**
@@ -1913,6 +1897,15 @@ export class BattleView {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
     }
 
+    // 보스는 최대 체력을 태그로 먼저 세운다(11/20 피드백). 체력바 오른쪽의 현재/최대 숫자는 줄어드는 값이고,
+    // 이 태그는 "이 보스가 얼마나 단단한가"만 말한다.
+    if (e.def.boss) {
+      const tooltip = e.healthBars > 1
+        ? tip(`최대 체력 ${e.maxHp}`, `체력바 ${e.healthBars}칸\n한 칸 ${e.hpPerBar}`)
+        : `최대 체력 ${e.maxHp}`
+      icons.push(`<span class="boss-maxhp-tag" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${icon('heart')}<b>${e.maxHp}</b></span>`)
+    }
+
     // 공략 쪽지가 줄의 초입에 선다. 뒤따르는 능력 뱃지와 섞이지 않도록 모양·색·라벨이 모두 다르다.
     const tacticalGuide = tacticalGuideForEnemy(e.def.id, e.def.tacticalGuideId, this.stageInfo)
     if (tacticalGuide) {
@@ -1933,23 +1926,26 @@ export class BattleView {
           : attackStep.bonusAtk > 0
             ? `평소보다 ${attackStep.bonusAtk} 세게 때린다`
             : '평소 위력으로 때린다'
-      add('attack', icon('sword'), tip(`다음 행동 · ${attackStep.name}`, detail))
+      // 보스의 다음 행동은 바로 아래 문장판이 말하므로 뱃지로 한 번 더 세우지 않는다.
+      if (!e.def.boss) add('attack', icon('sword'), tip(`다음 행동 · ${attackStep.name}`, detail))
     }
-    if (e.def.boss) {
+    // 공격 단계는 1단계(×1.00)일 때는 알릴 것이 없다. 올라간 뒤에만 세운다.
+    if (e.def.boss && bossAttackStage(e) > 1) {
       const stage = bossAttackStage(e)
       // 클래스 이름을 `stage`로 두면 무대 루트(`.stage`)의 규칙을 그대로 받는다 —
       // `transform: translate(-50%, -50%)`이 36px 뱃지에 걸려 (-18, -18)만큼 밀렸다.
-      add(`attack-stage attack-stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `단계가 오를수록 세진다 (지금 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)})`))
+      add(`attack-stage attack-stage-${stage}`, `<b>${stage}</b>`, tip(`공격 단계 ${stage}`, `보스 공격 ×${BOSS_ATTACK_MULTIPLIER[stage].toFixed(2)}\n단계가 오를수록 세진다`))
     }
     if (e.guard > 0) add('guard', `${icon('shield')}<b>${e.guard}</b>`, tip(`방어 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다`))
-    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다 · 연타로 벗긴다`))
-    if (e.def.pierceGuard || e.def.attackPattern?.some((step) => step.pierceGuard)) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
-    if (summonPattern) add(
+    if (e.magicShield > 0) add('magic', `${icon('shield')}<b>${e.magicShield}</b>`, tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다\n연타로 벗긴다`))
+    // 보스의 관통·소환·거미줄은 문장판 태그(방어 관통·봉인 n/3)와 무대 위 일벌이 이미 보여 준다.
+    if (!e.def.boss && (e.def.pierceGuard || e.def.attackPattern?.some((step) => step.pierceGuard))) add('pierce', icon('sword'), tip('관통', '내 방어를 뚫고 체력을 바로 깎는다'))
+    if (summonPattern && !e.def.boss) add(
       `summon${summons >= (summonPattern.releaseAt ?? Infinity) ? ' ready' : ''}`,
       icon('jar'),
       tip(`${summonPattern.name} ${summons}/${summonPattern.max}`, `부하가 늘수록 세진다 (지금 공격 +${summons * (summonPattern.attackBonusPerUnit ?? 0)})`),
     )
-    if (e.def.webPattern) add(
+    if (e.def.webPattern && !e.def.boss) add(
       `web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`,
       '<b>✣</b>',
       tip(`거미줄 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards}`, '드러난 다리를 때리거나 약점 감정으로 막고 회복하면 풀린다'),
@@ -1989,7 +1985,10 @@ export class BattleView {
         const lines = [
           `공격 속성이 ${EMOTION_LABEL[affinity]}이면 피해 ×${formatMult(weakMult)}`,
           '공격 속성은 문장에서 가장 많이 쓴 감정',
-          ...(activePart ? [`지금 부위(${activePart.def.name})의 약점`] : []),
+          ...(activePart ? [
+            `지금 부위(${activePart.def.name})의 약점`,
+            ...(e.def.webPattern ? ['약점 감정으로 막거나 회복하면 봉인 -1', '약점 감정+관용구 공격은 남은 피해가 다음 부위로'] : []),
+          ] : []),
         ]
         weakBadge.dataset.tooltip = tip(affinityLabel, lines.join('\n'))
         weakBadge.dataset.tipPlace = 'above'
@@ -2036,7 +2035,9 @@ export class BattleView {
       const mark = plate.querySelector<HTMLElement>('.boss-health-mark')
       const escortedQueen = e.def.id === 'queenBee' && summonCount(e) > 0
       if (mark) {
-        mark.textContent = escortedQueen ? QUEEN_ESCORT_IMMUNITY_LABEL : 'BOSS'
+        // 'BOSS' 꼬리표는 장식일 뿐이라(이름·스테이지가 이미 말한다) 호위 규칙이 있을 때만 띄운다.
+        mark.textContent = escortedQueen ? QUEEN_ESCORT_IMMUNITY_LABEL : ''
+        mark.hidden = !escortedQueen
         mark.toggleAttribute('aria-hidden', !escortedQueen)
         mark.classList.toggle('escort-rule', escortedQueen)
       }

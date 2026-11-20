@@ -182,7 +182,6 @@ function spiderManuscript(enemy: EnemyInst): EnemySentenceClause[] {
 
 function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string): EnemySentenceView {
   const active = activeEnemyPart(enemy)
-  const weakness = active?.def.weakness
   const webMax = enemy.def.webPattern?.maxSealedCards ?? 0
   const web = spiderWebTension(enemy)
   const step = nextEnemyAttackStep(enemy)
@@ -201,7 +200,7 @@ function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string
       damageMeta(state, enemy),
       ...(pierces ? [tx('guardPierce')] : []),
       tx('sealCount', { current: web, max: webMax }),
-      ...(weakness ? [tx('currentWeakness', { weakness: weakness.label }), tx('weaknessAction'), tx('weaknessComboPierce')] : [tx('bodyNoWeakness')]),
+      // 현재 약점과 약점 행동은 체력바 옆 약점 아이콘(툴팁)이 맡는다. 문장판에는 공격 정보만 둔다.
     ],
     manuscript: spiderManuscript(enemy),
     eventText,
