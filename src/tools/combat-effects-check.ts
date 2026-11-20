@@ -506,7 +506,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 {
   const tables = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'mantis')
   const tactic = tables.words.verb.find((word) => word.id === 'mantisTactic')!
-  assert(tactic.kind === 'guard' && tactic.stat === 'guard' && tactic.statMult === 4 && tactic.inkCost === 4, 'mantis tactic leaves room for a starting modifier')
+  assert(tactic.kind === 'guard' && tactic.stat === 'guard' && tactic.statMult === 4 && tactic.inkCost === 3, 'mantis tactic leaves room for a starting modifier')
   const intent = compile({ subj: tables.words.subj[0], adv: tables.words.adv[0], verb: tactic }, tables, { atk: 1, guard: 3, heal: 1, luck: 0 })
   assert(intent.guard === 12 && intent.base === 0, 'mantis tactic builds guard instead of dealing unexplained conditional damage')
 }

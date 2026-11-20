@@ -24,13 +24,15 @@ export function recommendedWordInkCost(word: Word): number {
   // 문장부호(올림프의 황금 당근)는 아이템이 여는 덤 칸이라 잉크를 쓰지 않는다.
   if (word.slot === 'punct') return 0
 
-  if (word.growHp) return word.slot === 'subj' || word.slot === 'subj2' ? 2 : 3
+  // 시작 잉크 5에 주어·수식어·동사 세 칸을 모두 채워야 하므로 칸별 상한은 주어 1 · 수식어 2 · 동사 3.
+  // 카드별 실제 값은 src/tools/ink-cost-index.ts(조합 전수 기여도)가 정하고, 이 공식은 명시 비용이 없을 때의 폴백이다.
+  if (word.growHp) return word.slot === 'adv' ? 2 : 1
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
     const expected = expectedMultiplier(word)
     const cost = Math.ceil((expected - 1.2) / 0.3)
       + (word.aoe === 'all' ? 1 : 0)
-    return Math.max(0, Math.min(2, cost))
+    return Math.max(0, Math.min(1, cost))
   }
 
   if (word.slot === 'verb' || word.slot === 'verb2') {
@@ -45,7 +47,7 @@ export function recommendedWordInkCost(word: Word): number {
     cost += Math.ceil(Math.max(0, effects?.guardAttackMultiplier ?? 0))
     cost += Math.ceil(Math.max(0, effects?.overhealDamageMultiplier ?? 0))
     cost += Math.ceil(Math.max(0, effects?.lifeStealRate ?? 0) / .5)
-    return Math.max(1, Math.min(4, cost))
+    return Math.max(1, Math.min(3, cost))
   }
 
   let power = 0
@@ -69,7 +71,7 @@ export function recommendedWordInkCost(word: Word): number {
   power += Math.abs(effects?.guardRank ?? 0)
   power -= Math.max(0, effects?.inkDiscount ?? 0)
 
-  return Math.max(0, Math.min(3, Math.floor(power + 1e-6)))
+  return Math.max(0, Math.min(2, Math.floor(power + 1e-6)))
 }
 
 export function wordInkCost(word: Word): number {
