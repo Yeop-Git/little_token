@@ -130,7 +130,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   mosquito: {
     id: 'mosquito', name: '모기', hp: 8, atk: 3, every: 1, initiative: 'second',
     sprite: 'enemy_mosquito', pierceGuard: true, weakEmotion: 'pleasure',
-    note: '긴 침으로 방어막을 소모시키지 않고 체력에 직접 피해를 준다.',
+    note: '긴 침으로 방어도를 소모시키지 않고 체력에 직접 피해를 준다.',
   },
 }
 

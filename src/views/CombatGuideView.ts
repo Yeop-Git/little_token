@@ -103,7 +103,7 @@ export class CombatGuideView {
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
     { key: 'damage', title: '피해가 정해지는 순서', hint: '점수 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
-    { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
+    { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어도', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
   ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body })))
     .filter((chapter) => !IS_DEMO || chapter.key !== 'journey')
@@ -336,7 +336,7 @@ export class CombatGuideView {
             ${mults}
           </ul>
           <p class="g-calc-sum">합계 <b>${mult(normal.mult)}</b></p>
-          <p class="g-note g-tight">배율 풀은 <b>더해서</b> 한 번, 관용구·공명은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
+          <p class="g-note g-tight">카드 배율은 <b>더해서</b> 한 번, 관용구·공명은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
         </section>
         <span class="g-calc-op" aria-hidden="true">=</span>
         <section class="g-calc-col g-calc-out">
@@ -437,7 +437,7 @@ export class CombatGuideView {
             <li><b>2명·3명</b> — 앞줄부터 <b>${falloff}</b>로 피해가 줄어든다.</li>
             <li><b>전체</b> — 살아 있는 모든 적을 같은 위력으로 때린다.</li>
             <li><b>2연타·3연타</b> — 최전방 하나만 여러 번 때린다. 쓰러지면 남은 타격은 다음 적으로 넘어가지 않는다.</li>
-            <li><b>관통</b> — 적의 방어막과 매직실드를 지나쳐 체력에 직접 꽂히고, 둘을 깎지도 않는다.</li>
+            <li><b>관통</b> — 적의 방어도와 매직실드를 지나쳐 체력에 직접 꽂히고, 둘을 깎지도 않는다.</li>
             <li><b>다음 턴 발동</b> — 타격 수·범위·관통·감정까지 그대로 보존해 다음 턴에 실행한다.</li>
             <li>단일 공격이 적을 넘겨 죽이면 <b>초과 피해가 뒷줄로 관통</b>한다.</li>
           </ul>
@@ -445,10 +445,10 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">적이 두르는 것</h3>
           <ul class="g-bullets">
-            <li><b>방어막</b> — 피해를 먼저 받아 낸다. ${roach ? `${josa(roach.name, '은', '는')} 방어 ${roach.guard}짜리 껍질을 두르고 나온다.` : ''}</li>
+            <li><b>방어도</b> — 피해를 먼저 받아 낸다. ${roach ? `${josa(roach.name, '은', '는')} 방어 ${roach.guard}짜리 껍질을 두르고 나온다.` : ''}</li>
             <li><b>매직실드</b> — 한 타격을 통째로 막고 1겹이 사라진다. <b>관통</b>은 이를 우회하고, 일반 공격은 <b>연타</b>로 벗길 수 있다.
               ${pillbug ? `${josa(pillbug.name, '이', '가')} 1겹을 들고 나온다.` : ''}</li>
-            <li><b>관통하는 적</b> — ${mosquito ? `${mosquito.name}처럼` : '일부 적은'} 내 방어막을 소모시키지 않고 체력에 직접 꽂는다.</li>
+            <li><b>관통하는 적</b> — ${mosquito ? `${mosquito.name}처럼` : '일부 적은'} 내 방어도를 소모시키지 않고 체력에 직접 꽂는다.</li>
             <li>보스는 저마다 방어를 무력화하는 수단을 하나씩 갖는다. 대신 반드시 미리 읽히게 예고하고,
               왼쪽 토큰이 붉은 쪽지로 경고한다.</li>
           </ul>
@@ -457,12 +457,12 @@ export class CombatGuideView {
 
       <div class="g-split">
         <section class="g-panel">
-          <h3 class="g-h3">내 방어막</h3>
+          <h3 class="g-h3">내 방어도</h3>
           <ul class="g-bullets">
             <li>피해를 <b>흡수한 만큼만</b> 줄어들고 남은 양은 그대로 유지된다.</li>
             <li>새 방어는 기존 방어에 <b>합산</b>되며, 이월분을 포함해 <b>최대 체력의 50% + 방어 스탯×2</b>까지 비축할 수 있다.</li>
             <li>한도에 걸려 담기지 못한 방어도도 <b>그 턴 방패치기 피해</b>에는 그대로 들어간다.</li>
-            <li>체력과 방어막은 <b>다음 스테이지에도 그대로 이어진다.</b> 스테이지가 바뀐다고 회복되지 않는다.</li>
+            <li>체력과 방어도는 <b>다음 스테이지에도 그대로 이어진다.</b> 스테이지가 바뀐다고 회복되지 않는다.</li>
           </ul>
         </section>
         <section class="g-panel">
@@ -470,7 +470,7 @@ export class CombatGuideView {
           <p>카운터 수식어는 공격 행동 중에는 받은 피해의 <b>50%</b>를, 방어 또는 회복 행동 중에는
             받은 피해의 <b>100%</b>를 즉시 최전방 적에게 되돌린다.</p>
           <p class="g-example">받은 피해 <b>4</b> → 공격 행동 <b>2</b> 반격 · 방어/회복 행동 <b>4</b> 반격</p>
-          <p class="g-note g-tight">실드 유무는 카운터 비율에 영향을 주지 않으며, 해당 문장을 쓴 턴에만 유효하다.</p>
+          <p class="g-note g-tight">방어도 유무는 카운터 비율에 영향을 주지 않으며, 해당 문장을 쓴 턴에만 유효하다.</p>
         </section>
       </div>`
   }

@@ -1755,7 +1755,7 @@ export class BattleView {
       max: s.playerMax,
       guard: s.guard,
       guardLimit,
-      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도는 방어 스탯에 비례해 오른다 (현재 ⟦${guardLimit}|최대 체력 ${s.playerMax} 절반 → ${Math.floor(s.playerMax / 2)}; 방어 ${formatNumber(s.playerGuardStat ?? 0)} × ${PLAYER_GUARD_LIMIT_PER_GUARD_STAT} → ${formatNumber((s.playerGuardStat ?? 0) * PLAYER_GUARD_LIMIT_PER_GUARD_STAT)}; 합계 ${guardLimit}⟧)`),
+      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도는 방어 스탯에 비례해 오른다\n지금 한도 ⟦${guardLimit}|최대 체력 ${s.playerMax} 절반 → ${Math.floor(s.playerMax / 2)}; 방어 ${formatNumber(s.playerGuardStat ?? 0)} × ${PLAYER_GUARD_LIMIT_PER_GUARD_STAT} → ${formatNumber((s.playerGuardStat ?? 0) * PLAYER_GUARD_LIMIT_PER_GUARD_STAT)}; 합계 ${guardLimit}⟧`),
       magic: s.playerMagicShield ? 1 : 0,
       magicTip: BUILD_EFFECT_TEXT.magicTip,
     })
@@ -2031,7 +2031,7 @@ export class BattleView {
     if (summonPattern && !e.def.boss) add(
       `summon${summons >= (summonPattern.releaseAt ?? Infinity) ? ' ready' : ''}`,
       icon('jar'),
-      tip(`${summonPattern.name} ${summons}/${summonPattern.max}`, `부하가 늘수록 세진다 (지금 공격 +${summons * (summonPattern.attackBonusPerUnit ?? 0)})`),
+      tip(`${summonPattern.name} ${summons}/${summonPattern.max}`, `부하가 늘수록 세진다\n지금 공격 +${summons * (summonPattern.attackBonusPerUnit ?? 0)}`),
     )
     if (e.def.webPattern && !e.def.boss) add(
       `web${spiderWebTension(e) >= e.def.webPattern.maxSealedCards ? ' ready' : ''}`,
@@ -2085,7 +2085,7 @@ export class BattleView {
           `공격 속성이 ${EMOTION_LABEL[affinity]}이면 피해 ×${formatMult(weakMult)}`,
           '공격 속성은 문장에서 가장 많이 쓴 감정',
           ...(activePart ? [
-            `지금 부위(${activePart.def.name})의 약점`,
+            `지금 부위 ${activePart.def.name}의 약점`,
             ...(e.def.webPattern ? ['약점 감정으로 막거나 회복하면 봉인 -1', '약점 감정+관용구 공격은 남은 피해가 다음 부위로'] : []),
           ] : []),
         ]
@@ -2114,7 +2114,7 @@ export class BattleView {
       guard: e.guard,
       guardTip: tip(`방어도 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다\n관통 공격은 무시한다`),
       magic: e.magicShield,
-      magicTip: tip(`매직실드 ${e.magicShield}겹`, `공격 ${e.magicShield}번을 통째로 막는다(관통도 막는다)\n연타로 한 겹씩 벗긴다\n오버킬로 넘어온 피해에는 깨지며 뚫린다`),
+      magicTip: tip(`매직실드 ${e.magicShield}겹`, `공격 ${e.magicShield}번을 통째로 막는다\n관통 공격도 막는다\n연타로 한 겹씩 벗긴다\n오버킬로 넘어온 피해에는 깨지며 뚫린다`),
     })
     const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
     hpbar.hidden = false
@@ -3022,7 +3022,7 @@ export class BattleView {
         `한도 ⟦${limit}|최대 체력 ${s.playerMax} 절반 → ${Math.floor(s.playerMax / 2)}; 방어 ${formatNumber(stats.guard)} × ${PLAYER_GUARD_LIMIT_PER_GUARD_STAT} → ${formatNumber(stats.guard * PLAYER_GUARD_LIMIT_PER_GUARD_STAT)}; 합계 ${limit}⟧ = 최대 체력 절반 + 방어×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}`,
         '피해를 먼저 막고 막은 만큼만 줄어든다',
         examples((w) => w.slot === 'verb' && w.kind === 'guard' && !(w.effects?.guardAttackMultiplier)),
-        '방패치기: 지금 쌓인 만큼 피해를 더한다 (소모 없음)',
+        '방패치기: 쌓인 방어도만큼 피해를 더하고 방어도는 그대로 남긴다',
         '한도를 넘친 몫도 그 턴 방패치기엔 들어간다',
         examples((w) => (w.effects?.guardAttackMultiplier ?? 0) > 0, 2),
       )
@@ -3035,8 +3035,8 @@ export class BattleView {
       )
     } else {
       lines.push(
-        `확률 카드 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(LUCK_SUCCESS_CAP * 100)}%)`,
-        `대성공 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(CRIT_CAP * 100)}%)`,
+        `확률 카드 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p · 최대 ${Math.round(LUCK_SUCCESS_CAP * 100)}%`,
+        `대성공 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p · 최대 ${Math.round(CRIT_CAP * 100)}%`,
         `보상 등급 최저 ${gradeFloor(stats.luck)} · 영웅 +${formatNumber(luckRarityShift(stats.luck).epic, 1)}%p · 전설 +${formatNumber(luckRarityShift(stats.luck).legendary, 1)}%p`,
         examples((w) => (w.crit ?? 0) > 0 || !!w.variance),
       )
@@ -3763,7 +3763,7 @@ export class BattleView {
       const explained = flats.reduce((sum, part) => sum + part.value, 0)
       if (supportBase > explained) {
         flats.push({
-          label: kind === 'guard' ? '실드 효과' : '회복 효과',
+          label: kind === 'guard' ? '방어도 효과' : '회복 효과',
           value: supportBase - explained,
           cls: kind,
         })
@@ -3874,7 +3874,7 @@ export class BattleView {
     el.className = `tally ${tally.kind}`
     const convertedOnly = tally.kind === 'dmg' && tally.mults.length === 0 && tally.flats.length > 0
       && tally.flats.every((f) => f.label === text.guardConvert || f.label === text.overhealConvert)
-    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : convertedOnly ? text.converted : '점수'
+    const baseLabel = tally.kind === 'guard' ? '방어도' : tally.kind === 'heal' ? '회복' : convertedOnly ? text.converted : '점수'
     el.innerHTML = `
       <div class="tally-slots">
         <div class="tally-cell"><div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div></div>

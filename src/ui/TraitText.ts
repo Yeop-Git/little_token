@@ -30,7 +30,7 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     ['방어도', { kind: 'stat', stat: 'guard' }], ['방어 스탯', { kind: 'stat', stat: 'guard' }],
     ['회복', { kind: 'stat', stat: 'heal' }], ['운 스탯', { kind: 'stat', stat: 'luck' }],
     ['대성공', { kind: 'keyword' }], ['관용구', { kind: 'keyword' }], ['공명', { kind: 'keyword' }],
-    ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['배율 풀', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],
+    ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['카드 배율', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],
     ['최대 체력', { kind: 'keyword' }], ['생명력 폭발', { kind: 'keyword' }], ['무럭무럭', { kind: 'keyword' }], ['랭크', { kind: 'keyword' }],
     ['문장부호 칸', { kind: 'slot' }], ['문장부호', { kind: 'slot' }], ['주어 칸', { kind: 'slot' }], ['동사 칸', { kind: 'slot' }],
     ['수식어 칸', { kind: 'slot' }], ['서술어', { kind: 'slot' }], ['주어', { kind: 'slot' }], ['수식어', { kind: 'slot' }], ['동사', { kind: 'slot' }],
@@ -65,7 +65,7 @@ function termsForLocale(): Array<[string, TagSpec]> {
 /** 한국어 설명 속 태그 툴팁. 전투 키워드는 카드 키워드 설명(wordKeywords)을 먼저 쓴다. */
 const TAG_TIPS_KO: Record<string, string> = {
   공격: '적의 체력을 깎는 행동이에요.\n공격 동사로 문장을 끝내면 피해를 줘요.',
-  방어: '실드를 쌓아 받는 피해를 줄여요.\n방어 동사로 문장을 끝내면 실드가 생겨요.',
+  방어: '방어도를 쌓아 받는 피해를 줄여요.\n방어 동사로 문장을 끝내면 방어도가 생겨요.',
   회복: '잃은 체력을 되찾아요.\n회복 동사로 문장을 끝내면 체력이 차요.',
   '운 스탯': '확률 효과가 터질 가능성을 높여요.',
   잉크: '카드를 낼 때 쓰는 자원이에요.\n카드마다 잉크 비용이 있어요.',
@@ -75,7 +75,7 @@ const TAG_TIPS_KO: Record<string, string> = {
   공명: '같은 감정 카드를 한 문장에 모으면 일어나요.\n공명 배율이 곱해져요.',
   '공명 배율': '같은 감정 카드가 모였을 때 곱해지는 배율이에요.',
   '관용구 배율': '관용구를 완성했을 때 곱해지는 배율이에요.',
-  '배율 풀': '여러 보너스를 더해서 한 번에 곱하는 배율이에요.',
+  '카드 배율': '주어·수식어·어미 카드의 배율은 서로 더한 뒤 한 번에 곱해요.',
   배율: '문장의 기본 점수에 곱해지는 값이에요.',
   '최대 체력': '체력이 차오를 수 있는 최대치예요.',
   랭크: '공격·방어를 25%씩 올리거나 내리는 단계예요.\n그 스테이지가 끝나면 사라져요.',

@@ -47,7 +47,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'pillbug',
     rewardFloors: [3],
     title: '반복 수식어',
-    tooltip: '매직실드는 공격 한 번을 한 겹씩 막아 내요(관통도 막아요)\n「미친 듯이」를 공격 동사와 함께 쓰면 동사가 2번 발동해 실드를 빨리 벗겨요\n혹은 앞 적을 쓰러뜨린 오버킬 피해로 실드를 깨며 뚫어요',
+    tooltip: '매직실드는 공격 한 번을 한 겹씩 막아 내요\n관통 공격도 막아요\n「미친 듯이」를 공격 동사와 함께 쓰면 동사가 2번 발동해 실드를 빨리 벗겨요\n혹은 앞 적을 쓰러뜨린 오버킬 피해로 실드를 깨며 뚫어요',
     cardIds: ['michin'],
   },
   {

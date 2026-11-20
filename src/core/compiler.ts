@@ -37,16 +37,16 @@ export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
           : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
 const CORE_TEXT = currentLocale === 'en'
-  ? { sky:'Up to the Sky', fire:'Ember Ink', fireHint:'{n} Ink left', pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
+  ? { sky:'Up to the Sky', fire:'Ember Ink', fireHint:'{n} Ink left', pool:'Card multiplier', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
   : currentLocale === 'ja'
-    ? { sky:'空まで', fire:'燃えるインク', fireHint:'残りインク{n}', pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
+    ? { sky:'空まで', fire:'燃えるインク', fireHint:'残りインク{n}', pool:'カード倍率', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
     : currentLocale === 'ru'
-      ? { sky:'До неба', fire:'Пылающие чернила', fireHint:'осталось чернил: {n}', pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
+      ? { sky:'До неба', fire:'Пылающие чернила', fireHint:'осталось чернил: {n}', pool:'Множитель карт', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
       : currentLocale === 'zh-Hans'
-        ? { sky:'直上云霄', fire:'燃烧的墨水', fireHint:'剩余墨水{n}', pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
+        ? { sky:'直上云霄', fire:'燃烧的墨水', fireHint:'剩余墨水{n}', pool:'卡牌倍率', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
         : currentLocale === 'zh-Hant'
-          ? { sky:'直上雲霄', fire:'燃燒的墨水', fireHint:'剩餘墨水{n}', pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
-          : { sky:'하늘까지', fire:'타오르는 잉크', fireHint:'남은 잉크 {n}', pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
+          ? { sky:'直上雲霄', fire:'燃燒的墨水', fireHint:'剩餘墨水{n}', pool:'卡牌倍率', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
+          : { sky:'하늘까지', fire:'타오르는 잉크', fireHint:'남은 잉크 {n}', pool:'카드 배율', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
 
 const sameEmotionHint = (count: number): string => currentLocale === 'ko'
   ? `${CORE_TEXT.sameEmotion} ${count}장`

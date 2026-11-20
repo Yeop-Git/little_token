@@ -1268,7 +1268,7 @@ export const PUNCT_WORDS: Word[] = [
     "emotion": "neutral",
     "rarity": "legendary",
     "art": "7001",
-    "note": "선공 상대보다 먼저 행동한다",
+    "note": "선공",
     "lore": "느낌표를 찍자 손이 먼저 나갔다."
   },
   {
@@ -1282,7 +1282,7 @@ export const PUNCT_WORDS: Word[] = [
     "bonus": 0.1,
     "rarity": "legendary",
     "art": "7002",
-    "note": "배율 풀 +0.10 (안전한 한 수)",
+    "note": "배율 ×1.10",
     "lore": "조용히 마침표를 찍는다. 그걸로 충분한 날도 있다."
   },
   {
@@ -1296,7 +1296,7 @@ export const PUNCT_WORDS: Word[] = [
     "crit": 0.3,
     "rarity": "legendary",
     "art": "7003",
-    "note": "대성공 확률 +30%",
+    "note": "대성공 30%",
     "lore": "정말 이걸로 끝일까? 되묻는 순간 문장이 커진다."
   }
 ]
