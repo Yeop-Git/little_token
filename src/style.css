@@ -1213,14 +1213,10 @@ button {
 .action-order-item.timing-waiting { opacity: .3; transform: scale(.82); transform-origin: left center; }
 .action-order-item.timing-waiting .action-order-portrait { filter: grayscale(.38) blur(1px); }
 .action-order-item.timing-waiting .action-order-copy { background: rgba(18, 14, 23, .32); }
-.action-order-item.timing-summary { opacity: .62; transform: scale(.78); transform-origin: left center; }
-.action-order-item.timing-summary .action-order-portrait { color: var(--gold-hi); background: rgba(30, 22, 34, .9); }
-.action-order-item.timing-summary .action-order-portrait svg { width: 42px; height: 42px; }
+/* 레일 대기 묶음 — 초상 없이 "×N 레일 대기" 글자 한 줄만 둔다. 몇 마리든 이 한 줄이다. */
+.action-order-item.timing-summary { min-height: 0; opacity: .72; }
+.action-order-item.timing-summary .action-order-copy { margin-left: 8px; padding: 5px 14px; border-radius: 14px; }
 .action-order-item.timing-summary .action-order-copy b { color: var(--gold-hi); font-size: 19px; }
-/* 레일 대기 묶음 — 기다리는 적 초상을 작게 겹쳐 한 칸에 담는다. 몇 마리든 이 한 줄이다. */
-.action-order-stack { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 4px 4px; }
-.action-order-stack img { width: 46px; height: 62px; flex: none; margin-left: -22px; object-fit: contain; object-position: center bottom; filter: grayscale(.3); }
-.action-order-stack img:first-child { margin-left: 0; }
 
 /* 가방을 열지 않아도 보이는 Slay the Spire식 보유 아이템 열. */
 .relic-strip {

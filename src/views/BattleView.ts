@@ -223,8 +223,6 @@ const BOSS_WALK_MS = 3380
  * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
  */
 const RAIL_ADVANCE_WALK_MS = 420
-/** 레일 대기 묶음 줄에 겹쳐 세우는 초상 수. 나머지는 ×N 숫자로만 센다. */
-const MAX_ACTION_ORDER_WAITING_PORTRAITS = 3
 /** 보유 아이템이 이만큼을 넘으면 아이콘을 줄여 잉크 계량기 위에서 멈추게 한다. */
 const RELIC_DENSE_AT = 16
 const RELIC_TIGHT_AT = 25
@@ -1416,8 +1414,6 @@ export class BattleView {
       active: boolean
       /** 이번에 움직이는 적의 예상 피해(11/20: 붉은 글씨로 크게). */
       damage?: string
-      /** 레일 대기 묶음 — 작은 초상 몇 장만 겹쳐 세운다. */
-      portraits?: string[]
     }
 
     const entries: OrderEntry[] = []
@@ -1486,8 +1482,6 @@ export class BattleView {
         key: 'enemy-waiting',
         name: `×${waitingEnemies.length}`,
         portrait: '',
-        portraits: waitingEnemies.slice(0, MAX_ACTION_ORDER_WAITING_PORTRAITS)
-          .map((i) => this.visualForEnemy(this.state.enemies[i]).portrait2d),
         side: 'enemy',
         timing: 'summary',
         note: '레일 대기',
@@ -1513,9 +1507,7 @@ export class BattleView {
     host.innerHTML = entries.map((entry, index) => `
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
         data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
-        <div class="action-order-portrait">${entry.portraits?.length
-          ? `<span class="action-order-stack">${entry.portraits.map((src) => `<img src="${src}" alt="">`).join('')}</span>`
-          : entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
+        ${entry.timing === 'summary' ? '' : `<div class="action-order-portrait"><img src="${entry.portrait}" alt=""></div>`}
         <div class="action-order-copy"><b>${entry.name}${entry.damage ? `<strong class="action-order-damage" aria-label="${t('battleExpectedDamage', '예상 피해 {value}').replace('{value}', String(entry.damage))}" data-tooltip="${tip(t('battleExpectedDamage', '예상 피해 {value}').replace(/[:：]?\s*\{value\}/, ''), t('battleExpectedDamageTip', '이번 행동으로 받을 수 있는 피해 {value}').replace('{value}', String(entry.damage)))}" data-tip-place="above">${icon('sword')}${entry.damage}</strong>` : ''}</b><span>${entry.note}</span></div>
       </li>`).join('')
     host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
