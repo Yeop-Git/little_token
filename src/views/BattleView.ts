@@ -238,6 +238,10 @@ const HEAVY_HOLD_MS = 460
 const HEAVY_PANEL_CLEAR_MS = 200
 /** 돌진을 타격보다 이만큼 먼저 출발시킨다 — 0.44초 돌진의 42%(185ms)가 타격에 겹치게. */
 const HEAVY_LUNGE_LEAD_MS = 80
+/** 감정 공명 띠의 재생 길이 — style.css의 resonance-show와 같다. 끝까지 기다린 뒤 다음 연출로. */
+const RESONANCE_FLASH_MS = 760
+/** 맥락 발동 배너의 재생 길이 — style.css의 combo-show와 같다. */
+const COMBO_FLASH_MS = 1150
 /**
  * 섬광이 다 피어날 시간. 정지 화면에 붙들 그림이 없으면 정지가 공백으로 읽힌다.
  * 48ms로 잡았을 때는 겉겹(링·프리즘·베인 사선)이 아직 10~20%밖에 안 자라서
@@ -2353,7 +2357,7 @@ export class BattleView {
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       for (const c of matchCombos(this.sel, this.t.combos, order)) {
         const known = this.discoveredCombos.has(c.id)
-        extra += `<span class="chain-word ctx perfect"><b class="cw-text">${known ? `「${c.name}」` : '?'}</b><em class="cw-note combo">${known ? `완벽한 맥락 ×${formatMult(c.mult)}` : '새로운 맥락?'}</em></span>`
+        extra += `<span class="chain-word ctx perfect${known ? '' : ' unknown'}" data-combo="${c.id}"><b class="cw-text">${known ? `「${c.name}」` : '?'}</b><em class="cw-note combo">${known ? this.comboChainNote(c) : '새로운 맥락?'}</em></span>`
       }
       // 피노키오의 미아핑 — 문장을 완성하면 끝에 붙는 고정 맥락. 굴림 전에 범위를 보여준다.
       if (intent.doubtCount > 0) {
@@ -2371,6 +2375,23 @@ export class BattleView {
     // 랭크 카드를 고르면 스탯 칩에 「이번 턴 +1」 딱지가 바로 붙는다.
     this.renderStats()
     this.renderMultNow(anyPicked)
+  }
+
+  private comboChainNote(c: Combo): string {
+    return `완벽한 맥락 ×${formatMult(c.mult)}`
+  }
+
+  /** 정산 중 처음 밝혀진 맥락 — 문장 칸의 「?」 칸만 제자리에서 이름으로 바꾼다(체인 전체를 다시 그리지 않는다). */
+  private revealChainCombos(combos: Combo[]) {
+    for (const c of combos) {
+      const slot = this.q('#chain').querySelector<HTMLElement>(`.chain-word.ctx.perfect[data-combo="${c.id}"]`)
+      if (!slot) continue
+      slot.querySelector('.cw-text')!.textContent = `「${c.name}」`
+      slot.querySelector('.cw-note')!.textContent = this.comboChainNote(c)
+      slot.classList.remove('unknown', 'revealed')
+      void slot.offsetWidth
+      slot.classList.add('revealed')
+    }
   }
 
   private renderInk(): void {
@@ -3604,6 +3625,9 @@ export class BattleView {
     this.coachAfterPick()
     // 전부 채우면 자동 완성(반짝 → 발동)
     if (this.complete()) {
+      // 문장이 다 찼으면 마지막 카드의 상세창(예상 합계)을 먼저 닫는다 — 남아 있으면
+      // 날아가는 카드·정산 연출과 같은 자리에서 겹친다.
+      this.renderDetail(null)
       const intent = compile(this.sel, this.t, this.combatStats(), this.mods())
       GameAudio.playSentenceComplete(intent.emotions)
       // 맥락이 맞물린 문장은 토큰도 신이 난다.
@@ -3926,8 +3950,9 @@ export class BattleView {
     const adjustChip = tally.adjustment
       ? this.tallyChip(multFeed, `${text.adjustment} ${tally.adjustment > 0 ? '+' : ''}${formatNumber(tally.adjustment)}`, tally.adjustment > 0 ? 'buff' : 'down')
       : null
-    const excessChip = tally.excess && tally.excess.value > 0
-      ? this.tallyChip(multFeed, `${tally.excess.label} ${formatNumber(tally.excess.value)}`, `${tally.kind} excess`)
+    // 효과 칸(lanes)이 있으면 넘친 몫은 그 칸 아래 작은 글씨로 이미 적힌다 — 칩은 생략.
+    const excessChip = tally.excess && tally.excess.value > 0 && !tally.lanes
+      ?this.tallyChip(multFeed, `${tally.excess.label} ${formatNumber(tally.excess.value)}`, `${tally.kind} excess`)
       : null
 
     // 최종 숫자를 넣은 상태로 한 번 재서 상자·총합 폭을 고정하고 판 축척을 잠근다.
@@ -4158,13 +4183,18 @@ export class BattleView {
   }
 
   // 머물러 있던 총합을 거둔다 — 그 수치가 그대로 적에게 들어간 직후에 부른다.
-  private releaseTally() {
+  // 돌려주는 값은 걷히기 직전 결과 숫자의 무대 좌표 — 실드·회복 숫자가 바로 그 자리에서
+  // 프롬에게 날아가, 판이 사라지고 다른 숫자가 새로 뜨는 게 아니라 같은 숫자가 넘어간다.
+  private releaseTally(): { x: number; y: number } | null {
     const el = this.parkedTally
-    if (!el) return
+    if (!el) return null
+    const total = el.querySelector<HTMLElement>('.tally-total')
+    const origin = total ? this.toStageCenter(total.getBoundingClientRect()) : null
     this.parkedTally = null
     el.classList.remove('parked')
     el.classList.add('out')
     this.timers.push(window.setTimeout(() => el.remove(), 340))
+    return origin
   }
 
   private resonantEmotion(emotions: readonly Emotion[]): Emotion | null {
@@ -4187,7 +4217,7 @@ export class BattleView {
     el.classList.remove('show')
     void el.offsetWidth
     el.classList.add('show')
-    await this.sleep(520)
+    await this.sleep(RESONANCE_FLASH_MS)
     el.classList.remove('show')
   }
 
@@ -4204,15 +4234,6 @@ export class BattleView {
     el.classList.remove('bump')
     void el.offsetWidth
     el.classList.add('bump')
-  }
-
-  // 단어 하나가 문장 위로 톡 튀길 기여 수치.
-  private contribOf(w: Word): { text: string; cls: string } | null {
-    if (w.power) return { text: `+${w.power}`, cls: w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg' }
-    if (w.bonus) return { text: `×${(1 + w.bonus).toFixed(1)}`, cls: 'buff' }
-    if (w.effects?.guard) return { text: `방어+${w.effects.guard}`, cls: 'guard' }
-    if (w.effects?.heal) return { text: `+${w.effects.heal}`, cls: 'heal' }
-    return null
   }
 
   // ── 발동: 팅팅팅(기여 수치) → 맥락 → 총합 롤업 → 돌진·사각 블라스트로 꽂힘 ──
@@ -4265,17 +4286,16 @@ export class BattleView {
 
     // 문장을 읽고 맥락을 확정한 뒤 준비 효과와 본행동을 시간순으로 나눈다.
     const chainEls = Array.from(this.q('#chain').querySelectorAll<HTMLElement>('.chain-word'))
+    // 카드별 점수는 문장 칸의 작은 글씨와 정산판 내역이 이미 말해 준다 — 여기서 숫자를
+    // 또 튀기면 같은 값이 세 번 뜬다. 물결만 훑고 지나간다.
     for (let i = 0; i < order.length; i++) {
-      const w = this.sel[order[i]]
-      const c = w ? this.contribOf(w) : null
-      const el = chainEls[i]
-      if (el) el.classList.add('wave')
-      if (c && el) this.popEl(el, c.text, `tick ${c.cls}`)
+      chainEls[i]?.classList.add('wave')
       await this.sleep(70)
     }
     this.q('#flash').classList.add('go')
     await this.sleep(110)
 
+    // 공명 → 맥락 → 발견 쪽지 → 정산판. 앞 연출이 끝까지 사라진 뒤 다음 것이 뜬다.
     if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
 
     // 맥락(관용구) 발동 배너
@@ -4289,13 +4309,19 @@ export class BattleView {
       }
       const comboMult = combos.reduce((m, c) => m * c.mult, 1)
       const el = this.q('#combo')
-      el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">위력 ×${comboMult.toFixed(1)}</div>`
+      // 정산판 내역과 같은 이름·자릿수(배율 ×1.50)로 적는다.
+      el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">배율 ×${comboMult.toFixed(2)}</div>`
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await this.sleep(520)
+      // 배너가 끝까지 사라진 뒤 넘어간다 — 가장 진할 때 끊으면 다음 연출과 맞물리지 않는다.
+      await this.sleep(COMBO_FLASH_MS)
       el.classList.remove('show')
-      if (newlyDiscovered.length) await this.showComboDiscovery(newlyDiscovered)
+      if (newlyDiscovered.length) {
+        // 처음 밝혀진 맥락은 상단 문장 칸의 「?」 자리가 그 자리에서 이름으로 뒤집힌다.
+        this.revealChainCombos(newlyDiscovered)
+        await this.showComboDiscovery(newlyDiscovered)
+      }
     }
 
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
@@ -4338,8 +4364,10 @@ export class BattleView {
       playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'shield')
       // 캐릭터의 실드 형성과 같은 프레임에 체력바도 차오르기 시작한다.
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
-      await this.rollTotal(prep.guardGain, 'guard')
-      await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard')
+      // 실드 문장은 정산판이 이미 같은 숫자를 보여 줬다. 가운데 큰 숫자를 한 번 더
+      // 굴리지 않고, 판을 걷으며 결과 숫자 자리에서 곧장 프롬에게 날려 보낸다.
+      const handoff = tally.kind === 'guard' ? this.releaseTally() : null
+      await this.flyToPlayer(`방어+${prep.guardGain}`, 'guard', 'guard', handoff)
       this.log(`${intent.sentence} → 방어 ${prep.guardGain} 준비`)
     }
     if (prep.guardAttempted > prep.guardGain) {
@@ -4456,8 +4484,9 @@ export class BattleView {
     const missedSpiderWeakness = dealsDamage && res.hits.some((hit) =>
       !hit.weak && this.state.enemies[hit.target]?.def.id === 'elderSpider',
     )
-    this.releaseTally()
-    await this.strike(res, sweep, heavy, Math.max(1, intent.hitCount * intent.castCount))
+    const tallyHandoff = this.releaseTally()
+    // 회복 문장은 정산판의 결과 숫자가 그대로 프롬에게 날아간다.
+    await this.strike(res, sweep, heavy, Math.max(1, intent.hitCount * intent.castCount), tally.kind === 'heal' ? tallyHandoff : null)
     if ((res.lifeStolen ?? 0) > 0) {
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       await this.flyToPlayer(buildEffectText('healPop', res.lifeStolen), 'heal', 'heal')
@@ -4693,6 +4722,8 @@ export class BattleView {
     heavy: AttackCut | null = null,
     /** 문장이 꽂는 타격 수(연타 × 반복 발동). 한 숫자로 합쳐 들어가면 그 옆에 "2연타"를 붙인다. */
     comboCount = 1,
+    /** 회복 숫자가 출발할 자리(정산판 결과 칸). 없으면 무대 가운데에서 출발한다. */
+    healFrom: { x: number; y: number } | null = null,
   ) {
     const you = this.q<HTMLElement>('.actor.you')
     // 생명력 폭발은 회복 뒤에 넘친 힘이 적에게 향하는 연속 동작이다.
@@ -4702,7 +4733,7 @@ export class BattleView {
       GameAudio.play('heal')
       playCharacterAnimation(you, 'heal')
       this.updatePlayer(you)
-      await this.flyToPlayer(`+${healShown}`, 'heal', 'heal')
+      await this.flyToPlayer(`+${healShown}`, 'heal', 'heal', healFrom)
     }
     // 여왕벌은 피해를 먼저 일벌 킬체인에 소비하므로 본체 hit가 0건일 수 있다.
     // 그 경우에도 실제 공격은 일어났다. hit만 보면 정확히 30/60/120 피해에서 프롬이
@@ -5794,13 +5825,14 @@ export class BattleView {
   }
 
   // 수치가 중앙에서 플레이어에게 날아가 꽂힌다.
-  private async flyToPlayer(text: string, cls: string, theme: 'self' | 'heal' | 'guard') {
+  private async flyToPlayer(text: string, cls: string, theme: 'self' | 'heal' | 'guard', from: { x: number; y: number } | null = null) {
     const pboxEl = this.q('#pbox')
     const you = this.q<HTMLElement>('.actor.you')
     const modelShell = you.querySelector<HTMLElement>(':scope > .model-shell') ?? you
     const to = this.toStageCenter(modelShell.getBoundingClientRect())
-    const fx = pboxEl.offsetWidth / 2
-    const fy = pboxEl.offsetHeight * 0.5
+    // 정산판에서 넘겨받은 숫자는 그 결과 칸에서 출발한다(글자 높이 절반만큼 올려 중심을 맞춘다).
+    const fx = from ? from.x : pboxEl.offsetWidth / 2
+    const fy = from ? from.y - 22 : pboxEl.offsetHeight * 0.5
     const p = document.createElement('div')
     p.className = `pop ${cls} big`
     p.textContent = text
@@ -6147,31 +6179,6 @@ export class BattleView {
     this.timers.push(window.setTimeout(() => fx.remove(), phase === 'telegraph' ? 920 : 760))
   }
 
-  // 중앙 총합 카운트업(띠리리릭).
-  private async rollTotal(val: number, cls: string) {
-    const host = this.q('#pbox')
-    const el = document.createElement('div')
-    el.className = `big-total ${cls}`
-    host.appendChild(el)
-    const dur = 440
-    const t0 = performance.now()
-    // rAF는 탭이 가려지면 멈춘다. 굴림이 안 끝나도 턴은 이어지도록 시간 제한을 둔다.
-    const rollUp = new Promise<void>((resolve) => {
-      const tick = (t: number) => {
-        const p = Math.min(1, (t - t0) / dur)
-        el.textContent = String(Math.round(val * (0.15 + 0.85 * p)))
-        if (p < 1) requestAnimationFrame(tick)
-        else resolve()
-      }
-      requestAnimationFrame(tick)
-    })
-    await Promise.race([rollUp, this.sleep(dur + 220)])
-    el.textContent = String(val)
-    await this.sleep(160)
-    el.classList.add('out')
-    this.timers.push(window.setTimeout(() => el.remove(), 400))
-  }
-
   // ── 피드백 ──
   private toStage(rect: DOMRect): { x: number; y: number } {
     const pboxEl = this.q('#pbox')
@@ -6187,10 +6194,6 @@ export class BattleView {
       x: (rect.left + rect.width / 2 - box.left) / scale,
       y: (rect.top + rect.height / 2 - box.top) / scale,
     }
-  }
-  private popEl(el: HTMLElement, txt: string, cls: string) {
-    const { x, y } = this.toStage(el.getBoundingClientRect())
-    this.spawnPop(x, y - 4, txt, cls)
   }
   private popAt(enemyIdx: number, txt: string, cls: string, sub = '', offsetY = 0) {
     const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
