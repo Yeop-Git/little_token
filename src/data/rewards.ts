@@ -209,7 +209,7 @@ const toItemOption = (item: ItemDef): RewardOption => ({
   kind: 'item',
   rarity: item.rarity,
   name: item.name,
-  desc: item.passive ? '고유효과 · 제련 문장으로 스탯 선택' : '제련 문장으로 스탯 선택',
+  desc: item.passive ? '특성 · 제련 문장으로 스탯 선택' : '제련 문장으로 스탯 선택',
   art: 'gift',
   item,
 })

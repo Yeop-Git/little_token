@@ -16,6 +16,7 @@ import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } fro
 import { itemArt } from '@/ui/Icons'
 import { wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
+import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
 import type { RewardPhase } from '@core/run'
@@ -182,8 +183,10 @@ function itemCardEffect(opt: RewardOption): string {
  * 일반·희귀 아이템에도 특성이 붙을 수 있으므로 길어지면 줄을 늘리지 자르지 않는다.
  */
 function itemTraitHtml(opt: RewardOption): string {
-  if (opt.kind !== 'item' || !opt.item?.passive) return ''
-  const trait = PASSIVES[opt.item.passive]
+  if (opt.kind !== 'item' || !opt.item) return ''
+  const trait = opt.item.passive
+    ? PASSIVES[opt.item.passive]
+    : opt.item.trait ? itemTraitText(opt.item.trait, opt.item.rarity) : null
   if (!trait) return ''
   return `<div class="reward-kind-trait"><small>${text('rewardItemPassive', '특성')}</small><b>${trait.name}</b><span>${trait.desc}</span></div>`
 }
@@ -251,7 +254,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     const rows = STAT_ORDER.filter((key) => item.base[key])
       .map((key) => `<div class="idrow"><span>${STAT_LABEL[key]}</span><span class="iv">+${item.base[key]}</span></div>`)
       .join('')
-    const passive = item.passive ? PASSIVES[item.passive] : null
+    const passive = item.passive ? PASSIVES[item.passive] : item.trait ? itemTraitText(item.trait, item.rarity) : null
     return `
       <div class="wd-name">${item.name}</div>
       <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[item.rarity]}</div>

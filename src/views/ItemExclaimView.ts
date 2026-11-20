@@ -16,6 +16,9 @@ import { RARITY_LABEL, type Word } from '@core/types'
 import { wordCardInnerHtml } from '@/ui/WordCardFace'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
 import { GameAudio } from '@/audio/GameAudio'
+import { PASSIVES } from '@core/passives'
+import { itemTraitText, TRAIT_LABEL } from '@core/itemTraits'
+import { currentLocale } from '@/localization'
 
 interface Opts {
   item: ItemDef
@@ -83,6 +86,14 @@ export class ItemExclaimView {
     return t
   }
 
+  /** 제련할 아이템의 특성(일반·희귀는 진열에서 굴린 특성, 영웅·전설은 고유 특성). */
+  private traitHtml(): string {
+    const item = this.opts.item
+    const trait = item.passive ? PASSIVES[item.passive] : item.trait ? itemTraitText(item.trait, item.rarity) : null
+    if (!trait) return ''
+    return `<div class="iforge-trait"><small>${TRAIT_LABEL[currentLocale]}</small><b>${trait.name}</b><span>${trait.desc}</span></div>`
+  }
+
   private complete() {
     return EXCLAIM_SLOTS.every((s) => this.picks[s.key])
   }
@@ -119,6 +130,7 @@ export class ItemExclaimView {
             <div class="iforge-stats glass">
               <div class="dock-title">제련 스탯</div>
               <div class="stat-list" id="stats"></div>
+              ${this.traitHtml()}
               <div class="iforge-flavor">“${item.flavor}”</div>
             </div>
           </div>
@@ -270,6 +282,7 @@ export class ItemExclaimView {
         line,
         stats: { hp: totals.hp, atk: totals.atk, guard: totals.guard, heal: totals.heal, luck: totals.luck },
         passive: item.passive,
+        ...(item.trait ? { trait: item.trait } : {}),
       })
     }, reducedMotion ? 360 : FORGE_COMPLETE_HOLD_MS))
   }

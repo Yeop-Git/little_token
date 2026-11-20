@@ -806,7 +806,7 @@ export class CardHand {
     const spent = this.drawsLeft <= 0
     const disabled = !this.inputEnabled || this.processing || full || spent || pileLeft === 0
     const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
-    const saveHint = this.drawsLeft > 0 ? ` · 아끼면 영감 +${this.drawsLeft}` : ''
+    const saveHint = this.savedDraws > 0 ? ` · 아끼면 영감 +${this.savedDraws}` : ''
     this.opts.deckButton.disabled = disabled
     this.opts.deckButton.title = `남은 뽑기 ${this.drawsLeft}회${saveHint}`
     this.opts.deckButton.setAttribute('aria-label', (disabled ? `카드 뽑기 불가: ${note}` : `카드 뽑기, ${note}`) + saveHint)

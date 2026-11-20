@@ -35,16 +35,16 @@ export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
           : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
 const CORE_TEXT = currentLocale === 'en'
-  ? { pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions' }
+  ? { pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
   : currentLocale === 'ja'
-    ? { pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情' }
+    ? { pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
     : currentLocale === 'ru'
-      ? { pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций' }
+      ? { pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
       : currentLocale === 'zh-Hans'
-        ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪' }
+        ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
         : currentLocale === 'zh-Hant'
-          ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒' }
-          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
+          ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
+          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
 
 const sameEmotionHint = (count: number): string => currentLocale === 'ko'
   ? `${CORE_TEXT.sameEmotion} ${count}장`
@@ -237,6 +237,11 @@ export function compile(
 
   // 보너스 풀은 가산이다 — 단어마다 칩을 하나씩 세우면 화면이 곱셈으로 읽히고
   // (1+0.2)×(1+0.15) ≠ 1+0.35 만큼 집계판이 실제 피해와 어긋난다. 한 칩으로 합쳐 세운다.
+  // 아이템 특성(배율) — 배율 풀 칩 하나에 합쳐 세운다.
+  if (mods.traitPool) {
+    bonusPool += mods.traitPool
+    bonusFrom.push(CORE_TEXT.trait)
+  }
   if (bonusPool) {
     mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · ') })
   }
@@ -251,8 +256,29 @@ export function compile(
   // 피해 깡수치가 실제로 쌓였으면 회복/방어 동사가 뒤에 와도 공격 문장이다.
   if (base > 0 && damageKind) kind = damageKind
 
-  const comboMult = combos.reduce((m, c) => m * c.mult, 1)
+  // 아이템 특성 — 감정 카드 수, 행동 종류에 따라 문장의 주 수치(피해/방어/회복)에 더한다.
+  // 수치가 실제로 생긴 칸에만 얹어 0에 곱해지는 가짜 점수를 만들지 않는다.
+  const mainLane: 'damage' | 'guard' | 'heal' | null = base > 0 ? 'damage' : statGuard > 0 ? 'guard' : statHeal > 0 ? 'heal' : null
+  const addTraitFlat = (label: string, value: number) => {
+    if (!value || !mainLane) return
+    if (mainLane === 'damage') base += value
+    else if (mainLane === 'guard') statGuard += value
+    else statHeal += value
+    flats.push({ label, value, source: 'word', hint: CORE_TEXT.trait, lane: mainLane })
+  }
+  for (const [emotion, per] of Object.entries(mods.traitEmotionFlat ?? {}) as [Emotion, number][]) {
+    const count = order.filter((key) => sel[key] && emotionOrNeutral(sel[key]!.emotion) === emotion).length
+    addTraitFlat(`${EMOTION_LABEL[emotion]} ${CORE_TEXT.trait}`, count * per)
+  }
+  if (mainLane) addTraitFlat(`${CORE_TEXT.trait}`, mods.traitKindFlat?.[mainLane] ?? 0)
+
+  let comboMult = combos.reduce((m, c) => m * c.mult, 1)
   for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: CORE_TEXT.perfect })
+  // 아이템 특성(관용구) — 관용구가 하나라도 발동하면 문장 전체에 한 번 곱한다.
+  if (combos.length && mods.traitCombo) {
+    comboMult *= 1 + mods.traitCombo
+    mults.push({ label: CORE_TEXT.trait, value: 1 + mods.traitCombo, source: 'combo', hint: CORE_TEXT.perfect })
+  }
 
   // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
   const allTags = order.flatMap((k) => (sel[k] ? sel[k]!.tags : []))
@@ -279,7 +305,9 @@ export function compile(
   const emotionCounts = new Map<Emotion, number>()
   emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
   const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-  const emotionResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
+  const baseResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
+  // 아이템 특성(공명) — 공명이 실제로 일어났을 때만 공명 배율을 키운다.
+  const emotionResonance = baseResonance !== 1 ? baseResonance + (mods.traitResonance ?? 0) : 1
   if (emotionResonance !== 1) {
     mults.push({
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} ${CORE_TEXT.resonance}`,

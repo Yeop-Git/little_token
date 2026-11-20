@@ -14,6 +14,7 @@ import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
+import { rollItemTrait } from '@core/itemTraits'
 import { makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
@@ -105,7 +106,9 @@ const debugCombatModes = {
 // 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
 // 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
 function grantItem(def: ItemDef) {
+  const trait = def.passive ? undefined : rollItemTrait(def.id, def.rarity, Math.floor(Math.random() * 2 ** 31))
   applyItemReward(run.player, {
+    ...(trait ? { trait } : {}),
     id: def.id,
     name: def.name,
     rarity: def.rarity,
@@ -729,11 +732,23 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
   }
 }
 
+/** 일반·희귀 아이템 진열에 이번 클리어 씨앗으로 굴린 특성을 붙인다. 새로고침해도 같다. */
+function withItemTrait(item: ItemDef, seed = run.reward?.seed ?? 0): ItemDef {
+  if (item.trait || item.passive) return item
+  const trait = rollItemTrait(item.id, item.rarity, seed)
+  return trait ? { ...item, trait } : item
+}
+
+function withOptionTrait(option: RewardOption): RewardOption {
+  return option.kind === 'item' && option.item ? { ...option, item: withItemTrait(option.item) } : option
+}
+
 function shopOptionFromRef(ref: RewardPickRef | null): RewardOption | null {
   if (!ref) return null
   if (ref.kind === 'item') {
-    const item = ALL_ITEMS[ref.id]
-    if (!item || run.player.items.some((owned) => owned.id === item.id) || !canAddItemWithoutLock(run.player, item)) return null
+    const def = ALL_ITEMS[ref.id]
+    if (!def || run.player.items.some((owned) => owned.id === def.id) || !canAddItemWithoutLock(run.player, def)) return null
+    const item = withItemTrait(def)
     return {
       kind: 'item', rarity: item.rarity, name: item.name, desc: item.flavor,
       art: 'gift', item,
@@ -908,7 +923,7 @@ async function goReward(
     phase,
     rewardOfferRng(seed, phase, refreshes),
     run.inspiration,
-  )
+  ).map(withOptionTrait)
   // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
   // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
   if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {

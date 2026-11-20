@@ -239,6 +239,16 @@ export interface CompileMods {
   stageMult?: number
   /** 피노키오의 미아핑 — 완성한 문장 끝에 "…근데?" 한 번을 굴린다(굴림은 resolveMultiplier). */
   doubt?: boolean
+  /** 아이템 특성 — 감정 카드 1장마다 문장 주 수치에 더하는 값. */
+  traitEmotionFlat?: Partial<Record<Emotion, number>>
+  /** 아이템 특성 — 배율 풀에 더하는 값. */
+  traitPool?: number
+  /** 아이템 특성 — 해당 행동 문장에 한 번 더하는 수치. */
+  traitKindFlat?: { damage?: number; guard?: number; heal?: number }
+  /** 아이템 특성 — 감정 공명이 일어났을 때 공명 배율에 더하는 값. */
+  traitResonance?: number
+  /** 아이템 특성 — 관용구가 발동했을 때 (1+값)배. */
+  traitCombo?: number
 }
 
 export interface Tables {

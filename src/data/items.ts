@@ -6,6 +6,7 @@
  */
 
 import type { PassiveId } from '@core/passives'
+import type { ItemTraitId } from '@core/itemTraits'
 import type { Rarity } from '@core/types'
 import { RULE_ITEMS, STAT_ITEMS } from './generated/itemData'
 
@@ -44,6 +45,8 @@ export interface ItemDef {
    * 고유효과 등급만 모아도 감탄사 예산은 4~5점이라 단어 보상을 계속 골라야 한다.
    */
   passive?: PassiveId
+  /** 일반·희귀 아이템의 진열마다 굴린 특성(itemTraits.ts). 정의 데이터에는 없다. */
+  trait?: ItemTraitId
 }
 
 // 감탄 문장 슬롯 — 코어와 같은 "가변 슬롯" 사고. 기본 3칸.

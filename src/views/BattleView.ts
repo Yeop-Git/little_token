@@ -81,6 +81,7 @@ import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
 import { discoverCombos, discoveredComboIds } from '@core/comboDiscovery'
+import { traitExtraDraws } from '@core/itemTraits'
 import { beanstalkGrowthFor, DOUBT_RANGE, DOUBT_SUFFIX, ECHO_REPEAT_SCALE, hasPassive, modsFor, PASSIVES } from '@core/passives'
 import { ALL_ITEMS, STAT_LABEL } from '@data/items'
 import { CHARACTER_VISUALS, type CharacterVisualDef } from '@data/characters'
@@ -851,6 +852,9 @@ export class BattleView {
       },
       onPreviewEnd: () => this.fadeDock(() => this.renderDetail(null)),
     })
+    // 아이템 특성(한 장 더) — 이번 전투의 무료 뽑기 횟수를 늘린다.
+    const traitDraws = traitExtraDraws(this.player?.items)
+    if (traitDraws) this.cardHand.grantDraws(traitDraws)
     // 손패 DOM은 등장 연출 전에 먼저 만들어진다. 보이지 않는 카드를 광클해
     // 문장이 임의로 확정되지 않도록 적이 전장에 도착할 때까지 입력을 잠근다.
     this.cardHand.setInputEnabled(false)

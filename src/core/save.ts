@@ -13,6 +13,7 @@ import {
 } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import { ALL_ITEMS } from '@data/items'
+import { isItemTraitId } from '@core/itemTraits'
 import type { Word } from './types'
 import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerStats } from './player'
 import { IS_DEMO } from '@/config/edition'
@@ -150,6 +151,7 @@ function migrateItems(run: RunState): boolean {
       line: typeof saved.line === 'string' ? saved.line : def.flavor,
       stats: normalizedItemStats(saved.stats),
       ...(def.passive ? { passive: def.passive } : {}),
+      ...(!def.passive && isItemTraitId(saved.trait) ? { trait: saved.trait } : {}),
     })
   }
   run.player.items = normalized

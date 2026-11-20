@@ -9,6 +9,7 @@
 import type { PlayerState } from './player'
 import type { CompileMods } from './types'
 import { currentLocale } from '@/localization'
+import { traitInkBonus, traitMods } from './itemTraits'
 
 export type PassiveId =
   | 'echo' // 누댕의 메아리 — 대성공하면 그 문장이 한 번 더 발동한다
@@ -116,6 +117,7 @@ export function bonusInkFor(player: PlayerState | undefined): number {
   return (hasPassive(player, 'doubt') ? 1 : 0) + (hasPassive(player, 'matchFire') ? 2 : 0)
     + (hasPassive(player, 'punct') ? 1 : 0) + (hasPassive(player, 'twinSubj') ? 1 : 0)
     + (hasPassive(player, 'twinVerb') ? 2 : 0)
+    + traitInkBonus(player?.items)
 }
 
 export function beanstalkGrowthFor(player: PlayerState | undefined, available: boolean): number {
@@ -164,5 +166,6 @@ export function modsFor(player: PlayerState | undefined, kills = 0): CompileMods
     bonusEach: 0,
     stageMult: hasPassive(player, 'bbq') ? 1 + kills * BBQ_PER_KILL : 1,
     doubt: false,
+    ...traitMods(player?.items),
   }
 }

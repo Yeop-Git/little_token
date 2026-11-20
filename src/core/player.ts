@@ -5,6 +5,7 @@
 
 import { RARITY_LABEL, type Rarity, type Word } from '@core/types'
 import { PASSIVES, type PassiveId } from '@core/passives'
+import { itemTraitText, type ItemTraitId } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { WORDS } from '@data/words'
 import { currentLocale } from '@/localization'
@@ -37,6 +38,8 @@ export interface OwnedItem {
   stats: Partial<PlayerStats>
   /** 규칙을 바꾸는 패시브(영웅·전설 아이템 전용). 스탯 아이템은 없다. */
   passive?: PassiveId
+  /** 일반·희귀 아이템의 무작위 특성. */
+  trait?: ItemTraitId
 }
 
 export function ownedItemRarity(item: OwnedItem): Rarity {
@@ -97,6 +100,10 @@ export function itemTooltipText(item: OwnedItem): string {
   const stats = itemStatsText(item)
   const lines: string[] = []
   if (passive) lines.push(`${passive.name} — ${passive.desc}`)
+  if (item.trait) {
+    const trait = itemTraitText(item.trait, ownedItemRarity(item))
+    lines.push(`${trait.name} — ${trait.desc}`)
+  }
   if (stats) lines.push(stats)
   if (!lines.length) lines.push(item.line)
   return [item.name, ...lines].join('\n')
