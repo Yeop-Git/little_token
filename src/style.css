@@ -1834,12 +1834,18 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 피드백(11/20): 좌하단 고정 체력은 프롬과 떨어져 읽혔다. 일반전처럼 프롬의
      머리(후드) 바로 위에 붙인다. 배우 박스 상단이 곧 후드 끝 바로 위다. */
   position: absolute;
-  left: 42%;
-  top: 56px;
+  /* 피드백(11/20 2차): 그래도 구석처럼 읽혔다. 프롬 머리 정중앙 위로 올리고, 밝은 보스
+     배경(여왕벌 노을)에서도 묻히지 않게 옅은 어두운 받침을 깐다. 이름·숫자·바 양식은 일반전과 같다. */
+  left: 50%;
+  top: 40px;
   bottom: auto;
   z-index: 58;
-  width: 290px;
+  width: 300px;
   margin: 0;
+  padding: 6px 12px 8px;
+  border-radius: 10px;
+  background: rgba(18, 11, 10, .58);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
   transform: translateX(-50%);
 }
 .scene.battle[data-boss='true'] .actor.you .nameplate .nm { font-size: 21px; }
