@@ -425,6 +425,15 @@ export class BattleView {
    * 붙는다 — 관통이나 메아리에서 또 멈추면 검기가 지나가는 흐름이 토막토막 끊긴다.
    */
   private heavyStopUsed = false
+  /**
+   * 지금 레일을 훑고 있는 검기 한 줄기. 관통마다 새 검기를 만들면 앞 검기가 도착 지점에
+   * 200ms 서 있는 동안 다음 검기가 같은 자리에서 또 출발해, 한 줄기여야 할 검기가
+   * 두세 개 겹쳐 날아가는 것으로 보였다(실측). 관통·빠져나감은 이 하나를 이어서 민다.
+   */
+  /** x0는 앞날이 출발한 무대 좌표, dx는 거기서 앞날이 지금까지 나아간 거리. */
+  private slashBeam: { el: HTMLElement; x0: number; dx: number; fadeTimer: number } | null = null
+  /** 방금 터진 타격점의 높이 — 검기는 이 높이로 출발해야 섬광과 한 줄로 이어진다. */
+  private lastImpactY: number | null = null
   /** 이번 턴 준비 효과로 실제로 오른 공격·방어 랭크. 턴이 넘어가면 0으로 돌아간다. */
   private turnRankGain = { atk: 0, guard: 0 }
   private actionOrderSignature = ''
@@ -4570,6 +4579,10 @@ export class BattleView {
     // 강타의 일반 적은 검기 흐름을 위해 뒤에서 쓰러져도 되지만, 보스는 체력바가
     // 0까지 내려간 뒤 사망해야 한다. 여기서 기다리지 않으면 allDead 판정이 먼저
     // finishWin을 열어 체력이 남아 보이는 채 CLEAR가 덮인다.
+    // 강타의 확대·슬로우는 첫 타격의 정지(stopFirstHit)가 풀어 준다. 그런데 일벌 방패·무적에
+    // 다 막히거나 꽂힐 배우가 없으면 정지가 한 번도 안 열려, 적 차례 내내 화면이 조여든 채
+    // 남았다. 여기서 한 번 더 확인해 반드시 원위치시킨다.
+    if (heavy && !firstHitStopped && !this.motionOff()) this.endSlowmo()
     if (heavy) {
       for (const k of res.killed) {
         if (this.state.enemies[k]?.def.boss) await this.playDeath(k, 1, true)
@@ -4945,6 +4958,7 @@ export class BattleView {
     // 프롬이 오른쪽으로 파고들어 때리므로 접점은 적 실루엣의 왼쪽 앞면이다.
     flash.style.left = `${x - rect.width * 0.22}px`
     flash.style.top = `${y}px`
+    this.lastImpactY = y
     // 크기는 이 판을 얼마나 깎았는지(power)와 배율 등급(tier)을 함께 태운다.
     flash.style.setProperty('--power', (0.9 + power * 0.7 + tier * 0.8).toFixed(2))
     flash.style.setProperty('--tier', tier.toFixed(2))
@@ -5109,6 +5123,9 @@ export class BattleView {
     // 검기가 마지막 적을 베고도 힘이 남았을 때만 화면 밖으로 빠져나간다. 살아남은 적에게
     // 막혀 멈춘 검기를 또 내보내면, 이미 끝난 줄기 뒤에 두 번째 검기가 날아가는 것처럼 보였다.
     let beamCarriesOn = true
+    // 이번 관통은 새 줄기로 시작한다. 앞선 일격(메아리 등)의 검기가 아직 사그라드는
+    // 중이어도 그걸 이어받으면 엉뚱한 자리에서 출발한다.
+    this.slashBeam = null
     while (overflow > 0 && !allDead(this.state)) {
       const front = frontIdx(this.state)
       if (front < 0) break
@@ -5197,19 +5214,52 @@ export class BattleView {
     const frontSlot = { x: box.offsetWidth - stage.railRight - 140, y: box.offsetHeight * 0.52 }
     // 쓰러진 적은 풀로 돌아가 DOM에서 떨어진다. 떨어진 노드의 rect는 전부 0이라 그대로
     // 쓰면 검기가 화면 좌상단 구석에서 출발한다(실측으로 그랬다).
+    // 높이는 타격점(flashImpact)과 같은 몸통(.model-shell) 중심으로 잡는다. .actor 전체를
+    // 재면 이름표·체력바·TIP까지 포함돼 검기가 섬광보다 한참 위(머리 위)로 지나갔다.
     const centerOf = (el: HTMLElement | null) => {
       if (!el?.isConnected) return null
-      const rect = el.getBoundingClientRect()
+      const body = el.querySelector<HTMLElement>(':scope > .model-shell') ?? el
+      const rect = body.getBoundingClientRect()
       return rect.width > 0 && rect.height > 0 ? this.toStageCenter(rect) : null
     }
-    const start = centerOf(from) ?? frontSlot
     // 다음 적에게 정확히 날아간다. 이때 그 적은 아직 당겨지지 않고 자기 자리(레일 뒤)에
     // 서 있어야 한다 — 그래서 관통 전에는 레일을 다시 그리지 않는다(resolveOverflow 참고).
     // 궤적은 **올곧다**. 목표 높이로 기울이면 레일을 훑는 한 줄기가 아니라 여러 번
     // 꺾인 선으로 읽힌다 — 높이는 출발점에 고정하고 가로로만 뻗는다.
     const aim = centerOf(to)
-    const end = { x: aim ? aim.x : box.offsetWidth + 360, y: start.y }
     const tier = this.heavyTier()
+    // 배율이 높으면 조금 더 길게 뻗는다 — 궤적이 화면에 남는 시간도 등급이다.
+    const travel = Math.round((to ? SLASH_BEAM_MS : SLASH_BEAM_MS * 1.7) * (1 + tier * 0.25))
+    const easing = to ? 'cubic-bezier(0.2, 0.8, 0.3, 1)' : 'cubic-bezier(0.3, 0.5, 0.7, 1)'
+
+    // 이미 날아가고 있는 검기가 있으면 그 줄기를 이어서 민다 — 새로 만들지 않는다.
+    const current = this.slashBeam?.el.isConnected ? this.slashBeam : null
+    if (current) {
+      clearTimeout(current.fadeTimer)
+      const fromDx = current.dx
+      const toDx = (aim ? aim.x : box.offsetWidth + current.el.offsetWidth) - current.x0
+      for (const animation of current.el.getAnimations()) {
+        // 지금 그려진 자리를 인라인으로 굳힌 뒤 지운다 — 그냥 cancel하면 한 프레임
+        // 출발점으로 튀었다가 다시 날아간다.
+        try { animation.commitStyles() } catch { /* 떨어진 노드 */ }
+        animation.cancel()
+      }
+      current.el.animate(
+        [
+          { transform: `translate(calc(-50% + ${fromDx.toFixed(0)}px), -50%) scaleX(0.92)`, opacity: 1 },
+          { transform: `translate(calc(-50% + ${toDx.toFixed(0)}px), -50%) scaleX(${to ? 0.92 : 1.1})`, opacity: to ? 1 : 0 },
+        ],
+        { duration: travel, easing, fill: 'forwards' },
+      )
+      current.dx = toDx
+      this.scheduleSlashBeamFade(current, travel)
+      return travel
+    }
+
+    const origin = centerOf(from) ?? frontSlot
+    // 출발 높이는 방금 그 적에게 터진 타격점에 맞춘다. 베인 적은 이 순간 쓰러지는 동작으로
+    // 기울고 있어 몸통 중심을 다시 재면 매번 높이가 달라졌다(실측 60px 가까이 출렁임).
+    const start = { x: origin.x, y: this.lastImpactY ?? origin.y }
     const step = this.heavyTierStep()
     const beam = document.createElement('div')
     beam.className = 'slash-beam'
@@ -5227,22 +5277,46 @@ export class BattleView {
       + (step >= 2 ? '<i class="sb-spiral"></i>' : '')
       + (step >= 3 ? '<i class="sb-motes"></i>' : '')
     box.appendChild(beam)
-
-    // 배율이 높으면 조금 더 길게 뻗는다 — 궤적이 화면에 남는 시간도 등급이다.
-    const travel = Math.round((to ? SLASH_BEAM_MS : SLASH_BEAM_MS * 1.7) * (1 + tier * 0.25))
-    const dx = end.x - start.x
-    const dy = end.y - start.y
+    // 좌표는 검기의 **앞날**을 기준으로 잡는다. 몸통 중심을 목표에 맞추면 700px 넘는
+    // 줄기의 앞날이 목표를 한참 지나 화면 오른쪽에 따로 떠서, 적에게 터진 섬광과
+    // 앞날이 두 개의 검기처럼 갈라져 보였다(실측). 앞날(sb-edge, 폭의 약 90%)이
+    // 출발점과 목표에 닿게 몸통을 그만큼 뒤로 물린다.
+    const headOffset = beam.offsetWidth * 0.4
+    const x0 = start.x - headOffset
+    beam.style.left = `${x0}px`
+    const endX = aim ? aim.x : box.offsetWidth + beam.offsetWidth
+    const dx = endX - start.x
     beam.animate(
       [
         // 첫 프레임부터 보이게 둔다 — 0에서 시작하면 발사 순간이 빈 화면으로 지나간다.
         { transform: 'translate(-50%, -50%) scaleX(0.5)', opacity: 0.75 },
-        { transform: `translate(calc(-50% + ${(dx * 0.3).toFixed(0)}px), calc(-50% + ${(dy * 0.3).toFixed(0)}px)) scaleX(1.18)`, opacity: 1, offset: 0.28 },
-        { transform: `translate(calc(-50% + ${dx.toFixed(0)}px), calc(-50% + ${dy.toFixed(0)}px)) scaleX(0.92)`, opacity: to ? 1 : 0 },
+        { transform: `translate(calc(-50% + ${(dx * 0.3).toFixed(0)}px), -50%) scaleX(1.18)`, opacity: 1, offset: 0.28 },
+        { transform: `translate(calc(-50% + ${dx.toFixed(0)}px), -50%) scaleX(0.92)`, opacity: to ? 1 : 0 },
       ],
-      { duration: travel, easing: to ? 'cubic-bezier(0.2, 0.8, 0.3, 1)' : 'cubic-bezier(0.3, 0.5, 0.7, 1)', fill: 'forwards' },
+      { duration: travel, easing, fill: 'forwards' },
     )
-    this.timers.push(window.setTimeout(() => beam.remove(), travel + 200))
+    const entry = { el: beam, x0: start.x, dx, fadeTimer: 0 }
+    this.slashBeam = entry
+    this.scheduleSlashBeamFade(entry, travel)
     return travel
+  }
+
+  /**
+   * 도착한 검기가 이어받을 다음 관통 없이 남으면 그 자리에서 짧게 사그라든다.
+   * 예전엔 도착 지점에 불투명하게 서 있다가 툭 사라져서 "멈춘 검기"로 읽혔다.
+   */
+  private scheduleSlashBeamFade(entry: { el: HTMLElement; fadeTimer: number }, travel: number) {
+    entry.fadeTimer = window.setTimeout(() => {
+      if (this.slashBeam === entry) this.slashBeam = null
+      if (!entry.el.isConnected) return
+      for (const animation of entry.el.getAnimations()) {
+        try { animation.commitStyles() } catch { /* 떨어진 노드 */ }
+        animation.cancel()
+      }
+      entry.el.animate([{ opacity: getComputedStyle(entry.el).opacity }, { opacity: 0 }], { duration: 140, fill: 'forwards' })
+      this.timers.push(window.setTimeout(() => entry.el.remove(), 150))
+    }, travel + 160)
+    this.timers.push(entry.fadeTimer)
   }
 
   // 보상등급 배지 — 현재 등급 숫자와, 그 등급이면 노려볼 만한 희귀도의 색.

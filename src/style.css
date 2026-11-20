@@ -73,6 +73,11 @@ body {
   height: 1080px;
   transform-origin: center center;
   overflow: hidden;
+  /* hidden은 잘라 내기만 할 뿐 여전히 스크롤 상자다. 강공격 돌진·검기처럼 무대 밖으로
+     뻗는 연출이 겹치는 순간 브라우저가 이 상자를 스스로 (154, 80)px 굴려, 화면 전체가
+     좌상단으로 밀리고 상단 HUD가 잘린 채 다음 턴까지 남았다(실측: 스크립트 호출 없이
+     #stage.scrollLeft/Top만 바뀜). clip은 스크롤 자체가 불가능해 이런 밀림이 원천 차단된다. */
+  overflow: clip;
   transform: translate(-50%, -50%) scale(var(--scale, 1));
   font-family: var(--font);
   font-size: 20px;
@@ -10392,6 +10397,14 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
      원본 비율이 조금 어긋나도 위아래에 빈 띠가 생기지 않는다 — 그 띠가 곧 경계다. */
   object-fit: cover;
   opacity: 0;
+}
+/* 컷이 들어와 있는 동안 상단 점수판·문장 줄은 비켜 둔다 — 컷의 오른쪽은 마스크로
+   투명하게 풀리는 자리라 둘이 영상 위로 반투명하게 비쳐 얼룩처럼 겹쳐 보였다. */
+.scene.battle.atk-cine-open .tally,
+.scene.battle.atk-cine-open .combo-flash,
+.scene.battle.atk-cine-open #chain {
+  opacity: 0 !important;
+  transition: opacity 0.16s ease;
 }
 /* 지금 트는 컷만 보인다 — 둘 다 붙여 두고 골라 켜야 미리 받아 둔 게 헛되지 않는다 */
 .atk-cine[data-cut='pump'] .atk-cine-video[data-cut='pump'],

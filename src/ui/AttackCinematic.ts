@@ -83,6 +83,7 @@ export class AttackCinematic {
     this.timers.clear()
     this.playing = false
     this.el.classList.remove('is-in', 'is-out')
+    this.el.parentElement?.classList.remove('atk-cine-open')
     for (const v of Object.values(this.videos)) {
       releaseVideo(v)
     }
@@ -127,9 +128,16 @@ export class AttackCinematic {
     }
 
     this.el.dataset.cut = cut
-    video.currentTime = 0
+    // 닫을 때 이미 0초로 되감아 둔다(close 참고). 여기서 또 탐색하면 readyState가
+    // HAVE_METADATA로 떨어진 채 패널이 들어와, 지난번에 멈춘 장면이 잠깐 굳어 보였다가
+    // 첫 장면으로 튀었다(실측: 열리는 순간 currentTime 0, readyState 1).
+    if (video.currentTime !== 0) video.currentTime = 0
     this.el.classList.remove('is-out')
     this.el.classList.add('is-in')
+    // 컷이 덮는 동안 무대 위쪽의 점수판은 잠깐 숨긴다. 컷의 오른쪽 끝은 마스크로
+    // 투명하게 풀리는데, 점수판이 바로 그 자리(상단 가운데)에 있어 반투명하게 비쳐
+    // 영상 위에 얼룩처럼 겹쳐 보였다.
+    this.el.parentElement?.classList.add('atk-cine-open')
     GameAudio.play('cutscene')
     void video.play().catch((error) => {
       reportResourceFailure('attack video play', video.currentSrc || video.src, error)
@@ -143,9 +151,14 @@ export class AttackCinematic {
     for (const v of Object.values(this.videos)) v.pause()
     this.el.classList.remove('is-in')
     this.el.classList.add('is-out')
+    this.el.parentElement?.classList.remove('atk-cine-open')
     await this.wait(OUT_MS)
     if (this.destroyed) return
     this.el.classList.remove('is-out')
+    // 화면 밖으로 다 빠진 뒤에 되감는다 — 다음 컷이 첫 장면부터, 탐색 없이 바로 뜬다.
+    for (const v of Object.values(this.videos)) {
+      if (v.currentTime !== 0) v.currentTime = 0
+    }
     this.playing = false
   }
 
