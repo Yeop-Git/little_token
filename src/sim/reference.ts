@@ -460,6 +460,15 @@ function activePartWeak(enemy: EnemyInst, emotions: readonly Emotion[], tags: re
     : tags.includes(weakness.value)
 }
 
+/** 이 문장이 지금 이 적에게 들어갈 때의 약점 배율(화면 배지와 같은 판정). 시뮬 AI가 문장을 고를 때 쓴다. */
+export function intentWeaknessMult(enemy: EnemyInst | undefined, intent: Pick<Intent, 'emotions' | 'attackEmotion' | 'tags'>): number {
+  if (!enemy || enemy.dead) return 1
+  const emotions = weaknessEmotions(intent)
+  const part = activeEnemyPart(enemy)
+  if (part) return activePartWeak(enemy, emotions, intent.tags) ? PART_WEAKNESS_MULT : 1
+  return enemy.def.weakEmotion && emotions.includes(enemy.def.weakEmotion) ? WEAKNESS_MULT : 1
+}
+
 function cutSpiderWebWithSupport(state: BattleState, target: number, intent: Intent): ApplyResult['supportWebCut'] {
   const enemy = state.enemies[target]
   const supportsPlayer = intent.guard > 0 || intent.heal > 0
@@ -975,6 +984,8 @@ export interface EnemyStrike {
   lifeStolen: number
   /** 공격 직후 다음 플레이어 턴까지 받는 피해 증가 상태에 들어갔는가. */
   groggyEntered: boolean
+  /** 이번 공격이 그로기를 열 수 있는 기믹 공격이었는가(막았는지와 무관). */
+  groggyChance: boolean
   groggyDamageMult: number
   /** 예고 강공격을 완전히 막고 그로기를 열기 위해 필요한 방어. */
   guardRequired: number
@@ -1154,6 +1165,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     magicShieldBroken,
     lifeStolen,
     groggyEntered,
+    groggyChance: !!attackStep?.groggyDamageMult,
     groggyDamageMult: enemy.groggyDamageMult,
     guardRequired,
     telegraphText: attackStep?.telegraphText ?? null,

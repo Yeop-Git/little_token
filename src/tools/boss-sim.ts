@@ -37,6 +37,7 @@ import {
   summonCount,
   type BattleState,
   weaknessEmotions,
+  intentWeaknessMult,
 } from '../sim/reference'
 
 const rngSeeded = (seed: number) => () => {
@@ -196,7 +197,9 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
     const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
     const sealSlotKey = web ? spiderSealSlotForTurn(t.template.slots.map((slot) => slot.key), turn) : null
     const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, state)
-    const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => b.dmg - a.dmg)[0]
+    // 숙련 정책은 체력바 옆 약점 배지를 보고 공격 속성까지 맞춘 피해로 비교한다.
+    const readDmg = (c: Candidate) => policy === 'smart' ? c.dmg * intentWeaknessMult(boss, c.intent) : c.dmg
+    const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => readDmg(b) - readDmg(a))[0]
     const bestGuard = hand
       .filter((c) => c.guard > 0 || c.intent.magicShield > 0)
       .sort((a, b) => (b.guard + b.intent.magicShield * state.playerMax * .6) - (a.guard + a.intent.magicShield * state.playerMax * .6))[0]
