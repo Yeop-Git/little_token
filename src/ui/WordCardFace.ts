@@ -133,6 +133,22 @@ function wordCardNoteHtml(word: Word, note: string): string {
   return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
 }
 
+/**
+ * 공격·방어 랭크를 올리는 카드에 붙는 딱지. 키워드 칩보다 먼저 눈에 띄도록 카드
+ * 왼쪽 모서리에 스티커처럼 붙고, 올려 두면 이번 턴에 오른다는 설명이 뜬다.
+ */
+export function wordRankStickersHtml(word: Word): string {
+  const stickers = wordKeywords(word).filter((keyword) => keyword.id === 'empower' || keyword.id === 'guardEmpower')
+  if (!stickers.length) return ''
+  return `<span class="card-rank-stickers">${stickers.map((keyword) => {
+    const amount = keyword.id === 'empower' ? word.effects?.attackRank ?? 0 : word.effects?.guardRank ?? 0
+    const kind = keyword.id === 'empower' ? 'atk' : 'guard'
+    const short = ACTION_LABELS[currentLocale][kind === 'atk' ? 'attack' : 'guard']
+    const tooltip = escapeCardText(`${keyword.label}\n${keyword.detail}`)
+    return `<span class="card-rank-sticker rank-${kind}" role="img" tabindex="-1" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above"><small>${short}</small>▲${amount}</span>`
+  }).join('')}</span>`
+}
+
 export interface WordCardFaceOpts {
   /** 선택 불가 사유처럼 카드 문구를 갈아 끼울 때 쓴다. 기본은 단어의 note. */
   note?: string
@@ -160,7 +176,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const resourceBadge = hideMeta
     ? ''
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
-  const badges = resourceBadge
+  const badges = resourceBadge + (hideMeta ? '' : wordRankStickersHtml(word))
   if (artUrl) {
     // 이름과 효과는 한 덩이로 아래에 붙인다. 둘을 따로 바닥에 못 박아 두면 효과가 세 줄로
     // 늘어난 카드에서 글자가 이름 위로 올라타 서로를 지운다.

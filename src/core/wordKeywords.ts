@@ -12,7 +12,7 @@ export type WordKeywordId =
 interface KeywordCopy { label: string; detail: string }
 
 const RANK_DETAIL: Record<LocaleCode, { attack: string; guard: string }> = {
-  ko: { attack: '현재 스테이지 동안 플레이어의 공격 랭크를 높입니다.', guard: '현재 스테이지 동안 플레이어의 방어 랭크를 높입니다.' },
+  ko: { attack: '이 카드를 쓴 턴에 플레이어의 공격 랭크가 오르고 현재 스테이지 동안 유지됩니다. 랭크 1마다 기준 공격 +25%.', guard: '이 카드를 쓴 턴에 플레이어의 방어 랭크가 오르고 현재 스테이지 동안 유지됩니다. 랭크 1마다 기준 방어 +25%.' },
   en: { attack: 'Raises the player’s Attack rank for the current stage.', guard: 'Raises the player’s Guard rank for the current stage.' },
   ja: { attack: '現在のステージ中、プレイヤーの攻撃ランクを上げます。', guard: '現在のステージ中、プレイヤーの防御ランクを上げます。' },
   ru: { attack: 'Повышает ранг атаки игрока до конца текущего этапа.', guard: 'Повышает ранг защиты игрока до конца текущего этапа.' },

@@ -4,6 +4,10 @@
  */
 export interface TacticalCardGuide {
   id: string
+  /**
+   * 이 공략을 전장 TIP으로 붙일 적. 빈 문자열은 보상 진열 전용 안내라 어떤 적에게도
+   * 붙지 않는다(방패치기는 흰개미와 무관한 2층 보상 안내였는데 흰개미에 붙어 있었다).
+   */
   enemyId: string
   /** 이 층의 수식어 보상을 고르면 다음 층에서 해당 기믹을 만난다. 엔드리스에서도 반복한다. */
   rewardFloors?: readonly number[]
@@ -25,7 +29,7 @@ export const FIRST_FLOOR_ATTACK_GUIDE = {
 export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
   {
     id: 'stored-resolve',
-    enemyId: 'termite',
+    enemyId: '',
     rewardFloors: [2],
     title: '방패치기',
     tooltip: '2층 희귀 동사 「밀어냈다」는 새로 얻은 방어를 포함한 현재 방어도 100%를 피해로 바꾸고 방어도는 소모하지 않는다. 「꾹 참고」로 방어 성장을 시작할 수 있다.',
@@ -102,7 +106,7 @@ export function tacticalGuideForEnemy(
 ): Pick<TacticalCardGuide, 'title' | 'tooltip'> | undefined {
   if (stage?.floor === 1 && stage.endlessCycle === 0) return FIRST_FLOOR_ATTACK_GUIDE
   return (guideId ? TACTICAL_CARD_GUIDES.find((guide) => guide.id === guideId) : undefined)
-    ?? TACTICAL_CARD_GUIDES.find((guide) => guide.enemyId === enemyId)
+    ?? TACTICAL_CARD_GUIDES.find((guide) => !!guide.enemyId && guide.enemyId === enemyId)
 }
 
 export function tacticalCardIdsForRewardDay(day: number): readonly string[] {

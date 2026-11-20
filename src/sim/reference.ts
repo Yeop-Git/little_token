@@ -738,6 +738,11 @@ function disperseTargetSummons(
   const pattern = enemy.def.summonPattern
   const targets = summonTargets(enemy, targetCount, pierceGuard)
   const reachable = targets.length
+  // 호위가 한 마리도 없으면(그로기 직후 등) 막을 것이 없으므로 피해 전부가 본체로 간다.
+  // 예전에는 닿은 일벌이 0이라 "전부 쓰러뜨림" 판정이 거짓이 되어 본체 피해가 0이 됐다.
+  if (reachable === 0) {
+    return { count: 0, damage: 0, hits: [], remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+  }
   let remainingDamage = Math.max(0, dmg)
   let damage = 0
   const hits: number[] = []
@@ -795,6 +800,46 @@ function disperseTargetSummons(
   return { count: dispersed, damage, hits, remainingDamage, backlashDamage, focusedBacklash, groggyTriggered, killed: enemy.dead }
 }
 
+interface AttackExecution {
+  summon: SummonDisperseResult
+  attack: { hits: HitFx[]; killed: number[]; overflow: number }
+}
+
+/**
+ * 한 공격 계획을 실제로 휘두른다. 단일 대상 연타는 resolveAttack이 오버킬 줄기까지
+ * 한 번에 처리하지만, 다중 대상(확산·전체)이나 호위 일벌이 있는 적에게 연타·반복이
+ * 붙으면 **타격마다** 대상을 다시 고르고 일벌부터 다시 깎는다. 예전에는 이 경우
+ * 연타 수가 통째로 무시되어 「미친듯이 + 퍼뜨렸다」가 67% 위력으로 한 번만 때렸다.
+ */
+function executeAttackPlan(state: BattleState, plan: AttackPlan): AttackExecution {
+  const singleChain = plan.targetCount === 1 && !state.enemies[plan.target]?.def.summonPattern
+  const waves = singleChain ? 1 : Math.max(1, plan.hitCount)
+  const wavePlan = singleChain ? plan : { ...plan, hitCount: 1 }
+  const summon: SummonDisperseResult = { count: 0, damage: 0, hits: [], remainingDamage: 0, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
+  const attack = { hits: [] as HitFx[], killed: [] as number[], overflow: 0 }
+  for (let wave = 0; wave < waves; wave++) {
+    const stillReachable = plan.targetCount === 1
+      ? !state.enemies[plan.target]?.dead
+      : aliveIdx(state).some((index) => index >= plan.target)
+    if (!stillReachable) break
+    const disperse = disperseTargetSummons(state, plan.target, plan.dmg, plan.targetCount, plan.pierceGuard, plan.emotions)
+    summon.count += disperse.count
+    summon.damage += disperse.damage
+    summon.hits.push(...disperse.hits)
+    summon.remainingDamage = disperse.remainingDamage
+    summon.backlashDamage += disperse.backlashDamage
+    summon.focusedBacklash ||= disperse.focusedBacklash
+    summon.groggyTriggered ||= disperse.groggyTriggered
+    summon.killed ||= disperse.killed
+    if (disperse.killed || disperse.remainingDamage <= 0) continue
+    const result = resolveAttack(state, { ...wavePlan, dmg: disperse.remainingDamage })
+    attack.hits.push(...result.hits)
+    for (const index of result.killed) if (!attack.killed.includes(index)) attack.killed.push(index)
+    attack.overflow += result.overflow
+  }
+  return { summon, attack }
+}
+
 export function applyIntent(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
   const dealsDirectDamage = isDamageIntent(intent)
   const guardDamage = Math.floor(state.guard * intent.guardAttackMultiplier)
@@ -827,15 +872,13 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   }
 
   // 호위를 먼저 쓰러뜨려야 네 번째 일벌이 연 그로기가 바로 이 문장의 본 공격부터 적용된다.
-  const summonDisperse = dealsDamage
-    ? disperseTargetSummons(state, target, dmg, intent.targetCount, intent.pierceGuard, intent.emotions)
-    : { count: 0, damage: 0, hits: [] as number[], remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }
   // 일벌과 본체는 한 줄의 킬체인이다. 같은 피해를 본체에 한 번 더 복제하지 않고,
   // 일벌 체력을 차례로 소모하고 남은 초과분만 그로기된 본체까지 이어 보낸다.
-  const bodyPlan = { ...plan, dmg: summonDisperse.remainingDamage }
-  const attack = dealsDamage && !summonDisperse.killed && bodyPlan.dmg > 0
-    ? resolveAttack(state, bodyPlan)
-    : { hits: [], killed: [], overflow: 0 }
+  const execution = dealsDamage
+    ? executeAttackPlan(state, plan)
+    : { summon: { count: 0, damage: 0, hits: [] as number[], remainingDamage: dmg, backlashDamage: 0, focusedBacklash: false, groggyTriggered: false, killed: false }, attack: { hits: [] as HitFx[], killed: [] as number[], overflow: 0 } }
+  const summonDisperse = execution.summon
+  const attack = execution.attack
   const supportWebCut = dealsDamage ? null : cutSpiderWebWithSupport(state, target, intent)
   let selfDmg = intent.recoil
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
@@ -887,11 +930,7 @@ export function applyPendingAttack(state: BattleState): ApplyResult | null {
   const pending = state.pending
   if (!pending) return null
   state.pending = null
-  const summonDisperse = disperseTargetSummons(state, pending.target, pending.dmg, pending.targetCount, pending.pierceGuard, pending.emotions)
-  const bodyPlan = { ...pending, dmg: summonDisperse.remainingDamage }
-  const attack = summonDisperse.killed || bodyPlan.dmg <= 0
-    ? { hits: [], killed: [], overflow: 0 }
-    : resolveAttack(state, bodyPlan)
+  const { summon: summonDisperse, attack } = executeAttackPlan(state, pending)
   return {
     text: `${pending.sentence} → 예약 발동`,
     combos: [],

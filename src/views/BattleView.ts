@@ -25,6 +25,7 @@ import {
   inkExceedsLimit,
   inkOverdraw,
   selectionInkCost,
+  selectionInkRefill,
   sentenceInkAvailable,
   wordInkCost,
 } from '@core/ink'
@@ -75,7 +76,7 @@ import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
-import { rankedStat } from '@core/combatRules'
+import { PART_WEAKNESS_MULT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
 import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
@@ -401,6 +402,8 @@ export class BattleView {
    * 붙는다 — 관통이나 메아리에서 또 멈추면 검기가 지나가는 흐름이 토막토막 끊긴다.
    */
   private heavyStopUsed = false
+  /** 이번 턴 준비 효과로 실제로 오른 공격·방어 랭크. 턴이 넘어가면 0으로 돌아간다. */
+  private turnRankGain = { atk: 0, guard: 0 }
   private actionOrderSignature = ''
   private debugAttackMultiplier = 1
   private readonly enemyPool = new Map<string, HTMLElement[]>()
@@ -1534,6 +1537,7 @@ export class BattleView {
           <span class="hpn"></span>
         </div>
         <div class="hp-row">
+          <span class="weak-badge" hidden></span>
           <div class="hpbar foe">
             <div class="fill"></div>
             <div class="shield"></div>
@@ -1696,6 +1700,7 @@ export class BattleView {
             <span class="hpn"></span>
           </div>
           <div class="hp-row">
+            <span class="weak-badge" hidden></span>
             <div class="hpbar foe">
               <div class="fill"></div>
               <div class="shield"></div>
@@ -1918,15 +1923,31 @@ export class BattleView {
       ? activeWeakness?.kind === 'emotion' ? activeWeakness.value as Emotion : 'neutral'
       : e.def.weakEmotion ?? 'neutral'
     const affinityLabel = affinity === 'neutral' ? '무속성' : `${EMOTION_LABEL[affinity]} 약점`
+    const weakMult = activePart ? PART_WEAKNESS_MULT : WEAKNESS_MULT
     const affinityTooltip = affinity === 'neutral'
       ? tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
-      : tip(affinityLabel, `${EMOTION_LABEL[affinity]} 카드로 때리면 피해 1.5배`)
+      : tip(affinityLabel, `${EMOTION_LABEL[affinity]} 카드를 문장에 넣고 때리면 피해 ×${formatNumber(weakMult)}`)
     ;(['joy', 'anger', 'sorrow', 'pleasure', 'neutral'] as const).forEach((emotion) => {
       plate.classList.toggle(`emotion-${emotion}`, emotion === affinity)
     })
     plate.dataset.tooltip = affinityTooltip
     plate.dataset.tipPlace = 'above'
     plate.tabIndex = 0
+    // 약점 감정은 체력바 바로 옆 배지로 늘 보인다. 이름 글자색만으로는 어느 감정인지
+    // 매번 번역해야 해서, 카드 모서리와 같은 감정 얼굴과 이름을 그대로 세운다.
+    const weakBadge = plate.querySelector<HTMLElement>('.weak-badge')
+    if (weakBadge) {
+      const signature = affinity === 'neutral' ? '' : `${affinity}-${weakMult}`
+      weakBadge.hidden = affinity === 'neutral'
+      if (weakBadge.dataset.signature !== signature) {
+        weakBadge.dataset.signature = signature
+        weakBadge.className = affinity === 'neutral' ? 'weak-badge' : `weak-badge emotion-${affinity}`
+        weakBadge.innerHTML = affinity === 'neutral'
+          ? ''
+          : `${emotionIconContent(affinity)}<b>약점</b><small>×${formatNumber(weakMult)}</small>`
+        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
+      }
+    }
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
       ? (bossHud ? `${Math.max(0, e.hp)} / ${e.maxHp}` : `${Math.max(0, e.hp)}/${e.maxHp} · ${remainingBars}막`)
       : `${Math.max(0, e.hp)}/${e.maxHp}`
@@ -2074,7 +2095,7 @@ export class BattleView {
             ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
             ...(currentPart?.def.weakness
-              ? [['현재 약점', `${currentPart.def.weakness.label} · 공격 피해 ×1.5 · 방어·회복도 봉인 -1`]]
+              ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×${formatNumber(PART_WEAKNESS_MULT)}`]]
               : currentPart ? [['현재 속성', '무속성 · 감정 추가 피해 없음']] : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
@@ -2088,15 +2109,18 @@ export class BattleView {
           ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
         : ''
     }
-    host.className = 'info-dock glass character-dock'
+    // 적 상세는 마우스를 움직이면 사라지는 호버 팝업이라 스크롤할 수 없다. 읽을거리
+    // 서술(description)과 머리 라벨을 빼고 초상을 줄여, 전투에 필요한 수치와 특성
+    // 한 단락만 한 화면에 담는다.
+    host.className = `info-dock glass character-dock${enemy ? ' is-enemy' : ''}`
     host.innerHTML = `
       <article aria-label="${displayName} 상세 정보">
         <div class="character-portrait"><img src="${visual.portrait2d}" alt="${displayName} 2D 스프라이트"></div>
         <div class="character-copy">
-          <div class="character-kicker">CHARACTER DETAIL</div>
+          ${enemy ? '' : '<div class="character-kicker">CHARACTER DETAIL</div>'}
           <h2>${displayName}</h2>
           <h3>${visual.title}</h3>
-          <p>${visual.description}</p>
+          ${enemy ? '' : `<p>${visual.description}</p>`}
           <div class="character-stats">${stats}</div>
           ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${this.state.enemies[enemyIndex ?? 0]?.def.note ?? ''}</div>`}
         </div>
@@ -2153,6 +2177,8 @@ export class BattleView {
     host.classList.toggle('has-sentence', anyPicked)
     host.classList.toggle('sentence-ready', this.complete())
     this.renderInk()
+    // 랭크 카드를 고르면 스탯 칩에 「이번 턴 +1」 딱지가 바로 붙는다.
+    this.renderStats()
     this.renderMultNow(anyPicked)
   }
 
@@ -2161,7 +2187,7 @@ export class BattleView {
     const spent = selectionInkCost(this.sel)
     const available = this.currentInkAvailable()
     const over = inkOverdraw(spent, available)
-    updateInkMeter(meter, { spent, max: available, overdraw: over, previewSpent: this.inkPreviewSpent })
+    updateInkMeter(meter, { spent, max: available, overdraw: over, previewSpent: this.inkPreviewSpent, refill: selectionInkRefill(this.sel) })
   }
 
   private currentInkAvailable(): number {
@@ -2687,23 +2713,65 @@ export class BattleView {
 
   // ── 좌상단 아이콘 스탯 바 ──
   private renderStats() {
-    this.q('#stats').innerHTML =
+    const host = this.root.querySelector<HTMLElement>('#stats')
+    if (!host) return
+    const pending = this.pendingRanks()
+    host.innerHTML =
       `<span class="hud-player-name" aria-label="주인공 이름 ${t('playerName', '프롬')}">${t('playerName', '프롬')}</span>` +
       STAT_META.map(
         (m) => {
           const value = m.key === 'hp'
             ? `${Math.max(0, this.state.playerHp)}/${this.state.playerMax}${this.state.guard ? ` ◈${this.state.guard}` : ''}${this.state.playerMagicShield ? ' ✦1' : ''}`
             : m.key === 'atk'
-              ? `${formatNumber(this.combatStats().atk)}${this.state.playerAttackRank ? ` ${this.state.playerAttackRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerAttackRank)}` : ''}`
+              ? formatNumber(this.combatStats().atk)
               : m.key === 'guard'
-                ? `${formatNumber(this.combatStats().guard)}${this.state.playerGuardRank ? ` ${this.state.playerGuardRank > 0 ? '↑' : '↓'}${Math.abs(this.state.playerGuardRank)}` : ''}`
+                ? formatNumber(this.combatStats().guard)
                 : formatNumber(this.player.stats[m.key])
-          return `<div class="hud-stat" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${m.desc}" data-tooltip="${tip(`${m.label} ${value}`, m.desc)}">
+          const rank = m.key === 'atk' || m.key === 'guard' ? this.rankSticker(m.key, pending[m.key]) : null
+          const tooltip = tip(`${m.label} ${value}`, rank ? `${m.desc}\n${rank.detail}` : m.desc)
+          return `<div class="hud-stat${rank ? ' has-rank' : ''}" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${rank ? `${rank.aria}. ` : ''}${m.desc}" data-tooltip="${tooltip}">
         <span class="si">${icon(m.icon)}</span>
-        <b>${value}</b>
+        <b>${value}</b>${rank?.html ?? ''}
       </div>`
         },
       ).join('')
+  }
+
+  /** 지금 고른 카드들이 이번 문장에서 올릴 랭크(아직 적용 전). */
+  private pendingRanks(): { atk: number; guard: number } {
+    const selected = Object.values(this.sel)
+    return {
+      atk: selected.reduce((sum, word) => sum + Math.max(0, word?.effects?.attackRank ?? 0), 0),
+      guard: selected.reduce((sum, word) => sum + Math.max(0, word?.effects?.guardRank ?? 0), 0),
+    }
+  }
+
+  /**
+   * 공격·방어 랭크 딱지. 스탯 칩 모서리에 붙어 현재 랭크를 보여 주고, 고른 카드가
+   * 이번 문장에서 올릴 랭크는 점선 딱지로 미리 붙는다. 툴팁에는 이번 턴에 몇이
+   * 올랐는지와 랭크의 뜻을 함께 적는다.
+   */
+  private rankSticker(key: 'atk' | 'guard', pending: number): { html: string; detail: string; aria: string } | null {
+    const rank = (key === 'atk' ? this.state.playerAttackRank : this.state.playerGuardRank) ?? 0
+    const gained = this.turnRankGain[key]
+    const room = Math.max(0, STAT_RANK_LIMIT - rank)
+    const willGain = Math.min(room, pending)
+    if (!rank && !willGain) return null
+    const label = key === 'atk' ? '공격' : '방어'
+    const sign = (n: number) => `${n > 0 ? '+' : ''}${n}`
+    const lines = [
+      rank ? `${label} 랭크 ${sign(rank)} — 기준 ${label}의 ${Math.round(statRankScale(rank) * 100)}%` : `${label} 랭크 0`,
+      gained ? `이번 턴에 ${label} 랭크가 ${sign(gained)} 올랐다` : '',
+      willGain ? `이번 문장을 쓰면 이번 턴에 ${label} 랭크 +${willGain}` : '',
+      `랭크 1마다 기준 ${label} 25% · 현재 스테이지 동안 유지 · 최대 ±${STAT_RANK_LIMIT}`,
+    ].filter(Boolean)
+    const current = rank ? `<span class="rank-sticker ${rank > 0 ? 'up' : 'down'}${gained ? ' fresh' : ''}">${rank > 0 ? '▲' : '▼'}${Math.abs(rank)}</span>` : ''
+    const preview = willGain ? `<span class="rank-sticker pending">+${willGain}</span>` : ''
+    return {
+      html: `<span class="rank-stickers" aria-hidden="true">${current}${preview}</span>`,
+      detail: lines.join('\n'),
+      aria: lines.join('. '),
+    }
   }
 
   // ── 보유 아이템 — 가방을 열지 않고 전장 좌측에 유물 아이콘으로 상시 표시한다. ──
@@ -3743,6 +3811,7 @@ export class BattleView {
     // 5) 준비 효과 — 방어를 선공 공격보다 먼저 적용한다.
     this.setPhase('준비 효과')
     const prep = applyPreparation(this.state, intent, mult)
+    this.turnRankGain = { atk: prep.attackRankGain, guard: prep.guardRankGain }
     if (prep.attackRankGain || prep.guardRankGain) this.renderStats()
     if (prep.guardGain > 0) {
       GameAudio.play('shield')
@@ -3822,11 +3891,16 @@ export class BattleView {
     // 그래서 컷을 타격과 **겹쳐** 재생하는데, 겹치는 자리는 검을 들어올린 채 멈춘
     // 구간이다(heavyWindup) — 컷이 도는 동안 화면은 이미 절정을 붙들고 있다.
     let heavy: AttackCut | null = null
-    if (dealsDamage) {
+    // 예약(다음 턴) 공격은 이번 턴에 칼이 닿지 않는다. 여기서 강타 예비 동작을 열면
+    // 칼을 든 채 굳은 프롬이 풀리지 않는다.
+    if (dealsDamage && intent.timing !== 'delayed') {
       const alive = aliveIdx(this.state)
       const wipesAll =
         alive.length > 0 && this.predictKills(dmg, this.target, intent.aoe === 'all') >= alive.length
-      heavy = attackCutFor(dmg, this.encounterHp, mult, wipesAll)
+      // 강타 등급은 약점·방어·호위까지 반영한 실제 적중 합계로 매긴다. 예상 위력만
+      // 보면 방어에 다 막힌 일격에도 강타 컷이 떠서 숫자와 연출이 어긋났다.
+      const heavyDamage = tally.applied ? tally.total : dmg
+      heavy = attackCutFor(heavyDamage, this.encounterHp, mult, wipesAll)
       this.heavyMult = heavy ? mult : 0
       this.heavyStopUsed = false // 이번 문장의 정지 한 번을 새로 연다
     }
@@ -3968,6 +4042,7 @@ export class BattleView {
     // 채로 굳는다 — 실제로 "어두워진 화면이 안 돌아온다"는 사고가 여기서 났다.
     this.endSlowmo()
     this.sel = {}
+    this.turnRankGain = { atk: 0, guard: 0 }
     this.clearNormalTokenWarning()
     this.slotIndex = 0
     this.playerPreempting = false
@@ -4099,11 +4174,19 @@ export class BattleView {
       await sleep(HEAVY_LUNGE_LEAD_MS)
       await sleep(this.heavyRelease(you))
     } else if (attacking) {
+      // 메아리처럼 이미 칼을 놓은 뒤의 재타격은 평범한 칼질로 이어 간다.
+      if (this.heavyHeld) this.heavyRelease(you)
       GameAudio.play('paperAttack')
       playCharacterAnimation(you, 'attack')
       you.classList.add('lunge')
       await sleep(sweep ? 120 : 170)
     } else {
+      // 강타 예비 동작으로 칼을 들어올렸는데 실제 적중이 없으면(전부 막힘 등) 여기서
+      // 반드시 풀어 준다 — 안 그러면 다음 턴까지 그 자세로 굳는다.
+      if (this.heavyHeld) {
+        this.heavyRelease(you)
+        playCharacterAnimation(you, 'idle')
+      }
       await sleep(40)
     }
     // 꽂히는 순간 늘어졌던 시간이 풀리고 레일이 고속 모드로 전환된다.
@@ -4755,6 +4838,9 @@ export class BattleView {
     let killedCount = 0
     // 검기는 방금 베인 자리에서 다음 적으로 이어져야 한 줄기로 읽힌다.
     let lastHit = this.root.querySelector<HTMLElement>(`#actors .actor.foe[data-i="${this.target}"]`)
+    // 검기가 마지막 적을 베고도 힘이 남았을 때만 화면 밖으로 빠져나간다. 살아남은 적에게
+    // 막혀 멈춘 검기를 또 내보내면, 이미 끝난 줄기 뒤에 두 번째 검기가 날아가는 것처럼 보였다.
+    let beamCarriesOn = true
     while (overflow > 0 && !allDead(this.state)) {
       const front = frontIdx(this.state)
       if (front < 0) break
@@ -4812,6 +4898,7 @@ export class BattleView {
         overflow = transfer.overflow
       } else {
         overflow = 0
+        beamCarriesOn = false
         this.renderActors(false)
         await sleep(sweep ? 160 : heavy ? 90 : 320)
       }
@@ -4819,7 +4906,7 @@ export class BattleView {
     engageFront(this.state)
     this.renderActors()
     // 다 훑은 검기는 멈추지 않고 레일 뒤 화면 밖으로 주르륵 빠져나간다.
-    if (heavy) this.launchSlashBeam(lastHit, null, 0.4)
+    if (heavy && beamCarriesOn) this.launchSlashBeam(lastHit, null, 0.4)
     if (sweep) this.timers.push(window.setTimeout(() => actors.classList.remove('rail-rush'), 460))
     return killedCount
   }

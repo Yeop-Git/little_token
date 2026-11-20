@@ -720,7 +720,8 @@ assert((ENEMIES.roach.guard ?? 0) > 0, 'roach starts with guard')
 assert((ENEMIES.pillbug.magicShield ?? 0) > 0, 'pillbug starts with magic shield')
 assert(tacticalGuideForEnemy('termite', undefined, { floor: 1, endlessCycle: 0 })?.title === '공격으로 체력 깎기', 'first floor teaches attack damage instead of shield bash')
 assert(tacticalGuideForEnemy('moth', undefined, { floor: 1, endlessCycle: 0 })?.title === '공격으로 체력 깎기', 'every first-floor enemy shows the attack damage tip')
-assert(tacticalGuideForEnemy('termite', undefined, { floor: 1, endlessCycle: 1 })?.title === '방패치기', 'endless floor one keeps the normal enemy tactic')
+assert(tacticalGuideForEnemy('termite', undefined, { floor: 1, endlessCycle: 1 }) === undefined, 'termite has no ability, so no shield-bash tip is attached to it')
+assert(tacticalGuideForEnemy('roach', undefined, { floor: 1, endlessCycle: 1 })?.title === '관통 수식어', 'endless floor one keeps the normal enemy tactic')
 assert(ENEMIES.mosquito.pierceGuard, 'mosquito pierces player guard')
 const stagedRegularEnemies = new Set<string>()
 for (let day = 1; day <= 8; day++) {
@@ -961,3 +962,26 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
   assert(!blockable.meta.includes('방어 관통') && blockable.tokens.some((token) => token.text === '앞다리 휘두르기'), 'spider sentence exposes the alternating blockable attack')
 }
 console.log('combat effects: ok')
+
+// 11/20 피드백 회귀 — 다중 대상 연타·호위 0마리 여왕벌·같은 카드 두 칸의 잉크.
+{
+  const s = state([makeEnemy(foe('front', { hp: 100 })), makeEnemy(foe('second', { hp: 100 })), makeEnemy(foe('third', { hp: 100 }))])
+  const hits = previewIntentHits(s, attack({ targetCount: 2, castCount: 2, castScale: .67 }), 1, 0)
+  assert(hits.length === 4 && hits.join(',') === '6,4,6,4', `a repeated two-target verb hits both targets on every cast (got ${hits.join(',')})`)
+  const all = previewIntentHits(s, attack({ targetCount: 'all', aoe: 'all', castCount: 2, castScale: .67 }), 1, 0)
+  assert(all.length === 6, 'a repeated all-target verb hits every enemy on every cast')
+}
+{
+  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s)
+  const wipe = applyIntent(s, attack({ base: 40, targetCount: 'all', aoe: 'all' }), 1, 0)
+  assert(wipe.summonGroggyTriggered && summonCount(queen) === 0, 'an all-target sentence clears the worker wave')
+  s.turn = 2
+  const hp = queen.hp
+  const hit = applyIntent(s, attack({ base: 20 }), 1, 0)
+  assert(hit.hits.length === 1 && queen.hp < hp, 'a queen without escorts takes the sentence damage on her body')
+}
+{
+  const zero = { ...EARLY_WORDS.subj[0], id: 'zero-subject', inkCost: 0 }
+  const { selectionInkCost } = await import('@core/ink')
+  assert(selectionInkCost({ subj: zero, subj2: zero }) === 0, 'choosing the same zero-ink card in both subject slots costs exactly its printed ink')
+}

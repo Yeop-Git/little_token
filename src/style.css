@@ -1586,6 +1586,44 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .hud-stat .si { width: 22px; height: 22px; flex: none; }
 .hud-stat .si svg { width: 100%; height: 100%; }
+/* 공격·방어 랭크 딱지 — 스탯 칩 오른쪽 위 모서리에 비스듬히 붙는 스티커. */
+.hud-stat .rank-stickers {
+  position: absolute;
+  top: -11px;
+  right: -9px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+.rank-sticker {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  color: #2b1500;
+  background: linear-gradient(160deg, #ffe58a, #f2a93b);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .35), 0 0 0 1.5px #fff6d8;
+  transform: rotate(8deg);
+}
+.rank-sticker.down { color: #fff; background: linear-gradient(160deg, #8fa0b8, #4d5b73); }
+.rank-sticker.pending {
+  color: #ffe9a8;
+  background: rgba(30, 20, 8, .88);
+  box-shadow: 0 0 0 1.5px #ffd66b;
+  outline: 1.5px dashed rgba(255, 214, 107, .7);
+  outline-offset: 1px;
+  transform: rotate(-6deg);
+  animation: rank-sticker-pulse 1s ease-in-out infinite alternate;
+}
+.rank-sticker.fresh { animation: rank-sticker-pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes rank-sticker-pulse { to { opacity: .55; } }
+@keyframes rank-sticker-pop { from { transform: rotate(8deg) scale(1.8); } }
 .baked-stat-icon {
   display: block;
   object-fit: contain;
@@ -3515,6 +3553,30 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .hp-row { display: flex; align-items: center; gap: 7px; }
 .hp-row .hpbar { flex: 1; min-width: 0; }
+/* 약점 감정 배지 — 체력바 바로 왼쪽에 늘 보인다. 감정 얼굴 + 「약점」 + 배율. */
+.hp-row .weak-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px 2px 3px;
+  border-radius: 999px;
+  border: 2px solid var(--emotion-color, #c9c2b5);
+  background: color-mix(in srgb, var(--emotion-color, #c9c2b5) 26%, rgba(14, 10, 18, .88));
+  color: #fff7e6;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--emotion-color, #c9c2b5) 55%, transparent);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+}
+.hp-row .weak-badge[hidden] { display: none; }
+.hp-row .weak-badge .emotion-face { width: 20px; height: 20px; }
+.hp-row .weak-badge .emotion-symbol { font-size: 15px; }
+.hp-row .weak-badge small { font-size: 11px; opacity: .9; }
+.boss-health-hud .hp-row .weak-badge { font-size: 15px; padding: 3px 9px 3px 4px; }
+.boss-health-hud .hp-row .weak-badge .emotion-face { width: 24px; height: 24px; }
 .boss-hp-segments {
   position: absolute;
   inset: 0;
@@ -5302,6 +5364,17 @@ html[data-postprocessing='off'] .tip-bubble {
   text-shadow: 0 1px 2px #45060d, 0 0 9px rgba(255, 58, 42, .78);
 }
 .ink-meter-extra[hidden] { display: none; }
+.ink-meter-extra.is-refill {
+  top: -14px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #dff6ff;
+  font-size: 15px;
+  background: rgba(16, 70, 110, .92);
+  box-shadow: 0 0 0 1.5px #8fdcff, 0 0 12px rgba(80, 190, 255, .6);
+  text-shadow: 0 1px 2px #031a2c;
+  white-space: nowrap;
+}
 .ink-meter-overdraw {
   position: absolute;
   right: 10px;
@@ -5668,6 +5741,34 @@ html[data-postprocessing='off'] .tip-bubble {
     0 -1px 0 #1c1a5d;
 }
 .card-resource-meta.without-emotion .card-cost { top: 0; right: 0; }
+/* 랭크 딱지 — 감정 배지 아래, 카드 왼쪽 모서리에 비스듬히 붙는다. */
+.card-rank-stickers {
+  position: absolute;
+  top: 56px;
+  left: 4px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.card-rank-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 2px 5px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  color: #2b1500;
+  background: linear-gradient(160deg, #ffe58a, #f2a93b);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .4), 0 0 0 1.5px #fff6d8;
+  transform: rotate(-7deg);
+  cursor: help;
+}
+.card-rank-sticker small { font-size: 11px; font-weight: 900; }
+.card-rank-sticker.rank-guard { color: #06223a; background: linear-gradient(160deg, #bfe6ff, #5fb2ec); }
 .cw-cost {
   position: absolute;
   top: -12px;
@@ -7135,6 +7236,24 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-size: 13px;
 }
 .character-stats b { color: #fff2da; }
+/* 적 호버 상세는 스크롤 없이 한 화면에 — 초상을 줄이고 넘치는 글은 잘라 낸다. */
+.character-dock.is-enemy .character-portrait { height: 180px; }
+.character-dock.is-enemy .character-portrait img { height: 168px; }
+.character-dock.is-enemy .character-copy { padding: 12px 18px 14px; overflow: hidden; }
+.character-dock.is-enemy .character-copy h2 { margin-top: 0; font-size: 26px; }
+.character-dock.is-enemy .character-copy h3 { font-size: 14px; }
+.character-dock.is-enemy .character-stats { gap: 5px; margin-top: 10px; }
+.character-dock.is-enemy .character-stats > div { gap: 8px; padding: 5px 8px; font-size: 12.5px; }
+.character-dock.is-enemy .character-stats b { text-align: right; }
+.character-dock.is-enemy .character-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
 .character-stats .enemy-weakness { display: inline-flex; align-items: center; gap: 4px; color: var(--emotion-color); }
 .character-stats .enemy-weakness .emotion-face { width: 18px; height: 18px; }
 .character-note {

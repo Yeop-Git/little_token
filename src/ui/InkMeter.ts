@@ -10,6 +10,8 @@ export interface InkMeterState {
   max: number
   overdraw: number
   previewSpent?: number | null
+  /** 이번 문장에 고른 리필 카드가 돌려주는 잉크 합. 지출에서 이미 빠져 있다. */
+  refill?: number
 }
 
 function inkText(key: string, korean: string, values: Record<string, number> = {}): string {
@@ -55,9 +57,13 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   meter.classList.toggle('is-low', remaining > 0 && remaining <= Math.ceil(max * 0.3))
   meter.querySelector<HTMLElement>('[data-ink-now]')!.textContent = String(remaining)
   meter.querySelector<HTMLElement>('[data-ink-max]')!.textContent = String(max)
+  const refill = Math.max(0, Math.floor(state.refill ?? 0))
   const extra = meter.querySelector<HTMLElement>('[data-ink-extra]')!
-  extra.hidden = overdraw <= 0
-  extra.textContent = overdraw > 0 ? `+${overdraw}` : ''
+  // 리필은 고른 카드 비용에서 바로 빠진다. 아직 갚을 비용이 없으면 병이 그대로라
+  // 리필이 안 먹은 것처럼 보이므로, 이번 문장에 걸린 리필 양을 따로 띄워 둔다.
+  extra.hidden = overdraw <= 0 && refill <= 0
+  extra.classList.toggle('is-refill', overdraw <= 0 && refill > 0)
+  extra.textContent = overdraw > 0 ? `+${overdraw}` : refill > 0 ? `${t('inkRefillShort', '리필')} +${refill}` : ''
   meter.querySelectorAll<HTMLElement>('[data-ink-bottle]').forEach((bottle) => {
     const index = Number(bottle.dataset.inkBottle)
     const freeFilled = index < remaining
@@ -84,7 +90,10 @@ export function updateInkMeter(meter: HTMLElement, state: InkMeterState): void {
   const accessibilityText = overdraw > 0
     ? inkText('hudInkOverdrawAria', `잉크 ${spent}/${max}, 초과 체력 피해 ${overdraw}`, { spent, max, overdraw })
     : inkText('hudInkAria', `남은 잉크 ${remaining}/${max}`, { remaining, max })
-  const tooltip = inkText('hudInkTip', '잉크 {remaining}/{max}\n문장마다 잉크 {max}로 시작하며 선택한 단어가 잉크를 사용합니다.', { remaining, max })
+  const baseTooltip = inkText('hudInkTip', '잉크 {remaining}/{max}\n문장마다 잉크 {max}로 시작하며 선택한 단어가 잉크를 사용합니다.', { remaining, max })
+  const tooltip = refill > 0
+    ? `${baseTooltip}\n${inkText('hudInkRefillTip', '리필 +{refill}: 이번 문장의 카드 비용 합에서 {refill}을 돌려받습니다.', { refill })}`
+    : baseTooltip
   meter.setAttribute('aria-label', accessibilityText)
   meter.dataset.tooltip = tooltip
   meter.dataset.tipPlace = 'above'

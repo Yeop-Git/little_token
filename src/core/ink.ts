@@ -77,16 +77,22 @@ export function wordInkCost(word: Word): number {
   return recommendedWordInkCost(word)
 }
 
+/**
+ * 문장의 잉크 지출은 카드에 찍힌 비용의 합에서 리필을 뺀 값이다.
+ * 같은 카드를 겹주어·겹동사 칸에 다시 골라도 카드에 적힌 비용만 낸다 — 예전에는
+ * 반복 선택에 최소 1을 몰래 매겨, 잉크 0 카드(「들뜬 나는」)를 두 번 고르면
+ * 표시와 달리 1이 빠졌다.
+ */
 export function selectionInkCost(selection: Selection): number {
   const words = Object.values(selection).filter((word): word is Word => !!word)
-  const seen = new Set<string>()
-  const listed = words.reduce((sum, word) => {
-    const repeated = seen.has(word.id)
-    seen.add(word.id)
-    return sum + (repeated ? Math.max(1, wordInkCost(word)) : wordInkCost(word))
-  }, 0)
+  const listed = words.reduce((sum, word) => sum + wordInkCost(word), 0)
   const discount = words.reduce((sum, word) => sum + Math.max(0, word.effects?.inkDiscount ?? 0), 0)
   return Math.max(0, listed - discount)
+}
+
+/** 이번 문장에 고른 리필 카드들이 돌려주는 잉크 합. */
+export function selectionInkRefill(selection: Selection): number {
+  return Object.values(selection).reduce((sum, word) => sum + Math.max(0, word?.effects?.inkDiscount ?? 0), 0)
 }
 
 export function sentenceInkAvailable(carry = 0, player?: PlayerState): number {
