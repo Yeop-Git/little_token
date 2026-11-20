@@ -10233,42 +10233,37 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .mult-now:empty { display: none; }
 /* 같은 감정이 둘 이상 모이면 총배율 앞의 빈 칸에 공명 출처가 핀 배지처럼 피어난다.
    공용 emotion-* 팔레트를 그대로 써 카드 → 문장 → 배율이 한 색으로 이어진다. */
+/* 따로 테두리를 두른 알약(왼쪽 둥글고 오른쪽 각진 모양)이면 배율 칸 안에서 혼자 다른
+   양식으로 떠 보였다. 이제는 같은 판 안의 한 구획 — 테두리·바탕 없이 감정색 은은한
+   번짐과 오른쪽 구분선만 두고, 글씨도 옆의 「지금 배율」 라벨·숫자와 같은 결로 맞춘다. */
 .mn-emotion-badge {
   --badge-color: var(--emotion-color, #ffd27a);
   position: relative;
   isolation: isolate;
+  align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin: -2px 5px -2px -7px;
-  padding: 5px 13px 5px 6px;
+  gap: 7px;
+  margin: -5px 2px -5px -12px;
+  padding: 5px 14px 5px 10px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--badge-color) 74%, transparent);
-  border-radius: 999px 15px 15px 999px;
+  border-radius: 16px 0 0 16px;
+  border-right: 1px solid rgba(255, 220, 150, .16);
   color: var(--badge-color);
-  background:
-    radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--badge-color) 26%, transparent), transparent 34px),
-    linear-gradient(115deg, color-mix(in srgb, var(--badge-color) 16%, rgba(15, 10, 20, .96)), rgba(10, 7, 16, .94));
-  box-shadow:
-    inset 0 1px color-mix(in srgb, var(--badge-color) 34%, transparent),
-    inset 0 0 18px color-mix(in srgb, var(--badge-color) 12%, transparent),
-    0 0 18px color-mix(in srgb, var(--badge-color) 28%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--badge-color) 16%, transparent), transparent 92%);
   text-shadow: none;
 }
 .mn-emotion-face {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--badge-color) 13%, rgba(7, 5, 11, .88));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--badge-color) 52%, transparent);
 }
 .mn-emotion-face .emotion-face {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--badge-color) 52%, transparent));
 }
@@ -10282,17 +10277,17 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 .mn-emotion-copy small {
   margin-bottom: 3px;
-  color: color-mix(in srgb, var(--badge-color) 68%, #fff);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .08em;
+  color: color-mix(in srgb, var(--badge-color) 55%, #f3e6cf);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .12em;
   white-space: nowrap;
 }
 .mn-emotion-copy b {
   color: var(--badge-color);
-  font-size: 21px;
-  font-weight: 950;
-  text-shadow: 0 0 13px color-mix(in srgb, var(--badge-color) 68%, transparent);
+  font-size: 22px;
+  font-weight: 900;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--badge-color) 60%, transparent), 0 4px 11px rgba(0, 0, 0, .36);
 }
 .mn-emotion-spark {
   position: absolute;
