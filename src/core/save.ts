@@ -498,3 +498,27 @@ export function clearAllRecords(): void {
   clearTutorialHistory()
   clearPrefixedStorage()
 }
+
+/**
+ * 설정의 '모든 기록 삭제'가 쓰는 완전 초기화. 진행도에 더해 그래픽·사운드·언어
+ * 설정(`little-token-` 키)까지 지운다. 메모리에 들고 있는 토큰의 마음·취향 등이
+ * 다시 저장하지 못하도록 호출한 쪽은 곧바로 페이지를 새로 불러와야 한다.
+ */
+export function clearEverything(): void {
+  clearAllRecords()
+  const stores = new Set<Storage | null>([progressStorage()])
+  try { stores.add(typeof localStorage === 'undefined' ? null : localStorage) } catch { /* 저장소 없음 */ }
+  for (const store of stores) {
+    if (!store) continue
+    try {
+      const doomed: string[] = []
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i)
+        if (key?.startsWith('little-token')) doomed.push(key)
+      }
+      doomed.forEach((key) => store.removeItem(key))
+    } catch {
+      // 저장소를 못 쓰는 환경에서는 지울 설정도 없다.
+    }
+  }
+}

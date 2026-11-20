@@ -20,7 +20,7 @@ import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type Reward
 import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
 import { canAddItemWithoutLock, recoverBattleTables } from '@core/deckSafety'
-import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
+import { clearEverything, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import { sharedTokenMind } from '@core/tokenMind'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
@@ -450,11 +450,31 @@ function startNewRunBattle() {
   void goBattle(true, markTutorialSeen)
 }
 
-function resetAllRecordsAndStart() {
-  clearAllRecords()
-  run = newRun()
-  saveRun(run)
-  void goBattle(true, markTutorialSeen)
+/** 새로고침 직후 오프닝 시네마틱을 한 번 건너뛰게 하는 표식(진행도가 아니라 세션 저장소). */
+const SKIP_INTRO_ONCE_KEY = 'lt-skip-intro-once'
+
+/**
+ * 설정의 '모든 기록 삭제'. 진행도·설정을 전부 지우고 페이지를 새로 불러와 타이틀로
+ * 돌아간다. 토큰의 마음·취향 같은 메모리 싱글턴이 지운 직후 옛 값을 다시 저장하던
+ * 문제를 새로고침으로 끊는다. 튜토리얼은 타이틀에서 시작을 누르면 다시 나온다.
+ */
+function resetAllRecordsToTitle() {
+  battleRequest++
+  // 뷰가 정리되며 저장하는 값까지 함께 지우도록 먼저 내린 뒤 지운다.
+  reset()
+  clearEverything()
+  try { sessionStorage.setItem(SKIP_INTRO_ONCE_KEY, '1') } catch { /* 없으면 오프닝이 한 번 더 나올 뿐 */ }
+  window.location.reload()
+}
+
+function consumeSkipIntroOnce(): boolean {
+  try {
+    const skip = sessionStorage.getItem(SKIP_INTRO_ONCE_KEY) === '1'
+    sessionStorage.removeItem(SKIP_INTRO_ONCE_KEY)
+    return skip
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -473,7 +493,7 @@ function goTitle(withIntro: unknown = false) {
   const title = new TitleView(stage, {
     hasSave: !!loadRun(),
     holdUi: playIntro,
-    onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
+    onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsToTitle }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
       if (fresh) clearRun()
@@ -605,7 +625,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
       saveRun(run)
       goTitle()
     }, // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
-    onResetAll: resetAllRecordsAndStart,
+    onResetAll: resetAllRecordsToTitle,
 
     intro,
     onIntroComplete,
@@ -1085,4 +1105,4 @@ else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
 else if (start === 'guide') goCombatGuide()
 // 부팅으로 들어온 타이틀에서만 오프닝 시네마틱을 튼다(?scene=title이면 검수용이라 건너뛴다).
-else goTitle(!params.get('scene'))
+else goTitle(!params.get('scene') && !consumeSkipIntroOnce())
