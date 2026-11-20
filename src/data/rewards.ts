@@ -8,7 +8,7 @@
 
 import type { Emotion, Rarity, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
-import type { RewardPhase } from '@core/run'
+import { reinforceGrows, type RewardPhase } from '@core/run'
 import { GRADE_MAX, startGrade } from '@core/grade'
 import { canAddItemWithoutLock } from '@core/deckSafety'
 import { floorInCycle, STORY_FLOORS } from './stages'
@@ -212,8 +212,10 @@ function wordOptions(player: PlayerState, slots: string[]): RewardOption[] {
       art: 'word',
       word,
     }))
+  // 강화해도 오르는 수치가 없는 카드(관통·선공처럼 키워드만 가진 수식어)는 강화 보상으로 내지 않는다.
+  // 단계만 오르는 강화는 보상 한 칸을 버리는 함정이다(11/21 강화 검수).
   const reinforce = deckWords
-    .filter((word) => allowed.has(word.slot))
+    .filter((word) => allowed.has(word.slot) && reinforceGrows(word))
     .map((word): RewardOption => ({
       kind: 'word',
       reinforce: true,

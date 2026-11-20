@@ -99,7 +99,9 @@ export function wordCardPrimaryNote(word: Word, note = wordNoteText(word)): stri
     return [`×${formatMult(word.statMult)}`, ...extra].join(' · ')
   }
   if (word.variance) return wordCardDisplayNote(word, note).split(' · ')[0]
-  if (word.bonus) return `×${(1 + word.bonus).toFixed(2)}`
+  // 키워드 칩 옆의 맨 "×1.10"은 그 키워드의 값처럼 읽힌다(강화한 「힘껏」이 "관통 ×1.10"으로 보임).
+  // 배율은 주어 카드와 같이 "배율 ×1.10" 태그로 따로 세운다.
+  if (word.bonus) return `${MULT_LABEL[currentLocale]} ×${(1 + word.bonus).toFixed(2)}`
   return ''
 }
 

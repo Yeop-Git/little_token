@@ -14,7 +14,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { cardNoteTagsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
+import { cardNoteTagsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordCardPrimaryNote, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
@@ -238,7 +238,7 @@ function wordEffectHtml(word: Word): string {
       : word.variance
         ? wordCardDisplayNote(word, note).split(' · ')[0]
         : word.bonus
-          ? `×${(1 + word.bonus).toFixed(2)}`
+          ? wordCardPrimaryNote(word) // 손패 앞면과 같은 '배율 ×1.10' 태그
           : ''
     return `${action}${prefix ? `<span class="rp-effect-copy">${cardNoteTagsHtml(prefix, wordLuckChances(word))}</span>` : ''}${keywords}`
   }
@@ -266,11 +266,14 @@ function reinforceDeltas(w: Word): string {
   }
   reinforceWord(after)
   const rows: string[] = [`단계 Lv.${w.level ?? 1} → <b>Lv.${after.level}</b>`]
-  if (w.power != null) rows.push(`위력 ${w.power} → <b>${after.power}</b>`)
-  if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
-  if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
-  if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatMult(w.statMult)} → <b>×${formatMult(after.statMult!)}</b>`)
+  // 강화로 실제로 바뀌는 값만 줄을 세운다. 도박 카드는 배율 풀(0)이 그대로라
+  // "배율 ×1.00 → ×1.00" 줄이 남아 실패 배율이 오르는 것처럼 읽혔다(11/21).
+  if (w.power != null && w.power !== after.power) rows.push(`위력 ${w.power} → <b>${after.power}</b>`)
+  // 규칙 카드(관통·선공…)는 첫 강화에서 배율 줄이 새로 생기므로 없던 값은 ×1.00에서 출발한다.
+  if ((w.bonus ?? 0) !== (after.bonus ?? 0)) rows.push(`${multText(w.bonus ?? 0)} → <b>${multText(after.bonus ?? 0)}</b>`)
+  if (w.effects?.guard && w.effects.guard !== after.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
+  if (w.effects?.heal && w.effects.heal !== after.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
+  if (w.statMult != null && w.statMult !== after.statMult) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatMult(w.statMult)} → <b>×${formatMult(after.statMult!)}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
   if (w.variance) rows.push(`${tagLuckChances(gambleText(w.variance), wordLuckChances(w))} → <b>${tagLuckChances(gambleText(after.variance!), wordLuckChances(after))}</b>`)
   if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)

@@ -1,6 +1,6 @@
 import { comboLeads, compile } from '@core/compiler'
 import { bossTurnPressureMultiplier, PART_WEAKNESS_MULT, rankedStat } from '@core/combatRules'
-import { DECK_LIMITS, applyItemReward, emptyRunRecord, newRun, registerWord, reinforceWord, startingPlayer, type RunState } from '@core/run'
+import { DECK_LIMITS, applyItemReward, emptyRunRecord, newRun, registerWord, reinforceGrows, reinforceWord, startingPlayer, type RunState } from '@core/run'
 import { ECHO_REPEAT_SCALE, LUCK_CLOAK_RATE, TWIN_VERB_SCALE } from '@core/passives'
 import { defaultPlayer } from '@core/player'
 import { migrateCombatBalance } from '@core/save'
@@ -411,6 +411,24 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 { const card: Word = { id: 'counter', text: '', slot: 'adv', tags: [], emotion: 'sorrow', effects: { counter: true }, note: '' }; reinforceWord(card); assert(card.effects?.counter, 'counter remains a fixed rule after reinforce') }
 { const card: Word = { id: 'cast', text: '', slot: 'adv', tags: [], emotion: 'anger', effects: { castCount: 2, castScale: .65 }, note: '' }; reinforceWord(card); assert(card.effects?.castScale === .7, 'repeat-cast reinforce') }
 { const card: Word = { id: 'scaled', text: '', slot: 'verb', tags: [], emotion: 'anger', stat: 'atk', statMult: 1, kind: 'attack', note: '' }; reinforceWord(card); assert(card.statMult === 1.15, 'stat-scaled verb reinforce') }
+{
+  // 도박 주어는 실패 배율(배율 풀)을 올리지 않고, 기대 배율이 일반 주어(+0.15)만큼 오르도록 고점을 올린다.
+  for (const p of [.3, .44, .5, .55, .6, .75]) {
+    const card: Word = { id: 'gamble', text: '', slot: 'subj', tags: [], emotion: 'joy', bonus: 0, variance: { p, hi: 2, lo: 1 }, note: '' }
+    reinforceWord(card)
+    const evGain = p * (card.variance!.hi - 2)
+    assert(card.bonus === 0 && card.variance!.lo === 1, `gamble reinforce keeps the miss side at ×1 (p=${p})`)
+    assert(Math.abs(evGain - .15) <= .03, `gamble reinforce raises expected multiplier like a flat subject (p=${p}, +${evGain.toFixed(3)})`)
+  }
+  // 키워드만 가진 수식어는 규칙은 그대로 두고 강화마다 배율 +0.10이 한 줄로 붙는다.
+  const pierce: Word = { id: 'pierce', text: '', slot: 'adv', tags: [], emotion: 'anger', effects: { pierceGuard: true }, note: '' }
+  assert(reinforceGrows(pierce), 'keyword-only adverb grows on reinforce')
+  reinforceWord(pierce); reinforceWord(pierce)
+  assert(pierce.bonus === .2 && pierce.effects?.pierceGuard && wordValueLines(pierce).some((line) => line.text.includes('1.20')), 'keyword-only adverb gains +0.10 multiplier per reinforce and shows it')
+  const pierceSentence = compile({ subj: { id: 's', text: '', slot: 'subj', tags: [], emotion: 'joy', note: '' }, adv: pierce, verb: { id: 'v', text: '', slot: 'verb', tags: [], emotion: 'sorrow', stat: 'atk', statMult: 1, kind: 'attack', note: '' } }, { ...makeEarlyTables(), combos: [] }, startingPlayer().stats)
+  assert(Math.abs(pierceSentence.multiplier - 1.2) < 1e-9, `reinforced keyword adverb multiplier reaches the sentence (${pierceSentence.multiplier})`)
+  assert(reinforceGrows({ id: 'crit', text: '', slot: 'adv', tags: [], emotion: 'joy', crit: .3, note: '' }), 'crit adverb still grows on reinforce')
+}
 { const s = state([makeEnemy(foe('delay', { hp: 20 }))]); applyIntent(s, attack({ timing: 'delayed', hitCount: 2, pierceGuard: true, emotions: ['anger'] }), 1, 0); const r = applyPendingAttack(s)!; assert(r.hits.length === 2 && s.enemies[0].hp === 0, 'delayed plan') }
 {
   const boss = makeEnemy(foe('layered-stop', { boss: true, hp: 20 }), 1, 1, 3)
