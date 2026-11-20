@@ -30,7 +30,7 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     ['회복', { kind: 'stat', stat: 'heal' }], ['운 스탯', { kind: 'stat', stat: 'luck' }],
     ['대성공', { kind: 'keyword' }], ['관용구', { kind: 'keyword' }], ['공명', { kind: 'keyword' }],
     ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['배율 풀', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],
-    ['최대 체력', { kind: 'keyword' }], ['생명력 폭발', { kind: 'keyword' }], ['무럭무럭', { kind: 'keyword' }],
+    ['최대 체력', { kind: 'keyword' }], ['생명력 폭발', { kind: 'keyword' }], ['무럭무럭', { kind: 'keyword' }], ['랭크', { kind: 'keyword' }],
     ['문장부호 칸', { kind: 'slot' }], ['문장부호', { kind: 'slot' }], ['주어 칸', { kind: 'slot' }], ['동사 칸', { kind: 'slot' }],
     ['수식어 칸', { kind: 'slot' }], ['서술어', { kind: 'slot' }], ['주어', { kind: 'slot' }], ['수식어', { kind: 'slot' }], ['동사', { kind: 'slot' }],
     // 전장 TIP·적 기믹 설명에 자주 나오는 전투 용어(11/20 피드백: 팁도 태그로).
@@ -77,6 +77,7 @@ const TAG_TIPS_KO: Record<string, string> = {
   '배율 풀': '여러 보너스를 더해서 한 번에 곱하는 배율이에요.',
   배율: '문장의 기본 점수에 곱해지는 값이에요.',
   '최대 체력': '체력이 차오를 수 있는 최대치예요.',
+  랭크: '공격·방어를 25%씩 올리거나 내리는 단계예요.\n그 스테이지가 끝나면 사라져요.',
   무럭무럭: '문장을 쓰면 최대 체력이 영구히 자라요.\n배율을 받지 않는 고정 점수예요.',
   그로기: '큰 기믹이 막히면 빠지는 상태예요.\n주는 피해가 커지고 예정된 공격을 한 턴 걸러요.',
   봉인: '거미줄에 묶인 카드는 풀릴 때까지 쓸 수 없어요.',

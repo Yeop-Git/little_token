@@ -1404,17 +1404,14 @@ export class BattleView {
     const enemyReady = !!enemy && this.state.turn >= enemy.nextAttackTurn
     const enemyActive = this.phaseLabel.includes('상대 행동')
     const playerActive = this.phaseLabel.includes('본인 캐릭터') || this.phaseLabel.includes('선수')
-    const attackStep = enemy ? nextEnemyAttackStep(enemy) : null
     const enemyEntry = (timing: OrderEntry['timing'], note: string, active = false): OrderEntry => ({
       key: `enemy-${front}`,
       name: enemy!.def.name,
       portrait: this.visualForEnemy(enemy!).portrait2d,
       side: 'enemy',
       timing,
-      note: [
-        note,
-        attackStep?.name,
-      ].filter(Boolean).join(' · '),
+      // 11/20 피드백: 공격 이름(낫 휘두르기 등)은 의미가 없어 보여 선·후공만 남긴다.
+      note,
       active,
       damage: timing === 'first' || timing === 'second' ? (() => {
         const [min, max] = enemyDamageRange(this.state, enemy!)
@@ -1933,6 +1930,7 @@ export class BattleView {
     }
     // 일반 적은 캐릭터 옆 경고로 선공을 알린다. 보스는 문장판의 첫 태그(선공·후공)가 같은 값을 말한다.
     el.classList.toggle('strikes-first', strikesFirst)
+    if (e.def.boss) el.dataset.bossId = e.def.id
   }
 
   /**
@@ -2015,7 +2013,9 @@ export class BattleView {
         ? `${left}턴 뒤에 움직인다`
         : e.initiativePhase === 'first' ? '선공: 내 문장 직후, 내가 때리기 전에 먼저 때린다' : '후공: 내 문장이 끝난 뒤에 때린다'
       const label = left > 0 ? `${left}턴 뒤` : e.initiativePhase === 'first' ? '선공' : '후공'
-      add(`attack boss-attack${left === 0 && e.initiativePhase === 'first' ? ' is-first' : ''}`, `${icon('sword')}<em>${label}</em>`, tip(`공격 · ${label}`, [timing, attackStep ? attackDetail(attackStep) : ''].filter(Boolean).join('\n')))
+      // 11/20 피드백: 글자 없이 아이콘만 — 선공이면 일반 몹과 같은 선공 아이콘을 쓴다.
+      const first = left === 0 && e.initiativePhase === 'first'
+      add(first ? 'initiative boss-attack' : 'attack boss-attack', icon(first ? 'initiative' : 'sword'), tip(`공격 · ${label}`, [timing, attackStep ? attackDetail(attackStep) : ''].filter(Boolean).join('\n')))
     }
     // 공격 단계는 1단계(×1.00)일 때는 알릴 것이 없다. 올라간 뒤에만 세운다.
     if (e.def.boss && bossAttackStage(e) > 1) {
@@ -3036,28 +3036,44 @@ export class BattleView {
    * 이번 문장에서 올릴 랭크는 점선 딱지로 미리 붙는다. 툴팁에는 이번 턴에 몇이
    * 올랐는지와 랭크의 뜻을 함께 적는다.
    */
+  /** 직전에 그린 랭크 딱지 — 바뀐 순간에만 스르륵 붙는 연출을 건다(카드 고를 때마다 다시 흔들리지 않게). */
+  private shownRankSticker: Record<'atk' | 'guard', string> = { atk: '', guard: '' }
+
   private rankSticker(key: 'atk' | 'guard', pending: number): { html: string; detail: string; aria: string } | null {
     const rank = (key === 'atk' ? this.state.playerAttackRank : this.state.playerGuardRank) ?? 0
     const gained = this.turnRankGain[key]
     const room = Math.max(0, STAT_RANK_LIMIT - rank)
     const willGain = Math.min(room, pending)
-    if (!rank && !willGain) return null
+    if (!rank && !willGain) {
+      this.shownRankSticker[key] = ''
+      return null
+    }
     const label = key === 'atk' ? '공격' : '방어'
     const sign = (n: number) => `${n > 0 ? '+' : ''}${n}`
+    const total = rank + willGain
+    const base = key === 'atk' ? this.player.stats.atk * this.debugAttackMultiplier : this.player.stats.guard
+    const scale = statRankScale(total)
+    const value = rankedStat(base, total)
     const lines = [
-      rank ? `${label} 랭크 ${sign(rank)} — 기준 ${label}의 ${Math.round(statRankScale(rank) * 100)}%` : '',
-      gained ? `이번 턴에 ${label} 랭크가 ${sign(gained)} 올랐다` : '',
-      willGain ? `이번 문장을 쓰면 이번 턴에 ${label} 랭크 +${willGain}` : '',
-      `랭크 1마다 기준 ${label} 25% · 현재 스테이지 동안 유지 · 최대 ±${STAT_RANK_LIMIT}`,
+      rank ? `${label} 랭크 ${sign(rank)}: 이번 스테이지 동안 유지` : '',
+      gained ? `이번 턴에 랭크 ${sign(gained)}` : '',
+      willGain ? `이번 문장을 쓰면 랭크 +${willGain}` : '',
+      `랭크 1마다 기본 ${label}의 25%씩 · 최대 ±${STAT_RANK_LIMIT}`,
+      // 11/20 피드백: 맨 아래 줄에 기본 스탯과 랭크가 합쳐진 지금 값을 계산식 태그로 정리한다.
+      `현재 ${label} ⟦${formatNumber(value)}|기본 ${label} ${formatNumber(base)}; 랭크 ${sign(total)} → ×${formatMult(scale)}; ${formatNumber(base)} × ${formatMult(scale)} = ${formatNumber(value)}⟧ = 기본 ${label} × 랭크 배율`,
     ].filter(Boolean)
-    const current = rank ? `<span class="rank-sticker ${rank > 0 ? 'up' : 'down'}${gained ? ' fresh' : ''}">${rank > 0 ? '▲' : '▼'}${Math.abs(rank)}</span>` : ''
-    const preview = willGain ? `<span class="rank-sticker pending">이번 턴 ▲${willGain}</span>` : ''
+    const signature = `${rank}|${willGain}`
+    const slide = this.shownRankSticker[key] !== signature ? ' slide' : ''
+    this.shownRankSticker[key] = signature
+    const current = rank ? `<span class="rank-sticker ${rank > 0 ? 'up' : 'down'}${slide}">${rank > 0 ? '▲' : '▼'}${Math.abs(rank)} 랭크</span>` : ''
+    const preview = willGain ? `<span class="rank-sticker pending${slide}">이번 턴 ▲${willGain}</span>` : ''
     return {
-      html: `<span class="rank-stickers" aria-hidden="true">${current}${preview}</span>`,
+      html: `<span class="rank-stickers stat-${key}" aria-hidden="true">${current}${preview}</span>`,
       detail: lines.join('\n'),
-      aria: lines.join('. '),
+      aria: lines.join('. ').replace(/⟦([^|⟧]+)\|[^⟧]*⟧/g, '$1'),
     }
   }
+
 
   // ── 보유 아이템 — 가방을 열지 않고 전장 좌측에 유물 아이콘으로 상시 표시한다. ──
   private renderRelics() {
