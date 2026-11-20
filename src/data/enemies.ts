@@ -35,7 +35,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
         groggyRequiresGuardShatter: true,
       },
     ],
-    note: '낫 휘두르기 1~2번 뒤 큰낫 내려베기 예고\n표시된 필요 방어를 채우면 방어를 모두 쓰고 피해 없음\n막아 내면 그로기: 이번 문장 피해 ×2.5, 다음 공격 거름\n방어가 모자라면 남은 피해의 절반을 사마귀가 흡혈',
+    note: '휘두르기 1~2번 뒤 내려베기 예고\n필요 방어를 채우면 피해 없음, 모자라면 남은 피해 절반을 흡혈\n막아 내면 그로기: 피해 ×2.5, 다음 공격 거름',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
@@ -63,7 +63,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
       groggyEvery: 4,
       groggyDamageMult: 2.5,
     },
-    note: `마지막 페이지에 들어서면 체력 30 일벌 넷을 한 번만 호위로 세움\n${QUEEN_ESCORT_IMMUNITY_LABEL}, 여왕벌 공격은 방어 관통\n문장 피해는 일벌부터 차례로, 남은 만큼 본체로\n일벌 퇴치마다 여왕벌 최대 체력 5% 반동 피해\n관통 없는 분노 단일 공격이면 반동 2배\n넷을 모두 퇴치하면 그로기: 다음 내 턴까지 받는 피해 ×2.5, 행동 없음`,
+    // 11/21 피드백: 호버 상세가 넘쳐 스크롤이 생겼다. 호위 수는 위 칸이 보여 주므로 규칙만 남긴다.
+    note: `마지막 페이지에서 일벌 넷이 한 번 호위로 나옴\n${QUEEN_ESCORT_IMMUNITY_LABEL}, 공격은 방어 관통\n일벌 퇴치마다 본체 최대 체력 5% 반동\n관통 없는 분노 단일 공격은 반동 2배\n넷을 모두 퇴치하면 그로기: 피해 ×2.5, 행동 없음`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
@@ -89,7 +90,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '다리 약점: 기쁨→분노→슬픔→즐거움, 본체는 약점 없음\n문장마다 카드 1장 봉인, 최대 3장\n약점 공격: 피해 ×2, 봉인 1장 해제\n약점 관용구만 다음 다리까지 관통\n약점 방어·회복도 봉인 1장 해제\n다리가 떨어지면 봉인 모두 해제\n거미줄 조이기: 방어 무시, 최대 체력 1/5',
+    // 11/21 피드백: 호버 상세가 넘쳐 스크롤이 생겼다. 현재 부위·약점은 위 칸이 보여 주므로
+    // 여기엔 판단에 필요한 규칙만 짧게 남긴다(다리 약점 순서 줄은 빼고, 방어·회복 해제는 '약점 문장'에 함께 담는다).
+    note: '문장마다 카드 1장 봉인, 다리가 떨어지면 모두 해제\n약점 문장: 피해 ×2, 봉인 1장 해제\n약점 관용구만 다음 다리까지 관통\n거미줄 조이기: 방어 무시, 최대 체력 1/5',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',

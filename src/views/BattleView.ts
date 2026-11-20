@@ -2279,16 +2279,23 @@ export class BattleView {
       // 11/20 피드백: 모든 적이 매 턴 움직여 '행동 주기 1턴'은 늘 같은 말이었고, 공격 단계
       // 1단계(×1.00)·선후공·약점은 아래 •목록의 태그 줄이 더 잘 말한다. 칸에는 숫자만 남긴다.
       const partWeak = currentPart?.def.weakness
-      stats = enemy
+      // 11/21 피드백: 칸마다 성격색(체력 빨강·피해 주황·행동 보라·호위 금·단계 진홍·부위 청록)과
+      // 아이콘을 달아 한눈에 어느 수치인지 읽히게 한다. 색은 CSS의 stat-* 클래스가 정한다.
+      type EnemyStatRow = [kind: string, label: string, value: string, wide?: boolean]
+      const rows: EnemyStatRow[] = enemy
         ? [
-            ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
-            ['예상 피해', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
-            ...(enemy.def.boss && attackStep ? [['다음 행동', attackStep.name, 'wide']] : []),
-            ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`, 'wide']] : []),
-            ...(enemy.def.boss && attackStage > 1 ? [['공격 단계', `${attackStage}단계 ×${attackMultiplier.toFixed(2)}`]] : []),
-            ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}${partWeak?.kind === 'emotion' ? ` <span class="enemy-weakness emotion-${partWeak.value}">${emotionBadgeContent(partWeak.value as Emotion)}</span>` : ''}`, 'wide']] : []),
-          ].map(([label, value, wide]) => `<div${wide ? ' class="is-wide"' : ''}><span>${label}</span><b>${value}</b></div>`).join('')
-        : ''
+            ['hp', '체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
+            ['damage', '예상 피해', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
+            ...(enemy.def.boss && attackStep ? [['next', '다음 행동', attackStep.name, true] as EnemyStatRow] : []),
+            ...(summonPattern ? [['escort', '호위', `${summonPattern.name} ${summons}/${summonPattern.max}`, true] as EnemyStatRow] : []),
+            ...(enemy.def.boss && attackStage > 1 ? [['stage', '공격 단계', `${attackStage}단계 ×${attackMultiplier.toFixed(2)}`] as EnemyStatRow] : []),
+            ...(currentPart ? [['part', '현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}${partWeak?.kind === 'emotion' ? ` <span class="enemy-weakness emotion-${partWeak.value}">${emotionBadgeContent(partWeak.value as Emotion)}</span>` : ''}`, true] as EnemyStatRow] : []),
+          ]
+        : []
+      const statIcon: Record<string, string> = { hp: 'heart', damage: 'sword', next: 'initiative', escort: 'shield', stage: 'skull' }
+      stats = rows
+        .map(([kind, label, value, wide]) => `<div class="stat-${kind}${wide ? ' is-wide' : ''}">${statIcon[kind] ? `<i class="stat-icon" aria-hidden="true">${icon(statIcon[kind] as Parameters<typeof icon>[0])}</i>` : ''}<span>${label}</span><b>${value}</b></div>`)
+        .join('')
     }
     // 적 상세는 마우스를 움직이면 사라지는 호버 팝업이라 스크롤할 수 없다. 읽을거리
     // 서술(description)과 머리 라벨을 빼고 초상을 줄여, 전투에 필요한 수치와 특성

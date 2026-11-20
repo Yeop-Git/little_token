@@ -7550,27 +7550,76 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   font-size: 13px;
 }
 .character-stats b { color: #fff2da; }
-/* 적 호버 상세는 스크롤 없이 한 화면에 — 초상을 줄이고, 내용만큼만 세로로 자란다(11/20 피드백:
-   일반 적은 아래 절반이 빈 유리판이었다). 보스 기믹 •목록이 길면 카드 뽑기 더미 위까지 늘어난다. */
-.character-dock.is-enemy .character-portrait { height: 118px; }
-.character-dock.is-enemy .character-portrait img { height: 110px; }
-.info-dock.character-dock.is-enemy { width: 404px; bottom: auto; max-height: calc(100% - 122px - 262px); }
+/* 적 호버 상세는 스크롤 없이 한 화면에 — 내용만큼만 세로로 자란다(11/20 피드백: 일반 적은 아래
+   절반이 빈 유리판이었다). 11/21 피드백: 일러스트가 작아 누군지 안 보였다 — 초상을 크게 두고
+   object-fit: contain으로 잘림 없이 통째로 담는다. 대신 판을 넓혀 •목록 줄바꿈을 줄인다. */
+/* 초상은 판에서 남는 높이를 다 쓰고(최대 300px), 보스 •목록이 길면 글 대신 초상이 먼저 줄어든다 —
+   글이 스크롤되는 일은 없다. img는 절대 배치로 상자를 꽉 채워 contain으로 통째로 보인다. */
+.character-dock.is-enemy .character-portrait {
+  height: 300px;
+  min-height: 170px;
+  flex: 0 1 300px;
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 58%, rgba(255, 196, 120, 0.30), transparent 70%),
+    radial-gradient(circle at 50% 120%, rgba(255, 120, 90, 0.22), transparent 55%),
+    linear-gradient(180deg, rgba(38, 24, 44, 0.55), rgba(14, 9, 18, 0.2));
+  border-bottom: 1px solid rgba(255, 221, 160, 0.16);
+}
+.character-dock.is-enemy .character-portrait img { position: absolute; inset: 8px 12px 4px; width: calc(100% - 24px); height: calc(100% - 12px); max-width: none; object-fit: contain; object-position: center bottom; }
+.info-dock.character-dock.is-enemy { top: 100px; width: 452px; bottom: auto; max-height: calc(100% - 100px - 262px); }
 .character-dock.is-enemy article { min-height: 0; }
-.character-dock.is-enemy .character-copy { padding: 12px 18px 16px; overflow-y: auto; scrollbar-width: thin; }
+.character-dock.is-enemy .character-copy { flex: none; padding: 10px 18px 16px; overflow: visible; }
 .character-dock.is-enemy .character-copy h2 { margin-top: 0; font-size: 30px; }
-.character-dock.is-enemy .character-copy h3 { font-size: 17px; }
-.character-dock.is-enemy .character-stats { gap: 6px; margin-top: 12px; }
-.character-dock.is-enemy .character-stats > div { align-items: baseline; gap: 10px; padding: 6px 11px; font-size: 16px; }
+.character-dock.is-enemy .character-copy h3 { margin-top: 2px; font-size: 17px; }
+.character-dock.is-enemy .character-stats { gap: 6px; margin-top: 10px;; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* 칸이 내용 폭만큼 늘어나 판 밖으로 밀려나지 않게(러시아어 'Рабочая пчела 0/4'가 잘렸다). */
+.character-dock.is-enemy .character-stats > div { min-width: 0; }
+/* 칸마다 성격색 — 왼쪽 굵은 띠·옅은 바탕·숫자색을 같은 색에서 뽑는다. */
+.character-dock.is-enemy .character-stats > div {
+  --stat: #e8d6b4;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px 6px 9px;
+  border-radius: 10px;
+  border-left: 4px solid var(--stat);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--stat) 24%, transparent), rgba(255, 255, 255, 0.04) 78%);
+  color: color-mix(in srgb, var(--stat) 45%, #f3e7d0);
+  font-size: 16px;
+}
+.character-dock.is-enemy .character-stats > .stat-hp { --stat: #ff6f6f; }
+.character-dock.is-enemy .character-stats > .stat-damage { --stat: #ffa24c; }
+.character-dock.is-enemy .character-stats > .stat-next { --stat: #c79bff; }
+.character-dock.is-enemy .character-stats > .stat-escort { --stat: #ffd45e; }
+.character-dock.is-enemy .character-stats > .stat-stage { --stat: #ff5a7a; }
+.character-dock.is-enemy .character-stats > .stat-part { --stat: #6fe0cf; }
 .character-dock.is-enemy .character-stats > div.is-wide { grid-column: 1 / -1; }
-.character-dock.is-enemy .character-stats b { flex: none; text-align: right; font-size: 19px; line-height: 1.2; white-space: nowrap; }
-/* 다른 언어의 긴 라벨(Expected damage)이 숫자를 밀어 줄바꿈시키지 않게 라벨 쪽이 줄어든다. */
-.character-dock.is-enemy .character-stats > div > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.character-dock.is-enemy .character-stats .stat-icon { display: inline-grid; flex: none; place-items: center; width: 18px; height: 18px; color: var(--stat); }
+.character-dock.is-enemy .character-stats .stat-icon svg,
+.character-dock.is-enemy .character-stats .stat-icon img { display: block; width: 18px; height: 18px; object-fit: contain; }
+.character-dock.is-enemy .character-stats b {
+  flex: none;
+  margin-left: auto;
+  color: color-mix(in srgb, var(--stat) 30%, #fff8ea);
+  text-align: right;
+  font-size: 19px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--stat) 45%, transparent);
+}
+/* 다른 언어의 긴 라벨(Expected damage)이 숫자를 밀어 판 밖으로 내보내지 않게 라벨 쪽이 줄어든다. */
+.character-dock.is-enemy .character-stats > div > span { min-width: 0; font-size: 14px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 두 칸짜리(체력·예상 피해)는 숫자를 라벨 아래 줄로 내려 라벨이 칸 폭을 다 쓴다. */
+.character-dock.is-enemy .character-stats > div:not(.is-wide) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 6px; row-gap: 0; }
+.character-dock.is-enemy .character-stats > div:not(.is-wide) > b { grid-column: 1 / -1; justify-self: end; margin: 0; font-size: 21px; }
 /* 기믹 설명은 •항목으로 나눠 다 보여 준다. 잘라 내면 보스 규칙 절반이 사라졌다(11/20 피드백). */
 .character-dock.is-enemy .character-note {
   margin-top: 12px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 236, 200, 0.045);
   color: #eadfca;
-  font-size: 18px;
-  line-height: 1.45;
+  font-size: 17px;
+  line-height: 1.42;
 }
 .character-dock.is-enemy .character-note:empty { display: none; }
 .character-stats .enemy-weakness { display: inline-flex; align-items: center; gap: 4px; color: var(--emotion-color); vertical-align: -3px; }
