@@ -3732,7 +3732,7 @@ export class BattleView {
             value,
             cls: kind,
             order: slotOrder(p.key),
-            text: `${p.label} ${combatPreviewText().score} +${formatNumber(value)}${why}`,
+            text: `${combatPreviewText().score} +${formatNumber(value)}${why}`,
           }
         })
     // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
@@ -3760,7 +3760,7 @@ export class BattleView {
       return { flats: extras, mults: [], extras: [], base, mult: 1, hits, hitScale: 1, total: base * hits, kind }
     }
 
-    // 배율 풀(가산)은 카드별로 쪼개 "나는 배율 ×1.20", "힘껏 배율 +0.30"처럼 카드 순서대로 띄운다.
+    // 배율 풀(가산)은 카드별로 쪼개 "배율 ×1.20", "배율 +0.30"처럼 카드 순서대로 띄운다.
     // 칩 값은 배율 칸이 이어서 곱할 몫(누적 풀의 비율)이라 칩을 다 곱하면 원래 풀과 같다.
     const mults: TallyPart[] = intent.breakdown.mults.flatMap((part): TallyPart[] => {
       if (!part.poolParts?.length) return [{ label: part.label, value: part.value, cls: cls(part) }]
@@ -3769,20 +3769,20 @@ export class BattleView {
         const before = 1 + pool
         pool += piece.bonus
         const text = index === 0
-          ? `${piece.label} ${combatPreviewText().mult} ×${(1 + piece.bonus).toFixed(2)}`
-          : `${piece.label} ${combatPreviewText().mult} ${piece.bonus >= 0 ? '+' : ''}${piece.bonus.toFixed(2)}`
+          ? `${combatPreviewText().mult} ×${(1 + piece.bonus).toFixed(2)}`
+          : `${combatPreviewText().mult} ${piece.bonus >= 0 ? '+' : ''}${piece.bonus.toFixed(2)}`
         return { label: piece.label, value: (1 + pool) / before, cls: piece.bonus >= 0 ? 'buff' : 'down', order: slotOrder(piece.key), text }
       })
     })
     const p = resolved.parts
     if (p.variance !== 1) {
-      // 도박은 그 카드 자리에서 터진다 — "어제의 나는 도박 성공 ×1.80".
+      // 도박은 그 카드 자리에서 터진다 — "도박 성공 ×1.80".
       const gambleKey = [...this.t.template.slots].reverse().find((slot) => this.sel[slot.key]?.variance)?.key
       const gambleWord = gambleKey ? this.sel[gambleKey] : undefined
       const result = p.variance >= (gambleWord?.variance?.hi ?? Infinity) ? combatPreviewText().gambleWin : combatPreviewText().gambleMiss
       mults.push({
         label: '도박', value: p.variance, cls: p.variance > 1 ? 'buff' : 'down', order: slotOrder(gambleKey),
-        text: `${gambleWord ? `${gambleWord.text} ` : ''}${result} ×${p.variance.toFixed(2)}`,
+        text: `${result} ×${p.variance.toFixed(2)}`,
       })
     }
     if (p.luck !== 1) mults.push({ label: '운', value: p.luck, cls: 'stat' })
