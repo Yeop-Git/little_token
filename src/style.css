@@ -2408,9 +2408,9 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 짧은 말은 작은 쪽지, 긴 말은 넓은 쪽지 — 글 양에 맞춰 종이가 자란다. */
   width: max-content;
   min-width: 168px;
-  max-width: 400px;
-  min-height: 64px;
-  padding: 15px 26px 17px;
+  max-width: 460px;
+  min-height: 72px;
+  padding: 17px 30px 19px;
   /* 말풍선 종이는 한 벌이고 잉크 색만 갈린다 — 평소는 갈색 연필, 핵심 경고는
      빨간 색연필, 파훼 성공은 초록 잉크. 종이 결과 테두리 붓질은 그대로 두어
      경고가 UI 알림이 아니라 같은 그림일기의 한 줄로 읽히게 한다. */
@@ -2422,10 +2422,10 @@ html[data-postprocessing='off'] .tip-bubble {
   --speech-strong: #a3361b;
   --speech-mark: rgba(255, 196, 92, .62);
   color: var(--speech-ink);
-  font-size: 19px;
-  /* 본문은 한 단계 가늘게 두고 **강조**만 가장 굵게 — 다 굵으면 아무것도 안 튄다. */
-  font-weight: 700;
-  line-height: 1.42;
+  font-size: 23px;
+  /* 본문도 굵게(900) 두되 **강조**는 색·형광펜·한 단계 큰 글자로 따로 튀게 한다. */
+  font-weight: 900;
+  line-height: 1.4;
   text-align: center;
   white-space: normal;
   word-break: keep-all;
@@ -2438,7 +2438,7 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 손으로 오린 둥근 쪽지. 타원(%)이면 세 줄짜리 대사의 모서리 글자가 잘린다. */
   border-radius: 30px 34px 28px 36px / 28px 30px 34px 26px;
   background:
-    repeating-linear-gradient(0deg, transparent 0 26px, var(--speech-rule) 27px),
+    repeating-linear-gradient(0deg, transparent 0 31px, var(--speech-rule) 32px),
     var(--speech-paper);
   box-shadow:
     inset 0 0 0 3px rgba(255, 251, 231, .52),
@@ -2496,7 +2496,9 @@ html[data-postprocessing='off'] .tip-bubble {
 .token-speech.is-speaking .ts-w { animation: token-speech-word .26s ease-out both; animation-delay: calc(var(--d, 0ms) + 90ms); }
 .token-speech .ts-strong {
   color: var(--speech-strong);
+  font-size: 1.08em;
   font-weight: 1000;
+  -webkit-text-stroke: .4px currentColor;
   /* 형광펜 밑줄 — 글자 아래 40%만 칠해 종이 줄 위를 그은 것처럼. */
   background: linear-gradient(transparent 58%, var(--speech-mark) 58%, var(--speech-mark) 92%, transparent 92%) no-repeat 0 0 / 100% 100%;
   -webkit-box-decoration-break: clone;
@@ -2622,7 +2624,7 @@ html[data-postprocessing='off'] .tip-bubble {
   --speech-halo: rgba(226, 74, 48, .3);
   --speech-strong: #c21d10;
   --speech-mark: rgba(255, 150, 120, .5);
-  font-size: 19px;
+  font-size: 23px;
   letter-spacing: -.01em;
 }
 .token-speech[data-tone='warn'].is-speaking {
