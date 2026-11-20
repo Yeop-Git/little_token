@@ -420,6 +420,8 @@ export class IntroDialogue {
         hideMeta: true,
       })
       chip.disabled = true
+      // 차례가 된 카드 위 말풍선 문구(CSS가 attr()로 읽는다).
+      chip.dataset.hintLabel = t('tutorialTapHere', '여기 클릭!')
       chip.style.setProperty('--chip-delay', `${i * 90}ms`)
       // 이 런에서 처음 마주하는 선택 — 칩 위에 큰 화살표가 점멸하며 내려찍는다.
       if (i === 0 && !this.hintedFirstChoice) {

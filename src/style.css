@@ -9808,9 +9808,12 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 }
 
 /* 아직 차례가 아닌 단어 — 흐릿하게 대기 */
-.intro-word-chip:disabled:not(.is-done) {
+/* 피드백(11/20 2차): 차례가 아닌 카드는 더 작고 투명하게 — 지금 고를 카드만 또렷이. */
+.intro-word-chip.word-card { transform-origin: center bottom; }
+.intro-word-chip:disabled:not(.is-done):not(.is-entering) {
   cursor: default;
-  opacity: 0.42;
+  opacity: 0.28;
+  transform: translateY(0) scale(0.84);
 }
 
 /* 지금 고를 단어 — 손짓하듯 맥동하는 금빛 발광 */
@@ -9846,25 +9849,45 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
    피드백(11/20): 첫 칩만으론 약했다 — 이제 차례가 된 칩마다 화살표를 띄우고,
    첫 선택은 더 크게 내려찍어 강조한다. */
 .intro-word-chip.is-next::before,
-.intro-word-chip[data-hint]::before {
-  content: '▼';
+.intro-word-chip.is-next::after {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 10px);
-  z-index: 2;
+  z-index: 4;
   pointer-events: none;
-  font-size: 54px;
-  line-height: 1;
-  color: #ffe3a3;
-  -webkit-text-stroke: 2px rgba(92, 50, 10, 0.85);
-  text-shadow:
-    0 0 18px rgba(255, 210, 110, 1),
-    0 0 44px rgba(255, 168, 58, 0.85),
-    0 0 80px rgba(255, 140, 40, 0.5),
-    0 6px 14px rgba(0, 0, 0, 0.6);
-  animation: intro-hint-arrow 0.9s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+  animation: intro-hint-bob 1.4s ease-in-out infinite;
 }
-.intro-word-chip[data-hint]::before { font-size: 70px; }
+/* 피드백(11/20 2차): 굵은 ▼ 대신 말풍선 + 꼬리로 세련되게. 문구는 data-hint-label. */
+.intro-word-chip.is-next::before {
+  content: attr(data-hint-label);
+  bottom: calc(100% + 36px);
+  padding: 7px 16px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #5a3410;
+  background: linear-gradient(180deg, #fff6dc, #ffd98a);
+  box-shadow:
+    0 0 0 2px rgba(255, 244, 214, 0.9),
+    0 0 18px rgba(255, 196, 90, 0.75),
+    0 6px 12px rgba(0, 0, 0, 0.45);
+}
+/* 말풍선 꼬리 — 카드를 콕 가리키는 작은 마름모. */
+.intro-word-chip.is-next::after {
+  content: '';
+  bottom: calc(100% + 29px);
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: #ffd98a;
+  border-radius: 2px;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.25);
+  animation-name: intro-hint-bob-tail;
+}
+/* 이 런의 첫 선택은 한 번 더 크게 숨쉬게 한다. */
+.intro-word-chip[data-hint].is-next::before { font-size: 17px; padding: 8px 18px 9px; }
 
 /* 차례가 된 칩 둘레의 금빛 고리 — 어느 카드를 눌러야 하는지 화살표와 함께 못 박는다.
    호버 때 카드면(.card-lift)이 떠오르므로 고리도 그 상자에 붙여 같이 움직이게 한다. */
@@ -9884,26 +9907,26 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   50% { opacity: 1; transform: scale(1.035); }
 }
 
-@keyframes intro-hint-arrow {
-  0%, 100% { transform: translate(-50%, -12px) scale(0.94); opacity: 0.32; }
-  50% { transform: translate(-50%, 7px) scale(1.06); opacity: 1; }
+@keyframes intro-hint-bob {
+  0%, 100% { transform: translate(-50%, -5px); }
+  50% { transform: translate(-50%, 3px); }
+}
+@keyframes intro-hint-bob-tail {
+  0%, 100% { transform: translateY(-5px) rotate(45deg); }
+  50% { transform: translateY(3px) rotate(45deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .intro-word-chip.is-next .card-lift::after { animation: none; opacity: 1; }
-  .intro-word-chip.is-next::before,
-  .intro-word-chip[data-hint]::before {
-    animation: none;
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
+  .intro-word-chip.is-next::before { animation: none; transform: translate(-50%, 0); }
+  .intro-word-chip.is-next::after { animation: none; transform: rotate(45deg); }
 }
 
 /* 이미 문장에 들어간 단어 — 불이 꺼지며 살짝 가라앉는다 */
 .intro-word-chip.is-done {
   cursor: default;
-  opacity: 0.55;
-  transform: translateY(6px) scale(0.92);
+  opacity: 0.32;
+  transform: translateY(0) scale(0.8);
   filter: grayscale(.5) brightness(.68);
 }
 
