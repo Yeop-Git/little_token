@@ -26,6 +26,7 @@ import {
   inkOverdraw,
   selectionInkCost,
   selectionInkRefill,
+  selectionListedInk,
   sentenceInkAvailable,
   wordInkCost,
 } from '@core/ink'
@@ -2245,7 +2246,7 @@ export class BattleView {
     const spent = selectionInkCost(this.sel)
     const available = this.currentInkAvailable()
     const over = inkOverdraw(spent, available)
-    updateInkMeter(meter, { spent, max: available, overdraw: over, previewSpent: this.inkPreviewSpent, refill: selectionInkRefill(this.sel) })
+    updateInkMeter(meter, { spent, max: available, overdraw: over, previewSpent: this.inkPreviewSpent, refill: selectionInkRefill(this.sel), listed: selectionListedInk(this.sel) })
   }
 
   private currentInkAvailable(): number {

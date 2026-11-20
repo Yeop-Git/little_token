@@ -90,7 +90,12 @@ export function selectionInkCost(selection: Selection): number {
   return Math.max(0, listed - discount)
 }
 
-/** 이번 문장에 고른 리필 카드들이 돌려주는 잉크 합. */
+/** 리필 전, 고른 카드에 찍힌 잉크 비용의 합. */
+export function selectionListedInk(selection: Selection): number {
+  return Object.values(selection).reduce((sum, word) => sum + (word ? wordInkCost(word) : 0), 0)
+}
+
+/** 이번 문장에 고른 리필 카드들이 채워 주는 잉크 합. 쓴 잉크보다 많이 채우지는 않는다. */
 export function selectionInkRefill(selection: Selection): number {
   return Object.values(selection).reduce((sum, word) => sum + Math.max(0, word?.effects?.inkDiscount ?? 0), 0)
 }
