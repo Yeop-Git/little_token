@@ -19,13 +19,8 @@ export function luckValue(luck: number): number {
   return LUCK_CURVE_KNEE * Math.log2(1 + raw / LUCK_CURVE_KNEE)
 }
 
-/** 운 효과량 1당 기본 배율 +3% — 곡선이 고운에서 둔화되므로 초반 한 점을 조금 더 무겁게 둔다. */
-export const LUCK_MULT = 0.03
-
-/** 운이 곱하는 기본 배율. */
-export function luckMultiplier(luck: number): number {
-  return 1 + luckValue(luck) * LUCK_MULT
-}
+// 2026-11-20: 운이 문장 배율에 곱해 주던 기본 배율(효과량 1당 +3%)은 없앴다.
+// 운은 이제 확률(도박·대성공·보상등급·희귀도)에만 영향을 준다.
 
 /** 운 0에서도 예전 시작 운 3과 같은 보상등급 바닥을 주는 기준값. */
 export const LUCK_GRADE_OFFSET = 3

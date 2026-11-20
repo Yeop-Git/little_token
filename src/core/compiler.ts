@@ -11,7 +11,7 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { wordInkCost } from './ink'
-import { LUCK_MULT, luckChance, luckMultiplier } from './luck'
+import { luckChance } from './luck'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -395,7 +395,6 @@ export function compile(
 }
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.
-export { LUCK_MULT } // 운 계수 정본은 ./luck.ts
 export const ROULETTE = { crit: 1.5, fail: 0.25 } as const
 export const CRIT_STAT_K = 0.01 // 맥락 스탯 1당 대성공 +1%
 const FAIL_STAT_K = 0.01 // 맥락 스탯 1당 실패 −1%
@@ -421,7 +420,7 @@ export interface ResolvedMult {
   critP: number
   failP: number
   /** 배율 분해 — 화면에서 "무엇이 몇 배를 줬는지" 그대로 늘어놓으려고 쪼개 둔다. */
-  parts: { variance: number; luck: number; roulette: number; doubt: number }
+  parts: { variance: number; roulette: number; doubt: number }
   /** 피노키오의 미아핑 — 맥락마다 굴린 "근데?" 배율. 없으면 빈 배열. */
   doubtRolls: number[]
 }
@@ -445,7 +444,7 @@ export function rouletteOdds(intent: Intent, statBias: number, luck = 0): { crit
   return { critP, failP }
 }
 
-// 최종 배율 확정 — 기본배율 × variance × 운 × 룰렛. 천장 없음.
+// 최종 배율 확정 — 기본배율 × variance × 룰렛. 천장 없음. 운은 배율이 아니라 확률에만 들어간다.
 // 공격/회복/방어 모든 산출이 이 하나의 배율을 공유한다(한 문장 한 번의 굴림).
 export function resolveMultiplier(
   intent: Intent,
@@ -458,8 +457,6 @@ export function resolveMultiplier(
   // 도박 성공 확률도 운만큼 오른다 — 카드에 적힌 확률(운 반영)과 같은 값으로 굴린다.
   const variance = intent.variance && varRoll !== null ? (varRoll < luckChance(intent.variance.p, ctx.luck).final ? intent.variance.hi : intent.variance.lo) : 1
   m *= variance
-  const luck = luckMultiplier(ctx.luck) // 운은 기본 배율 요소(체감 곡선)
-  m *= luck
   const { critP, failP } = rouletteOdds(intent, ctx.statBias, ctx.luck)
   let outcome: RouletteOutcome = 'normal'
   let roulette = 1
@@ -475,7 +472,7 @@ export function resolveMultiplier(
   const rolls = doubtMults(intent, doubtRolls)
   const doubt = rolls.reduce((a, b) => a * b, 1)
   m *= doubt
-  return { mult: m, outcome, critP, failP, parts: { variance, luck, roulette, doubt }, doubtRolls: rolls }
+  return { mult: m, outcome, critP, failP, parts: { variance, roulette, doubt }, doubtRolls: rolls }
 }
 
 // sweep 전용 — variance만 적용한 기본 배율 분포(룰렛/운 제외, 천장 없음).

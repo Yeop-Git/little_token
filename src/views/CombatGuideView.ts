@@ -22,7 +22,6 @@ import {
   statBiasOf,
   STAT_NAME,
 } from '@core/compiler'
-import { luckMultiplier } from '@core/luck'
 import {
   BOSS_ATTACK_MULTIPLIER,
   EMOTION_RESONANCE,
@@ -317,8 +316,6 @@ export class CombatGuideView {
     const mults = intent.breakdown.mults.map((part) => `
       <li><b>${part.label}</b><i>${mult(part.value)}</i><span>${part.hint ?? ''}</span></li>`).join('')
 
-    const luckMult = luckMultiplier(STATS.luck)
-
     return `
       <p class="g-lead">피해는 <b>점수</b>를 만들고 거기에 <b>배율</b>을 곱해 정해진다.
         아래 계산은 시작 덱과 시작 스탯으로 실제 컴파일러를 돌린 결과다.</p>
@@ -337,10 +334,9 @@ export class CombatGuideView {
           <h3 class="g-h3">② 배율</h3>
           <ul class="g-parts">
             ${mults}
-            <li class="is-extra"><b>운</b><i>${mult(luckMult)}</i><span>운 ${STATS.luck} · 쌓일수록 효율 감소</span></li>
           </ul>
           <p class="g-calc-sum">합계 <b>${mult(normal.mult)}</b></p>
-          <p class="g-note g-tight">배율 풀은 <b>더해서</b> 한 번, 관용구·공명·운은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
+          <p class="g-note g-tight">배율 풀은 <b>더해서</b> 한 번, 관용구·공명은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
         </section>
         <span class="g-calc-op" aria-hidden="true">=</span>
         <section class="g-calc-col g-calc-out">

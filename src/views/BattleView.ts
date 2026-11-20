@@ -111,7 +111,7 @@ import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
 import { localizedWordText } from '@/localization/content'
-import { LUCK_CHANCE_PER, LUCK_SUCCESS_CAP, luckMultiplier, luckRarityShift, luckValue, setCardLuck } from '@core/luck'
+import { LUCK_CHANCE_PER, LUCK_SUCCESS_CAP, luckRarityShift, luckValue, setCardLuck } from '@core/luck'
 import { luckChanceHtml, tagLuckChances, wordLuckChances } from '@/ui/luckChance'
 import { CHANCE_LABEL, MULT_LABEL } from '@/ui/WordCardFace'
 import { combatPreviewText } from '@/localization/combatPreview'
@@ -3035,7 +3035,6 @@ export class BattleView {
       )
     } else {
       lines.push(
-        `문장 배율 ×${formatMult(luckMultiplier(stats.luck))}`,
         `확률 카드 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(LUCK_SUCCESS_CAP * 100)}%)`,
         `대성공 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(CRIT_CAP * 100)}%)`,
         `보상 등급 최저 ${gradeFloor(stats.luck)} · 영웅 +${formatNumber(luckRarityShift(stats.luck).epic, 1)}%p · 전설 +${formatNumber(luckRarityShift(stats.luck).legendary, 1)}%p`,
@@ -3808,7 +3807,6 @@ export class BattleView {
         text: `${result} ×${p.variance.toFixed(2)}`,
       })
     }
-    if (p.luck !== 1) mults.push({ label: '운', value: p.luck, cls: 'stat' })
     // 피노키오의 미아핑 — 맥락마다 따로 굴린 "근데?"를 하나씩 늘어놓는다.
     for (const d of resolved.doubtRolls) mults.push({ label: '근데?', value: d, cls: 'gamble' })
     if (resolved.outcome === 'crit') mults.push({ label: '대성공', value: p.roulette, cls: 'crit' })
@@ -3818,7 +3816,7 @@ export class BattleView {
     // 배율은 쪼개기 전 원래 조각으로 곱한다 — 쪼갠 비율을 다시 곱하면 1.4999…처럼 부동소수가
     // 새어 floor()에서 1점이 깎일 수 있다.
     const mult = intent.breakdown.mults.reduce((m, part) => m * part.value, 1)
-      * p.variance * p.luck * resolved.doubtRolls.reduce((m, d) => m * d, 1)
+      * p.variance * resolved.doubtRolls.reduce((m, d) => m * d, 1)
       * (resolved.outcome === 'normal' ? 1 : p.roulette)
     const extra = extras.reduce((n, f) => n + f.value, 0)
     const total = dealsDamage

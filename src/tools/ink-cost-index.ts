@@ -18,7 +18,6 @@
 import { compile, effectiveBase, rouletteOdds, statBiasOf } from '@core/compiler'
 import { TARGET_FALLOFF } from '@core/combatRules'
 import { wordInkCost } from '@core/ink'
-import { luckMultiplier } from '@core/luck'
 import { startingPlayer } from '@core/run'
 import { conflictReason } from '@core/validator'
 import type { Intent, Selection, Word } from '@core/types'
@@ -54,7 +53,7 @@ export function sentenceValue(selection: Selection): number | null {
   const intent = compile(selection, tables, stats)
   const variance = intent.variance ? intent.variance.p * intent.variance.hi + (1 - intent.variance.p) * intent.variance.lo : 1
   const { critP } = rouletteOdds(intent, statBiasOf(intent, stats))
-  const mult = intent.multiplier * variance * luckMultiplier(stats.luck) * (1 + critP * .5)
+  const mult = intent.multiplier * variance * (1 + critP * .5)
   const casts = intent.castCount * intent.castScale
   const damage = intent.kind === 'attack' ? effectiveBase(intent) * mult * casts * intent.hitCount * targetWeight(intent) : 0
   const guard = intent.guard * mult * casts

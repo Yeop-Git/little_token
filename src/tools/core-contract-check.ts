@@ -103,7 +103,8 @@ const lateLine = {
   adv: ALL_REWARD_WORDS.find((word) => word.id === 'michin')!,
   verb: ALL_REWARD_WORDS.find((word) => word.id === 'focusStrike')!,
 }
-const lateStats = { hp: 120, atk: 70, guard: 30, heal: 30, luck: 20 }
+// 운 기본 배율(×1.38)이 빠진 만큼(2026-11-20) 고성장 공격 스탯을 70 → 90으로 올려 같은 후반 화력을 가정한다.
+const lateStats = { hp: 120, atk: 90, guard: 30, heal: 30, luck: 20 }
 const lateIntent = compile(lateLine, makeEarlyTables(), lateStats)
 const lateMult = resolveMultiplier(lateIntent, { luck: lateStats.luck, statBias: lateStats.atk }, 0).mult
 assert(selectionInkCost(lateLine) <= sentenceInkAvailable(0, inkPlayer), 'late combo fits with ink items')

@@ -45,9 +45,8 @@ function benchmark(item: ItemDef | null, combinedItems: ItemDef[] = []): ItemBen
     if (index >= order.length) {
       if (selectionInkCost(selection) > sentenceInkAvailable(0, player)) return
       const intent = compile(selection, tables, player.stats, modsFor(player, 3))
-      const luck = 1 + player.stats.luck * 0.02
       const doubt = intent.doubtCount > 0 ? 1.15 ** intent.doubtCount : 1
-      const multiplier = intent.multiplier * luck * doubt * expectedRoulette(player, intent)
+      const multiplier = intent.multiplier * doubt * expectedRoulette(player, intent)
       if (isDamageIntent(intent) && effectiveBase(intent) > 0) {
         result.attacks.push(effectiveBase(intent) * multiplier * intent.hitCount * intent.castCount * intent.castScale)
       }
