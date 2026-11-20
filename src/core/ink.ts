@@ -21,6 +21,9 @@ export function expectedMultiplier(word: Word): number {
  * 더 비싸며, 명시 비용은 `check-tables`에서 이 값과 정확히 일치해야 한다.
  */
 export function recommendedWordInkCost(word: Word): number {
+  // 문장부호(올림프의 황금 당근)는 아이템이 여는 덤 칸이라 잉크를 쓰지 않는다.
+  if (word.slot === 'punct') return 0
+
   if (word.growHp) return word.slot === 'subj' || word.slot === 'subj2' ? 2 : 3
 
   if (word.slot === 'subj' || word.slot === 'subj2') {
