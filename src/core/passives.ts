@@ -10,6 +10,7 @@ import type { PlayerState } from './player'
 import type { CompileMods } from './types'
 import { currentLocale } from '@/localization'
 import { traitInkBonus, traitMods } from './itemTraits'
+import { SENTENCE_BASE_INK } from './ink'
 
 export type PassiveId =
   | 'echo' // 누댕의 메아리 — 대성공하면 그 문장이 한 번 더 발동한다
@@ -26,8 +27,8 @@ export type PassiveId =
 
 /** 백설공주의 구두가 동사 깡수치에 더하는 값. */
 export const HEAVY_SHOE_FLAT = 5
-/** 성냥팔이의 망토가 동사 깡수치로 바꾸는 운의 비율. */
-export const LUCK_CLOAK_RATE = 0.35
+/** 성냥팔이의 망토가 동사 점수로 바꾸는 운의 비율(2026-11-20, 0.35 → 0.7: 전설 중 가장 약했다. 1이면 전체 조합 상한을 넘는다). */
+export const LUCK_CLOAK_RATE = 0.7
 /** 메아리는 대성공 문장을 이 비율의 잔향으로 한 번 더 발동한다. */
 export const ECHO_REPEAT_SCALE = 0.5
 /** 겹동사의 두 번째 동사가 더하는 공격·방어·회복 수치 비율. */
@@ -38,8 +39,15 @@ export const MATCH_FIRE_BONUS = 0.05
 export const BBQ_PER_KILL = 0.05
 /** 피노키오의 미아핑 — "…근데?" 한 번의 배율 상한(1.0 ~ 1+이 값). */
 export const DOUBT_RANGE = 0.3
-/** 잭의 하늘나물 — 각 전투에서 첫 문장을 완성한 뒤 얻는 영구 최대 체력. */
-export const BEANSTALK_GROWTH = 1
+/** 잭의 하늘나물 — 각 전투에서 처음 문장을 완성하면 얻는 영구 최대 체력(2026-11-20, 1 → 2). */
+export const BEANSTALK_GROWTH = 2
+/** 잭의 하늘나물 — 가진 뒤 자란 최대 체력 이만큼마다 방어·회복 문장 점수 +1. */
+export const BEANSTALK_STEP = 5
+/** 잭의 하늘나물 — 무럭무럭 카드 성장량 배수. */
+export const BEANSTALK_CARD_MULT = 2
+/** 빨간망토의 불씨 — 완성한 문장에서 남은 잉크 1당 배율, 최대 잉크 수. */
+export const MATCH_FIRE_LEFTOVER = 0.05
+export const MATCH_FIRE_LEFTOVER_MAX = 3
 /** 완성한 문장 끝에 항상 붙는 말. 문장에 그대로 들어가므로 로그·체인에 함께 보인다. */
 export const DOUBT_SUFFIX = currentLocale === 'en' ? '…but?' : currentLocale === 'ja' ? '…でも？' : currentLocale === 'ru' ? '…но?' : currentLocale === 'zh-Hans' ? '……但是？' : currentLocale === 'zh-Hant' ? '……但是？' : '…근데?'
 
@@ -84,7 +92,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   matchFire: {
     id: 'matchFire',
     name: '타오르는 잉크',
-    desc: '매 문장의 최대 잉크 +2',
+    desc: `매 문장의 최대 잉크 +2 · 문장을 쓰고 남은 잉크 1당 배율 +${Math.round(MATCH_FIRE_LEFTOVER * 100)}% (최대 ${MATCH_FIRE_LEFTOVER_MAX})`,
   },
   luckCloak: {
     id: 'luckCloak',
@@ -104,7 +112,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   beanstalk: {
     id: 'beanstalk',
     name: '무럭무럭',
-    desc: `각 전투의 첫 문장을 완성하면 최대 체력 +${BEANSTALK_GROWTH}`,
+    desc: `전투마다 한 번, 문장을 완성하면 최대 체력 +${BEANSTALK_GROWTH} · 자란 체력 ${BEANSTALK_STEP}마다 방어와 회복 점수 +1 · 무럭무럭 카드 성장 ×${BEANSTALK_CARD_MULT}`,
   },
 }
 
@@ -122,6 +130,11 @@ export function bonusInkFor(player: PlayerState | undefined): number {
 
 export function beanstalkGrowthFor(player: PlayerState | undefined, available: boolean): number {
   return available && hasPassive(player, 'beanstalk') ? BEANSTALK_GROWTH : 0
+}
+
+/** 하늘까지 — 자란 최대 체력 BEANSTALK_STEP마다 방어·회복 문장 점수 +1. */
+export function beanstalkFlatFor(player: PlayerState | undefined): number {
+  return hasPassive(player, 'beanstalk') ? Math.floor(Math.max(0, player?.beanstalkGrown ?? 0) / BEANSTALK_STEP) : 0
 }
 
 export function passivesOf(player: PlayerState | undefined): PassiveDef[] {
@@ -167,5 +180,11 @@ export function modsFor(player: PlayerState | undefined, kills = 0): CompileMods
     stageMult: hasPassive(player, 'bbq') ? 1 + kills * BBQ_PER_KILL : 1,
     doubt: false,
     ...traitMods(player?.items),
+    ...(hasPassive(player, 'matchFire')
+      ? { inkFire: { available: SENTENCE_BASE_INK + bonusInkFor(player), rate: MATCH_FIRE_LEFTOVER, max: MATCH_FIRE_LEFTOVER_MAX } }
+      : {}),
+    ...(hasPassive(player, 'beanstalk')
+      ? { growMult: BEANSTALK_CARD_MULT, beanstalkFlat: beanstalkFlatFor(player) }
+      : {}),
   }
 }

@@ -122,19 +122,14 @@ export function carryInkAfterSpend(cost: number, available = SENTENCE_INK): numb
 }
 
 /**
- * 칸마다 카드 한 장이 쓸 수 있는 최대 잉크(주어 1 · 수식어 2 · 동사 3 · 문장부호 0).
- * `recommendedWordInkCost`의 칸별 상한과 같고, check-tables가 카드 비용을 이 안으로 묶는다.
+ * 지금 칸 구성에서 가장 비싼 문장이 쓰는 잉크. 이보다 큰 잉크 한도는 쓸 곳이 없다.
+ * `slotCap`은 칸마다 카드 한 장의 최대 비용(카드 카탈로그에서 계산해 넘긴다 — 상한이 바뀌어도 따라간다).
  */
-export const SLOT_INK_CAP: Readonly<Record<string, number>> = {
-  subj: 1, subj2: 1, adv: 2, verb: 3, verb2: 3, punct: 0,
-}
-
-/** 지금 칸 구성에서 가장 비싼 문장이 쓰는 잉크. 이보다 큰 잉크 한도는 쓸 곳이 없다. */
-export function maxUsefulInk(baseOrder: string[], player?: PlayerState): number {
-  return slotOrderFor(baseOrder, player).reduce((sum, key) => sum + (SLOT_INK_CAP[key] ?? 2), 0)
+export function maxUsefulInk(baseOrder: string[], slotCap: (slotKey: string) => number, player?: PlayerState): number {
+  return slotOrderFor(baseOrder, player).reduce((sum, key) => sum + Math.max(0, slotCap(key)), 0)
 }
 
 /** 잉크 한도가 이미 가장 비싼 문장을 감당하는가 — 그러면 잉크 특성(넉넉한 잉크)은 효과가 없다. */
-export function inkAlreadySaturated(baseOrder: string[], player?: PlayerState): boolean {
-  return sentenceInkAvailable(0, player) >= maxUsefulInk(baseOrder, player)
+export function inkAlreadySaturated(baseOrder: string[], slotCap: (slotKey: string) => number, player?: PlayerState): boolean {
+  return sentenceInkAvailable(0, player) >= maxUsefulInk(baseOrder, slotCap, player)
 }

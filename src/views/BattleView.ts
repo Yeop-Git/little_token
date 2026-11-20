@@ -4311,6 +4311,10 @@ export class BattleView {
     const passiveGrowth = beanstalkGrowthFor(this.player, !this.beanstalkGrownThisBattle)
     if (passiveGrowth > 0) this.beanstalkGrownThisBattle = true
     const totalGrowth = intent.growHp + passiveGrowth
+    // 하늘까지 — 하늘나물을 가진 뒤 자란 최대 체력을 쌓아 방어·회복 가산을 키운다.
+    if (totalGrowth > 0 && hasPassive(this.player, 'beanstalk')) {
+      this.player.beanstalkGrown = (this.player.beanstalkGrown ?? 0) + totalGrowth
+    }
     if (totalGrowth > 0) await this.growUp(totalGrowth)
 
     if (!dealsDamage && tally.kind === 'guard' && tally.total > 0) {

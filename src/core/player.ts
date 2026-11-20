@@ -52,6 +52,8 @@ export interface PlayerState {
   stats: PlayerStats
   items: OwnedItem[]
   deck: Record<string, Word[]> // 슬롯별 보유 단어
+  /** 잭의 하늘나물을 가진 뒤 자란 최대 체력 합(하늘까지 — 5마다 방어·회복 +1). */
+  beanstalkGrown?: number
 }
 
 // 스탯 표시 메타(아이콘/설명). 순서 = 표기 순서.

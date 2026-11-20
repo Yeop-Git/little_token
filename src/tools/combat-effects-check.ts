@@ -163,7 +163,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(rollExclaimMultipliers('rare', () => 0).join(',') !== rollExclaimMultipliers('rare', () => 0.99).join(','), 'rare exclaim bonus can appear in different slots')
   assert(EXCLAIM_SLOTS.flatMap((slot) => slot.words).filter((choice) => choice.mods.atk).every((choice) => choice.mods.atk === 0.5), 'every regular attack exclaim follows the half-point item rule')
   assert(ITEM_BLESS_POOL.every((bless) => itemStatBudget({ [bless.stat]: bless.n }) === 1), 'every lucky exclaim grants exactly one item-budget point')
-  assert(ECHO_REPEAT_SCALE === 0.5 && TWIN_VERB_SCALE === 0.5 && LUCK_CLOAK_RATE === 0.35, 'rule-item numeric contracts stay at echo 50%, twin verb 50%, and luck 35%')
+  assert(ECHO_REPEAT_SCALE === 0.5 && TWIN_VERB_SCALE === 0.5 && LUCK_CLOAK_RATE === 0.7, 'rule-item numeric contracts stay at echo 50%, twin verb 50%, and luck 70%')
   assert(Math.abs(counts.common - counts.rare) <= 1 && Math.abs(counts.epic - counts.legendary) <= 1, 'item rarities remain evenly distributed')
   const expectedPassiveTiers = {
     retry: 'epic', heavyShoe: 'epic', doubt: 'epic', bbq: 'epic', beanstalk: 'epic',

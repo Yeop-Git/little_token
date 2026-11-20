@@ -255,6 +255,12 @@ export interface CompileMods {
   traitResonance?: number
   /** 아이템 특성 — 관용구가 발동했을 때 (1+값)배. */
   traitCombo?: number
+  /** 빨간망토의 불씨 — 완성한 문장에서 남은 잉크 1당 배율 +rate(최대 max 잉크). available은 이번 문장 잉크 한도. */
+  inkFire?: { available: number; rate: number; max: number }
+  /** 잭의 하늘나물 — 무럭무럭 카드의 성장량 배수. */
+  growMult?: number
+  /** 잭의 하늘나물 — 자란 최대 체력에서 나온 방어·회복 문장 가산. */
+  beanstalkFlat?: number
 }
 
 export interface Tables {

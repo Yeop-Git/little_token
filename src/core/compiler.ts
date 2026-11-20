@@ -37,16 +37,16 @@ export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
           : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
 const CORE_TEXT = currentLocale === 'en'
-  ? { pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
+  ? { sky:'Up to the Sky', fire:'Ember Ink', fireHint:'{n} Ink left', pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
   : currentLocale === 'ja'
-    ? { pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
+    ? { sky:'空まで', fire:'燃えるインク', fireHint:'残りインク{n}', pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
     : currentLocale === 'ru'
-      ? { pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
+      ? { sky:'До неба', fire:'Пылающие чернила', fireHint:'осталось чернил: {n}', pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
       : currentLocale === 'zh-Hans'
-        ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
+        ? { sky:'直上云霄', fire:'燃烧的墨水', fireHint:'剩余墨水{n}', pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
         : currentLocale === 'zh-Hant'
-          ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
-          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
+          ? { sky:'直上雲霄', fire:'燃燒的墨水', fireHint:'剩餘墨水{n}', pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
+          : { sky:'하늘까지', fire:'타오르는 잉크', fireHint:'남은 잉크 {n}', pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
 
 const sameEmotionHint = (count: number): string => currentLocale === 'ko'
   ? `${CORE_TEXT.sameEmotion} ${count}장`
@@ -208,7 +208,7 @@ export function compile(
     // 칸 역할에 붙는 아이템 효과(백설공주의 구두·빨간망토의 성냥·성냥팔이 망토)를
     // 그대로 받아 "자라면서 때리는" 카드가 된다.
     if (w.growHp) {
-      growHp += w.growHp
+      growHp += w.growHp * (mods.growMult ?? 1)
       continue
     }
     if (role === 'object' || role === 'verb') {
@@ -294,6 +294,15 @@ export function compile(
     addTraitFlat(`${EMOTION_LABEL[emotion]} ${CORE_TEXT.trait}`, count * per)
   }
   if (mainLane) addTraitFlat(`${CORE_TEXT.trait}`, mods.traitKindFlat?.[mainLane] ?? 0)
+  // 잭의 하늘나물 — 자란 키가 버팀목이 된다. 방어·회복 문장에만 얹는다.
+  if (mainLane === 'guard' || mainLane === 'heal') {
+    const sky = mods.beanstalkFlat ?? 0
+    if (sky > 0) {
+      if (mainLane === 'guard') statGuard += sky
+      else statHeal += sky
+      flats.push({ label: CORE_TEXT.sky, value: sky, source: 'word', lane: mainLane })
+    }
+  }
 
   let comboMult = combos.reduce((m, c) => m * c.mult, 1)
   for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: CORE_TEXT.perfect })
@@ -341,7 +350,22 @@ export function compile(
     })
   }
 
-  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult * emotionResonance
+  // 빨간망토의 불씨 — 완성한 문장에서 쓰지 않고 남은 잉크가 불씨가 되어 문장 배율을 키운다.
+  // 다음 문장으로 넘어가지 않는 잉크 규칙은 그대로이고, 완성 전 미리보기에서는 붙이지 않는다.
+  let fireMult = 1
+  if (mods.inkFire && complete) {
+    const spent = order.reduce((sum, key) => {
+      const w = sel[key]
+      return w ? sum + wordInkCost(w) - Math.max(0, w.effects?.inkDiscount ?? 0) : sum
+    }, 0)
+    const left = Math.max(0, Math.min(mods.inkFire.max, Math.floor(mods.inkFire.available - Math.max(0, spent))))
+    if (left > 0) {
+      fireMult = 1 + left * mods.inkFire.rate
+      mults.push({ label: CORE_TEXT.fire, value: fireMult, source: 'combo', hint: CORE_TEXT.fireHint.replace('{n}', String(left)) })
+    }
+  }
+
+  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult * emotionResonance * fireMult
 
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
     order.reduce((n, key) => {

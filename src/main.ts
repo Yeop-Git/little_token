@@ -16,7 +16,7 @@ import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
 import { isItemTraitId, rollItemTrait, type ItemTraitId } from '@core/itemTraits'
-import { inkAlreadySaturated } from '@core/ink'
+import { inkAlreadySaturated, wordInkCost } from '@core/ink'
 import { EARLY_TEMPLATE, makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
@@ -751,7 +751,20 @@ function itemTraitSeed(refreshes: number): number {
 
 /** 지금 보유 상태에서 효과가 없는 특성 — 진열에 올리지 않는다(잉크가 이미 가장 비싼 문장을 감당하면 넉넉한 잉크). */
 function deadItemTraits(): ItemTraitId[] {
-  return inkAlreadySaturated(EARLY_TEMPLATE, run.player) ? ['inkMax'] : []
+  return inkAlreadySaturated(EARLY_TEMPLATE, slotInkCap, run.player) ? ['inkMax'] : []
+}
+
+/** 칸마다 카드 한 장의 최대 잉크 — 겹주어·겹동사 칸은 원래 칸 카드를 쓴다. 문장부호는 0. */
+let slotInkCaps: Record<string, number> | null = null
+function slotInkCap(slotKey: string): number {
+  if (!slotInkCaps) {
+    slotInkCaps = {}
+    for (const word of [...ALL_REWARD_WORDS, ...Object.values(EARLY_WORDS).flat()]) {
+      slotInkCaps[word.slot] = Math.max(slotInkCaps[word.slot] ?? 0, wordInkCost(word))
+    }
+  }
+  const base = slotKey === 'subj2' ? 'subj' : slotKey === 'verb2' ? 'verb' : slotKey
+  return slotInkCaps[base] ?? 0
 }
 
 function withItemTrait(item: ItemDef, seed = itemTraitSeed(run.reward?.shopRefreshes ?? 0)): ItemDef {
