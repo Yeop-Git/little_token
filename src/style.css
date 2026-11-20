@@ -4299,6 +4299,7 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   transform: translate(-50%, 0) scale(calc(.72 * var(--tally-fit)));
 }
 .tally.parked .tally-feed { opacity: 0.45; }
+.tally.parked .tally-flat-feed { opacity: 0.9; }
 .tally.out { opacity: 0; transform: translate(-50%, -6%) scale(calc(1.06 * var(--tally-fit))); }
 /* 내용만큼만 넓어진다 — 자릿수가 늘면 상자가 커지고, 무대를 넘기는 건 잘라내는 게
    아니라 fitTallyToStage가 판 전체를 줄여서 막는다. 100%로 묶어 두면 큰 수치가
@@ -11833,3 +11834,21 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 /* 보스 HUD는 체력 숫자가 14px라 방어도 알약이 작게 읽혔다. 보스 쪽만 한 단계 키운다. */
 .boss-health-heading .hpn .hp-readout { font-size: 16px; gap: 7px; }
 .boss-health-heading .hpn .hp-readout-chip { font-size: .9em; padding: 0 8px 0 6px; }
+
+/* 정산 내역 — 1번 카드부터 순서대로 한 줄로 읽힌다. 밝은 필드에서도 읽히게 어두운 알약을 깐다. */
+.tally .tally-phase { display: none; }
+.tally .tally-flat-feed { gap: 6px 8px; max-width: 980px; }
+.tally .tally-flat-feed:empty { display: none; }
+.tally .tally-chip.card,
+.tally .tally-chip.tail {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(10, 7, 16, .82);
+  box-shadow: inset 0 0 0 1px rgba(255, 242, 218, .16), 0 4px 12px rgba(0, 0, 0, .3);
+  font-size: 19px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tally .tally-chip.tail { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent), 0 4px 12px rgba(0, 0, 0, .3); }
+.tally.compact .tally-chip.card,
+.tally.compact .tally-chip.tail { padding: 1px 8px; font-size: 16px; }

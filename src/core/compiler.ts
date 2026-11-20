@@ -174,6 +174,7 @@ export function compile(
   let damageKind: Intent['kind'] | null = null
   let growHp = 0
   const bonusFrom: string[] = [] // 보너스 풀에 기여한 단어 이름(집계판 힌트용)
+  const poolParts: { label: string; bonus: number; key?: string }[] = []
   let targetMode: Intent['targetMode'] = 'enemy'
   let aoe: Intent['aoe'] = 'single'
   let targetCount: TargetCount = 1
@@ -200,7 +201,7 @@ export function compile(
       if (flat > 0) {
         const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}` : undefined
         const lane = w.kind === 'guard' ? 'guard' : w.kind === 'heal' ? 'heal' : 'damage'
-        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane })
+        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane, key })
         if (lane === 'guard') statGuard += flat
         else if (lane === 'heal') statHeal += flat
         else base += flat
@@ -211,7 +212,10 @@ export function compile(
       const extra = mods.bonusEach ?? 0
       const bonus = (w.bonus || 0) + extra
       bonusPool += bonus
-      if (bonus) bonusFrom.push(w.text)
+      if (bonus) {
+        bonusFrom.push(w.text)
+        poolParts.push({ label: w.text, bonus, key })
+      }
     }
     critP += w.crit || 0
     failP += w.fail || 0
@@ -243,9 +247,10 @@ export function compile(
   if (mods.traitPool) {
     bonusPool += mods.traitPool
     bonusFrom.push(CORE_TEXT.trait)
+    poolParts.push({ label: CORE_TEXT.trait, bonus: mods.traitPool })
   }
   if (bonusPool) {
-    mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · ') })
+    mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · '), poolParts })
   }
 
   // 백설공주의 구두 — 피해 동사가 하나라도 있으면 문장 끝에 고정 깡수치를 한 번 얹는다.

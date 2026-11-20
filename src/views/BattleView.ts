@@ -17,6 +17,7 @@ import {
   resolveMultiplier,
   sentenceTokens,
   statBiasOf,
+  STAT_NAME,
   type ResolvedMult,
 } from '@core/compiler'
 import { wordDetailNoteLine, wordNoteText, wordValueLines } from '@core/wordText'
@@ -355,6 +356,10 @@ interface TallyPart {
   label: string
   value: number
   cls: string
+  /** 이 조각을 낸 카드의 칸 순서(0부터). 카드가 아닌 조각(공명·맥락·운·대성공)은 비워 뒤로 보낸다. */
+  order?: number
+  /** 칩에 그대로 띄울 문구. 없으면 "이름 +값"/"이름 ×값"으로 만든다. */
+  text?: string
 }
 interface Tally {
   flats: TallyPart[]
@@ -3641,6 +3646,8 @@ export class BattleView {
     // 피해·실드·회복 어느 문장이든 같은 배율 정산을 보여 준다.
     // 순수 효과형 카드도 실제 적용값과 일치하도록 아래에서 깡수치를 보충한다.
     const kind: Tally['kind'] = dealsDamage ? 'dmg' : intent.guard > 0 ? 'guard' : 'heal'
+    const slotKeys = this.t.template.slots.map((slot) => slot.key as string)
+    const slotOrder = (key?: string) => (key && slotKeys.includes(key) ? slotKeys.indexOf(key) : undefined)
     // 피해는 "1타 위력"을 쌓고 마지막에 타격 수를 따로 곱해 보여 준다(2번 타격 명시).
     // 방어·회복은 반복 발동이 그대로 한 덩어리 수치라 지금처럼 합쳐서 쌓는다.
     const hits = dealsDamage ? Math.max(1, intent.hitCount * intent.castCount) : 1
@@ -3665,11 +3672,22 @@ export class BattleView {
       ? []
       : intent.breakdown.flats
         .filter((p) => (p.lane ?? 'damage') === lane)
-        .map((p) => ({
-          label: p.hint ? `${p.label} (${p.hint})` : p.label,
-          value: p.value * repeatPower,
-          cls: kind,
-        }))
+        .map((p) => {
+          const value = p.value * repeatPower
+          // "때렸다 점수 +5 (공격 5 × 1.0)" — 점수 5가 어느 카드의 어떤 스탯에서 왔는지 한 칩에 적는다.
+          const word = p.key ? this.sel[p.key] : undefined
+          const statValue = word?.stat && word.statMult ? formatNumber(p.value / word.statMult) : null
+          const why = word?.stat && word.statMult != null && statValue
+            ? ` (${STAT_NAME[word.stat]} ${statValue} × ${formatMult(word.statMult)})`
+            : p.hint ? ` (${p.hint})` : ''
+          return {
+            label: p.label,
+            value,
+            cls: kind,
+            order: slotOrder(p.key),
+            text: `${p.label} ${combatPreviewText().score} +${formatNumber(value)}${why}`,
+          }
+        })
     // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
     // 집계판의 깡수치 합이 실제 방어·회복 적용값과 항상 같도록 남은 값만 보탠다.
     if (supportBase > 0) {
@@ -3695,9 +3713,31 @@ export class BattleView {
       return { flats: extras, mults: [], extras: [], base, mult: 1, hits, hitScale: 1, total: base * hits, kind }
     }
 
-    const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
+    // 배율 풀(가산)은 카드별로 쪼개 "나는 배율 ×1.20", "힘껏 배율 +0.30"처럼 카드 순서대로 띄운다.
+    // 칩 값은 배율 칸이 이어서 곱할 몫(누적 풀의 비율)이라 칩을 다 곱하면 원래 풀과 같다.
+    const mults: TallyPart[] = intent.breakdown.mults.flatMap((part): TallyPart[] => {
+      if (!part.poolParts?.length) return [{ label: part.label, value: part.value, cls: cls(part) }]
+      let pool = 0
+      return part.poolParts.map((piece, index) => {
+        const before = 1 + pool
+        pool += piece.bonus
+        const text = index === 0
+          ? `${piece.label} ${combatPreviewText().mult} ×${(1 + piece.bonus).toFixed(2)}`
+          : `${piece.label} ${combatPreviewText().mult} ${piece.bonus >= 0 ? '+' : ''}${piece.bonus.toFixed(2)}`
+        return { label: piece.label, value: (1 + pool) / before, cls: piece.bonus >= 0 ? 'buff' : 'down', order: slotOrder(piece.key), text }
+      })
+    })
     const p = resolved.parts
-    if (p.variance !== 1) mults.push({ label: '도박', value: p.variance, cls: p.variance >= 1 ? 'buff' : 'down' })
+    if (p.variance !== 1) {
+      // 도박은 그 카드 자리에서 터진다 — "어제의 나는 도박 성공 ×1.80".
+      const gambleKey = [...this.t.template.slots].reverse().find((slot) => this.sel[slot.key]?.variance)?.key
+      const gambleWord = gambleKey ? this.sel[gambleKey] : undefined
+      const result = p.variance >= (gambleWord?.variance?.hi ?? Infinity) ? combatPreviewText().gambleWin : combatPreviewText().gambleMiss
+      mults.push({
+        label: '도박', value: p.variance, cls: p.variance > 1 ? 'buff' : 'down', order: slotOrder(gambleKey),
+        text: `${gambleWord ? `${gambleWord.text} ` : ''}${result} ×${p.variance.toFixed(2)}`,
+      })
+    }
     if (p.luck !== 1) mults.push({ label: '운', value: p.luck, cls: 'stat' })
     // 피노키오의 미아핑 — 맥락마다 따로 굴린 "근데?"를 하나씩 늘어놓는다.
     for (const d of resolved.doubtRolls) mults.push({ label: '근데?', value: d, cls: 'gamble' })
@@ -3705,7 +3745,11 @@ export class BattleView {
     if (resolved.outcome === 'fail') mults.push({ label: '실패', value: p.roulette, cls: 'down' })
 
     const base = flats.reduce((n, f) => n + f.value, 0)
-    const mult = mults.reduce((m, x) => m * x.value, 1)
+    // 배율은 쪼개기 전 원래 조각으로 곱한다 — 쪼갠 비율을 다시 곱하면 1.4999…처럼 부동소수가
+    // 새어 floor()에서 1점이 깎일 수 있다.
+    const mult = intent.breakdown.mults.reduce((m, part) => m * part.value, 1)
+      * p.variance * p.luck * resolved.doubtRolls.reduce((m, d) => m * d, 1)
+      * (resolved.outcome === 'normal' ? 1 : p.roulette)
     const extra = extras.reduce((n, f) => n + f.value, 0)
     const total = dealsDamage
       ? (Math.floor(base * mult * hitScale) + extra) * hits
@@ -3785,15 +3829,27 @@ export class BattleView {
     const multFeed = el.querySelector<HTMLElement>('.tally-mult-feed')!
     const totalEl = el.querySelector<HTMLElement>('.tally-total')!
     const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
-    if (hasRisingMultiplier) el.classList.add('has-phase')
     // 배율이 하나도 붙지 않는 정산(전환 피해만 있는 문장)은 "× 1.00" 칸을 세우지 않는다.
     if (tally.mults.length === 0) el.classList.add('no-mult')
 
     // 모든 칩을 처음부터 자리만 잡아 두고(보이지 않게) 하나씩 드러낸다.
     // 칩이 붙을 때마다 판의 높이·축척이 바뀌면 가운데 정렬된 판 전체가 위아래로
     // 출렁여 점수가 "내려갔다 올라오는" 것처럼 보였다. 판 크기는 한 번만 잰다.
-    const flatChips = tally.flats.map((f) => this.tallyChip(flatFeed, `${f.label} +${formatNumber(f.value)}`, f.cls))
-    const multChips = tally.mults.map((m) => this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls))
+    // 내역은 한 줄에 1번 카드부터 차례로 — 카드가 낸 점수·배율이 먼저, 공명·맥락·운·대성공은 뒤에.
+    // 점수 조각은 점수 칸에, 배율 조각은 배율 칸에 꽂히지만 읽는 순서는 카드 순서를 따른다.
+    type Step = { box: 'base' | 'mult'; part: TallyPart; chip: HTMLElement }
+    const ordered = [
+      ...tally.flats.map((part) => ({ box: 'base' as const, part })),
+      ...tally.mults.map((part) => ({ box: 'mult' as const, part })),
+    ].map((step, index) => ({ ...step, index }))
+      .sort((a, b) => (a.part.order ?? 1000) - (b.part.order ?? 1000) || a.index - b.index)
+    const steps: Step[] = ordered.map((step) => ({
+      box: step.box,
+      part: step.part,
+      chip: this.tallyChip(flatFeed, step.part.text ?? (step.box === 'base'
+        ? `${step.part.label} +${formatNumber(step.part.value)}`
+        : `${step.part.label} ×${step.part.value.toFixed(2)}`), `${step.part.cls}${step.part.order === undefined ? ' tail' : ' card'}`),
+    }))
     const extraChips = tally.extras.map((f) => this.tallyChip(multFeed, `${f.label} +${formatNumber(f.value)}`, `${f.cls} extra`))
     const scaleNote = tally.hitScale !== 1 ? ` · ${text.perHit.replace('{value}', String(Math.round(tally.hitScale * 100)))}` : ''
     const hitChip = tally.hits > 1 || tally.hitScale !== 1
@@ -3825,33 +3881,35 @@ export class BattleView {
     await this.sleep(120)
 
     let base = 0
-    for (const [i, f] of tally.flats.entries()) {
-      base += f.value
-      baseBox.querySelector('b')!.textContent = formatNumber(base)
-      this.revealChip(flatChips[i])
-      this.bump(baseBox)
-      // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
-      this.setFever(el, base)
-      await this.sleep(140)
-    }
     let mult = 1
-    if (hasRisingMultiplier) {
-      el.classList.add('mult-rising')
-      GameAudio.playMultiplierRise()
-    }
-    multBox.classList.add('rolling')
-    for (const [i, m] of tally.mults.entries()) {
-      const nextMult = mult * m.value
-      this.revealChip(multChips[i])
+    let multStarted = false
+    for (const [i, step] of steps.entries()) {
+      this.revealChip(step.chip)
+      if (step.box === 'base') {
+        base += step.part.value
+        baseBox.querySelector('b')!.textContent = formatNumber(base)
+        this.bump(baseBox)
+        // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
+        this.setFever(el, base * mult)
+        await this.sleep(150)
+        continue
+      }
+      if (!multStarted) {
+        multStarted = true
+        multBox.classList.add('rolling')
+        if (hasRisingMultiplier) {
+          el.classList.add('mult-rising')
+          GameAudio.playMultiplierRise()
+        }
+      }
+      const nextMult = i === steps.length - 1 || !steps.slice(i + 1).some((s) => s.box === 'mult') ? tally.mult : mult * step.part.value
       // 배율이 겹칠수록 판이 뜨거워진다.
-      el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
+      el.style.setProperty('--heat', Math.min(1, steps.slice(0, i + 1).filter((s) => s.box === 'mult').length / 4).toFixed(2))
       await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 220)
       mult = nextMult
       this.bump(multBox)
-      // 배율이 한 칸 꽂힐 때마다 지금까지의 예상 총합으로 열기를 다시 잰다 —
-      // 곱이 겹칠수록 판이 커지고 흔들리고 불이 붙는다.
       this.setFever(el, base * mult)
-      await this.sleep(20)
+      await this.sleep(60)
     }
     multBox.classList.remove('rolling')
     if (hasRisingMultiplier) {

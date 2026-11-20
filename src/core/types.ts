@@ -224,6 +224,10 @@ export interface IntentPart {
    * 피해·방어·회복이 동시에 생기므로, 집계판이 자기 풀만 골라 쓴다.
    */
   lane?: 'damage' | 'guard' | 'heal'
+  /** 이 조각을 낸 카드의 문장 칸(subj·adv·verb…). 집계판이 1번 카드부터 순서대로 띄운다. */
+  key?: string
+  /** 배율 풀(가산) 칩을 카드별로 쪼개 보여 줄 때 쓰는 기여분. 합은 value - 1과 같다. */
+  poolParts?: { label: string; bonus: number; key?: string }[]
 }
 
 /**
