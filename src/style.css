@@ -11723,3 +11723,35 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .anchored .word-keyword-list { gap: 16px; }
 .anchored .word-keyword-detail b { font-size: 22px; }
 .anchored .word-keyword-detail span { font-size: 20px; line-height: 1.5; color: #fff7e6; }
+
+/* 맨 위 문장 칸 뒤 어둠 스크림(11/20 피드백): 아래 「지금 배율」 칸까지 번져 겹쳐 보였다.
+   세로로 덜 퍼지고 더 옅게 — 가로 여백은 그대로 둬서 밝은 배경 위 가독성은 지킨다. */
+.chain-rail::before {
+  inset: -14px -64px -10px;
+  background: radial-gradient(ellipse at center, rgba(8, 6, 12, 0.46) 0%, rgba(8, 6, 12, 0.18) 60%, transparent 80%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.chain-rail.has-sentence { box-shadow: inset 0 1px rgba(255,255,255,.1), 0 6px 16px rgba(0, 0, 0, .2); }
+.chain-rail.sentence-ready { box-shadow: inset 0 1px rgba(255,255,255,.16), 0 0 20px rgba(255, 179, 79, .14), 0 6px 16px rgba(0, 0, 0, .24); }
+
+/* 손패 상세의 예상 합계(11/20 피드백): 머리 글자와 숫자를 크게, 숫자는 금빛 칸에 담아 한눈에. */
+.wd-proj {
+  margin-top: 16px;
+  padding: 12px 16px 14px;
+  background: linear-gradient(180deg, rgba(255, 214, 128, .12), rgba(255, 214, 128, .04));
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 122, .34);
+}
+.pj-head { margin-bottom: 8px; color: #ffe0a0; font-size: 22px; font-weight: 1000; letter-spacing: .06em; }
+.pj-rows { gap: 8px; }
+.pj-row { align-items: center; }
+.pj-l { font-size: 24px; color: #fff3dc; }
+.pj-f {
+  min-width: 64px;
+  font-size: 52px;
+  color: #fff2da;
+  text-shadow: 0 0 14px rgba(255, 200, 90, .55), 0 2px 4px rgba(0, 0, 0, .85);
+}
+.pj-row.dmg .pj-f { color: #ffd9a0; }
+.pj-row.guard .pj-f { color: #cfe6ff; }
+.pj-row.heal .pj-f { color: #c8f5b4; }
