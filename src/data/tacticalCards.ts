@@ -71,7 +71,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'queenBee',
     rewardFloors: [9],
     title: '범위 수식어·분노 집중',
-    tooltip: '일벌을 쓰러뜨릴 때마다 여왕벌도 반동 피해를 받아요\n분노 감정의 단일 공격으로 쓰러뜨리면 반동 피해가 2배예요\n혹은 「웃으며」·「거칠게」·「신나게」로 일벌을 빠르게 정리해요',
+    tooltip: '마지막 페이지에 들어서면 일벌 넷이 한 번 호위로 나와요\n일벌을 쓰러뜨릴 때마다 여왕벌도 반동 피해를 받아요\n분노 감정의 단일 공격으로 쓰러뜨리면 반동 피해가 2배예요\n혹은 「웃으며」·「거칠게」·「신나게」로 일벌을 빠르게 정리해요',
     cardIds: ['useumyeo', 'geochilge', 'sinnage'],
   },
   {

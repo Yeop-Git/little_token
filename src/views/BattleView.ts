@@ -77,7 +77,7 @@ import {
   type EnemyInst,
   weaknessEmotions,
 } from '@/sim/reference'
-import { enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
+import { enemyDamageRange, enemySentenceFor, type EnemySentenceToken, type EnemySentenceView } from '@/sim/enemySentences'
 import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
@@ -505,8 +505,6 @@ export class BattleView {
   private bossSentenceEvent: string | null = null
   private bossSentenceEventTimer = 0
   private bossSentenceSignature = ''
-  /** 보스 옆 행동 표식의 툴팁(후공·예상 피해·소환 안내). 문장판에서 옮겨 왔다(11/20). */
-  private bossIntent: { tip: string; tone: string } | null = null
   /** 프롬 곁을 자유롭게 나는 토큰. 일반전·보스전이 같은 한 몸을 쓴다. */
   private token: TokenActor | null = null
   /** 현재 층. 토큰이 런의 끝을 기억할 때 "몇 층까지 갔는지"로 남긴다. */
@@ -1396,6 +1394,8 @@ export class BattleView {
       timing: 'first' | 'player' | 'second' | 'displaced' | 'cooldown' | 'waiting' | 'summary'
       note: string
       active: boolean
+      /** 이번에 움직이는 적의 예상 피해(11/20: 붉은 글씨로 크게). */
+      damage?: string
     }
 
     const entries: OrderEntry[] = []
@@ -1416,6 +1416,10 @@ export class BattleView {
         attackStep?.name,
       ].filter(Boolean).join(' · '),
       active,
+      damage: timing === 'first' || timing === 'second' ? (() => {
+        const [min, max] = enemyDamageRange(this.state, enemy!)
+        return max <= 0 ? undefined : min === max ? `${max}` : `${min}~${max}`
+      })() : undefined,
     })
     const playerEntry: OrderEntry = {
       key: 'player',
@@ -1478,7 +1482,7 @@ export class BattleView {
     // 11/20 피드백: 적이 선공이면 좌측 화면에 은은한 붉은 경고를 깔아 행동 순서로 눈이 가게 한다.
     const enemyFirst = entries[0]?.side === 'enemy' && entries[0].timing === 'first'
     this.root.querySelector<HTMLElement>('.scene.battle')?.toggleAttribute('data-enemy-first', enemyFirst)
-    const signature = JSON.stringify(entries.map(({ key, name, timing, note, active }) => [key, name, timing, note, active]))
+    const signature = JSON.stringify(entries.map(({ key, name, timing, note, active, damage }) => [key, name, timing, note, active, damage]))
     if (signature === this.actionOrderSignature) return
     this.actionOrderSignature = signature
 
@@ -1489,7 +1493,7 @@ export class BattleView {
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
         data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
         <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
-        <div class="action-order-copy"><b>${entry.name}</b><span>${entry.note}</span></div>
+        <div class="action-order-copy"><b>${entry.name}${entry.damage ? `<strong class="action-order-damage" aria-label="예상 피해 ${entry.damage}" data-tooltip="${tip('예상 피해', `이번 행동으로 받을 수 있는 피해 ${entry.damage}`)}" data-tip-place="above">${icon('sword')}${entry.damage}</strong>` : ''}</b><span>${entry.note}</span></div>
       </li>`).join('')
     host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
       const before = previous.get(item.dataset.orderKey!)
@@ -1593,38 +1597,12 @@ export class BattleView {
     host.innerHTML = `
       <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
       ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
-    // 11/20 피드백: 후공·예상 피해·소환 같은 보조 정보는 판에서 빼 보스 옆 표식의 설명으로 띄운다.
-    const bossName = this.state.enemies.find((enemy) => enemy.def.boss)?.def.name ?? '보스'
-    this.bossIntent = view.meta.length ? { tip: tip(`${bossName}의 다음 행동`, view.meta.join('\n')), tone: view.tone } : null
-    this.syncBossIntentSigil()
+    // 11/20 피드백: 후공·예상 피해 같은 보조 정보는 판에 싣지 않는다. 선·후공은 보스 체력 아래 공격 아이콘,
+    // 예상 피해는 좌측 행동 순서가 말한다.
     host.hidden = false
     host.classList.remove('is-writing')
     void host.offsetWidth
     host.classList.add('is-writing')
-  }
-
-  /** 보스 몸 옆의 행동 표식 — 올리면 이번 보스 문장의 후공·예상 피해·소환 안내를 읽는다. */
-  private syncBossIntentSigil() {
-    const actor = this.root.querySelector<HTMLElement>('#actors .actor.foe.boss')
-    if (!actor) return
-    let sigil = actor.querySelector<HTMLElement>(':scope > .boss-intent-sigil')
-    if (!this.bossIntent) {
-      sigil?.remove()
-      return
-    }
-    if (!sigil) {
-      sigil = document.createElement('span')
-      sigil.className = 'boss-intent-sigil'
-      sigil.setAttribute('role', 'img')
-      sigil.tabIndex = 0
-      sigil.dataset.tipPlace = 'above'
-      sigil.innerHTML = `<i aria-hidden="true">${icon('initiative')}</i><b>다음 행동</b>`
-      actor.appendChild(sigil)
-    }
-    sigil.dataset.boss = this.state.enemies.find((enemy) => enemy.def.boss)?.def.id ?? ''
-    sigil.dataset.tooltip = this.bossIntent.tip
-    sigil.setAttribute('aria-label', this.bossIntent.tip.replace(/\n/g, '. '))
-    sigil.classList.toggle('tone-danger', this.bossIntent.tone === 'danger')
   }
 
   /** 봉인·파훼·실패처럼 상태 한 장으로는 사라지는 사건만 짧게 문장 여백에 남긴다. */
@@ -1682,7 +1660,7 @@ export class BattleView {
     if (!boss) return null
     if (boss.def.id === 'mantis') return TOKEN_BOSS_HINTS.mantisStart
     if (boss.def.id === 'queenBee') {
-      // 일벌은 두 번째 페이지에서야 나온다. 이미 호위가 서 있으면(재시작 등) 기존 안내를 쓴다.
+      // 일벌은 마지막 페이지에서야 나온다. 이미 호위가 서 있으면(재시작 등) 기존 안내를 쓴다.
       return summonCount(boss) > 0 ? TOKEN_BOSS_HINTS.queenBeeStart : bossTokenLine('queenBeeOpening')
     }
     if (boss.def.id === 'elderSpider') {
@@ -1943,7 +1921,6 @@ export class BattleView {
     this.updateSummonedAllies(el, e)
     const strikesFirst = front && !e.dead && e.initiativePhase === 'first'
     this.updateEnemyIntel(el, e, strikesFirst)
-    if (e.def.boss) this.syncBossIntentSigil()
 
     // 대기 적도 이름과 체력을 즉시 읽을 수 있도록 이름표 투명도를 낮추지 않는다.
     const plate = el.querySelector<HTMLElement>('.nameplate')!
@@ -2009,6 +1986,13 @@ export class BattleView {
     // 방어·관통과 나란히 읽히는 항목이다. 보스만 예외인데, 보스의 선공 표식은
     // 애초에 이 줄과 같은 `boss-badge-row` 안에 있어 한 줄에서 두 번 말하게 된다.
     if (strikesFirst && !e.def.boss) add('initiative', icon('initiative'), tip('선공', '내 문장 직후, 내가 때리기 전에 먼저 때린다'))
+    const attackDetail = (step: NonNullable<typeof attackStep>) => step.damageScale === 0
+      ? '이번엔 안 때리고 다음 공격을 준비한다'
+      : step.damageScale != null && step.damageScale !== 1
+        ? `평소 위력의 ${Math.round(step.damageScale * 100)}%로 때린다`
+        : step.bonusAtk > 0
+          ? `평소보다 ${step.bonusAtk} 세게 때린다`
+          : '평소 위력으로 때린다'
     if (attackStep) {
       const detail = attackStep.damageScale === 0
         ? '이번엔 안 때리고 다음 공격을 준비한다'
@@ -2017,8 +2001,16 @@ export class BattleView {
           : attackStep.bonusAtk > 0
             ? `평소보다 ${attackStep.bonusAtk} 세게 때린다`
             : '평소 위력으로 때린다'
-      // 보스의 다음 행동은 바로 아래 문장판이 말하므로 뱃지로 한 번 더 세우지 않는다.
       if (!e.def.boss) add('attack', icon('sword'), tip(`다음 행동 · ${attackStep.name}`, detail))
+    }
+    if (e.def.boss && !e.dead) {
+      // 11/20 피드백: 보스의 선·후공은 체력바 아래 공격 아이콘 하나로 알린다(예상 피해는 행동 순서에).
+      const left = Math.max(0, e.nextAttackTurn - this.state.turn)
+      const timing = left > 0
+        ? `${left}턴 뒤에 움직인다`
+        : e.initiativePhase === 'first' ? '선공: 내 문장 직후, 내가 때리기 전에 먼저 때린다' : '후공: 내 문장이 끝난 뒤에 때린다'
+      const label = left > 0 ? `${left}턴 뒤` : e.initiativePhase === 'first' ? '선공' : '후공'
+      add(`attack boss-attack${left === 0 && e.initiativePhase === 'first' ? ' is-first' : ''}`, `${icon('sword')}<em>${label}</em>`, tip(`${label} · ${attackStep?.name ?? e.def.name}`, [timing, attackStep ? attackDetail(attackStep) : ''].filter(Boolean).join('\n')))
     }
     // 공격 단계는 1단계(×1.00)일 때는 알릴 것이 없다. 올라간 뒤에만 세운다.
     if (e.def.boss && bossAttackStage(e) > 1) {
@@ -4555,7 +4547,7 @@ export class BattleView {
     this.renderActors()
     if (turnSummons.length > 0) {
       await this.playTurnSummons(turnSummons)
-      // 여왕벌이 두 번째 페이지에서 일벌을 부른 순간 — 이제부터 본체가 막힌다는 것을 바로 알린다.
+      // 여왕벌이 마지막 페이지에서 일벌을 부른 순간 — 이제부터 본체가 막힌다는 것을 바로 알린다.
       if (turnSummons.some((summon) => this.state.enemies[summon.idx]?.def.id === 'queenBee')) {
         this.showBossTokenHint(TOKEN_BOSS_HINTS.queenBeeStart)
         this.showBossSentenceEvent(bossText('workersSummoned'), 3200)

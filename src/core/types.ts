@@ -341,8 +341,8 @@ export interface EnemyDef {
     refillOnlyWhenEmpty?: boolean
     /** 전투 전체에서 호위 묶음을 부를 수 있는 횟수. 비우면 제한 없이 다시 부른다. */
     maxWaves?: number
-    /** 이 체력 페이지(1부터, 위에서부터 센 막)에 들어선 뒤에야 소환한다. 없으면 전투 시작부터. */
-    summonFromBar?: number
+    /** 이 체력 페이지(1부터, 위에서부터 센 막)에 들어선 뒤에야 소환한다. 'last'는 마지막 페이지. 없으면 전투 시작부터. */
+    summonFromBar?: number | 'last'
     /** 호위가 한 마리라도 살아 있으면 소환자의 공격이 플레이어 방어를 관통한다. */
     pierceWhileEscorted?: boolean
     /** 호위 하나를 흩뜨릴 때 소환자 최대 체력에서 직접 깎는 비율. */
