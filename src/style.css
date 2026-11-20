@@ -6600,7 +6600,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   background: linear-gradient(90deg, transparent, var(--wglow, var(--gold)), transparent);
   box-shadow: 0 0 16px var(--wglow, var(--gold));
 }
-.cast-dock { --wglow: var(--gold); }
 /* 단어 상세 — 일러스트를 패널 전체에 풀로 깔고, 글은 아래쪽 스크림 위에 */
 .info-dock.word-detail { padding: 0; justify-content: flex-end; }
 .word-detail .wd-art {
@@ -6641,73 +6640,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .anchored .wd-art,
 .anchored .wd-scrim { display: none; }
 .anchored .wd-body { margin-top: 0; padding: 16px 18px; }
-.cast-head { flex: none; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
-.cast-kicker { color: var(--gold); font-size: 11px; font-weight: 900; letter-spacing: 3px; }
-.cast-head h2 { margin-top: 2px; color: #fff6e2; font-size: 24px; line-height: 1.2; }
-.cast-list {
-  min-height: 0;
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-}
-.cast-entry {
-  flex: none;
-  padding: 11px 12px 12px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.045);
-  box-shadow: inset 3px 0 0 rgba(255, 210, 122, 0.58);
-}
-.cast-entry.enemy { box-shadow: inset 3px 0 0 rgba(240, 122, 82, 0.72); }
-.cast-entry.system { box-shadow: inset 3px 0 0 rgba(127, 199, 203, 0.68); }
-.cast-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--ink-faint); font-size: 10px; font-weight: 900; letter-spacing: 1px; }
-.cast-meta b { color: var(--gold); }
-.cast-entry.enemy .cast-meta b { color: var(--danger); }
-.cast-entry.system .cast-meta b { color: var(--teal); }
-.cast-text { margin-top: 6px; color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.45; }
-/* 로그 아래 점수 요약 — "깡 24 × 배율 3.20 = 77" */
-.cast-score {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 9px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.28);
-}
-.cast-score .cs-cell { display: flex; flex-direction: column; line-height: 1.15; }
-.cast-score .cs-cell em {
-  font-style: normal;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: var(--ink-faint);
-}
-.cast-score .cs-cell b { font-size: 19px; font-weight: 900; color: #fff2da; }
-.cast-score .cs-cell:first-child b { color: #9fd8ff; }
-.cast-score .cs-cell:nth-child(3) b { color: var(--gold); }
-.cast-score .cs-cell.total { margin-left: auto; text-align: right; }
-.cast-score.dmg .cs-cell.total b { color: #fff2da; }
-.cast-score.heal .cs-cell.total b { color: #fff2da; }
-.cast-score .cs-op { font-size: 15px; font-weight: 900; color: var(--ink-faint); }
-.cast-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.cs-chip {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--ink-dim);
-  background: rgba(255, 255, 255, 0.06);
-}
-.cs-chip.dmg { color: #fff2da; }
-.cs-chip.heal { color: #fff2da; }
-.cs-chip.stat { color: #9fd8ff; }
-.cs-chip.buff { color: #ffd27a; }
-.cs-chip.combo { color: #fff0c0; background: rgba(255, 168, 60, 0.2); }
-.cs-chip.crit { color: #fff; background: rgba(255, 90, 28, 0.3); }
-.cs-chip.down { color: #b7a9c8; }
-.cast-empty { margin: auto 0; padding: 28px 10px; color: var(--ink-faint); font-size: 15px; line-height: 1.7; text-align: center; }
 .wd-name { font-size: 40px; font-weight: 900; color: #fff6e2; line-height: 1.05; text-shadow: 0 0 20px rgba(255, 210, 122, 0.3); }
 .wd-grade { margin-top: 6px; font-size: 14px; font-weight: 900; letter-spacing: 2px; color: var(--wglow, var(--gold)); text-shadow: 0 0 12px var(--wglow, var(--gold)); }
 .wd-title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -7890,10 +7822,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   box-shadow: inset 0 0 0 2px rgba(255, 219, 139, .58), 0 0 24px rgba(255, 190, 86, .26);
 }
 .reward-choice.is-passed-over .reward-kindline { opacity: .28; transform: translateY(8px) scale(.96); }
-.reward-shop-card {
-  width: 1250px;
-  padding: 26px 44px 24px;
-}
 .reward-shop-art {
   position: absolute;
   top: 12px;
@@ -7905,113 +7833,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .42)) drop-shadow(0 0 16px rgba(255, 205, 83, .2));
   pointer-events: none;
 }
-.reward-shop-card .reward-head { margin-bottom: 14px; padding-right: 220px; text-align: left; }
-.reward-shop-card .reward-head .t { font-size: 38px; }
-.shop-row-guide {
-  margin-top: 7px;
-  color: #e6c98f;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .05em;
-}
-.reward-shop-card .reward-wallet { margin: 10px 0 0; }
-.reward-shop-card .reward-grid { gap: 10px 18px; }
-.reward-shop-card .reward-choice {
-  gap: 0;
-  padding: 3px;
-  border-radius: 17px;
-  background: rgba(12, 9, 18, .72);
-  box-shadow: inset 0 0 0 1px rgba(255, 231, 180, .2), 0 7px 18px rgba(0, 0, 0, .26);
-  transition: transform .16s ease, box-shadow .16s ease;
-}
-.reward-shop-card .reward-choice:hover,
-.reward-shop-card .reward-choice:focus-within {
-  transform: translateY(-5px);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 48%, transparent), 0 15px 28px rgba(0, 0, 0, .4);
-}
-.reward-shop-card .reward-pick {
-  min-height: 164px;
-  border-radius: 14px 14px 0 0;
-  box-shadow: inset 0 1px 0 var(--glass-hi);
-}
-.reward-shop-card .reward-pick.is-item,
-.reward-shop-card .reward-pick .rp-bg,
-.reward-shop-card .reward-pick .rp-veil,
-.reward-shop-card .reward-pick .rp-foil {
-  border-radius: 14px 14px 0 0;
-}
-.reward-shop-card .reward-pick:hover,
-.reward-shop-card .reward-choice:focus-within .reward-pick { transform: none; }
-.reward-shop-card .rp-bg {
-  overflow: hidden;
-  background: #17121f;
-}
-.reward-shop-card .rp-bg img {
-  object-fit: cover;
-  object-position: 50% 42%;
-}
-.reward-shop-card .reward-pick.is-item .rp-bg img { object-position: 50% 50%; }
-.reward-shop-card .rp-word-meta { inset: 7px 8px auto; }
-.reward-shop-card .rp-word-meta .rp-emotion {
-  width: 30px;
-  height: 30px;
-  flex-basis: 30px;
-  padding: 3px;
-  box-sizing: border-box;
-}
-.reward-shop-card .rp-word-meta .rp-emotion .emotion-face,
-.reward-shop-card .rp-word-meta .rp-emotion .emotion-symbol {
-  display: block;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-}
-.reward-shop-card .rp-ink-cost { width: 38px; height: 38px; font-size: 16px; }
-.reward-shop-card .rp-foot { padding: 0 8px 7px; }
-.reward-shop-card .rp-name { font-size: 22px; }
-.reward-shop-card .reward-pick.has-medium-name .rp-name,
-.reward-shop-card .reward-pick.has-long-name .rp-name { font-size: 18px; }
 /* 상점 카드의 능력 문구는 카드 이름 다음으로 크게 읽혀야 한다(11/20 피드백). */
-.reward-shop-card .rp-effect {
-  gap: 4px 8px;
-  min-height: 28px;
-  margin-top: 4px;
-  font-size: 19px;
-  font-weight: 900;
-  line-height: 1.2;
-  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, .85);
-}
-.reward-shop-card .rp-effect .card-action-inline { gap: 5px; padding: 3px 9px; font-size: 18px; }
-.reward-shop-card .rp-effect .card-action-inline b { font-size: 18px; }
-.reward-shop-card .rp-effect .card-action-inline svg,
-.reward-shop-card .rp-effect .card-action-inline .baked-stat-icon { width: 22px; height: 22px; }
-.reward-shop-card .rp-effect .card-keyword,
-.reward-card:not(.reward-shop-card) .rp-effect .card-keyword { font-size: 18px; }
-.reward-shop-card .rp-base-stats,
-.reward-shop-card .rp-item-passive { margin-top: 4px; }
-.reward-shop-card .rp-base-stats { gap: 6px; }
-.reward-shop-card .rp-base-stat { padding: 7px 14px; font-size: 24px; }
-.reward-shop-card .rp-base-label { padding: 6px 9px; font-size: 13px; }
-.reward-shop-card .rp-item-passive { padding: 7px 11px; }
-.reward-shop-card .rp-item-passive small { font-size: 13px; }
-.reward-shop-card .rp-item-passive b { font-size: 17px; }
-.reward-shop-card .rp-item-passive span { font-size: 15px; line-height: 1.3; }
-.reward-shop-card .rp-actions { margin-top: 4px; }
-.reward-shop-card .rp-cost { padding: 4px 8px; font-size: 11px; }
-.reward-shop-card .reward-kindline {
-  min-height: 40px;
-  margin-top: -1px;
-  padding: 5px 8px;
-  border-radius: 0 0 13px 13px;
-  background:
-    linear-gradient(90deg, rgba(var(--reward-bar-rgb), .16), rgba(11, 8, 17, .98) 38%, rgba(11, 8, 17, .98) 62%, rgba(var(--reward-bar-rgb), .16)),
-    rgba(11, 8, 17, .98);
-  box-shadow: inset 0 0 0 1px rgba(var(--reward-bar-rgb), .58), 0 0 12px rgba(var(--reward-bar-rgb), .1);
-}
-.reward-shop-card .reward-type-label { padding: 5px 8px; font-size: 11px; }
-.reward-shop-card .reward-rarity-label { left: 8px; gap: 3px; font-size: 9px; }
-.reward-shop-card .reward-rarity-label i { font-size: 7px; }
-.reward-shop-card .reward-card-sticker { top: 7px; padding: 4px 8px 3px; font-size: 10px; }
 .reward-kind-cost {
   position: absolute;
   right: 8px;
@@ -8029,12 +7851,6 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   text-shadow: 0 0 8px rgba(255, 195, 67, .72);
 }
 .reward-kind-cost i { color: #fff0a8; font-style: normal; font-size: 12px; }
-.reward-shop-card .reward-pick.rarity-rare .rp-foil { opacity: .56; }
-html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-epic .rp-foil { opacity: .78; }
-html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp-foil { opacity: .92; }
-.reward-shop-card .foil-shader-canvas {
-  filter: saturate(1.34) brightness(1.08) contrast(1.06);
-}
 .reward-side {
   width: 382px;
   align-self: stretch;
@@ -8288,9 +8104,6 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 }
 .reward-kind-trait > b { display: block; margin: 2px 0 2px; color: #ffe9a8; font-size: 24px; font-weight: 1000; line-height: 1.2; }
 .reward-kind-trait > .trait-desc { color: #fff4de; }
-.reward-shop-card .reward-kind-trait { padding: 28px 4px 3px; font-size: 16px; }
-.reward-shop-card .reward-kind-trait > b { font-size: 19px; }
-.reward-shop-card .reward-kind-trait > small { top: 7px; font-size: 11px; }
 .rp-base-stat.stat-hp { --stat-color: #ff9faf; }
 .rp-base-stat.stat-atk { --stat-color: #e8ddca; }
 .rp-base-stat.stat-guard { --stat-color: #e8ddca; }
@@ -8504,7 +8317,6 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   pointer-events: none;
 }
 .reward-pick.touch-previewing .reward-touch-confirm-hint { display: block; }
-.reward-shop-card .reward-touch-confirm-hint { top: 43px; padding: 4px 7px; font-size: 9px; }
 /* 내 단어장 펼쳐 보기 — 보상·상점 위에 덮는 한 장. 카드는 손패와 같은 앞면을 쓴다. */
 .reward-deck-sheet {
   position: absolute;
@@ -11360,14 +11172,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .card-action-inline svg,
 .card-action-inline .baked-stat-icon { width: 14px; height: 14px; }
 /* 보상 카드 앞면의 효과 문구(배율 ×1.20, 관통 등)도 이름 다음으로 크게. */
-.reward-card:not(.reward-shop-card) .rp-effect {
-  font-size: 21px;
-  font-weight: 1000;
-  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, .85);
-}
-.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline b { font-size: 18px; }
-.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline svg,
-.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline .baked-stat-icon { width: 22px; height: 22px; }
 /* 보상 하단 버튼(내 단어장·다른 발상 비용)도 읽혀야 하는 정보다. */
 .reward-controls .reward-deck,
 .reward-controls .reward-refresh,
@@ -11376,7 +11180,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .word-card.web-pending .card-web-overlay { opacity: 0; }
 /* 상점(보상 페이지) 카드는 손패보다 두 배 넓어 잉크 배지가 상대적으로 작아 보였다(11/20 피드백). */
 .rp-ink-cost { width: 78px; height: 78px; padding: 12px 1px 0 0; font-size: 32px; }
-.reward-shop-card .rp-ink-cost { width: 56px; height: 56px; padding: 9px 1px 0 0; font-size: 24px; }
 
 /* 리필 태그: 잉크 아이콘을 박은 키워드 태그(11/20 피드백). */
 .card-keyword.keyword-discount { gap: 2px; }
@@ -11428,11 +11231,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   background: linear-gradient(180deg, #d0524a, #a3302a);
   box-shadow: inset 0 0 0 2px rgba(255, 190, 170, .8), 0 0 18px rgba(255, 90, 70, .35);
 }
-.reward-card:not(.reward-shop-card) .reward-pick { min-height: 452px; }
-.reward-card:not(.reward-shop-card) .rp-name { font-size: 34px; }
-.reward-card:not(.reward-shop-card) .reward-pick.has-long-name .rp-name { font-size: 28px; }
-.reward-card:not(.reward-shop-card) .reward-type-label { font-size: 17px; padding: 6px 16px; }
-.reward-card:not(.reward-shop-card) .reward-rarity-label { font-size: 14px; }
 
 /* 카드 요약 수치 태그(11/20 피드백): "44% 확률"·"배율 ×3.30"·"방어 +2"를 키워드와 같은 네모 태그로. */
 .card-note-text { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 4px; }
@@ -11589,8 +11387,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 /* 아이템 하단: '특성' 딱지 없이 노란 특성 이름과 설명만 크게. */
 .reward-kind-trait { padding: 8px 6px 6px; font-size: 21px; }
 .reward-kind-trait > b { font-size: 28px; color: #ffe27a; }
-.reward-shop-card .reward-kind-trait { padding: 6px 4px 3px; }
-.reward-shop-card .reward-kind-trait > b { font-size: 21px; }
 
 /* 잉크 비용 숫자 더 두껍게. */
 .card-cost,
@@ -11654,18 +11450,8 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   -webkit-text-stroke: 2.4px currentColor;
   text-shadow: 0 3px 0 #171246, 2px 0 #171246, -2px 0 #171246, 0 -2px #171246, 2px 2px #171246, -2px 2px #171246, 0 0 8px rgba(255,255,255,.75);
 }
-.reward-shop-card .rp-ink-cost { padding: 3px 1px 0 0; font-size: 26px; -webkit-text-stroke: 1.8px currentColor; }
 
 /* 보상 하단 줄의 "N번 동사" 태그 — 더 크고 또렷하게(11/20 피드백). */
-.reward-card:not(.reward-shop-card) .reward-type-label {
-  padding: 7px 22px 8px;
-  font-size: 22px;
-  letter-spacing: .03em;
-  background: rgba(var(--reward-bar-rgb), .24);
-  box-shadow: inset 0 0 0 2px rgba(var(--reward-bar-rgb), .9), 0 0 16px rgba(var(--reward-bar-rgb), .3);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, .7), 0 0 8px rgba(0, 0, 0, .8);
-}
-.reward-shop-card .reward-type-label { padding: 5px 12px; font-size: 15px; }
 
 /* 강화 카드 앞면: 이전 수치(회색) → 강화 수치(강조). */
 .rp-up { display: inline-flex; align-items: baseline; gap: .12em; white-space: nowrap; }
@@ -11736,10 +11522,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
     radial-gradient(circle at 12px calc(100% - 12px), #e8bf72 0 3px, transparent 4px),
     radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #e8bf72 0 3px, transparent 4px);
 }
-.reward-shop-card .reward-card-back { gap: 14px; }
-.reward-shop-card .reward-card-back i:first-child { width: 54px; height: 54px; }
-.reward-shop-card .reward-card-back i:first-child::before { inset: 12px; }
-.reward-shop-card .reward-card-back i:nth-child(2) { inset: 10px; border-radius: 8px; }
 .reward-choice .reward-kindline { animation: reward-kindline-in .7s linear backwards; }
 @keyframes reward-kindline-in {
   0%, 37% { opacity: 0; }
@@ -11931,3 +11713,15 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   background: linear-gradient(90deg, rgba(92, 20, 16, .88), rgba(40, 12, 14, .55));
 }
 @media (prefers-reduced-motion: reduce) { .scene.battle[data-enemy-first] .enemy-first-wash { animation: none; } }
+
+/* 손패 카드 상세 쪽지(11/20 피드백): 이름·감정 아이콘은 조금 줄이고, 키워드 아래 설명을 키운다.
+   커진 글씨에 맞춰 쪽지 폭도 넓힌다. 쪽지 위치는 BattleView.anchorDetail이 실제 폭으로 다시 잡는다. */
+.info-dock.word-detail.anchored { width: fit-content; min-width: 260px; max-width: 420px; }
+.anchored .wd-body { padding: 18px 22px 20px; }
+.anchored .wd-name { font-size: 32px; }
+.anchored .wd-emotion { width: 34px; height: 34px; flex-basis: 34px; }
+.anchored .wd-emotion .emotion-face { width: 29px; height: 29px; }
+.anchored .wd-emotion .emotion-symbol { width: 26px; height: 26px; font-size: 19px; }
+.anchored .word-keyword-list { gap: 16px; }
+.anchored .word-keyword-detail b { font-size: 22px; }
+.anchored .word-keyword-detail span { font-size: 20px; line-height: 1.5; color: #fff7e6; }
