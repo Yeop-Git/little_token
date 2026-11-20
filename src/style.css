@@ -1334,7 +1334,9 @@ button {
 .tip-sub-title { display: block; margin-bottom: 6px; color: #ffd991; font-size: 20px; font-weight: 1000; }
 .tip-sub-body { display: block; font-size: 18px; line-height: 1.45; }
 :lang(ko) .tip-sub-body { word-break: keep-all; }
-.tip-sub[data-kind='card'] { padding: 10px; background: rgba(13, 10, 19, .9); }
+/* 카드 미리보기는 카드 앞면만 — 뒤에 검은 판을 깔지 않는다. */
+.tip-sub[data-kind='card'] { padding: 0; border: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tip-sub[data-kind='card'] .word-card { filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .6)); }
 .tip-sub-card { position: relative; width: 221px; height: 305px; }
 .tip-sub-card .word-card { position: absolute; left: 0; top: 0; transform: scale(1.4); transform-origin: 0 0; pointer-events: none; }
 .tip-sub-card .word-card .card-lift { transform: none !important; }
