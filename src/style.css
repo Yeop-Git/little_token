@@ -1341,6 +1341,9 @@ button {
 .tip-bullets { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .tip-bullets li { position: relative; padding-left: 18px; }
 .tip-bullets li::before { content: '•'; position: absolute; left: 2px; color: #ffcf7a; font-weight: 1000; }
+/* 다른 선택지(혹은 …) 줄 — 머리말만 하늘색으로 짚어 둘째 방법이 눈에 띄게. */
+.tip-bullets li.is-alt::before { color: #9fd0ff; }
+.tip-bullets .tip-or { color: #9fd0ff; font-weight: 1000; }
 .tip-bubble.is-rich { white-space: normal; min-width: 280px; }
 .tip-bubble.is-rich .tip-bubble-body { display: grid; gap: 8px; }
 /* 보유 아이템 쪽지 — 특성 한 칸과 올라가는 스탯 칩. 전부 큰 글씨로 한눈에. */

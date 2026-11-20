@@ -31,7 +31,15 @@ export function tipBulletItems(text: string): string[] {
 export function tipBulletsHtml(text: string): string {
   const items = tipBulletItems(text)
   if (items.length <= 1) return tipLineHtml(items[0] ?? '')
-  return `<ul class="tip-bullets">${items.map((item) => `<li>${tipLineHtml(item)}</li>`).join('')}</ul>`
+  return `<ul class="tip-bullets">${items.map(tipBulletHtml).join('')}</ul>`
+}
+
+/** '혹은 …'으로 시작하는 줄은 다른 선택지라서 머리말을 따로 강조한다. */
+function tipBulletHtml(item: string): string {
+  const alt = /^(혹은)\s+(.+)$/.exec(item)
+  return alt
+    ? `<li class="is-alt"><b class="tip-or">${alt[1]}</b> ${tipLineHtml(alt[2])}</li>`
+    : `<li>${tipLineHtml(item)}</li>`
 }
 
 /** 쪽지 본문 — •목록과 키워드·카드 태그. tipBulletsHtml이 모든 글자를 이스케이프한다. */
