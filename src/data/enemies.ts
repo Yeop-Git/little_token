@@ -63,7 +63,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       groggyEvery: 4,
       groggyDamageMult: 2.5,
     },
-    note: `두 번째 페이지에 들어서면 체력 30 일벌 넷을 한 번만 호위로 세움\n${QUEEN_ESCORT_IMMUNITY_LABEL}\n일벌이 남아 있으면 여왕벌 공격이 방어 관통\n문장 피해는 일벌부터 차례로, 남은 만큼 본체로\n일벌 1마리 퇴치마다 여왕벌 최대 체력 5% 반동 피해(분노 단일 비관통 공격은 2배)\n넷을 모두 퇴치하면 그로기: 그 턴 피해 ×2.5, 다음 턴 행동 없음\n일벌은 다시 나오지 않음`,
+    note: `두 번째 페이지에 들어서면 체력 30 일벌 넷을 한 번만 호위로 세움\n${QUEEN_ESCORT_IMMUNITY_LABEL}\n일벌이 남아 있으면 여왕벌 공격이 방어 관통\n문장 피해는 일벌부터 차례로, 남은 만큼 본체로\n일벌 1마리 퇴치마다 여왕벌 최대 체력 5% 반동 피해(분노 단일 비관통 공격은 2배)\n넷을 모두 퇴치하면 그로기: 다음 내 턴까지 받는 피해 ×2.5, 다음 턴 행동 없음\n일벌은 다시 나오지 않음`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,

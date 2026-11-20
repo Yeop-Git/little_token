@@ -847,7 +847,10 @@ function disperseTargetSummons(
   const groggyTriggered = groggyEvery > 0 && defeatedTotal >= groggyEvery && !enemy.dead
   enemy.summonsDefeated = groggyEvery > 0 ? defeatedTotal % groggyEvery : defeatedTotal
   if (groggyTriggered) {
-    enemy.groggyUntilTurn = state.turn
+    // 그로기 배율은 일벌을 다 지운 이 문장의 남은 피해와, 여왕이 숨을 고르는 다음 턴의
+    // 내 문장까지 적용한다. 예전에는 이번 턴에서 끝나, 다음 턴 문장판·안내가 "받는 피해 ×2.5"를
+    // 보여 주는데도 실제 피해는 ×1이었다(11/20 점검).
+    enemy.groggyUntilTurn = state.turn + 1
     enemy.groggyDamageMult = pattern.groggyDamageMult ?? 1.5
     // 다음 턴은 여왕이 정신을 차리는 데만 쓴다. 그 다음 턴 시작에야 새 일벌
     // 네 마리가 한 묶음으로 돌아오며, 회복 턴 도중에는 공격도 소환도 하지 않는다.

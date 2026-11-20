@@ -3452,6 +3452,22 @@ html[data-postprocessing='off'] .tip-bubble {
 .enemy-intel-icon.summon { color: #ffe47d; border-color: rgba(255, 213, 73, .72); }
 .enemy-intel-icon.web { color: #ded4ee; border-color: rgba(210, 198, 231, .58); }
 .enemy-intel-icon.groggy { color: #fff1a6; border-color: rgba(255, 226, 102, .72); }
+/* 그로기 칩 — 아이콘 뱃지보다 넓혀 배율을 바로 적는다. 노란 빛으로 "지금이 빈틈"을 알린다. */
+.enemy-intel-icon.groggy-chip {
+  width: auto !important;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 0 8px;
+  background: linear-gradient(150deg, rgba(120, 88, 14, .96), rgba(58, 38, 8, .96)) !important;
+  box-shadow: 0 0 12px rgba(255, 211, 76, .45);
+  animation: groggy-chip-glow 1.2s ease-in-out infinite alternate;
+}
+.enemy-intel-icon.groggy-chip > b { position: static; font-size: 16px; }
+.enemy-intel-icon.groggy-chip > em { position: static; color: #fff6cf; font-style: normal; font-size: 15px; font-weight: 900; }
+@keyframes groggy-chip-glow { from { box-shadow: 0 0 6px rgba(255, 211, 76, .3); } to { box-shadow: 0 0 16px rgba(255, 211, 76, .7); } }
+@media (prefers-reduced-motion: reduce) { .enemy-intel-icon.groggy-chip { animation: none; } }
 .enemy-intel-icon.initiative { color: #ff9a70; border-color: rgba(255, 126, 78, .74); }
 /* 공략 쪽지 — 각진 능력 뱃지와 형태부터 갈라 둔다. 둥근 알약 + 접힌 모서리 + 글자 라벨이라
    한눈에 "이건 적의 효과가 아니라 조언"으로 읽힌다. 자리도 줄 맨 앞이고 뒤에 칸막이를 세운다. */

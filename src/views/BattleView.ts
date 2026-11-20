@@ -1953,7 +1953,18 @@ export class BattleView {
       '<b>✣</b>',
       tip(`거미줄 ${spiderWebTension(e)}/${e.def.webPattern.maxSealedCards}`, '드러난 다리를 때리거나 약점 감정으로 막고 회복하면 풀린다'),
     )
-    if (this.state.turn <= e.groggyUntilTurn) add('groggy', '<b>✦</b>', tip('그로기', `지금 주는 피해가 ${e.groggyDamageMult.toFixed(1)}배가 되고 예정된 공격을 한 턴 거른다`))
+    // 그로기는 피해 계산(damageEnemy)에 실제로 곱해지는 상태다. 아이콘 하나로는 무엇이 몇 배인지
+    // 읽히지 않아(11/20 피드백) 배율을 칩에 바로 적고, 툴팁에 효과와 남은 기간을 •목록으로 둔다.
+    if (this.state.turn <= e.groggyUntilTurn) {
+      const mult = formatMult(e.groggyDamageMult)
+      const until = e.groggyUntilTurn > this.state.turn ? '다음 내 턴까지 유지' : '이번 턴까지 유지'
+      add('groggy groggy-chip', `<b>✦</b><em>그로기 ×${mult}</em>`, tip(`그로기 · 받는 피해 ×${mult}`, [
+        `내 공격 피해 ×${mult}`,
+        '약점 배율과 곱으로 겹친다',
+        '예정된 공격을 한 턴 거른다',
+        until,
+      ].join('\n')))
+    }
     if (e.def.elite) {
       add(`elite elite-${e.def.elite.rarity}`, '<b>◆</b>', tip(`${e.def.name} · ${e.def.elite.label}`, e.def.note))
     }
