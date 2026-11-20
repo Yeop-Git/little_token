@@ -1697,10 +1697,10 @@ export class BattleView {
         <div class="nameplate glass">
           <div class="row">
             <span class="nm">${e.def.name}</span>
+            <span class="weak-badge" hidden></span>
             <span class="hpn"></span>
           </div>
           <div class="hp-row">
-            <span class="weak-badge" hidden></span>
             <div class="hpbar foe">
               <div class="fill"></div>
               <div class="shield"></div>
@@ -2760,13 +2760,13 @@ export class BattleView {
     const label = key === 'atk' ? '공격' : '방어'
     const sign = (n: number) => `${n > 0 ? '+' : ''}${n}`
     const lines = [
-      rank ? `${label} 랭크 ${sign(rank)} — 기준 ${label}의 ${Math.round(statRankScale(rank) * 100)}%` : `${label} 랭크 0`,
+      rank ? `${label} 랭크 ${sign(rank)} — 기준 ${label}의 ${Math.round(statRankScale(rank) * 100)}%` : '',
       gained ? `이번 턴에 ${label} 랭크가 ${sign(gained)} 올랐다` : '',
       willGain ? `이번 문장을 쓰면 이번 턴에 ${label} 랭크 +${willGain}` : '',
       `랭크 1마다 기준 ${label} 25% · 현재 스테이지 동안 유지 · 최대 ±${STAT_RANK_LIMIT}`,
     ].filter(Boolean)
     const current = rank ? `<span class="rank-sticker ${rank > 0 ? 'up' : 'down'}${gained ? ' fresh' : ''}">${rank > 0 ? '▲' : '▼'}${Math.abs(rank)}</span>` : ''
-    const preview = willGain ? `<span class="rank-sticker pending">+${willGain}</span>` : ''
+    const preview = willGain ? `<span class="rank-sticker pending">이번 턴 ▲${willGain}</span>` : ''
     return {
       html: `<span class="rank-stickers" aria-hidden="true">${current}${preview}</span>`,
       detail: lines.join('\n'),
