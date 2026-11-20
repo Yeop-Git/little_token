@@ -227,7 +227,12 @@ export interface IntentPart {
   /** 이 조각을 낸 카드의 문장 칸(subj·adv·verb…). 집계판이 1번 카드부터 순서대로 띄운다. */
   key?: string
   /** 배율 풀(가산) 칩을 카드별로 쪼개 보여 줄 때 쓰는 기여분. 합은 value - 1과 같다. */
-  poolParts?: { label: string; bonus: number; key?: string }[]
+  poolParts?: { label: string; bonus: number; key?: string; itemTags?: string[] }[]
+  /**
+   * 이 조각을 낸 보유 아이템 — 고유효과는 PassiveId, 특성은 `trait:<ItemTraitId>`.
+   * 화면이 이 조각을 꽂는 순간 보유 아이템창의 해당 아이콘을 맥동시킨다(컴파일러는 아이템 id를 모른다).
+   */
+  itemTags?: string[]
 }
 
 /**

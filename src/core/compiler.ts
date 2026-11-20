@@ -190,7 +190,7 @@ export function compile(
   let damageKind: Intent['kind'] | null = null
   let growHp = 0
   const bonusFrom: string[] = [] // 보너스 풀에 기여한 단어 이름(집계판 힌트용)
-  const poolParts: { label: string; bonus: number; key?: string }[] = []
+  const poolParts: NonNullable<IntentPart['poolParts']> = []
   let targetMode: Intent['targetMode'] = 'enemy'
   let aoe: Intent['aoe'] = 'single'
   let targetCount: TargetCount = 1
@@ -217,7 +217,7 @@ export function compile(
       if (flat > 0) {
         const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}` : undefined
         const lane = w.kind === 'guard' ? 'guard' : w.kind === 'heal' ? 'heal' : 'damage'
-        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane, key })
+        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane, key, ...(mods.verbLuck && wordFlat(w, stats) < flat ? { itemTags: ['luckCloak'] } : {}) })
         if (lane === 'guard') statGuard += flat
         else if (lane === 'heal') statHeal += flat
         else base += flat
@@ -263,7 +263,7 @@ export function compile(
   if (mods.traitPool) {
     bonusPool += mods.traitPool
     bonusFrom.push(CORE_TEXT.trait)
-    poolParts.push({ label: CORE_TEXT.trait, bonus: mods.traitPool })
+    poolParts.push({ label: CORE_TEXT.trait, bonus: mods.traitPool, itemTags: ['trait:poolBonus'] })
   }
   if (bonusPool) {
     mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · '), poolParts })
@@ -273,7 +273,7 @@ export function compile(
   // 동사마다가 아니라 문장당 한 번이라 겹동사와 곱해져 폭발하지 않는다.
   if (base > 0 && mods.verbFlat) {
     base += mods.verbFlat
-    flats.push({ label: CORE_TEXT.shoe, value: mods.verbFlat, source: 'word', lane: 'damage' })
+    flats.push({ label: CORE_TEXT.shoe, value: mods.verbFlat, source: 'word', lane: 'damage', itemTags: ['heavyShoe'] })
   }
 
   // 피해 깡수치가 실제로 쌓였으면 회복/방어 동사가 뒤에 와도 공격 문장이다.
@@ -282,25 +282,25 @@ export function compile(
   // 아이템 특성 — 감정 카드 수, 행동 종류에 따라 문장의 주 수치(피해/방어/회복)에 더한다.
   // 수치가 실제로 생긴 칸에만 얹어 0에 곱해지는 가짜 점수를 만들지 않는다.
   const mainLane: 'damage' | 'guard' | 'heal' | null = base > 0 ? 'damage' : statGuard > 0 ? 'guard' : statHeal > 0 ? 'heal' : null
-  const addTraitFlat = (label: string, value: number) => {
+  const addTraitFlat = (label: string, value: number, itemTags: string[]) => {
     if (!value || !mainLane) return
     if (mainLane === 'damage') base += value
     else if (mainLane === 'guard') statGuard += value
     else statHeal += value
-    flats.push({ label, value, source: 'word', hint: CORE_TEXT.trait, lane: mainLane })
+    flats.push({ label, value, source: 'word', hint: CORE_TEXT.trait, lane: mainLane, itemTags })
   }
   for (const [emotion, per] of Object.entries(mods.traitEmotionFlat ?? {}) as [Emotion, number][]) {
     const count = order.filter((key) => sel[key] && emotionOrNeutral(sel[key]!.emotion) === emotion).length
-    addTraitFlat(`${EMOTION_LABEL[emotion]} ${CORE_TEXT.trait}`, count * per)
+    addTraitFlat(`${EMOTION_LABEL[emotion]} ${CORE_TEXT.trait}`, count * per, [`trait:${emotion}Score`])
   }
-  if (mainLane) addTraitFlat(`${CORE_TEXT.trait}`, mods.traitKindFlat?.[mainLane] ?? 0)
+  if (mainLane) addTraitFlat(`${CORE_TEXT.trait}`, mods.traitKindFlat?.[mainLane] ?? 0, [`trait:${mainLane === 'damage' ? 'attack' : mainLane}Flat`])
   // 잭의 하늘나물 — 자란 키가 버팀목이 된다. 방어·회복 문장에만 얹는다.
   if (mainLane === 'guard' || mainLane === 'heal') {
     const sky = mods.beanstalkFlat ?? 0
     if (sky > 0) {
       if (mainLane === 'guard') statGuard += sky
       else statHeal += sky
-      flats.push({ label: CORE_TEXT.sky, value: sky, source: 'word', lane: mainLane })
+      flats.push({ label: CORE_TEXT.sky, value: sky, source: 'word', lane: mainLane, itemTags: ['beanstalk'] })
     }
   }
 
@@ -309,7 +309,7 @@ export function compile(
   // 아이템 특성(관용구) — 관용구가 하나라도 발동하면 문장 전체에 한 번 곱한다.
   if (combos.length && mods.traitCombo) {
     comboMult *= 1 + mods.traitCombo
-    mults.push({ label: CORE_TEXT.trait, value: 1 + mods.traitCombo, source: 'combo', hint: CORE_TEXT.perfect })
+    mults.push({ label: CORE_TEXT.trait, value: 1 + mods.traitCombo, source: 'combo', hint: CORE_TEXT.perfect, itemTags: ['trait:comboBoost'] })
   }
 
   // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
@@ -326,7 +326,7 @@ export function compile(
 
   // 아기돼지 바베큐 — 이번 전투에서 잡은 수만큼 문장 전체가 세진다.
   const stageMult = mods.stageMult ?? 1
-  if (stageMult !== 1) mults.push({ label: CORE_TEXT.bbq, value: stageMult, source: 'combo', hint: CORE_TEXT.kills })
+  if (stageMult !== 1) mults.push({ label: CORE_TEXT.bbq, value: stageMult, source: 'combo', hint: CORE_TEXT.kills, itemTags: ['bbq'] })
 
   // 천장 없음 — 배율은 상한 없이 곱해진다(벌레 스웜을 오버킬로 관통하는 쾌감).
   // 등급제 폐지 — 희귀도 보너스 없음(다양성 + 반복강화로 대체 예정).
@@ -347,6 +347,7 @@ export function compile(
       value: emotionResonance,
       source: 'emotion',
       hint: sameEmotionHint(repeatedEmotion![1]),
+      ...(mods.traitResonance ? { itemTags: ['trait:resonanceBoost'] } : {}),
     })
   }
 
@@ -361,7 +362,7 @@ export function compile(
     const left = Math.max(0, Math.min(mods.inkFire.max, Math.floor(mods.inkFire.available - Math.max(0, spent))))
     if (left > 0) {
       fireMult = 1 + left * mods.inkFire.rate
-      mults.push({ label: CORE_TEXT.fire, value: fireMult, source: 'combo', hint: CORE_TEXT.fireHint.replace('{n}', String(left)) })
+      mults.push({ label: CORE_TEXT.fire, value: fireMult, source: 'combo', hint: CORE_TEXT.fireHint.replace('{n}', String(left)), itemTags: ['matchFire'] })
     }
   }
 

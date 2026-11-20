@@ -1261,6 +1261,14 @@ button {
 .relic-icons.is-tight .relic-icon { width: 38px; height: 38px; border-radius: 10px 4px 9px 5px; }
 .relic-icon.rarity-rare { color: #a7d8ff; border-color: rgba(129, 193, 255, .65); }
 .relic-icon.rarity-legendary { color: #ffe28a; border-color: rgba(255, 206, 86, .82); box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .08), 0 0 14px rgba(255, 188, 64, .24); }
+/* 아이템 발동 — 정산판에 그 아이템의 점수·배율이 꽂히는 순간 아이콘이 금빛으로 맥동한다. */
+.relic-icon.relic-fired { animation: relic-fired .9s cubic-bezier(.2, 1.3, .4, 1) both; z-index: 1; }
+@keyframes relic-fired {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 214, 110, .9), 0 4px 10px rgba(0, 0, 0, .45); filter: brightness(1); }
+  30% { transform: scale(1.18); box-shadow: 0 0 0 7px rgba(255, 214, 110, .35), 0 0 26px rgba(255, 196, 64, .9); filter: brightness(1.6); border-color: rgba(255, 230, 150, 1); }
+  100% { transform: scale(1); box-shadow: 0 0 0 14px rgba(255, 214, 110, 0), 0 4px 10px rgba(0, 0, 0, .45); filter: brightness(1); }
+}
+@media (prefers-reduced-motion: reduce) { .relic-icon.relic-fired { animation: none; filter: brightness(1.5); } }
 /* ── 아이콘 호버 툴팁 (공용) ──
    아이템·적 상태·플레이어 스탯이 같은 쪽지를 쓴다. 처음 하는 사람이 한 줄만 읽고
    무슨 뜻인지 알아야 하는 자리라, 작은 글씨로 규칙을 빼곡히 적지 않는다.
@@ -4929,6 +4937,99 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
 @keyframes chain-wave {
   0%, 100% { transform: translateY(0) scale(1); }
   40% { transform: translateY(-18px) scale(1.16); }
+}
+/* ── 도박·대성공 판정 — 문장 칸의 그 단어 자리에서 터진다 ──
+   굴림(덜덜) → 성공은 금빛 폭죽과 도장, 실패는 흔들리며 회색으로 꺼진다.
+   황금사과가 재시도를 걸면 꺼졌던 단어에 다시 불이 들어온다(revive). */
+.chain-word.gamble-rolling { animation: gamble-rattle .14s linear infinite; }
+.chain-word.gamble-rolling .cw-text { filter: brightness(1.35); }
+@keyframes gamble-rattle {
+  0% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(-2px, -1px) rotate(-3deg); }
+  50% { transform: translate(1px, -3px) rotate(2deg); }
+  75% { transform: translate(2px, 0) rotate(-1deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+.chain-word.gamble-win { animation: gamble-win-pop .5s cubic-bezier(.2, 1.5, .4, 1) both; }
+.chain-word.gamble-win .cw-text {
+  color: #fff0b0;
+  text-shadow: 0 0 24px rgba(255, 210, 90, .95), 0 0 8px rgba(255, 240, 180, .9), 0 5px 12px rgba(0, 0, 0, .9);
+}
+@keyframes gamble-win-pop {
+  0% { transform: scale(1); }
+  45% { transform: translateY(-10px) scale(1.24); }
+  100% { transform: none; }
+}
+.chain-word.gamble-lose { animation: gamble-lose-shake .46s ease both; }
+/* 꺼지는 건 단어·설명뿐이다 — 판정 도장까지 회색이 되면 "실패"라는 글자가 안 읽힌다. */
+.chain-word > :not(.gamble-stamp, .gamble-burst) { transition: filter .4s ease, opacity .4s ease; }
+.chain-word.gamble-lose > :not(.gamble-stamp, .gamble-burst) { filter: grayscale(1) brightness(.62); opacity: .72; }
+@keyframes gamble-lose-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-7px) rotate(-2deg); }
+  35% { transform: translateX(6px) rotate(1.5deg); }
+  55% { transform: translateX(-4px); }
+  75% { transform: translateX(2px); }
+}
+.chain-word.gamble-revive { animation: gamble-revive-lift .56s ease both; }
+.chain-word.gamble-revive > :not(.gamble-stamp, .gamble-burst) { animation: gamble-revive-light .56s ease both; }
+.chain-word.gamble-revive .cw-text { text-shadow: 0 0 26px rgba(255, 196, 64, .95), 0 0 9px rgba(255, 236, 160, .9), 0 5px 12px rgba(0, 0, 0, .9); }
+@keyframes gamble-revive-lift {
+  0% { transform: scale(.94); }
+  50% { transform: translateY(-6px) scale(1.1); }
+  100% { transform: none; }
+}
+@keyframes gamble-revive-light {
+  0% { filter: grayscale(1) brightness(.62); opacity: .72; }
+  50% { filter: grayscale(0) brightness(1.9); opacity: 1; }
+  100% { filter: none; opacity: 1; }
+}
+/* 판정 도장 — 단어 위로 떠올랐다 사라진다. 레일 높이를 바꾸지 않게 절대 위치로 띄운다. */
+.gamble-stamp {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  z-index: 2;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .9);
+  animation: gamble-stamp 1.3s ease both;
+}
+.gamble-stamp.win { color: #fff2b8; background: rgba(170, 110, 20, .78); box-shadow: 0 0 14px rgba(255, 196, 64, .6); }
+.gamble-stamp.lose { color: #e4e0ea; background: rgba(60, 56, 70, .82); }
+.gamble-stamp.revive { color: #fff2b8; background: rgba(176, 52, 40, .82); box-shadow: 0 0 14px rgba(255, 150, 80, .55); }
+@keyframes gamble-stamp {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(.7) rotate(-6deg); }
+  18% { opacity: 1; transform: translate(-50%, -4px) scale(1.08) rotate(-4deg); }
+  75% { opacity: 1; transform: translate(-50%, -8px) scale(1) rotate(-4deg); }
+  100% { opacity: 0; transform: translate(-50%, -16px) scale(.96) rotate(-4deg); }
+}
+/* 성공 폭죽 — 단어 중심에서 조각이 사방으로 튄다. */
+.gamble-burst { position: absolute; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; z-index: 1; }
+.gamble-burst i {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--c);
+  box-shadow: 0 0 8px var(--c);
+  animation: gamble-spark .9s cubic-bezier(.15, .8, .3, 1) var(--d) both;
+}
+.gamble-burst i:nth-child(3n) { border-radius: 50%; width: 6px; height: 6px; }
+@keyframes gamble-spark {
+  0% { opacity: 1; transform: translate(0, 0) scale(.4) rotate(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 14px)) scale(1) rotate(200deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chain-word.gamble-rolling, .chain-word.gamble-win, .chain-word.gamble-lose, .chain-word.gamble-revive,
+  .chain-word.gamble-revive > * { animation: none; }
 }
 /* 자동 완성 직전 반짝 */
 .chain-rail.sparkle { animation: rail-sparkle 0.3s ease; }

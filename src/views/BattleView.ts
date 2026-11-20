@@ -16,6 +16,7 @@ import {
   isDamageIntent,
   matchCombos,
   resolveMultiplier,
+  rouletteOdds,
   sentenceTokens,
   statBiasOf,
   STAT_NAME,
@@ -369,6 +370,8 @@ interface TallyPart {
   order?: number
   /** 칩에 그대로 띄울 문구. 없으면 "이름 +값"/"이름 ×값"으로 만든다. */
   text?: string
+  /** 이 조각을 낸 보유 아이템 꼬리표(IntentPart.itemTags) — 칩이 꽂힐 때 아이템창 아이콘이 맥동한다. */
+  itemTags?: string[]
 }
 interface Tally {
   flats: TallyPart[]
@@ -2416,6 +2419,108 @@ export class BattleView {
   }
 
   /**
+   * 도박(배율 범위)·대성공 카드의 판정을 상단 문장 칸의 그 단어 자리에서 보여 준다.
+   * 굴림은 이미 resolveMultiplier가 끝냈다 — 여기서는 결과를 순서대로 드러내기만 한다.
+   * 도박 카드가 먼저(카드 고유 배율), 대성공이 뒤(문장 전체 룰렛)다. 정산판 칩 순서와 같다.
+   */
+  private async playGambleReveal(order: string[], chainEls: HTMLElement[], intent: Intent, resolved: ResolvedMult, retried: boolean) {
+    const text = combatPreviewText()
+    // 도박 범위는 뒤 슬롯이 덮는다(compiler) — 실제로 굴린 카드는 맨 뒤 도박 카드 하나다.
+    const varianceIndex = intent.variance ? order.map((k) => this.sel[k]).map((w, i) => (w?.variance ? i : -1)).filter((i) => i >= 0).pop() : undefined
+    const critEls = order.map((k, i) => ((this.sel[k]?.crit ?? 0) > 0 ? chainEls[i] : undefined)).filter((el): el is HTMLElement => !!el)
+    if (varianceIndex !== undefined && chainEls[varianceIndex] && intent.variance) {
+      const won = resolved.parts.variance >= intent.variance.hi && intent.variance.hi > intent.variance.lo
+      await this.rollChainWords([chainEls[varianceIndex]], won, won ? text.gambleWin : text.gambleMiss)
+    }
+    if (retried) {
+      // 첫 굴림은 실패였다 — 대성공 카드가 꺼진 뒤, 황금사과가 빛나며 되살린다.
+      if (critEls.length) await this.rollChainWords(critEls, false, text.critMiss)
+      this.pulseRelics(['retry'])
+      if (critEls.length) {
+        await this.reviveChainWords(critEls, text.retryAgain)
+        await this.rollChainWords(critEls, resolved.outcome === 'crit', resolved.outcome === 'crit' ? text.critHit : text.critMiss)
+      } else {
+        await this.sleep(360)
+      }
+    } else if (critEls.length) {
+      await this.rollChainWords(critEls, resolved.outcome === 'crit', resolved.outcome === 'crit' ? text.critHit : text.critMiss)
+    }
+  }
+
+  /** 단어가 잠깐 덜덜 굴러간 뒤 성공(폭죽)·실패(흔들리며 회색)로 갈린다. */
+  private async rollChainWords(els: HTMLElement[], won: boolean, label: string) {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    for (const el of els) {
+      el.classList.remove('gamble-win', 'gamble-lose', 'gamble-revive', 'wave')
+      el.classList.add('gamble-rolling')
+    }
+    GameAudio.play('wordSelect')
+    await this.sleep(reduced ? 120 : 420)
+    for (const el of els) {
+      el.classList.remove('gamble-rolling')
+      void el.offsetWidth
+      el.classList.add(won ? 'gamble-win' : 'gamble-lose')
+      this.stampChainWord(el, label, won ? 'win' : 'lose')
+      if (won && !reduced) this.burstChainWord(el)
+    }
+    if (won) GameAudio.play('contextBonus')
+    await this.sleep(reduced ? 260 : 620)
+  }
+
+  /** 황금사과 — 꺼졌던 단어에 다시 불이 들어온다. */
+  private async reviveChainWords(els: HTMLElement[], label: string) {
+    for (const el of els) {
+      el.classList.remove('gamble-lose')
+      void el.offsetWidth
+      el.classList.add('gamble-revive')
+      this.stampChainWord(el, label, 'revive')
+    }
+    await this.sleep(560)
+  }
+
+  /** 단어 위에 잠깐 찍히는 판정 도장. 같은 단어에 다시 찍히면 앞 도장을 갈아 끼운다. */
+  private stampChainWord(el: HTMLElement, label: string, kind: 'win' | 'lose' | 'revive') {
+    el.querySelector('.gamble-stamp')?.remove()
+    const stamp = document.createElement('span')
+    stamp.className = `gamble-stamp ${kind}`
+    stamp.setAttribute('aria-hidden', 'true')
+    stamp.textContent = label
+    el.appendChild(stamp)
+    window.setTimeout(() => stamp.remove(), 1300)
+  }
+
+  /** 성공 폭죽 — 단어 둘레로 불꽃 조각이 터져 나간다. */
+  private burstChainWord(el: HTMLElement) {
+    const burst = document.createElement('span')
+    burst.className = 'gamble-burst'
+    burst.setAttribute('aria-hidden', 'true')
+    const colors = ['#ffd96a', '#ff9ad5', '#9ee7ff', '#c6a2ff', '#fff4c2']
+    const count = 18
+    burst.innerHTML = Array.from({ length: count }, (_, i) => {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.3
+      const dist = 46 + Math.random() * 38
+      const dx = Math.cos(angle) * dist
+      const dy = Math.sin(angle) * dist * 0.8
+      return `<i style="--dx:${dx.toFixed(1)}px;--dy:${dy.toFixed(1)}px;--c:${colors[i % colors.length]};--d:${(Math.random() * 90).toFixed(0)}ms"></i>`
+    }).join('')
+    el.appendChild(burst)
+    window.setTimeout(() => burst.remove(), 1100)
+  }
+
+  /** 보유 아이템이 발동한 순간 아이템창의 그 아이콘을 맥동시킨다. 꼬리표는 PassiveId 또는 `trait:<id>`. */
+  private pulseRelics(tags: string[]) {
+    const icons = this.root.querySelectorAll<HTMLElement>('#relic-strip .relic-icon[data-item-tags]')
+    icons.forEach((icon) => {
+      const own = (icon.dataset.itemTags ?? '').split(' ')
+      if (!tags.some((tag) => own.includes(tag))) return
+      icon.classList.remove('relic-fired')
+      void icon.offsetWidth
+      icon.classList.add('relic-fired')
+      window.setTimeout(() => icon.classList.remove('relic-fired'), 900)
+    })
+  }
+
+  /**
    * 문장 칸은 한 줄로만 선다. 맥락 칸(「?」·새로운 맥락?)이 여럿 붙어 길어지면 예전엔
    * 두 줄로 접히며 아래로 자라 「지금 배율」 칸·공명 띠와 겹쳤다. 줄을 접는 대신 칸 전체를
    * 축소해 왼쪽 상태판(영감·보상·스탯) 오른쪽 끝과 대칭이 되는 폭 안에 담는다.
@@ -2957,10 +3062,15 @@ export class BattleView {
    * 신데렐라의 황금사과 — 대성공에 실패하면 한 번 더 굴린다.
    * 낮은 굴림일수록 대성공이므로 두 번 굴려 낮은 쪽을 쓰면 "재시도"와 같다.
    */
-  private rouletteRoll(): number {
+  private rouletteRoll(intent: Intent): { value: number; retried: boolean } {
     const a = Math.random()
-    if (!hasPassive(this.player, 'retry')) return a
-    return Math.min(a, Math.random())
+    if (!hasPassive(this.player, 'retry')) return { value: a, retried: false }
+    // 첫 굴림이 이미 대성공이면 재시도는 일어나지 않는다 — 화면에 "한 번 더"를 띄울지 가른다.
+    // min(a, b)와 같은 분포라 이전 규칙과 수치는 그대로다.
+    const ctx = this.multCtx(intent)
+    const { critP } = rouletteOdds(intent, ctx.statBias, ctx.luck)
+    if (critP <= 0 || a < critP) return { value: a, retried: false }
+    return { value: Math.min(a, Math.random()), retried: true }
   }
 
   /** 피노키오의 미아핑 — 맥락 수만큼 "근데?"를 굴린다. */
@@ -3183,7 +3293,8 @@ export class BattleView {
         ${this.player.items.map((item) => {
           const rarity = ownedItemRarity(item)
           const attr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
-          return `<span class="relic-icon rarity-${rarity}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item, (desc) => traitDescHtml(desc, true)))}">${itemArt(item.art)}</span>`
+          const tags = [item.passive, item.trait ? `trait:${item.trait}` : undefined].filter(Boolean).join(' ')
+          return `<span class="relic-icon rarity-${rarity}" data-item="${attr(item.id)}" data-item-tags="${tags}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item, (desc) => traitDescHtml(desc, true)))}">${itemArt(item.art)}</span>`
         }).join('')}
       </div>`
   }
@@ -3827,6 +3938,7 @@ export class BattleView {
             cls: kind,
             order: slotOrder(p.key),
             text: `${combatPreviewText().score} +${formatNumber(value)}${why}`,
+            itemTags: p.itemTags,
           }
         })
     // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
@@ -3857,7 +3969,7 @@ export class BattleView {
     // 배율 풀(가산)은 카드별로 쪼개 "배율 ×1.20", "배율 +0.30"처럼 카드 순서대로 띄운다.
     // 칩 값은 배율 칸이 이어서 곱할 몫(누적 풀의 비율)이라 칩을 다 곱하면 원래 풀과 같다.
     const mults: TallyPart[] = intent.breakdown.mults.flatMap((part): TallyPart[] => {
-      if (!part.poolParts?.length) return [{ label: part.label, value: part.value, cls: cls(part) }]
+      if (!part.poolParts?.length) return [{ label: part.label, value: part.value, cls: cls(part), itemTags: part.itemTags }]
       let pool = 0
       return part.poolParts.map((piece, index) => {
         const before = 1 + pool
@@ -3865,7 +3977,7 @@ export class BattleView {
         const text = index === 0
           ? `${combatPreviewText().mult} ×${(1 + piece.bonus).toFixed(2)}`
           : `${combatPreviewText().mult} ${piece.bonus >= 0 ? '+' : ''}${piece.bonus.toFixed(2)}`
-        return { label: piece.label, value: (1 + pool) / before, cls: piece.bonus >= 0 ? 'buff' : 'down', order: slotOrder(piece.key), text }
+        return { label: piece.label, value: (1 + pool) / before, cls: piece.bonus >= 0 ? 'buff' : 'down', order: slotOrder(piece.key), text, itemTags: piece.itemTags }
       })
     })
     const p = resolved.parts
@@ -4026,6 +4138,7 @@ export class BattleView {
     let multStarted = false
     for (const [i, step] of steps.entries()) {
       this.revealChip(step.chip)
+      if (step.part.itemTags?.length) this.pulseRelics(step.part.itemTags)
       if (step.box === 'base') {
         base += step.part.value
         baseBox.querySelector('b')!.textContent = formatNumber(base)
@@ -4317,10 +4430,11 @@ export class BattleView {
     const dealsDamage = (isDamageIntent(intent) && intent.base > 0)
       || intent.guardAttackMultiplier > 0 || intent.overhealDamageMultiplier > 0
     // 한 문장 한 번의 굴림 — 운·룰렛·variance를 확정해 공/방/회가 같은 배율을 공유한다.
+    const roll = this.rouletteRoll(intent)
     const resolved = resolveMultiplier(
       intent,
       this.multCtx(intent),
-      this.rouletteRoll(),
+      roll.value,
       intent.variance ? Math.random() : null,
       this.doubtRolls(intent),
     )
@@ -4342,6 +4456,10 @@ export class BattleView {
     }
     this.q('#flash').classList.add('go')
     await this.sleep(110)
+
+    // 도박·대성공 카드는 물결이 지나간 그 자리에서 판정을 터뜨린다(성공 폭죽 / 실패 회색).
+    // 황금사과가 재시도를 걸었으면 꺼졌던 단어가 되살아나 한 번 더 굴러간다.
+    await this.playGambleReveal(order, chainEls, intent, resolved, roll.retried)
 
     // 공명 → 맥락 → 발견 쪽지 → 정산판. 앞 연출이 끝까지 사라진 뒤 다음 것이 뜬다.
     if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
@@ -4391,6 +4509,7 @@ export class BattleView {
     if (totalGrowth > 0 && hasPassive(this.player, 'beanstalk')) {
       this.player.beanstalkGrown = (this.player.beanstalkGrown ?? 0) + totalGrowth
     }
+    if (passiveGrowth > 0) this.pulseRelics(['beanstalk'])
     if (totalGrowth > 0) await this.growUp(totalGrowth)
 
     if (!dealsDamage && tally.kind === 'guard' && tally.total > 0) {
@@ -4579,6 +4698,7 @@ export class BattleView {
     // 누댕의 메아리 — 대성공한 문장은 한 번 더 발동한다. 준비 효과와 적 페이즈는
     // 다시 돌지 않는다(문장만 메아리친다). 이미 전멸했으면 울릴 곳이 없다.
     if (resolved.outcome === 'crit' && hasPassive(this.player, 'echo') && !allDead(this.state)) {
+      this.pulseRelics(['echo'])
       kills += await this.echoStrike(intent, mult * ECHO_REPEAT_SCALE, sweep, heavy)
     }
 
