@@ -106,7 +106,7 @@
   cursor: pointer;
   transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease;
 }
-.g-tab b { color: #b98255; font-family: Georgia, serif; font-size: 22px; font-weight: 400; letter-spacing: -1px; }
+.g-tab b { color: #b98255; font-family: var(--font); font-size: 22px; font-weight: 400; letter-spacing: -1px; }
 .g-tab em { display: block; font-size: 17px; font-style: normal; font-weight: 900; }
 .g-tab small { display: block; margin-top: 2px; color: #8b7259; font-size: 12px; font-weight: 800; }
 .g-tab:hover { background: rgba(255, 255, 246, .82); transform: translateX(2px); }
@@ -139,7 +139,7 @@
   color: #7c4934;
   font-size: 28px;
 }
-.g-page-title i { color: #c08a5d; font-family: Georgia, serif; font-size: 20px; font-style: normal; }
+.g-page-title i { color: #c08a5d; font-family: var(--font); font-size: 20px; font-style: normal; }
 
 .g-lead { margin: 0 0 16px; color: #574033; font-size: 17px; line-height: 1.74; }
 .g-h3 { margin: 0 0 10px; color: #7c4934; font-size: 19px; }
@@ -217,7 +217,7 @@
   border-radius: 50%;
   color: #fff4dd;
   background: #a86649;
-  font-family: Georgia, serif;
+  font-family: var(--font);
   font-size: 15px;
   font-style: normal;
 }
@@ -238,7 +238,7 @@
   background: rgba(255, 255, 246, .58);
 }
 .g-stats b { color: #7c4934; font-size: 15px; }
-.g-stats i { color: #a3542c; font-family: Georgia, serif; font-size: 20px; font-style: normal; }
+.g-stats i { color: #a3542c; font-family: var(--font); font-size: 20px; font-style: normal; }
 .g-stats span { color: #7a6250; font-size: 13px; }
 
 /* 카드 해부 — 카드 진열 옆에 부위별 설명을 세운다. */
@@ -295,7 +295,7 @@
   background: rgba(255, 255, 246, .62);
 }
 .g-parts b { color: #4a3527; font-size: 15px; }
-.g-parts i { color: #a3542c; font-family: Georgia, serif; font-size: 17px; font-style: normal; }
+.g-parts i { color: #a3542c; font-family: var(--font); font-size: 17px; font-style: normal; }
 .g-parts span { grid-column: 1 / -1; color: #86705c; font-size: 12px; }
 .g-parts li.is-extra { background: rgba(255, 240, 210, .7); }
 .g-calc-sum { margin: auto 0 0 !important; padding-top: 8px; border-top: 2px solid rgba(140, 96, 66, .3); color: #6d5341; font-size: 15px; text-align: right; }
@@ -338,7 +338,7 @@
   background: rgba(255, 252, 236, .62);
 }
 .g-combos b { color: #8c4f2c; font-size: 15px; }
-.g-combos i { color: #a3542c; font-family: Georgia, serif; font-size: 16px; font-style: normal; }
+.g-combos i { color: #a3542c; font-family: var(--font); font-size: 16px; font-style: normal; }
 .g-combos span { grid-column: 1 / -1; color: #7a6250; font-size: 13px; }
 
 /* 적 목록. */
@@ -379,7 +379,7 @@
   background: rgba(255, 255, 246, .66);
 }
 .g-chips b { color: #7c4934; font-size: 14px; }
-.g-chips i { color: #a3542c; font-family: Georgia, serif; font-size: 15px; font-style: normal; }
+.g-chips i { color: #a3542c; font-family: var(--font); font-size: 15px; font-style: normal; }
 .g-chips-wide li { padding: 8px 16px; }
 
 @media (max-width: 1500px) {

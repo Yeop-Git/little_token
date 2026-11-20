@@ -108,7 +108,8 @@ import {
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
-import { setCardLuck } from '@core/luck'
+import { localizedWordText } from '@/localization/content'
+import { luckMultiplier, setCardLuck } from '@core/luck'
 import { luckChanceHtml, tagLuckChances, wordLuckChances } from '@/ui/luckChance'
 import { CHANCE_LABEL, MULT_LABEL } from '@/ui/WordCardFace'
 import { combatPreviewText } from '@/localization/combatPreview'
@@ -1740,7 +1741,7 @@ export class BattleView {
       max: s.playerMax,
       guard: s.guard,
       guardLimit,
-      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도 ${guardLimit}\n최대 체력 절반 ${Math.floor(s.playerMax / 2)} + 방어 스탯 ${formatNumber(s.playerGuardStat ?? 0)}×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}\n넘친 몫도 그 턴 방패치기 피해엔 들어간다`),
+      guardTip: tip(`방어도 ${s.guard}`, `피해를 ${s.guard}만큼 먼저 막아 낸다\n한도는 방어 스탯에 비례해 오른다 (현재 ${guardLimit})`),
       magic: s.playerMagicShield ? 1 : 0,
       magicTip: BUILD_EFFECT_TEXT.magicTip,
     })
@@ -2915,13 +2916,74 @@ export class BattleView {
                 ? formatNumber(this.combatStats().guard)
                 : formatNumber(this.player.stats[m.key])
           const rank = m.key === 'atk' || m.key === 'guard' ? this.rankSticker(m.key, pending[m.key]) : null
-          const tooltip = tip(`${m.label} ${value}`, rank ? `${m.desc}\n${rank.detail}` : m.desc)
+          const tooltip = tip(`${m.label} ${value}`, [this.statTipLines(m.key), rank?.detail ?? ''].filter(Boolean).join('\n'))
           return `<div class="hud-stat${rank ? ' has-rank' : ''}" data-stat-key="${m.key}" role="img" tabindex="0" aria-label="${m.label} ${value}. ${rank ? `${rank.aria}. ` : ''}${m.desc}" data-tooltip="${tooltip}">
         <span class="si">${icon(m.icon)}</span>
         <b>${value}</b>${rank?.html ?? ''}
       </div>`
         },
       ).join('')
+  }
+
+  /**
+   * 상단 스탯 칩 툴팁 본문 — 스탯이 무엇을 바꾸는지, 걸린 규칙(방어도 한도·방패치기 등),
+   * 영향을 받는 「카드」 예시를 •줄로 쓴다(11/20 피드백: 메커니즘은 스탯 툴팁에 모은다).
+   */
+  private statTipLines(key: keyof PlayerState['stats']): string {
+    const s = this.state
+    const stats = this.player.stats
+    const examples = (pick: (w: Word) => boolean, n = 3): string => {
+      const seen = new Set<string>()
+      const out: string[] = []
+      const owned = Object.values(this.player.deck).flat()
+      for (const word of [...owned, ...ALL_REWARD_WORDS]) {
+        const name = localizedWordText(word)
+        if (out.length >= n || seen.has(name) || !pick(word)) continue
+        seen.add(name)
+        out.push(`「${name}」`)
+      }
+      return out.length ? `예시 카드 ${out.join(' ')}` : ''
+    }
+    const lines: string[] = []
+    if (key === 'hp') {
+      lines.push(
+        `최대 체력 ${s.playerMax} · 0이 되면 쓰러진다`,
+        '체력·방어도는 다음 스테이지로 이어진다',
+        '무럭무럭: 문장을 쓸 때 최대 체력이 영구히 자란다',
+        examples((w) => (w.growHp ?? 0) > 0),
+      )
+    } else if (key === 'atk') {
+      lines.push(
+        '피해 = 스탯 × 카드 계수',
+        examples((w) => w.slot === 'verb' && w.kind === 'attack' && w.stat === 'atk'),
+      )
+    } else if (key === 'guard') {
+      const limit = stateGuardLimit(s)
+      lines.push(
+        '방어도 = 스탯 × 카드 계수',
+        `한도 ${limit} = 체력 절반 ${Math.floor(s.playerMax / 2)} + 스탯 ${formatNumber(stats.guard)}×${PLAYER_GUARD_LIMIT_PER_GUARD_STAT}`,
+        '피해를 먼저 막고 막은 만큼만 줄어든다',
+        examples((w) => w.slot === 'verb' && w.kind === 'guard' && !(w.effects?.guardAttackMultiplier)),
+        '방패치기: 지금 쌓인 만큼 피해를 더한다 (소모 없음)',
+        '한도를 넘친 몫도 그 턴 방패치기엔 들어간다',
+        examples((w) => (w.effects?.guardAttackMultiplier ?? 0) > 0, 2),
+      )
+    } else if (key === 'heal') {
+      lines.push(
+        '회복량 = 스탯 × 카드 계수',
+        '생명력 폭발: 넘친 회복을 피해로 바꾼다',
+        examples((w) => w.slot === 'verb' && w.kind === 'heal' && !(w.effects?.overhealDamageMultiplier)),
+        examples((w) => (w.effects?.overhealDamageMultiplier ?? 0) > 0, 2),
+      )
+    } else {
+      lines.push(
+        `문장 배율 ×${formatMult(luckMultiplier(stats.luck))}`,
+        '대성공·확률 카드가 터질 확률을 올린다',
+        '보상 등급과 영웅·전설 등장 확률을 올린다',
+        examples((w) => (w.crit ?? 0) > 0 || !!w.variance),
+      )
+    }
+    return lines.filter(Boolean).join('\n')
   }
 
   /** 지금 고른 카드들이 이번 문장에서 올릴 랭크(아직 적용 전). */

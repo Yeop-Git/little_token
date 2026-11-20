@@ -1357,7 +1357,7 @@ button {
   color: #2a1a0c;
   background: linear-gradient(140deg, #ffdc9a, #f0b45f);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
-  font: 900 14px/1.35 Georgia, serif;
+  font: 900 14px/1.35 var(--font);
   letter-spacing: .11em;
   text-shadow: none;
 }
@@ -1985,13 +1985,13 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-health-heading .boss-health-mark {
   justify-self: start;
   color: #ffad72;
-  font: 900 10px/1 Georgia, serif;
+  font: 900 10px/1 var(--font);
   letter-spacing: .28em;
   opacity: .76;
 }
 .boss-health-heading .boss-health-stage {
   color: #ffe0a3;
-  font: 900 11px/1 var(--font-body);
+  font: 900 11px/1 var(--font);
   font-style: normal;
   letter-spacing: 0;
   opacity: .82;
@@ -2108,7 +2108,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .boss-sentence-line > i {
   flex: none;
   color: rgba(82, 50, 36, .38);
-  font: italic 800 24px Georgia, serif;
+  font: italic 800 24px var(--font);
 }
 .boss-sentence-token {
   position: relative;
@@ -2457,7 +2457,7 @@ html[data-postprocessing='off'] .tip-bubble {
   width: 36px;
   height: 36px;
   color: var(--speech-paper);
-  font: 900 22px/1 Georgia, serif;
+  font: 900 22px/1 var(--font);
   border-radius: 52% 48% 46% 54% / 48% 54% 46% 52%;
   background: var(--speech-edge);
   box-shadow: 0 0 0 3px var(--speech-paper), 0 3px 9px rgba(0, 0, 0, .38);
@@ -3391,7 +3391,7 @@ html[data-postprocessing='off'] .tip-bubble {
   background: none;
   box-shadow: none;
   color: #ffdba6;
-  font: 900 15px/1 Georgia, serif;
+  font: 900 15px/1 var(--font);
   text-shadow:
     0 0 4px #000, 0 2px 3px rgba(0, 0, 0, .95),
     1px 1px 0 rgba(0, 0, 0, .85), -1px 1px 0 rgba(0, 0, 0, .85),
@@ -3437,11 +3437,11 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .enemy-intel-icon svg,
 .enemy-intel-icon .baked-stat-icon { width: 28px; height: 28px; }
-.enemy-intel-icon > b { font: 900 21px/1 Georgia, serif; }
+.enemy-intel-icon > b { font: 900 21px/1 var(--font); }
 .enemy-intel-icon .emotion-face { width: 26px; height: 26px; object-fit: contain; }
 .enemy-intel-icon .emotion-symbol { font-size: 20px; }
 .enemy-intel-icon.magic > b,
-.enemy-intel-icon.guard > b { position: absolute; right: -5px; bottom: -5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; color: #2b1d3e; background: #e5d0ff; font: 900 10px/1 sans-serif; }
+.enemy-intel-icon.guard > b { position: absolute; right: -5px; bottom: -5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; color: #2b1d3e; background: #e5d0ff; font: 900 10px/1 var(--font); }
 .enemy-intel-icon.guard > b { color: #302c28; background: #e8ddca; }
 .enemy-intel-icon:hover,
 .enemy-intel-icon:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
@@ -3503,7 +3503,7 @@ html[data-postprocessing='off'] .tip-bubble {
 .enemy-tip-note:hover,
 .enemy-tip-note:focus-visible { transform: translateY(-3px); filter: brightness(1.18); }
 .enemy-tip-note svg { width: 22px; height: 22px; }
-.enemy-tip-note > b { font: 900 15px/1 Georgia, serif; letter-spacing: .1em; }
+.enemy-tip-note > b { font: 900 15px/1 var(--font); letter-spacing: .1em; }
 .boss-health-hud .boss-intel .enemy-tip-note { height: 33px; padding: 0 12px 0 9px; }
 .boss-health-hud .boss-intel .enemy-tip-note svg { width: 19px; height: 19px; }
 .boss-health-hud .boss-intel .enemy-tip-note > b { font-size: 13px; }
@@ -5698,7 +5698,7 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
 .card-front small {
   margin-top: auto;
   color: color-mix(in srgb, var(--wglow) 62%, #59402e);
-  font-family: Georgia, serif;
+  font-family: var(--font);
   font-size: 8px;
   font-weight: 900;
   letter-spacing: 1.8px;
@@ -5719,7 +5719,7 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   transform: rotate(45deg);
   box-shadow: 0 0 18px rgba(255,207,118,.34), inset 0 0 18px rgba(255,207,118,.2);
 }
-.card-back b { font-family: Georgia, serif; font-size: 12px; letter-spacing: 3px; }
+.card-back b { font-family: var(--font); font-size: 12px; letter-spacing: 3px; }
 
 /* 풀 일러스트 맥락카드 — 일러스트 전체 + 감정 BaseColor + 발광·깊은그림자 글자 */
 .card-front.art {
@@ -9513,7 +9513,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   border-radius: 10px;
   background: rgba(10, 8, 14, 0.5);
   color: rgba(246, 236, 214, 0.58);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -11794,7 +11794,7 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-body);
+  font-family: var(--font);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
