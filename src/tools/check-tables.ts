@@ -43,6 +43,10 @@ import {
 } from '@data/earlyWords'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { TABLES } from '@data/tables'
+import { setCardLuck } from '@core/luck'
+
+// CSV note는 운 보정 전 기본 확률을 적는다 — 기본 확률로 대조한다(카드 화면은 운 반영 확률을 보여 준다).
+setCardLuck(0)
 
 // 이 태그가 하나라도 충돌 쌍에 등장하면, 앞 선택에 따라 차단될 여지가 있다.
 function tagInAnyConflict(tag: string, t: Tables): boolean {

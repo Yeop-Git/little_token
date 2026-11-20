@@ -42,3 +42,39 @@ export function luckRarityShift(luck: number): { epic: number; legendary: number
     legendary: value * LUCK_RARITY_LEGENDARY_PER,
   }
 }
+
+/**
+ * 카드 확률(도박 성공·대성공)에 더하는 운 보정. 운 1당 +1%p, 최대 +15%p.
+ * 확률이 없는 카드(0%)는 운으로 새로 생기지 않는다 — 확률을 쓰는 카드만 오른다.
+ */
+export const LUCK_CHANCE_PER = 1
+export const LUCK_CHANCE_MAX_BONUS = 15
+/** 도박 성공 확률은 운이 아무리 높아도 95%에서 멈춘다(실패 가능성은 남긴다). */
+export const LUCK_SUCCESS_CAP = 0.95
+
+/** 운 보정 확률. 모두 0~1 비율이고 bonus는 상한까지 실제로 더해진 몫이다. */
+export interface LuckChance {
+  base: number
+  bonus: number
+  final: number
+}
+
+export function luckChance(base: number, luck: number, ceiling = LUCK_SUCCESS_CAP): LuckChance {
+  const safeBase = Number.isFinite(base) ? Math.max(0, base) : 0
+  if (safeBase <= 0) return { base: 0, bonus: 0, final: 0 }
+  const want = Math.min(LUCK_CHANCE_MAX_BONUS, Math.max(0, Number.isFinite(luck) ? luck : 0) * LUCK_CHANCE_PER) / 100
+  const final = Math.max(safeBase, Math.min(ceiling, safeBase + want))
+  return { base: safeBase, bonus: final - safeBase, final }
+}
+
+/**
+ * 카드 문구가 쓸 현재 운. 카드 앞면·상세·보상 문구는 플레이어 상태를 모르므로
+ * 전투·보상 화면이 열릴 때 지금 운을 한 번 알려 준다(전투 판정은 이 값을 쓰지 않는다).
+ */
+let cardLuck = LUCK_BASE
+export function setCardLuck(luck: number): void {
+  cardLuck = Number.isFinite(luck) ? luck : LUCK_BASE
+}
+export function getCardLuck(): number {
+  return cardLuck
+}

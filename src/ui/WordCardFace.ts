@@ -15,6 +15,9 @@ import { emotionOrNeutral, type Word } from '@core/types'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { wordKeywords, type WordKeywordId } from '@core/wordKeywords'
+import { CRIT_CAP } from '@core/compiler'
+import { getCardLuck, luckChance, type LuckChance } from '@core/luck'
+import { luckChanceAttrs, luckChanceHtml, wordLuckChances } from '@/ui/luckChance'
 
 /** 제목을 한 줄에 온전히 남기되, 카드 폭을 넘는 경우에만 글자를 줄인다. */
 export function cardTitleStyle(text: string, illustrated = false): string {
@@ -112,7 +115,7 @@ export function wordKeywordChipsHtml(word: Word): string {
   // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
   const effects = keywords.filter((keyword) => !isRankKeyword(keyword.id))
   const effectHtml = effects.length
-    ? `<span class="card-keywords">${effects.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
+    ? `<span class="card-keywords">${effects.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? (keyword.id === 'critical' && word.crit ? luckChanceHtml(luckChance(word.crit, getCardLuck(), CRIT_CAP), 'card-keyword-value') : `<span class="card-keyword-value">${keyword.value}</span>`) : ''}</span>`).join('')}</span>`
     : ''
   return effectHtml + wordRankTagsHtml(word)
 }
@@ -149,10 +152,17 @@ export function wordKeywordDetailsHtml(word: Word, omitValues?: ReadonlySet<Word
  * 카드 문구 안의 핵심 숫자(×1.20, 75%, +1, ▲1)를 따로 감싸 크게 띄운다.
  * 글자 설명은 그대로 두고 숫자만 키워야 좁은 손패 카드에서도 한눈에 값이 읽힌다.
  */
-export function emphasizeCardNumbers(text: string): string {
+export function emphasizeCardNumbers(text: string, chances: readonly LuckChance[] = []): string {
+  // 운이 반영된 확률(도박 성공·대성공)은 툴팁이 붙은 확률 태그로 바꾼다 — 같은 숫자가
+  // 여러 번 나와도 카드가 가진 확률 수만큼만 앞에서부터 바꾼다.
+  const pending = [...chances]
   return escapeCardText(text).replace(
     /(×\s?\d+(?:\.\d+)?|\d+(?:\.\d+)?%|[+＋]\d+(?:\.\d+)?|▲\d+|=\s?\d+(?:\.\d+)?)/g,
-    '<b class="card-num">$1</b>',
+    (match) => {
+      const at = match.endsWith('%') ? pending.findIndex((chance) => `${Math.round(chance.final * 100)}%` === match) : -1
+      if (at >= 0) return luckChanceHtml(pending.splice(at, 1)[0], 'card-num')
+      return `<b class="card-num">${match}</b>`
+    },
   )
 }
 
@@ -164,13 +174,20 @@ const MULT_LABEL: Record<LocaleCode, string> = { ko: '배율', en: 'Multiplier',
  * "44% 확률로 배율 ×3.30"은 [44% 확률][배율 ×3.30] 두 장으로, "배율 ×1.20"·"방어 +2" 같은
  * 점수는 한 장씩. 행동 태그 옆의 맨 값("×1.5")은 키워드 값처럼 태그 밖에 그대로 둔다.
  */
-export function cardNoteTagsHtml(note: string): string {
-  const tag = (text: string, cls = '') => `<span class="card-value-tag${cls}">${emphasizeCardNumbers(text)}</span>`
+export function cardNoteTagsHtml(note: string, chances: readonly LuckChance[] = []): string {
+  const tag = (text: string, cls = '') => `<span class="card-value-tag${cls}">${emphasizeCardNumbers(text, chances)}</span>`
   return note.split(' · ').map((part) => part.trim()).filter(Boolean).map((part) => {
     if (!/\d/.test(part)) return `<span class="card-value-plain">${escapeCardText(part)}</span>`
     if (/^[×x]\s?\d/.test(part)) return `<span class="card-value-bare">${emphasizeCardNumbers(part)}</span>`
     const gamble = part.match(/^(\d+(?:\.\d+)?%)\D*?(×\s?\d+(?:\.\d+)?)$/)
-    if (gamble) return tag(`${gamble[1]} ${CHANCE_LABEL[currentLocale]}`, ' is-chance') + tag(`${MULT_LABEL[currentLocale]} ${gamble[2]}`)
+    if (gamble) {
+      // 확률 태그 전체에 운 툴팁을 단다 — 숫자는 운이 반영된 최종 확률이다.
+      const chance = chances.find((c) => `${Math.round(c.final * 100)}%` === gamble[1])
+      const chanceTag = chance
+        ? `<span class="card-value-tag is-chance luck-chance-tag${chance.bonus > 0 ? ' boosted' : ''}" ${luckChanceAttrs(chance)}><b class="card-num">${gamble[1]}</b> ${CHANCE_LABEL[currentLocale]}</span>`
+        : tag(`${gamble[1]} ${CHANCE_LABEL[currentLocale]}`, ' is-chance')
+      return chanceTag + tag(`${MULT_LABEL[currentLocale]} ${gamble[2]}`)
+    }
     return tag(part)
   }).join('')
 }
@@ -181,7 +198,7 @@ function wordCardNoteHtml(word: Word, note: string): string {
   // 주행동과 키워드를 분리한다. 키워드 이름을 요약 줄과 칩에 두 번 쓰지 않는다.
   const displayNote = note === wordNoteText(word) ? wordCardPrimaryNote(word, note) : note
   const keywordHtml = wordKeywordChipsHtml(word)
-  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${note === wordNoteText(word) ? cardNoteTagsHtml(displayNote) : emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${note === wordNoteText(word) ? cardNoteTagsHtml(displayNote, wordLuckChances(word)) : emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
 }
 
 

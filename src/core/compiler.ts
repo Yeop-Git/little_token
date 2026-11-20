@@ -11,7 +11,7 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { wordInkCost } from './ink'
-import { LUCK_MULT, luckMultiplier } from './luck'
+import { LUCK_MULT, luckChance, luckMultiplier } from './luck'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -416,8 +416,10 @@ export function doubtMults(intent: Pick<Intent, 'doubtCount'>, rolls: number[]):
 }
 
 // 스탯 보정된 룰렛 확률. 기본 실패가 0이면 0을 유지(무실패 수식은 계속 안전).
-export function rouletteOdds(intent: Intent, statBias: number): { critP: number; failP: number } {
-  const critP = Math.min(CRIT_CAP, intent.critP + statBias * CRIT_STAT_K)
+// 운은 대성공 확률이 있는 문장에만 +%p로 더해진다(luck.ts LUCK_CHANCE_PER, 상한 CRIT_CAP).
+export function rouletteOdds(intent: Intent, statBias: number, luck = 0): { critP: number; failP: number } {
+  const statCrit = Math.min(CRIT_CAP, intent.critP + statBias * CRIT_STAT_K)
+  const critP = intent.critP > 0 ? luckChance(statCrit, luck, CRIT_CAP).final : statCrit
   const failP = intent.failP > 0 ? Math.max(FAIL_FLOOR, intent.failP - statBias * FAIL_STAT_K) : 0
   return { critP, failP }
 }
@@ -432,11 +434,12 @@ export function resolveMultiplier(
   doubtRolls: number[] = [],
 ): ResolvedMult {
   let m = intent.multiplier
-  const variance = intent.variance && varRoll !== null ? (varRoll < intent.variance.p ? intent.variance.hi : intent.variance.lo) : 1
+  // 도박 성공 확률도 운만큼 오른다 — 카드에 적힌 확률(운 반영)과 같은 값으로 굴린다.
+  const variance = intent.variance && varRoll !== null ? (varRoll < luckChance(intent.variance.p, ctx.luck).final ? intent.variance.hi : intent.variance.lo) : 1
   m *= variance
   const luck = luckMultiplier(ctx.luck) // 운은 기본 배율 요소(체감 곡선)
   m *= luck
-  const { critP, failP } = rouletteOdds(intent, ctx.statBias)
+  const { critP, failP } = rouletteOdds(intent, ctx.statBias, ctx.luck)
   let outcome: RouletteOutcome = 'normal'
   let roulette = 1
   if (rouletteRoll < critP) {

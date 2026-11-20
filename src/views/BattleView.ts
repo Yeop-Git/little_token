@@ -104,6 +104,8 @@ import {
 import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
+import { setCardLuck } from '@core/luck'
+import { tagLuckChances, wordLuckChances } from '@/ui/luckChance'
 import { combatPreviewText } from '@/localization/combatPreview'
 
 const BUILD_EFFECT_TEXT = {
@@ -484,6 +486,7 @@ export class BattleView {
     this.inspiration = Math.max(0, Math.floor(opts.inspiration ?? 0))
     this.t = tablesForEncounter(opts.tables ?? TABLES, opts.encounter[0])
     this.player = opts.player ?? defaultPlayer()
+    setCardLuck(this.player.stats.luck)
     const atkMult = opts.atkMult ?? this.field.enemyAtkMult ?? 1
     const enemies = opts.encounter.map((id, index) =>
       makeEnemy(
@@ -2206,7 +2209,7 @@ export class BattleView {
         return `<span class="chain-word emotion-${emotion}${attach}" data-i="${i}">
           <b class="cw-text">${toks[i]}</b>
           <span class="cw-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" title="잉크 비용">${wordInkCost(w)}</span>
-          ${note ? `<em class="cw-note ${note.cls}">${note.text}</em>` : ''}
+          ${note ? `<em class="cw-note ${note.cls}">${tagLuckChances(note.text, wordLuckChances(w))}</em>` : ''}
         </span>`
       })
       .join('')
@@ -2673,7 +2676,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
          ${this.projectionHtml(w, key)}
-         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => `<div class="v ${v.cls}">${v.text}</div>`).join('')}</div>
+         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => `<div class="v ${v.cls}">${tagLuckChances(v.text, wordLuckChances(w))}</div>`).join('')}</div>
          ${wordKeywordDetailsHtml(w)}
          ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
@@ -2732,6 +2735,8 @@ export class BattleView {
     const selected = Object.values(selection)
     const pendingAttackRank = selected.reduce((sum, word) => sum + (word?.effects?.attackRank ?? 0), 0)
     const pendingGuardRank = selected.reduce((sum, word) => sum + (word?.effects?.guardRank ?? 0), 0)
+    // 카드 문구의 확률 표기도 지금 운을 따른다(손패·상세·체인이 모두 이 값을 읽는다).
+    setCardLuck(this.player.stats.luck)
     return {
       ...this.player.stats,
       atk: rankedStat(this.player.stats.atk * this.debugAttackMultiplier, (this.state.playerAttackRank ?? 0) + pendingAttackRank),

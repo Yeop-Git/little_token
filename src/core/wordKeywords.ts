@@ -1,5 +1,6 @@
 import { currentLocale, type LocaleCode } from '@/localization'
-import { PREEMPT_TAG } from './compiler'
+import { CRIT_CAP as CRIT_CHANCE_CAP, PREEMPT_TAG } from './compiler'
+import { getCardLuck, luckChance } from './luck'
 import type { Word } from './types'
 
 export type WordKeywordId =
@@ -87,7 +88,7 @@ export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>
     ['pierce', effects?.pierceGuard ? '' : null],
     ['counter', effects?.counter ? '' : null],
     ['preempt', word.tags.includes(PREEMPT_TAG) ? '' : null],
-    ['critical', word.crit ? percent(word.crit) : null],
+    ['critical', word.crit ? percent(luckChance(word.crit, getCardLuck(), CRIT_CHANCE_CAP).final) : null],
     ['repeat', (effects?.hitCount ?? 1) > 1
       ? `${effects!.hitCount}회`
       : (effects?.castCount ?? 1) > 1

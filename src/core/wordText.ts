@@ -5,10 +5,11 @@
 
 import { formatNumber } from './numberFormat'
 import { TARGET_FALLOFF } from './combatRules'
-import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
+import { CRIT_CAP, PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
 import type { StatBlock, TargetCount, Variance, Word } from './types'
 import { currentLocale } from '@/localization'
 import { wordKeywords } from './wordKeywords'
+import { getCardLuck, luckChance } from './luck'
 
 const L = {
   ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발', magicShield:'매직실드', guardAttack:'현재 방어도 피해', overhealAttack:'초과 회복 피해', lifeSteal:'흡혈' },
@@ -54,8 +55,9 @@ export const OVERDRAW_HIT_UNIT = {
  * 양쪽을 나란히 적을 필요가 없다. `×2.50 / ×1.00`은 "절반은 손해"처럼 읽혀서 폐지했다.
  * 저점이 1이 아닌 데이터가 들어오면 그때만 나머지 쪽을 덧붙인다.
  */
-export function gambleText(v: Variance): string {
-  const p = Math.round(v.p * 100)
+export function gambleText(v: Variance, luck = getCardLuck()): string {
+  // 카드에는 운이 반영된 최종 확률을 적는다(기본 확률·운 몫은 툴팁이 밝힌다).
+  const p = Math.round(luckChance(v.p, luck).final * 100)
   const hi = `${p}% ${L.chance} ×${v.hi.toFixed(2)}`
   return v.lo === 1 ? hi : `${hi} · ${L.rest} ×${v.lo.toFixed(2)}`
 }
@@ -80,7 +82,7 @@ export function wordDetailNoteLine(w: Word): ValueLine | null {
 export const multText = (bonus: number): string => `${L.mult} ×${(1 + bonus).toFixed(2)}`
 
 /** 대성공 표기 — "대성공 20%". */
-export const critText = (crit: number): string => `${L.crit} ${Math.round(crit * 100)}%`
+export const critText = (crit: number, luck = getCardLuck()): string => `${L.crit} ${Math.round(luckChance(crit, luck, CRIT_CAP).final * 100)}%`
 
 /**
  * 카드가 화면에 내걸어야 하는 수치 조각 — CSV `note`가 빠뜨리지 않았는지 검사하는
