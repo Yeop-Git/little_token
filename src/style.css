@@ -3945,6 +3945,8 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 단어 기여 수치(팅) — 작게 톡 */
 .pop.tick { font-size: 27px; animation: pop-tick 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 .pop.big { font-size: 58px; }
+/* 매직실드가 삼킨 피해 — 계산된 숫자는 그대로 읽히되 금빛 결정색으로 막혔음을 알린다. */
+.pop.shield-blocked { color: #ffe27a; font-size: 44px; text-shadow: 0 0 10px rgba(255, 205, 50, .85), 0 2px 0 #7d4800; }
 .queen-chain-link {
   position: absolute;
   z-index: 98;

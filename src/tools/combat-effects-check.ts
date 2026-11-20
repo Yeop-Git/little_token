@@ -222,7 +222,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(heavy.groggyDamageMult === 2.5, 'solving the first-mantis guard gimmick opens a decisive damage window and scheduled attack skip')
 }
 
-{ const s = state([makeEnemy(foe('shield', { magicShield: 2, hp: 20 }))]); const r = applyIntent(s, attack({ hitCount: 3 }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].magicShieldRemaining === 1 && r.hits[1].magicShieldRemaining === 0 && r.hits[2].dmg === 10 && s.enemies[0].hp === 10 && r.text.includes('0 + 0 + 10 피해'), 'layered magic shield and multihit log each applied hit') }
+{ const s = state([makeEnemy(foe('shield', { magicShield: 2, hp: 20 }))]); const r = applyIntent(s, attack({ hitCount: 3 }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].magicShieldRemaining === 1 && r.hits[1].magicShieldRemaining === 0 && r.hits[2].dmg === 10 && s.enemies[0].hp === 10 && r.text.includes('10(매직실드 막음) + 10(매직실드 막음) + 10 피해') && r.hits[0].shown === 10, 'layered magic shield and multihit log each applied hit') }
 { const s = state([makeEnemy(foe('scaled-multihit', { hp: 20 }))]); const r = applyIntent(s, attack({ castCount: 2, castScale: .65 }), 1, 0); assert(r.hits.map((hit) => hit.dmg).join(',') === '6,6' && s.enemies[0].hp === 8, 'scaled verb casts discard fractional damage per hit') }
 { const s = state([makeEnemy(foe('scaled-guard'))]); const r = applyPreparation(s, attack({ base: 0, kind: 'guard', guard: 10, castCount: 2, castScale: .65 }), 1); assert(r.guardGain === 13, 'scaled verb cast repeats guard at the same disclosed total power') }
 { const s = state(); const r = applyIntent(s, attack({ base: 10.5 }), 1.1, 0); assert(r.hits[0].dmg === 11 && s.enemies[0].hp === 19, 'fractional attack damage is floored before execution') }
@@ -249,9 +249,15 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const rear = makeEnemy(foe('early-multihit-rear', { hp: 20 }))
   const s = state([front, rear])
   const r = applyIntent(s, attack({ hitCount: 2 }), 1, 0)
-  assert(r.overflow === 15, 'multihit keeps the killing blow excess and every unused hit')
-  const transfer = applyOverkillTransfer(s, 1, r.overflow)
-  assert(transfer.dealt === 15 && rear.hp === 5, 'unused multihits join the kill chain')
+  assert(r.hits.length === 3 && r.hits[1].transfer && r.hits[1].target === 1 && r.hits[1].dmg === 5, 'first hit finishes its pierce chain before the next hit')
+  assert(r.hits[2].target === 1 && !r.hits[2].transfer && r.hits[2].dmg === 10 && rear.hp === 5 && r.overflow === 0, 'next multihit strikes the enemy where the chain stopped')
+}
+{
+  const front = makeEnemy(foe('multihit-shield-front', { hp: 5 }))
+  const rear = makeEnemy(foe('multihit-shield-rear', { hp: 20, magicShield: 1 }))
+  const s = state([front, rear])
+  const r = applyIntent(s, attack({ hitCount: 2 }), 1, 0)
+  assert(r.hits[1].transfer && r.hits[1].magicShieldBroken && r.hits[1].shown === 5 && r.hits[2].dmg === 10 && rear.hp === 10, 'magic shield eats the pierce chain, then the next hit lands')
 }
 {
   const front = makeEnemy(foe('range-front', { hp: 5 }))
@@ -272,13 +278,15 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   assert(rear.dead && r.overflow === 0, 'rear overkill cannot flow backward through a surviving shielded front enemy')
 }
 { const s = state([makeEnemy(foe('guard', { guard: 8, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].guard === 8, 'pierce guard') }
-{ const s = state([makeEnemy(foe('magic-pierce', { magicShield: 1, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].dmg === 10 && s.enemies[0].magicShield === 1, 'pierce bypasses magic shield without consuming it') }
+{ const s = state([makeEnemy(foe('magic-pierce', { magicShield: 1, hp: 20 }))]); const r = applyIntent(s, attack({ pierceGuard: true }), 1, 0); assert(r.hits[0].magicShieldBroken && r.hits[0].dmg === 0 && r.hits[0].shown === 10 && s.enemies[0].hp === 20 && s.enemies[0].magicShield === 0, 'pierce cannot bypass magic shield: full damage is computed but the shield eats it') }
 {
   const shielded = makeEnemy(foe('overkill-shielded', { guard: 99, magicShield: 3, hp: 15 }))
   const s = state([shielded])
   const r = applyOverkillTransfer(s, 0, 20)
-  assert(r.dealt === 15 && r.killed && r.overflow === 5, 'overkill transfer deals directly to hp and keeps flowing')
-  assert(shielded.guard === 99 && shielded.magicShield === 3, 'overkill transfer ignores and does not consume guard or magic shield')
+  assert(r.dealt === 0 && !r.killed && r.overflow === 0 && r.magicShieldBroken && r.magicShieldRemaining === 2 && shielded.hp === 15, 'magic shield swallows an overkill transfer and stops the chain')
+  shielded.magicShield = 0
+  const r2 = applyOverkillTransfer(s, 0, 20)
+  assert(r2.dealt === 15 && r2.killed && r2.overflow === 5 && shielded.guard === 99, 'overkill transfer ignores guard and keeps flowing')
 }
 { const s = state([makeEnemy(foe('a')), makeEnemy(foe('b')), makeEnemy(foe('c'))]); const r = applyIntent(s, attack({ targetCount: 3 }), 1, 0); assert(r.hits.map((h) => h.dmg).join(',') === '10,7,5', 'three targets') }
 {

@@ -1102,10 +1102,15 @@ export class BattleView {
     this.timers.push(start)
   }
 
+  /** 연타 연출 중 아직 그려지지 않은 타격 전의 체력. 키가 있으면 그 적은 레일에 남는다. */
+  private strikeHpOverride = new Map<number, number>()
+
   private renderActors(full = true) {
     const host = this.q('#actors')
     const s = this.state
-    const alive = aliveIdx(s) // 살아있는 적 인덱스(앞→뒤)
+    // 연타를 한 타격씩 그리는 동안에는 코어에서 이미 쓰러진 적도 자기 차례가 올 때까지
+    // 레일에 남아 그 순간의 체력을 보여 준다.
+    const alive = [...new Set([...aliveIdx(s), ...this.strikeHpOverride.keys()])].sort((a, b) => a - b) // 살아있는 적 인덱스(앞→뒤)
     // 전투 대상은 항상 최전방.
     this.target = frontIdx(s)
     const visible = alive.slice(0, MAX_VISIBLE_ENEMIES)
@@ -1138,7 +1143,8 @@ export class BattleView {
       if (!visibleSet.has(Number(el.dataset.i)) && !el.classList.contains('dying')) this.releaseFoe(el)
     })
     visible.forEach((i, rank) => {
-      const e = s.enemies[i]
+      const override = this.strikeHpOverride.get(i)
+      const e = override === undefined ? s.enemies[i] : { ...s.enemies[i], hp: override, dead: false }
       let el = host.querySelector<HTMLElement>(`.actor.foe[data-i="${i}"]`)
       if (!el) {
         el = this.acquireFoe(i, e)
@@ -2043,6 +2049,10 @@ export class BattleView {
     const spellshield = hpbar.querySelector<HTMLElement>('.spellshield-overlay')!
     spellshield.hidden = e.magicShield <= 0
     spellshield.querySelector<HTMLElement>('b')!.textContent = e.magicShield > 1 ? `×${e.magicShield}` : ''
+    // 매직실드는 남은 체력만큼만 덮는다. 체력이 1이 되어도 막이 바 전체를 가리면
+    // 얼마나 남았는지 읽을 수 없으므로, 체력 비율에 맞춰 함께 줄어든다.
+    const shieldRatio = e.maxHp > 0 ? Math.max(0, Math.min(1, e.hp / e.maxHp)) : 0
+    spellshield.style.right = `calc(${((1 - shieldRatio) * 100).toFixed(2)}% + 1px)`
     // 보스 상단 HUD의 체력과 호위 규칙을 갱신한다. 세부 전투 정보는 바로 아래의
     // 공용 아이콘 배지가 맡아 긴 텍스트가 체력바 폭을 밀어내지 않게 한다.
     if (bossHud) {
@@ -4291,7 +4301,7 @@ export class BattleView {
         for (const hit of result.hits) {
           const el = this.q(`#actors .actor.foe[data-i="${hit.target}"]`)
           if (hit.summonShieldBlocked) this.popAt(hit.target, '일벌 호위 · 본체 무적', 'guard big')
-          else if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining)
+          else if (hit.magicShieldBroken) await this.playSpellShieldImpact(hit.target, hit.magicShieldRemaining, hit.shown ?? 0)
           else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
@@ -4543,16 +4553,48 @@ export class BattleView {
       hit.dmg > 0 && !hit.summonShieldBlocked && !hit.magicShieldBroken,
     ).length
     // 연타는 적 머리 위 숫자마다 몇 번째 타격인지 붙인다 — 작은 숫자가 여러 번 들어가는 게 읽히게.
-    const comboHits = res.hits.filter((hit) => !hit.summonShieldBlocked && !hit.magicShieldBroken).length
+    const comboHits = res.hits.filter((hit) => !hit.summonShieldBlocked && !hit.magicShieldBroken && !hit.transfer).length
     let hitNo = 0
+    // 연타는 타격마다 관통이 끝난다. 앞 타격이 쓰러뜨린 적은 다음 타격 전에 쓰러지고
+    // 레일이 당겨져야, 다음 칼질이 "멈춘 그 적"을 이어서 때리는 것으로 읽힌다.
+    const deathsPlayed = new Set<number>()
+    const struck: number[] = []
+    const sequential = res.hits.some((hit) => hit.transfer)
+    this.strikeHpOverride.clear()
+    if (sequential) {
+      for (const hit of res.hits) {
+        if (!this.strikeHpOverride.has(hit.target) && hit.hpBefore !== undefined) this.strikeHpOverride.set(hit.target, hit.hpBefore)
+      }
+    }
+    let shownHit: ApplyResult["hits"][number] | null = null
+    const settleShownHit = () => {
+      if (!sequential || !shownHit || shownHit.hpAfter === undefined) return
+      if (this.strikeHpOverride.has(shownHit.target)) this.strikeHpOverride.set(shownHit.target, shownHit.hpAfter)
+      this.renderActors(false)
+    }
     for (const h of res.hits) {
+      settleShownHit()
+      shownHit = h
+      const fallen = struck.filter((k) => k !== h.target && res.killed.includes(k) && !deathsPlayed.has(k))
+      if (fallen.length) {
+        for (const k of fallen) {
+          deathsPlayed.add(k)
+          this.strikeHpOverride.delete(k)
+          await this.playDeath(k, 1, sweep)
+        }
+        // 뒤에서 기다리던 적을 레일 앞으로 불러와야 이어지는 타격이 꽂힐 자리가 생긴다.
+        engageFront(this.state)
+        this.renderActors(false)
+        await this.sleep(sweep ? 120 : 260)
+      }
+      if (!struck.includes(h.target)) struck.push(h.target)
       if (h.summonShieldBlocked) {
         this.popAt(h.target, QUEEN_ESCORT_IMMUNITY_LABEL, 'guard big')
         continue
       }
       if (h.magicShieldBroken) {
         const shieldTarget = this.q<HTMLElement>(`#actors .actor.foe[data-i="${h.target}"]`)
-        await this.playSpellShieldImpact(h.target, h.magicShieldRemaining)
+        await this.playSpellShieldImpact(h.target, h.magicShieldRemaining, h.shown ?? 0)
         if (shieldTarget) await stopFirstHit(shieldTarget)
         continue
       }
@@ -4568,8 +4610,9 @@ export class BattleView {
         this.hitOne(el)
       }
       // 막·부위 경계에서 잘린 몫까지 포함한 타격 수치를 띄운다 — 체력바는 실제로 깎인 만큼만 준다.
-      hitNo++
-      const hitTag = comboHits > 1
+      // 관통 전이는 새 칼질이 아니므로 몇 번째 타격인지 세지 않는다.
+      if (!h.transfer) hitNo++
+      const hitTag = h.transfer ? '' : comboHits > 1
         ? combatPreviewText().hitNo.replace('{n}', String(hitNo))
         : comboCount > 1 ? combatPreviewText().combo.replace('{count}', String(comboCount)) : ''
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`, hitTag)
@@ -4581,6 +4624,8 @@ export class BattleView {
       if (el) await stopFirstHit(el)
       if (remainingSwordHits > 0) await this.sleep(SWORD_HIT_GAP_MS)
     }
+    settleShownHit()
+    this.strikeHpOverride.clear()
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
     // 실제로 attack 애니메이션이 닿은 첫 대상만 붙든다. 보호막·무적 때문에 대상 연출이
     // 없거나 이후 resolveOverflow로 이어지는 연쇄 타격에는 히트스톱을 만들지 않는다.
@@ -4609,13 +4654,14 @@ export class BattleView {
     // 다 막히거나 꽂힐 배우가 없으면 정지가 한 번도 안 열려, 적 차례 내내 화면이 조여든 채
     // 남았다. 여기서 한 번 더 확인해 반드시 원위치시킨다.
     if (heavy && !firstHitStopped && !this.motionOff()) this.endSlowmo()
+    const pendingDeaths = res.killed.filter((k) => !deathsPlayed.has(k))
     if (heavy) {
-      for (const k of res.killed) {
+      for (const k of pendingDeaths) {
         if (this.state.enemies[k]?.def.boss) await this.playDeath(k, 1, true)
         else void this.playDeath(k, 1, true)
       }
     } else {
-      for (const k of res.killed) await this.playDeath(k, 1, sweep)
+      for (const k of pendingDeaths) await this.playDeath(k, 1, sweep)
     }
   }
 
@@ -4822,7 +4868,7 @@ export class BattleView {
   }
 
   /** 매직실드가 공격을 삼킨 순간의 결정 균열. 마지막 겹은 체력바 밖으로 파편이 터진다. */
-  private async playSpellShieldImpact(target: number, remaining: number): Promise<void> {
+  private async playSpellShieldImpact(target: number, remaining: number, blocked = 0): Promise<void> {
     const actor = this.q<HTMLElement>(`#actors .actor.foe[data-i="${target}"]`)
     const hpbar = actor?.querySelector<HTMLElement>('.hpbar.foe')
     const overlay = hpbar?.querySelector<HTMLElement>('.spellshield-overlay')
@@ -4834,7 +4880,10 @@ export class BattleView {
     overlay.classList.remove('cracking', 'shattering')
     void overlay.offsetWidth
     overlay.classList.add(removed ? 'shattering' : 'cracking')
-    this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard')
+    // 피해는 끝까지 계산된다. 그 숫자를 그대로 띄우고 실드가 삼켰다는 표시를 붙인다.
+    // 막힌 숫자가 위, 실드 상태 문구가 그 아래 — 같은 자리에 겹쳐 뜨지 않게 띄운다.
+    if (blocked > 0) this.popAt(target, `${blocked} 막힘`, 'dmg big shield-blocked', '', -40)
+    this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard', '', blocked > 0 ? 30 : 0)
     if (removed) this.spawnCrystalShards(hpbar)
     await this.sleep(removed ? 360 : 180)
     const enemy = this.state.enemies[target]
@@ -5169,7 +5218,7 @@ export class BattleView {
       // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
       const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
       await this.sleep(beamMs > 0 ? beamMs : gap)
-      // 오버킬 전이는 일반 방어막과 매직실드를 소모하지 않고 체력에 직접 꽂힌다.
+      // 오버킬 전이는 일반 방어막을 건너뛰고 체력에 직접 꽂힌다. 매직실드만은 한 겹이 삼킨다.
       // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
       const transfer = applyOverkillTransfer(this.state, front, overflow, {
         emotions: intent ? weaknessEmotions(intent) : undefined,
@@ -5190,7 +5239,9 @@ export class BattleView {
       // 검기가 훑는 동안은 화면을 흔들지 않는다 — 관통마다 흔들면 지나가는 한 줄기가
       // 아니라 매번 뭔가 터지며 멈추는 것으로 읽힌다(정지는 첫 칼질 한 번뿐이다).
       if (!heavy) this.shakeStage(Math.min(1, combo / 5))
-      this.popAt(front, `${overflow}`, 'dmg big')
+      // 다음 적의 매직실드는 전이 피해도 통째로 삼킨다 — 숫자는 보여 주되 체력은 그대로다.
+      if (transfer.magicShieldBroken) await this.playSpellShieldImpact(front, transfer.magicShieldRemaining ?? 0, overflow)
+      else this.popAt(front, `${overflow}`, 'dmg big')
       this.timers.push(window.setTimeout(() => ember.remove(), 220))
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
       if (transfer.killed) {
@@ -5772,7 +5823,7 @@ export class BattleView {
       }
       if (st.counterHit) {
         if (st.counterHit.magicShieldBroken) {
-          await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining)
+          await this.playSpellShieldImpact(st.counterHit.target, st.counterHit.magicShieldRemaining, st.counterHit.shown ?? 0)
         }
         else if (st.counterHit.dmg > 0) {
           this.popAt(st.counterHit.target, `카운터 ${st.counterHit.dmg}`, 'dmg big')
@@ -5894,11 +5945,11 @@ export class BattleView {
     const { x, y } = this.toStage(el.getBoundingClientRect())
     this.spawnPop(x, y - 4, txt, cls)
   }
-  private popAt(enemyIdx: number, txt: string, cls: string, sub = '') {
+  private popAt(enemyIdx: number, txt: string, cls: string, sub = '', offsetY = 0) {
     const el = this.q('#actors').querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"]`)
     if (!el) return
     const { x, y } = this.toStage(el.getBoundingClientRect())
-    this.spawnPop(x, y + 30, txt, cls, sub)
+    this.spawnPop(x, y + 30 + offsetY, txt, cls, sub)
   }
   private popPlayer(txt: string, cls: string) {
     this.spawnPop(320, 120, txt, cls)
