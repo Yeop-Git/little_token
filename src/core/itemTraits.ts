@@ -62,13 +62,24 @@ export function isItemTraitId(value: unknown): value is ItemTraitId {
  * 진열 씨앗과 아이템 id로 특성을 고른다. 같은 상점을 새로고침(페이지)해도 같은 특성이
  * 보이고, 상점을 새로 펼치거나 다음 클리어가 되면 다시 굴린다.
  */
-export function rollItemTrait(itemId: string, rarity: Rarity | undefined, seed: number): ItemTraitId | undefined {
+export function rollItemTrait(
+  itemId: string,
+  rarity: Rarity | undefined,
+  seed: number,
+  exclude: readonly ItemTraitId[] = [],
+): ItemTraitId | undefined {
   if (!rarityHasRandomTrait(rarity)) return undefined
   let h = (Math.floor(seed) ^ 0x7f4a7c15) >>> 0
   for (const ch of itemId) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0
   h ^= h >>> 16
   h = Math.imul(h, 0x85ebca6b) >>> 0
   h = (h ^ (h >>> 13)) >>> 0
+  // 지금 보유 상태에서 아무 효과도 없는 특성(예: 이미 다 쓰지 못하는 잉크)은 건너뛰고
+  // 다음 특성을 준다. 나머지 특성은 제외 목록과 무관하게 같은 결과가 나오도록 순서대로 민다.
+  for (let step = 0; step < ITEM_TRAIT_IDS.length; step++) {
+    const id = ITEM_TRAIT_IDS[(h + step) % ITEM_TRAIT_IDS.length]
+    if (!exclude.includes(id)) return id
+  }
   return ITEM_TRAIT_IDS[h % ITEM_TRAIT_IDS.length]
 }
 

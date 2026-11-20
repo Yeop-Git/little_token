@@ -15,8 +15,9 @@ import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
-import { isItemTraitId, rollItemTrait } from '@core/itemTraits'
-import { makeEarlyTables } from '@data/earlyWords'
+import { isItemTraitId, rollItemTrait, type ItemTraitId } from '@core/itemTraits'
+import { inkAlreadySaturated } from '@core/ink'
+import { EARLY_TEMPLATE, makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
 import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
@@ -113,7 +114,7 @@ const debugCombatModes = {
 // 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
 // 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
 function grantItem(def: ItemDef) {
-  const trait = def.passive ? undefined : rollItemTrait(def.id, def.rarity, Math.floor(Math.random() * 2 ** 31))
+  const trait = def.passive ? undefined : rollItemTrait(def.id, def.rarity, Math.floor(Math.random() * 2 ** 31), deadItemTraits())
   applyItemReward(run.player, {
     ...(trait ? { trait } : {}),
     id: def.id,
@@ -748,9 +749,14 @@ function itemTraitSeed(refreshes: number): number {
   return ((run.reward?.seed ?? 0) ^ Math.imul(Math.max(0, refreshes) + 1, 0x9e3779b1)) >>> 0
 }
 
+/** 지금 보유 상태에서 효과가 없는 특성 — 진열에 올리지 않는다(잉크가 이미 가장 비싼 문장을 감당하면 넉넉한 잉크). */
+function deadItemTraits(): ItemTraitId[] {
+  return inkAlreadySaturated(EARLY_TEMPLATE, run.player) ? ['inkMax'] : []
+}
+
 function withItemTrait(item: ItemDef, seed = itemTraitSeed(run.reward?.shopRefreshes ?? 0)): ItemDef {
   if (item.trait || item.passive) return item
-  const trait = rollItemTrait(item.id, item.rarity, seed)
+  const trait = rollItemTrait(item.id, item.rarity, seed, deadItemTraits())
   return trait ? { ...item, trait } : item
 }
 
