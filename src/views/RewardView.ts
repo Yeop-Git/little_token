@@ -194,11 +194,37 @@ function itemTraitHtml(opt: RewardOption): string {
   return `<div class="reward-kind-trait" aria-label="${text('rewardItemPassive', '특성')}"><b>${trait.name}</b>${traitDescHtml(trait.desc)}</div>`
 }
 
+/**
+ * 강화 카드 앞면 — 강화 전·후 효과 문구에서 숫자만 짝지어, 바뀐 숫자는 "이전(회색) → 강화 후(강조)"로 바꿔 적는다.
+ * 태그 안 속성값은 건드리지 않고 글자 부분의 숫자만 비교한다. 숫자 개수가 다르면 강화 후 문구만 쓴다.
+ */
+const NUMBER = /\d+(?:\.\d+)?/g
+function textNumbers(html: string): string[] {
+  return html.split(/(<[^>]*>)/).filter((part) => !part.startsWith('<')).flatMap((part) => part.match(NUMBER) ?? [])
+}
+function reinforceEffectHtml(before: string, after: string): string {
+  const old = textNumbers(before)
+  if (old.length !== textNumbers(after).length) return after
+  let index = 0
+  return after.split(/(<[^>]*>)/).map((part) => part.startsWith('<') ? part : part.replace(NUMBER, (value) => {
+    const prev = old[index++]
+    return prev === value ? value : `<span class="rp-up"><s class="rp-up-old">${prev}</s><i class="rp-up-arrow" aria-hidden="true">→</i><b class="rp-up-new">${value}</b></span>`
+  })).join('')
+}
+
 // 하단 메인 효과 한 줄.
 function mainEffect(opt: RewardOption): string {
   if (opt.kind === 'item') return itemCardEffect(opt)
+  if (opt.reinforce && opt.word) {
+    const after: Word = { ...opt.word, tags: [...opt.word.tags], effects: opt.word.effects ? { ...opt.word.effects } : undefined, variance: opt.word.variance ? { ...opt.word.variance } : undefined }
+    reinforceWord(after)
+    return reinforceEffectHtml(wordEffectHtml(opt.word), wordEffectHtml(after))
+  }
+  return wordEffectHtml(opt.word!)
+}
+
+function wordEffectHtml(word: Word): string {
   // 단어는 손패 카드 앞면과 같은 문구를 쓴다 — 보상에서 본 카드가 전투에서 다르게 읽히면 안 된다.
-  const word = opt.word!
   const action = wordActionInline(word)
   const keywords = wordKeywordChipsHtml(word)
   const note = action ? wordCardDisplayNote(word) : wordNoteText(word)
@@ -298,14 +324,17 @@ function wordDockHtml(opt: RewardOption, deck?: Record<string, Word[]>): string 
   // 도박 카드는 앞면에 성공 쪽만 적으므로 상세 칸에서 실패 결과를 붉게 밝힌다.
   const failLine = wordDetailNoteLine(word)
   const comparedKeywords = new Set<WordKeywordId>()
+  let cardHtml = wordCardHtml(word)
   if (opt.reinforce) {
     const after = { ...word, tags: [...word.tags], effects: word.effects ? { ...word.effects } : undefined, variance: word.variance ? { ...word.variance } : undefined }
     reinforceWord(after)
     if (after.crit !== word.crit) comparedKeywords.add('critical')
     if (after.effects?.castScale !== word.effects?.castScale) comparedKeywords.add('repeat')
+    // 큰 카드도 앞면에서 바로 "이전 → 강화" 수치를 보여 준다.
+    cardHtml = reinforceEffectHtml(cardHtml, wordCardHtml(after))
   }
   return `
-    <div class="rd-card">${wordCardHtml(word)}</div>
+    <div class="rd-card">${cardHtml}</div>
     <div class="rd-grade">✦ ${typeLabel(opt)} · ${RARITY_LABEL[opt.rarity]}</div>
     ${failLine ? `<div class="wd-values rd-gamble"><div class="v ${failLine.cls}">${failLine.text}</div></div>` : ''}
     ${opt.reinforce ? reinforceDeltas(word) : ''}
