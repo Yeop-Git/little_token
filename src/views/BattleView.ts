@@ -1745,6 +1745,9 @@ export class BattleView {
       magicTip: BUILD_EFFECT_TEXT.magicTip,
     })
     this.paintGuardedHpBar(el.querySelector<HTMLElement>('.hpbar.you')!, s.playerHp, s.playerMax, s.guard)
+    // 매직실드가 있는 동안 캐릭터 위에 금빛 반짝이 막을 씌운다(적과 같은 연출).
+    const shell = el.querySelector<HTMLElement>(':scope > .model-shell')
+    if (shell) shell.dataset.magicShield = (s.playerMagicShield ?? 0) > 0 ? 'on' : 'off'
   }
 
   /** 일반 방어는 진영과 무관하게 현재 체력 오른쪽에 이어지는 파란 추가 체력으로 그린다. */
@@ -1862,6 +1865,8 @@ export class BattleView {
 
   private updateFoe(el: HTMLElement, e: EnemyInst, rank: number) {
     const front = rank === 0
+    const shieldShell = el.querySelector<HTMLElement>(':scope > .model-shell')
+    if (shieldShell) shieldShell.dataset.magicShield = e.magicShield > 0 && !e.dead ? 'on' : 'off'
     // 일반 전투 레일은 원근 단차를 두지 않는다. 모든 적을 같은 바닥선과 크기로
     // 세우고, 배경별 차이는 가로 자리와 간격에만 남긴다.
     const st = currentFieldStage()
@@ -1955,7 +1960,8 @@ export class BattleView {
     const tacticalGuide = tacticalGuideForEnemy(e.def.id, e.def.tacticalGuideId, this.stageInfo)
     if (tacticalGuide) {
       const tooltip = tip(tacticalGuide.title, tacticalGuide.tooltip)
-      icons.push(`<span class="enemy-tip-note" role="img" tabindex="0" aria-label="공략 팁 · ${tooltip}" data-tooltip="${tooltip}" data-tip-label="TIP" data-tip-place="above">${icon('note')}<b>TIP</b></span>`)
+      // 팁도 다른 특징과 같은 아이콘 하나짜리 뱃지다. 줄의 맨 앞 자리와 쪽지 아이콘으로 구분한다.
+      add('tip', icon('note'), tooltip)
     }
 
     // 선공은 머리 위 경고 표식과 **같은 값**을 쓴다(AGENTS.md 턴 페이즈 계약).
@@ -2070,7 +2076,7 @@ export class BattleView {
       guard: e.guard,
       guardTip: tip(`방어도 ${e.guard}`, `피해를 ${e.guard}만큼 먼저 막아 낸다\n관통 공격은 무시한다`),
       magic: e.magicShield,
-      magicTip: tip(`마법실드 ${e.magicShield}`, `공격 ${e.magicShield}번을 통째로 지운다\n연타로 벗긴다`),
+      magicTip: tip(`매직실드 ${e.magicShield}겹`, `공격 ${e.magicShield}번을 통째로 막는다(관통도 막는다)\n연타로 한 겹씩 벗긴다\n오버킬로 넘어온 피해에는 깨지며 뚫린다`),
     })
     const hpbar = plate.querySelector<HTMLElement>('.hpbar.foe')!
     hpbar.hidden = false
@@ -4657,6 +4663,7 @@ export class BattleView {
       const hitTag = h.transfer ? '' : comboHits > 1
         ? combatPreviewText().hitNo.replace('{n}', String(hitNo))
         : comboCount > 1 ? combatPreviewText().combo.replace('{count}', String(comboCount)) : ''
+      if (h.magicShieldPierced) void this.playSpellShieldImpact(h.target, h.magicShieldRemaining, 0, -140)
       // 관통 전이 숫자는 바로 뒤 칼질 숫자와 같은 적 위에 뜨므로 한 단 위로 띄워 겹치지 않게 한다.
       this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`, hitTag, h.transfer ? -70 : 0)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
@@ -4911,7 +4918,7 @@ export class BattleView {
   }
 
   /** 매직실드가 공격을 삼킨 순간의 결정 균열. 마지막 겹은 체력바 밖으로 파편이 터진다. */
-  private async playSpellShieldImpact(target: number, remaining: number, blocked = 0): Promise<void> {
+  private async playSpellShieldImpact(target: number, remaining: number, blocked = 0, statusOffset = 0): Promise<void> {
     const actor = this.q<HTMLElement>(`#actors .actor.foe[data-i="${target}"]`)
     const hpbar = actor?.querySelector<HTMLElement>('.hpbar.foe')
     const overlay = hpbar?.querySelector<HTMLElement>('.spellshield-overlay')
@@ -4924,9 +4931,12 @@ export class BattleView {
     void overlay.offsetWidth
     overlay.classList.add(removed ? 'shattering' : 'cracking')
     // 피해는 끝까지 계산된다. 그 숫자를 그대로 띄우고 실드가 삼켰다는 표시를 붙인다.
-    // 막힌 숫자가 위, 실드 상태 문구가 그 아래 — 같은 자리에 겹쳐 뜨지 않게 띄운다.
-    if (blocked > 0) this.popAt(target, `${blocked} 막힘`, 'dmg big shield-blocked', '', -40)
-    this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard', '', blocked > 0 ? 30 : 0)
+    // 막힌 숫자와 실드 상태 문구를 한 덩어리로 띄운다. 두 개를 따로 띄우면 같이 떠오르다
+    // 겹쳐 읽히지 않았다. 숫자 아래 작은 줄이 실드 상태다.
+    const status = removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹 남음`
+    if (blocked > 0) this.popAt(target, `${blocked} 막힘`, 'shield-blocked', status)
+    // 오버킬이 깨고 지나갈 때는 같은 자리에 피해 숫자가 뜨므로 실드 문구를 한 단 위로 올린다.
+    else this.popAt(target, status, 'shield-blocked shield-status-only', '', statusOffset)
     if (removed) this.spawnCrystalShards(hpbar)
     await this.sleep(removed ? 360 : 180)
     const enemy = this.state.enemies[target]
@@ -5261,7 +5271,7 @@ export class BattleView {
       // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
       const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
       await this.sleep(beamMs > 0 ? beamMs : gap)
-      // 오버킬 전이는 일반 방어막을 건너뛰고 체력에 직접 꽂힌다. 매직실드만은 한 겹이 삼킨다.
+      // 오버킬 전이는 일반 방어막을 건너뛰고, 매직실드는 한 겹을 깨면서 체력에 직접 꽂힌다.
       // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
       const transfer = applyOverkillTransfer(this.state, front, overflow, {
         emotions: intent ? weaknessEmotions(intent) : undefined,
@@ -5282,9 +5292,9 @@ export class BattleView {
       // 검기가 훑는 동안은 화면을 흔들지 않는다 — 관통마다 흔들면 지나가는 한 줄기가
       // 아니라 매번 뭔가 터지며 멈추는 것으로 읽힌다(정지는 첫 칼질 한 번뿐이다).
       if (!heavy) this.shakeStage(Math.min(1, combo / 5))
-      // 다음 적의 매직실드는 전이 피해도 통째로 삼킨다 — 숫자는 보여 주되 체력은 그대로다.
-      if (transfer.magicShieldBroken) await this.playSpellShieldImpact(front, transfer.magicShieldRemaining ?? 0, overflow)
-      else this.popAt(front, `${overflow}`, 'dmg big')
+      // 오버킬은 다음 적의 매직실드를 깨면서 그대로 들어간다 — 파괴 연출과 피해 숫자를 함께 띄운다.
+      if (transfer.magicShieldPierced) void this.playSpellShieldImpact(front, transfer.magicShieldRemaining ?? 0, 0, -78)
+      this.popAt(front, `${overflow}`, 'dmg big')
       this.timers.push(window.setTimeout(() => ember.remove(), 220))
       // 또 넘겼으면 카드가 쓰러진 뒤 남은 초과 피해가 다음 적으로 연쇄된다.
       if (transfer.killed) {
@@ -5839,7 +5849,9 @@ export class BattleView {
         if (st.magicShieldBroken) {
           const you = this.q<HTMLElement>('.actor.you')
           SquareBurst.playOn(you, 'guard', { spread: 130 })
-          this.popPlayer(BUILD_EFFECT_TEXT.blocked, 'guard big')
+          // 적 쪽과 같은 양식 — 계산된 피해를 「N 막힘」으로, 그 아래 실드가 깨졌음을 붙인다.
+          if (st.magicShieldBlockedDamage > 0) this.spawnPop(320, 120, `${st.magicShieldBlockedDamage} 막힘`, 'shield-blocked', '매직실드 파괴!')
+          else this.popPlayer(BUILD_EFFECT_TEXT.blocked, 'guard big')
           this.log(BUILD_EFFECT_TEXT.magicBlocked)
         }
         if (st.guardShattered) {

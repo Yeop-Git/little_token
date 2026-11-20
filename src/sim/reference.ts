@@ -377,6 +377,8 @@ export interface HitFx {
   /** 이 타격 직전·직후 대상의 체력. 연타를 한 타격씩 그릴 때 체력바를 그 순간으로 맞춘다. */
   hpBefore?: number
   hpAfter?: number
+  /** 관통 전이가 매직실드 한 겹을 깨고 체력까지 들어갔다. */
+  magicShieldPierced?: boolean
   /** 부위 보스에서 이 타격이 시작된 다리 또는 본체. */
   partId?: string
   partName?: string
@@ -435,8 +437,8 @@ export interface OverkillTransferResult {
   killed: boolean
   /** 다음 적까지 쓰러뜨리고도 남아 뒤로 이어질 피해. */
   overflow: number
-  /** 다음 적의 매직실드가 이 전이 피해를 통째로 삼켰는가(한 겹 소모, 연쇄 정지). */
-  magicShieldBroken?: boolean
+  /** 전이 피해가 다음 적의 매직실드 한 겹을 깨고 그대로 체력까지 들어갔는가. */
+  magicShieldPierced?: boolean
   magicShieldRemaining?: number
 }
 
@@ -678,7 +680,7 @@ function damageEnemy(
 
 /**
  * 오버킬 전이는 이미 앞 적을 뚫고 나온 한 줄기이므로 다음 적의 일반 방어막은
- * 건너뛴다. 매직실드는 예외다 — 전이 피해도 한 겹이 통째로 삼키고 연쇄가 멈춘다.
+ * 건너뛰고, 매직실드는 한 겹을 깨면서 피해가 그대로 들어간다.
  * View가 전투 상태를 직접 고치지 않도록 여기서 체력 막까지 함께 동기화한다.
  */
 export function applyOverkillTransfer(
@@ -690,10 +692,9 @@ export function applyOverkillTransfer(
   const enemy = state.enemies[target]
   const incoming = Math.max(0, Math.floor(damage))
   if (!enemy || enemy.dead || incoming <= 0) return { dealt: 0, killed: false, overflow: 0 }
-  if (enemy.magicShield > 0) {
-    enemy.magicShield--
-    return { dealt: 0, killed: false, overflow: 0, magicShieldBroken: true, magicShieldRemaining: enemy.magicShield }
-  }
+  // 오버킬은 이미 앞 적을 뚫고 나온 힘이라 매직실드 한 겹을 깨면서 그대로 체력까지 들어간다.
+  const magicShieldPierced = enemy.magicShield > 0
+  if (magicShieldPierced) enemy.magicShield--
 
   const before = Math.max(0, enemy.hp)
   const activePart = activeEnemyPart(enemy)
@@ -723,6 +724,7 @@ export function applyOverkillTransfer(
     dealt,
     killed: enemy.dead,
     overflow: enemy.dead ? Math.max(0, incoming - before) : 0,
+    ...(magicShieldPierced ? { magicShieldPierced: true, magicShieldRemaining: enemy.magicShield } : {}),
   }
 }
 
@@ -961,7 +963,8 @@ function executeAttackPlan(state: BattleState, plan: AttackPlan): AttackExecutio
         shown: overflow,
         transfer: true,
         guardAbsorbed: 0,
-        magicShieldBroken: !!transfer.magicShieldBroken,
+        magicShieldBroken: false,
+        magicShieldPierced: !!transfer.magicShieldPierced,
         magicShieldRemaining: transfer.magicShieldRemaining ?? enemy.magicShield,
         weak: false,
         barsBroken: 0,
@@ -1100,6 +1103,8 @@ export interface EnemyStrike {
   guardShattered: boolean
   /** 플레이어 매직실드가 이번 공격을 통째로 막았는가. */
   magicShieldBroken: boolean
+  /** 매직실드가 막은 공격의 계산된 피해. 화면에 「N 막힘」으로 띄운다. */
+  magicShieldBlockedDamage: number
   /** 실제 체력 피해에 비례해 적이 회복한 양. */
   lifeStolen: number
   /** 공격 직후 다음 플레이어 턴까지 받는 피해 증가 상태에 들어갔는가. */
@@ -1283,6 +1288,7 @@ export function enemyTurn(state: BattleState, rng: () => number, phase: 'first' 
     absorbed,
     guardShattered,
     magicShieldBroken,
+    magicShieldBlockedDamage: magicShieldBroken ? raw : 0,
     lifeStolen,
     groggyEntered,
     groggyChance: !!attackStep?.groggyDamageMult,

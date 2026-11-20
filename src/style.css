@@ -3469,6 +3469,8 @@ html[data-postprocessing='off'] .tip-bubble {
 @keyframes groggy-chip-glow { from { box-shadow: 0 0 6px rgba(255, 211, 76, .3); } to { box-shadow: 0 0 16px rgba(255, 211, 76, .7); } }
 @media (prefers-reduced-motion: reduce) { .enemy-intel-icon.groggy-chip { animation: none; } }
 .enemy-intel-icon.initiative { color: #ff9a70; border-color: rgba(255, 126, 78, .74); }
+/* 공략 팁 — 다른 특징과 같은 아이콘 뱃지. 맨 앞 자리와 양피지 금색으로 구분한다. */
+.enemy-intel-icon.tip { color: #ffe3a3; border-color: rgba(255, 210, 122, .8); }
 /* 공략 쪽지 — 각진 능력 뱃지와 형태부터 갈라 둔다. 둥근 알약 + 접힌 모서리 + 글자 라벨이라
    한눈에 "이건 적의 효과가 아니라 조언"으로 읽힌다. 자리도 줄 맨 앞이고 뒤에 칸막이를 세운다. */
 .enemy-tip-note {
@@ -3511,6 +3513,15 @@ html[data-postprocessing='off'] .tip-bubble {
 .actor.foe[data-enemy-rarity='rare'] > .model-shell { filter: drop-shadow(0 0 7px rgba(98, 197, 255, .42)); }
 .actor.foe[data-enemy-rarity='epic'] > .model-shell { filter: drop-shadow(0 0 9px rgba(197, 105, 255, .48)); }
 .actor.foe[data-enemy-rarity='legendary'] > .model-shell { filter: drop-shadow(0 0 12px rgba(145, 214, 255, .62)) drop-shadow(0 0 18px rgba(229, 119, 255, .34)); }
+/* 매직실드 — 3D 모델은 셰이더가 금빛 막을 씌우고, 2D 대체 그림은 금빛 테두리 광채로 대신한다. */
+.actor > .model-shell[data-magic-shield='on'] {
+  filter: drop-shadow(0 0 6px rgba(255, 214, 92, .85)) drop-shadow(0 0 16px rgba(255, 180, 40, .45));
+  animation: magic-shield-aura 1.6s ease-in-out infinite alternate;
+}
+@keyframes magic-shield-aura {
+  from { filter: drop-shadow(0 0 5px rgba(255, 214, 92, .7)) drop-shadow(0 0 12px rgba(255, 180, 40, .35)); }
+  to { filter: drop-shadow(0 0 9px rgba(255, 228, 120, .95)) drop-shadow(0 0 22px rgba(255, 190, 50, .55)); }
+}
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
 .actor.foe > .model-shell { cursor: default; }
@@ -3946,7 +3957,29 @@ html[data-postprocessing='off'] .tip-bubble {
 .pop.tick { font-size: 27px; animation: pop-tick 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 .pop.big { font-size: 58px; }
 /* 매직실드가 삼킨 피해 — 계산된 숫자는 그대로 읽히되 금빛 결정색으로 막혔음을 알린다. */
-.pop.shield-blocked { color: #ffe27a; font-size: 44px; text-shadow: 0 0 10px rgba(255, 205, 50, .85), 0 2px 0 #7d4800; }
+/* 매직실드가 삼킨 피해 — 크기는 작게, 대신 두꺼운 짙은 테두리로 어떤 배경에서도 읽힌다. */
+.pop.shield-blocked {
+  color: #ffe45c;
+  font-size: 40px;
+  line-height: 1.05;
+  text-align: center;
+  -webkit-text-stroke: 7px #2a1500;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #2a1500, 0 0 14px rgba(255, 200, 40, .55);
+}
+.pop.shield-blocked .pop-sub {
+  margin-top: 4px;
+  padding: 2px 10px;
+  border: 2px solid #ffe45c;
+  background: #2a1500;
+  color: #fff6c8;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.pop.shield-blocked.shield-status-only { font-size: 22px; -webkit-text-stroke: 5px #2a1500; }
 .queen-chain-link {
   position: absolute;
   z-index: 98;

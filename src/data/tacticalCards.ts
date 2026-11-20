@@ -47,7 +47,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     enemyId: 'pillbug',
     rewardFloors: [3],
     title: '반복 수식어',
-    tooltip: '매직실드는 공격 한 번을 한 겹씩 막아 내요\n「미친 듯이」를 공격 동사와 함께 쓰면 동사가 2번 발동해 실드를 빨리 벗겨요\n혹은 약한 공격으로 실드를 먼저 벗기고 센 공격을 넣어요',
+    tooltip: '매직실드는 공격 한 번을 한 겹씩 막아 내요(관통도 막아요)\n「미친 듯이」를 공격 동사와 함께 쓰면 동사가 2번 발동해 실드를 빨리 벗겨요\n혹은 앞 적을 쓰러뜨린 오버킬 피해로 실드를 깨며 뚫어요',
     cardIds: ['michin'],
   },
   {
@@ -96,6 +96,14 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     id: 'elite-raging', enemyId: '*', rewardFloors: [12, 13], title: '격문 정예',
     tooltip: '약한 견제와 강한 돌진을 번갈아 써요\n돌진 차례에는 「애써」나 「못 이기는 척」을 방어 동사와 함께 써서 막아요\n혹은 견제 차례에 공격을 몰아 넣어요',
     cardIds: ['aesseo', 'motdohage'],
+  },
+  // 번역표(TACTICAL_TEXT)가 순서로 짝지어지므로 새 공략은 항상 끝에 붙인다.
+  {
+    id: 'preempt',
+    enemyId: 'flea',
+    title: '선공 수식어',
+    tooltip: '좀나방은 내 문장보다 먼저 날아들어 때려요\n「살짝」을 공격 동사와 함께 쓰면 먼저 움직여 맞기 전에 쓰러뜨려요\n혹은 방어 동사로 먼저 버텨요',
+    cardIds: ['saljjak'],
   },
 ]
 

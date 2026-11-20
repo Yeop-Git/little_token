@@ -420,6 +420,9 @@ class BattleCharacterModel {
   private spiderPartDissolves: SpiderPartDissolve[] = []
   private eliteElapsed = 0
   private readonly eliteTimeUniforms: Array<{ value: number }> = []
+  /** 매직실드가 씌워져 있는 동안 금빛 반짝이 막이 0→1로 차오른다. 셸의 data-magic-shield가 켠다. */
+  private magicShieldLevel = 0
+  private readonly magicShieldUniforms: Array<{ value: number }> = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = acquireRenderer()
@@ -596,6 +599,9 @@ class BattleCharacterModel {
       const eliteTime = { value: this.eliteElapsed }
       shader.uniforms.uEliteTime = eliteTime
       this.eliteTimeUniforms.push(eliteTime)
+      const magicShield = { value: this.magicShieldLevel }
+      shader.uniforms.uMagicShield = magicShield
+      this.magicShieldUniforms.push(magicShield)
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
@@ -628,6 +634,7 @@ uniform float uPartDissolve;
 uniform float uEliteTier;
 uniform float uEliteTime;
 uniform float uElitePhase;
+uniform float uMagicShield;
 varying float vBattleHeight;
 varying float vBattleSide;
 varying vec3 vEliteNormalView;
@@ -776,13 +783,34 @@ if (uEliteTier > 0.5) {
     outgoingLight += vec3(1.0) * starGlint * 0.52;
   }
 }
+// Magic Shield -> a gold leaf coat with a sweeping sheen and twinkling four-point
+// sparks. It sits on top of rarity so a shielded elite still reads as shielded.
+if (uMagicShield > 0.01) {
+  vec3 shieldNormal = normalize(vEliteNormalView);
+  float shieldFacing = clamp(dot(shieldNormal, normalize(vEliteViewDir)), 0.0, 1.0);
+  float shieldRim = pow(1.0 - shieldFacing, 2.0);
+  float shieldBand = pow(max(0.0, sin(vEliteWorldPosition.y * 5.5 - vEliteWorldPosition.x * 2.0 - uEliteTime * 2.4)), 14.0);
+  vec2 shieldGrid = vEliteWorldPosition.xy * 11.0 + shieldNormal.xy * 1.3;
+  vec2 shieldLocal = abs(fract(shieldGrid) - 0.5);
+  float shieldSeed = fract(sin(dot(floor(shieldGrid), vec2(27.31, 71.17))) * 35791.113);
+  float shieldCross = (1.0 - smoothstep(0.02, 0.07, min(shieldLocal.x, shieldLocal.y)))
+    * (1.0 - smoothstep(0.10, 0.42, max(shieldLocal.x, shieldLocal.y)));
+  float shieldCore = 1.0 - smoothstep(0.03, 0.14, length(shieldLocal));
+  float shieldTwinkle = pow(0.5 + 0.5 * sin(uEliteTime * (2.6 + shieldSeed * 1.8) + shieldSeed * 40.0), 7.0);
+  float shieldSpark = step(0.62, shieldSeed) * max(shieldCross, shieldCore) * shieldTwinkle;
+  vec3 shieldGold = vec3(1.0, 0.70, 0.16);
+  outgoingLight = mix(outgoingLight, outgoingLight * 0.92 + shieldGold * 0.14, 0.22 * uMagicShield);
+  outgoingLight += shieldGold * shieldRim * 0.55 * uMagicShield;
+  outgoingLight += vec3(1.0, 0.86, 0.45) * shieldBand * (0.18 + shieldFacing * 0.14) * uMagicShield;
+  outgoingLight += vec3(1.0, 0.95, 0.75) * shieldSpark * 1.10 * uMagicShield;
+}
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
           float partDissolveEdge = partDissolveActive * (1.0 - smoothstep(0.0, 0.09, partDissolveNoise - uPartDissolve));
 outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolve);`)
     }
-    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v4-${weather}`
+    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v5-${weather}`
   }
 
   private fitModel(model: THREE.Object3D): THREE.Box3 | null {
@@ -1451,6 +1479,14 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.updateSpiderPartDissolves(frameDelta)
     this.eliteElapsed += frameDelta
     this.eliteTimeUniforms.forEach((uniform) => { uniform.value = this.eliteElapsed })
+    const shieldTarget = this.shell.dataset.magicShield === 'on' ? 1 : 0
+    if (this.magicShieldLevel !== shieldTarget) {
+      const step = Math.min(1, frameDelta * 4)
+      this.magicShieldLevel = Math.abs(shieldTarget - this.magicShieldLevel) < 0.01
+        ? shieldTarget
+        : this.magicShieldLevel + (shieldTarget - this.magicShieldLevel) * step
+      this.magicShieldUniforms.forEach((uniform) => { uniform.value = this.magicShieldLevel })
+    }
     const zoomBlend = 1 - Math.exp(-frameDelta * 8)
     const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
     if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {

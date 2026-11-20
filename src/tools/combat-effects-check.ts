@@ -258,7 +258,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const rear = makeEnemy(foe('multihit-shield-rear', { hp: 20, magicShield: 1 }))
   const s = state([front, rear])
   const r = applyIntent(s, attack({ hitCount: 2 }), 1, 0)
-  assert(r.hits[1].transfer && r.hits[1].magicShieldBroken && r.hits[1].shown === 5 && r.hits[2].dmg === 10 && rear.hp === 10, 'magic shield eats the pierce chain, then the next hit lands')
+  assert(r.hits[1].transfer && r.hits[1].magicShieldPierced && r.hits[1].dmg === 5 && rear.magicShield === 0 && r.hits[2].dmg === 10 && rear.hp === 5, 'overkill chain breaks the magic shield and lands, then the next hit lands')
 }
 {
   const front = makeEnemy(foe('range-front', { hp: 5 }))
@@ -284,10 +284,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
   const shielded = makeEnemy(foe('overkill-shielded', { guard: 99, magicShield: 3, hp: 15 }))
   const s = state([shielded])
   const r = applyOverkillTransfer(s, 0, 20)
-  assert(r.dealt === 0 && !r.killed && r.overflow === 0 && r.magicShieldBroken && r.magicShieldRemaining === 2 && shielded.hp === 15, 'magic shield swallows an overkill transfer and stops the chain')
-  shielded.magicShield = 0
-  const r2 = applyOverkillTransfer(s, 0, 20)
-  assert(r2.dealt === 15 && r2.killed && r2.overflow === 5 && shielded.guard === 99, 'overkill transfer ignores guard and keeps flowing')
+  assert(r.dealt === 15 && r.killed && r.overflow === 5 && r.magicShieldPierced && r.magicShieldRemaining === 2 && shielded.guard === 99, 'overkill transfer breaks one magic shield layer, ignores guard and keeps flowing')
 }
 { const s = state([makeEnemy(foe('a')), makeEnemy(foe('b')), makeEnemy(foe('c'))]); const r = applyIntent(s, attack({ targetCount: 3 }), 1, 0); assert(r.hits.map((h) => h.dmg).join(',') === '10,7,5', 'three targets') }
 {
