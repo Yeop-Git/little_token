@@ -402,6 +402,11 @@ export class RewardView {
     this.root = root
     this.opts = opts
     const shop = opts.mode === 'shop'
+    const walletHtml = `<div class="reward-wallet" aria-label="${text('rewardWalletOwned', '보유 영감')} ${opts.inspiration}, ${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} ${shop ? opts.purchases ?? 0 : `+${opts.earned}`}">
+                <span class="inspiration-mark" aria-hidden="true">◈</span>
+                <span class="reward-wallet-balance"><small>${text('rewardWalletOwned', '보유 영감')}</small><b>${opts.inspiration}</b></span>
+                <span class="reward-wallet-earned">${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} <b>${shop ? opts.purchases ?? 0 : `+${opts.earned}`}</b></span>
+              </div>`
     this.root.innerHTML = `
       <div class="scene reward-scene${shop ? ' reward-shop-scene' : ''}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
@@ -416,11 +421,14 @@ export class RewardView {
               ${shop ? `<div class="shop-row-guide">${text('shopRowGuide', '1행 주어·수식어 · 2행 동사 · 3행 아이템')}</div>` : `<div class="reward-progress" aria-label="보상 ${PHASE_NO[opts.phase]}단계 / 3단계">
                 ${[1, 2, 3].map((step) => `<i class="${step <= PHASE_NO[opts.phase] ? 'on' : ''}"></i>`).join('')}
               </div>`}
-              <div class="reward-wallet" aria-label="${text('rewardWalletOwned', '보유 영감')} ${opts.inspiration}, ${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} ${shop ? opts.purchases ?? 0 : `+${opts.earned}`}">
-                <span class="inspiration-mark" aria-hidden="true">◈</span>
-                <span class="reward-wallet-balance"><small>${text('rewardWalletOwned', '보유 영감')}</small><b>${opts.inspiration}</b></span>
-                <span class="reward-wallet-earned">${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} <b>${shop ? opts.purchases ?? 0 : `+${opts.earned}`}</b></span>
-              </div>
+              ${shop ? walletHtml : `<div class="reward-toolbar">
+                <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
+                <div class="reward-toolbar-center">
+                ${walletHtml}
+                <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
+                </div>
+                <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
+              </div>`}
               ${!shop && opts.options.some((option) => option?.bossPrice !== undefined) ? `<div class="reward-boss-discount">${bossRewardDiscountText()}</div>` : ''}
               ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase !== 'verb' ? `
                 <div class="reward-build-preview">
@@ -431,11 +439,6 @@ export class RewardView {
             <div class="reward-grid">
               ${opts.options.map((p, i) => rewardPickHtml(p, i, shop)).join('')}
             </div>
-            ${shop ? '' : `<div class="reward-controls">
-              <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
-              <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
-              <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
-            </div>`}
           </div>
           ${shop ? '<div class="reward-side">' : ''}
             ${!shop && opts.phase === 'item' ? '' : `<aside class="info-dock glass reward-dock empty${!shop && opts.phase === 'subject' ? ' is-entering' : ''}" id="rdetail" aria-live="polite">
