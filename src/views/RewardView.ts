@@ -14,7 +14,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { cardNoteTagsHtml, levelStarsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
+import { cardNoteTagsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
@@ -253,10 +253,7 @@ function rewardWordMeta(opt: RewardOption): string {
   const ink = wordInkCost(opt.word)
   return `<div class="rp-word-meta">
     ${emotionIconBadge(emotion, 'rp-emotion')}
-    <span class="rp-cost-col">
-      <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
-      ${levelStarsHtml(opt.word.level, opt.reinforce, 'card-level-stars rp-level-stars')}
-    </span>
+    <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
   </div>`
 }
 
