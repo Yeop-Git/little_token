@@ -7,6 +7,7 @@
  */
 
 import type { Rarity } from './types'
+import { LUCK_GRADE_OFFSET, luckValue } from './luck'
 
 export const GRADE_MAX = 10
 /** 방어·회복 전개가 한 문장 길다는 이유만으로 매번 보상을 잃지 않게 하는 완충 구간. */
@@ -15,7 +16,7 @@ export const GRADE_DECAY_INTERVAL = 3
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** 운이 보장하는 최소 등급 — 아무리 오래 끌어도 여기까지만 내려간다. */
-export const gradeFloor = (luck: number): number => clamp(Math.round(luck), 0, GRADE_MAX)
+export const gradeFloor = (luck: number): number => clamp(Math.round(LUCK_GRADE_OFFSET + luckValue(luck)), 0, GRADE_MAX)
 
 /** 전투 시작 등급 — 바닥 위에 여유 2를 얹고 시작해, 끌수록 잃을 게 있게 한다. */
 export const startGrade = (luck: number): number => clamp(gradeFloor(luck) + 2, 0, GRADE_MAX)

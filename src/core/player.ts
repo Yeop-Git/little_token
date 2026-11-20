@@ -25,7 +25,7 @@ export const STARTING_COMBAT_STATS: Readonly<PlayerStats> = {
   atk: 5,
   guard: 3,
   heal: 5,
-  luck: 3,
+  luck: 0,
 }
 
 export interface OwnedItem {

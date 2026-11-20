@@ -11,7 +11,7 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { wordInkCost } from './ink'
-import { LUCK_MULT } from './luck'
+import { LUCK_MULT, luckMultiplier } from './luck'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -434,7 +434,7 @@ export function resolveMultiplier(
   let m = intent.multiplier
   const variance = intent.variance && varRoll !== null ? (varRoll < intent.variance.p ? intent.variance.hi : intent.variance.lo) : 1
   m *= variance
-  const luck = 1 + ctx.luck * LUCK_MULT // 운은 기본 배율 요소
+  const luck = luckMultiplier(ctx.luck) // 운은 기본 배율 요소(체감 곡선)
   m *= luck
   const { critP, failP } = rouletteOdds(intent, ctx.statBias)
   let outcome: RouletteOutcome = 'normal'
