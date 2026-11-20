@@ -245,6 +245,8 @@ const HEAVY_LUNGE_LEAD_MS = 80
 const RESONANCE_FLASH_MS = 760
 /** 맥락 발동 배너의 재생 길이 — style.css의 combo-show와 같다. */
 const COMBO_FLASH_MS = 1150
+/** 보유 아이템 맥동이 옆 아이콘으로 번지는 간격. 한 번의 파도는 0.3초 안에 끝난다. */
+const RELIC_WAVE_MS = 90
 /**
  * 섬광이 다 피어날 시간. 정지 화면에 붙들 그림이 없으면 정지가 공백으로 읽힌다.
  * 48ms로 잡았을 때는 겉겹(링·프리즘·베인 사선)이 아직 10~20%밖에 안 자라서
@@ -2501,14 +2503,23 @@ export class BattleView {
 
   /** 보유 아이템이 발동한 순간 아이템창의 그 아이콘을 맥동시킨다. 꼬리표는 PassiveId 또는 `trait:<id>`. */
   private pulseRelics(tags: string[]) {
-    const icons = this.root.querySelectorAll<HTMLElement>('#relic-strip .relic-icon[data-item-tags]')
-    icons.forEach((icon) => {
-      const own = (icon.dataset.itemTags ?? '').split(' ')
-      if (!tags.some((tag) => own.includes(tag))) return
-      icon.classList.remove('relic-fired')
-      void icon.offsetWidth
-      icon.classList.add('relic-fired')
-      window.setTimeout(() => icon.classList.remove('relic-fired'), 900)
+    const icons = [...this.root.querySelectorAll<HTMLElement>('#relic-strip .relic-icon[data-item-tags]')]
+      .filter((icon) => {
+        const own = (icon.dataset.itemTags ?? '').split(' ')
+        return tags.some((tag) => own.includes(tag))
+      })
+    // 같은 조각에 여러 아이템이 걸리면(같은 특성 여럿) 한꺼번에 번쩍이지 않고 왼쪽부터 파도처럼 번진다.
+    // 아이템이 많아도 파도 전체는 0.3초 안에 끝내 다음 칩의 맥동과 너무 길게 겹치지 않게 한다.
+    const step = Math.min(RELIC_WAVE_MS, 300 / Math.max(1, icons.length - 1))
+    icons.forEach((icon, i) => {
+      const fire = () => {
+        icon.classList.remove('relic-fired')
+        void icon.offsetWidth
+        icon.classList.add('relic-fired')
+        window.setTimeout(() => icon.classList.remove('relic-fired'), 900)
+      }
+      if (i === 0) fire()
+      else window.setTimeout(fire, i * step)
     })
   }
 
