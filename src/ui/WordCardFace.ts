@@ -166,8 +166,8 @@ export function emphasizeCardNumbers(text: string, chances: readonly LuckChance[
   )
 }
 
-const CHANCE_LABEL: Record<LocaleCode, string> = { ko: '확률', en: 'chance', ja: '確率', ru: 'шанс', 'zh-Hans': '概率', 'zh-Hant': '機率' }
-const MULT_LABEL: Record<LocaleCode, string> = { ko: '배율', en: 'Multiplier', ja: '倍率', ru: 'Множитель', 'zh-Hans': '倍率', 'zh-Hant': '倍率' }
+export const CHANCE_LABEL: Record<LocaleCode, string> = { ko: '확률', en: 'chance', ja: '確率', ru: 'шанс', 'zh-Hans': '概率', 'zh-Hant': '機率' }
+export const MULT_LABEL: Record<LocaleCode, string> = { ko: '배율', en: 'Multiplier', ja: '倍率', ru: 'Множитель', 'zh-Hans': '倍率', 'zh-Hant': '倍率' }
 
 /**
  * 카드 요약 문구를 키워드와 같은 네모 태그로 쪼갠다(11/20 피드백).

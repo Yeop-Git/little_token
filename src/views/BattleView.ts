@@ -106,7 +106,8 @@ import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
 import { setCardLuck } from '@core/luck'
-import { tagLuckChances, wordLuckChances } from '@/ui/luckChance'
+import { luckChanceHtml, tagLuckChances, wordLuckChances } from '@/ui/luckChance'
+import { CHANCE_LABEL, MULT_LABEL } from '@/ui/WordCardFace'
 import { combatPreviewText } from '@/localization/combatPreview'
 
 const BUILD_EFFECT_TEXT = {
@@ -2677,7 +2678,7 @@ export class BattleView {
         <div class="wd-title-row">${emotionIconBadge(emotion, 'wd-emotion')}<div class="wd-name">${w.text}</div></div>
         <div class="wd-grade">✦ ${slotLabel} · ${RARITY_LABEL[w.rarity ?? 'common']}${(w.level ?? 1) > 1 ? ` · Lv.${w.level}` : ''}</div>
          ${this.projectionHtml(w, key)}
-         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => `<div class="v ${v.cls}">${tagLuckChances(v.text, wordLuckChances(w))}</div>`).join('')}</div>
+         <div class="wd-values"><span class="wd-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" role="img" aria-label="${t('wordInkCost', '잉크 비용 {value}').replace('{value}', String(wordInkCost(w)))}">${wordInkCost(w)}</span>${values.map((v) => this.detailValueHtml(w, v)).join('')}</div>
          ${wordKeywordDetailsHtml(w)}
          ${comboHintHtml(w, { combos: this.t.combos, words: this.t.words }, intent.combos)}
         ${warn}
@@ -2802,6 +2803,21 @@ export class BattleView {
   }
 
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
+  /**
+   * 상세 팝업의 수치 한 줄. 도박 줄은 카드 앞면처럼 [81% 확률]과 [배율 ×1.80] 두 태그로 나눠
+   * 확률 태그에만 운 툴팁을 단다. 나머지 줄의 확률 숫자(대성공 33%)도 같은 운 태그로 바꾼다.
+   */
+  private detailValueHtml(w: Word, v: { text: string; cls: string }): string {
+    const chances = wordLuckChances(w)
+    const gamble = v.cls === 'gamble' ? v.text.match(/^(\d+(?:\.\d+)?%)\D*?(×\s?\d+(?:\.\d+)?)/) : null
+    if (gamble) {
+      const chance = chances[0]
+      const pct = chance ? luckChanceHtml(chance) : gamble[1]
+      return `<div class="v gamble">${pct} ${CHANCE_LABEL[currentLocale]}</div><div class="v buff">${MULT_LABEL[currentLocale]} ${gamble[2]}</div>`
+    }
+    return `<div class="v ${v.cls}">${tagLuckChances(v.text, chances)}</div>`
+  }
+
   private wordOwnValues(w: Word, includeKeywords = true): { text: string; cls: string }[] {
     const lines = wordValueLines(w, this.combatStats(), includeKeywords)
     const fail = wordDetailNoteLine(w)
@@ -3610,7 +3626,7 @@ export class BattleView {
     el.className = `tally ${tally.kind}`
     const convertedOnly = tally.kind === 'dmg' && tally.mults.length === 0 && tally.flats.length > 0
       && tally.flats.every((f) => f.label === text.guardConvert || f.label === text.overhealConvert)
-    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : convertedOnly ? text.converted : '깡 점수'
+    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : convertedOnly ? text.converted : '점수'
     el.innerHTML = `
       <div class="tally-slots">
         <div class="tally-cell"><div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div></div>

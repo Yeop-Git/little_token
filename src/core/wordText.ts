@@ -67,6 +67,11 @@ const GAMBLE_FAIL_LABEL = {
   'zh-Hans': '失败时倍率', 'zh-Hant': '失敗時倍率',
 }[currentLocale]
 
+const CRIT_MISS_TEXT = {
+  ko: '대성공 아니면 효과 없음', en: 'No critical: no extra effect', ja: '大成功しなければ追加効果なし',
+  ru: 'Без крит. успеха: без доп. эффекта', 'zh-Hans': '未大成功时无额外效果', 'zh-Hant': '未大成功時無額外效果',
+}[currentLocale]
+
 /**
  * 도박 카드의 실패 쪽 결과 — "실패 시 배율 ×1.00". 카드 앞면은 짧게 성공 쪽만 적고,
  * 상세 팝업에서는 붉은 줄로 실패하면 어떻게 되는지 함께 밝힌다(11/20 피드백).
@@ -74,8 +79,10 @@ const GAMBLE_FAIL_LABEL = {
 export function wordDetailNoteLine(w: Word): ValueLine | null {
   // 무럭무럭처럼 배율을 받지 않는 규칙도 앞면이 아니라 상세 설명에서 밝힌다(11/20 피드백).
   if (w.growHp) return { text: L.noMult, cls: 'rule' }
-  if (!w.variance) return null
-  return { text: `${GAMBLE_FAIL_LABEL} ×${w.variance.lo.toFixed(2)}`, cls: 'gamble-fail' }
+  if (w.variance) return { text: `${GAMBLE_FAIL_LABEL} ×${w.variance.lo.toFixed(2)}`, cls: 'gamble-fail' }
+  // 대성공 카드도 터지지 않았을 때를 붉은 줄로 밝힌다 — 배율 ×1.5가 붙지 않을 뿐 손해는 없다.
+  if (w.crit && w.slot !== 'punct') return { text: CRIT_MISS_TEXT, cls: 'gamble-fail' }
+  return null
 }
 
 /** 가산 배율 표기 — "배율 ×1.20". */
