@@ -21,7 +21,7 @@ import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
 import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
-import { canAddItemWithoutLock, recoverBattleTables } from '@core/deckSafety'
+import { recoverBattleTables } from '@core/deckSafety'
 import { clearEverything, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import { sharedTokenMind } from '@core/tokenMind'
 import packageInfo from '../package.json'
@@ -516,7 +516,8 @@ function goTitle(withIntro: unknown = false) {
       else if (run.pendingEndingGrade != null) goEnding(run.pendingEndingGrade, run.pendingEndingEarned ?? run.pendingEndingGrade)
       else if (run.reward?.day === run.day) {
         if (run.reward.phase === 'complete') finishReward()
-        else if (run.reward.phase === 'shop') goInspirationShop(run.reward.grade)
+        // 예전 저장의 보스 영감 상점 단계는 상점을 없앤 뒤 보상 완료로 넘긴다.
+        else if (run.reward.phase === 'shop') finishReward()
         else goReward(run.reward.grade, run.reward.phase)
       }
       else void goBattle()
@@ -757,116 +758,6 @@ function withOptionTrait(option: RewardOption, refreshes: number): RewardOption 
   return option.kind === 'item' && option.item ? { ...option, item: withItemTrait(option.item, itemTraitSeed(refreshes)) } : option
 }
 
-function shopOptionFromRef(ref: RewardPickRef | null): RewardOption | null {
-  if (!ref) return null
-  if (ref.kind === 'item') {
-    const def = ALL_ITEMS[ref.id]
-    if (!def || run.player.items.some((owned) => owned.id === def.id) || !canAddItemWithoutLock(run.player, def)) return null
-    const item = withItemTrait(def)
-    return {
-      kind: 'item', rarity: item.rarity, name: item.name, desc: item.flavor,
-      art: 'gift', item,
-    }
-  }
-  const owned = Object.values(run.player.deck).flat().find((word) => word.id === ref.id)
-  const word = ref.reinforce ? owned : ALL_REWARD_WORDS.find((candidate) => candidate.id === ref.id)
-  if (!word) return null
-  return {
-    kind: 'word', reinforce: ref.reinforce, rarity: word.rarity ?? 'common',
-    name: word.text, desc: word.note, art: 'word', word,
-  }
-}
-
-function makeShopStock(grade: number, refreshes: number): RewardPickRef[] {
-  const seed = run.reward?.seed ?? 0
-  return (['subject', 'verb', 'item'] as RewardPhase[]).flatMap((phase) =>
-    genRewards(
-      run.player,
-      grade,
-      run.day,
-      phase,
-      rewardOfferRng(seed, phase, refreshes),
-      Number.POSITIVE_INFINITY,
-    ).map(rewardPickRef),
-  )
-}
-
-async function goInspirationShop(
-  grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
-  playEntrance = true,
-) {
-  const request = ++battleRequest
-  reset()
-  stage.setAttribute('data-theme', 'day')
-  const pending = run.reward
-  if (!pending) {
-    finishReward()
-    return
-  }
-  pending.phase = 'shop'
-  pending.shopRefreshes ??= 0
-  pending.shopPurchases ??= 0
-  if (!pending.shopStock?.length) pending.shopStock = makeShopStock(grade, pending.shopRefreshes)
-  const options = Array.from({ length: 9 }, (_, index) => shopOptionFromRef(pending.shopStock![index] ?? null))
-  saveRun(run)
-  const { RewardView } = await import('@views/RewardView')
-  if (request !== battleRequest) return
-  // 카드 문구의 확률은 운 반영 값으로 적는다 — 보상·상점에서도 전투와 같은 운을 쓴다.
-  setCardLuck(run.player.stats.luck)
-  current = new RewardView(stage, {
-    day: run.day,
-    deck: run.player.deck,
-    inspiration: run.inspiration,
-    earned: pending.earned,
-    phase: 'subject',
-    refreshes: pending.shopRefreshes,
-    purchases: pending.shopPurchases,
-    mode: 'shop',
-    playEntrance,
-    options,
-    onPick: (opt) => {
-      const cost = rewardPrice(opt)
-      if (run.inspiration < cost) {
-        goInspirationShop(grade, false)
-        return
-      }
-      const slotIndex = options.indexOf(opt)
-      const finishPurchase = () => {
-        spendInspiration(run, cost)
-        if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
-        if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
-        saveRun(run)
-        goInspirationShop(grade, false)
-      }
-      if (opt.kind === 'word' && opt.word) {
-        const result = registerWord(run.player, opt.word)
-        if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, finishPurchase, () => goInspirationShop(grade, false))
-        }
-        else finishPurchase()
-      } else if (opt.item) {
-        goItem(opt.item, grade, undefined, rewardPickRef(opt), cost, () => {
-          if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
-          if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
-          saveRun(run)
-          goInspirationShop(grade, false)
-        })
-      }
-    },
-    onRefresh: () => {
-      const cost = rewardRefreshCost(pending.shopRefreshes ?? 0)
-      if (!spendInspiration(run, cost)) return false
-      pending.shopRefreshes = (pending.shopRefreshes ?? 0) + 1
-      pending.shopStock = makeShopStock(grade, pending.shopRefreshes)
-      saveRun(run)
-      goInspirationShop(grade)
-      return true
-    },
-    onSkip: () => finishReward(),
-  })
-  mountMeta('reward')
-}
-
 function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
   // 전리품을 고른 순간 토큰의 기분이 오른다. 기분은 런 안에서만 사는 값이라
   // 화면이 바뀌어도 같은 마음 한 벌(sharedTokenMind)이 그대로 들고 다음 전투로 간다.
@@ -1006,7 +897,6 @@ function goItem(
   rewardPhase?: RewardPhase,
   pick?: RewardPickRef,
   inspirationCost = 0,
-  onComplete?: () => void,
 ) {
   battleRequest++
   reset()
@@ -1017,14 +907,9 @@ function goItem(
     onDone: (result) => {
       if (inspirationCost > 0 && !spendInspiration(run, inspirationCost)) {
         if (rewardPhase) advanceReward(grade, rewardPhase)
-        else if (onComplete) goInspirationShop(grade, false)
         return
       }
       applyItemReward(run.player, result)
-      if (onComplete) {
-        onComplete()
-        return
-      }
       if (rewardPhase && pick) {
         advanceReward(grade, rewardPhase, pick)
       } else {
@@ -1120,13 +1005,6 @@ if (start === 'reward') {
   const grade = startGrade(run.player.stats.luck)
   if (!run.reward) prepareReward(grade, Math.max(1, Math.round(grade)))
   openPreparedReward(grade)
-}
-else if ((start as string) === 'shop') {
-  // 검수용: 보스 클리어 영감 상점으로 바로 들어간다.
-  const grade = startGrade(run.player.stats.luck)
-  if (!run.reward) prepareReward(grade, Math.max(1, Math.round(grade)))
-  run.inspiration = Math.max(run.inspiration, 30)
-  void goInspirationShop(grade)
 }
 else if (start === 'item') {
   // 검수용: ?item=아이템id&trait=특성id 로 특성 표시를 바로 확인한다.
