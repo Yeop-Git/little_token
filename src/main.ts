@@ -719,9 +719,9 @@ function beginReward(grade: number, earned: number = grade) {
   openPreparedReward(grade)
 }
 
-/** 새 보상은 일반전과 보스전 모두 세 단계로 선택한다. */
+/** 새 보상은 일반전과 보스전 모두 세 단계(아이템 → 주어·수식어 → 동사)로 선택한다. */
 function openPreparedReward(grade: number) {
-  goReward(grade, 'subject')
+  goReward(grade, 'item')
 }
 
 function rewardPickRef(opt: RewardOption): RewardPickRef {
@@ -860,16 +860,17 @@ function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) 
   const earned = run.reward?.earned ?? Math.max(0, Math.round(grade))
   const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }
   if (pick) picks.push(pick)
+  // 1페이지 아이템 → 2페이지 주어·수식어 → 3페이지 동사.
+  if (phase === 'item') {
+    run.reward = { day: run.day, grade, earned, phase: 'subject', picks, seed, refreshes }
+    saveRun(run)
+    goReward(grade, 'subject')
+    return
+  }
   if (phase === 'subject') {
     run.reward = { day: run.day, grade, earned, phase: 'verb', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'verb')
-    return
-  }
-  if (phase === 'verb') {
-    run.reward = { day: run.day, grade, earned, phase: 'item', picks, seed, refreshes }
-    saveRun(run)
-    goReward(grade, 'item')
     return
   }
   finishReward()
@@ -909,7 +910,7 @@ function goDiscard(incoming: Word, candidates: Word[], onDone: () => void, onDis
 // 전투 등급에 현재 15층 사이클의 진행도를 더해 실제 희귀도 가중치를 정한다.
 async function goReward(
   grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
-  phase: RewardPhase = run.reward?.phase === 'item' || run.reward?.phase === 'verb' ? run.reward.phase : 'subject',
+  phase: RewardPhase = run.reward?.phase === 'subject' || run.reward?.phase === 'verb' ? run.reward.phase : 'item',
 ) {
   const request = ++battleRequest
   reset()

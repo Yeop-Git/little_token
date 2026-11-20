@@ -62,7 +62,7 @@ const ENTRANCE_INPUT_GUARD_MS = 850
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
 const STAT_ORDER: StatKey[] = ['hp', 'atk', 'guard', 'heal', 'luck']
-const PHASE_NO: Record<RewardPhase, number> = { subject: 1, verb: 2, item: 3 }
+const PHASE_NO: Record<RewardPhase, number> = { item: 1, subject: 2, verb: 3 }
 const PHASE_TITLE: Record<RewardPhase, string> = {
   subject: '주어와 수식어를 고르자',
   item: '이야기의 소품을 고르자',
@@ -123,7 +123,7 @@ function deckSheetHtml(deck: Record<string, Word[]>): string {
             <section class="rds-slot">
               <h3>${SLOT_NO[slot] ? `<i>${SLOT_NO[slot]}</i>` : ''}${slotLabel(slot)} <b>${list.length}</b></h3>
               <div class="rds-cards">${list.map((word) => `
-                <div class="rds-card">${wordCardHtml(word)}${(word.level ?? 1) > 1 ? `<em class="rds-level">Lv.${word.level}</em>` : ''}</div>`).join('')}
+                <div class="rds-card" data-slot="${slot}" data-id="${word.id}" role="button" tabindex="0" aria-label="${word.text}">${wordCardHtml(word)}${(word.level ?? 1) > 1 ? `<em class="rds-level">Lv.${word.level}</em>` : ''}</div>`).join('')}
               </div>
             </section>`).join('')}
           <section class="rds-combos">
@@ -394,7 +394,7 @@ export class RewardView {
                 <span class="reward-wallet-earned">${shop ? text('shopPurchased', '이번 상점 구매') : '이번 클리어'} <b>${shop ? opts.purchases ?? 0 : `+${opts.earned}`}</b></span>
               </div>
               ${!shop && opts.options.some((option) => option?.bossPrice !== undefined) ? `<div class="reward-boss-discount">${bossRewardDiscountText()}</div>` : ''}
-              ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase === 'subject' ? `
+              ${!shop && opts.day === EARLY_BUILD_REWARD_DAY && opts.phase !== 'verb' ? `
                 <div class="reward-build-preview">
                   ${text('rewardEarlyBuildReserve', '마지막 동사 단계에 희귀 빌드 동사 3종이 나온다. 영감 {cost}를 남기면 하나를 기록할 수 있다.', { cost: REWARD_PRICE.rare })}
                 </div>` : ''}
@@ -490,13 +490,39 @@ export class RewardView {
       if (event.key !== 'Escape') return
       event.preventDefault()
       event.stopPropagation()
-      close()
+      // 크게 펼친 카드가 있으면 그것부터 접는다.
+      const zoomed = sheet.querySelector('.rds-zoom')
+      if (zoomed) zoomed.remove()
+      else close()
     }
     document.addEventListener('keydown', onKey, true)
-    // 카드 밖 빈 곳이나 닫기를 누르면 접는다. 카드를 눌러도 아무것도 사지 않는다.
+    // 카드 밖 빈 곳이나 닫기를 누르면 접는다. 카드를 누르면 크게 펼쳐 수치·키워드를 검수한다.
+    const deck = this.opts.deck ?? EARLY_WORDS
+    const zoom = (card: HTMLElement) => {
+      const word = deck[card.dataset.slot ?? '']?.find((entry) => entry.id === card.dataset.id)
+      if (!word) return
+      sheet.querySelector('.rds-zoom')?.remove()
+      const opt = { kind: 'word', word, rarity: word.rarity ?? 'common', name: word.text, desc: word.note, art: 'word' } as RewardOption
+      sheet.querySelector('.rds-panel')!.insertAdjacentHTML('beforeend', `
+        <div class="rds-zoom">
+          <div class="rds-zoom-card">${wordCardHtml(word)}</div>
+          <div class="rds-zoom-detail mood-${moodOf(word)}">${detailHtml(opt, deck)}</div>
+        </div>`)
+    }
     sheet.addEventListener('click', (event) => {
       const target = event.target as HTMLElement
       if (target === sheet || target.closest('.rds-close')) close()
+      else if (target.closest('.rds-zoom')) sheet.querySelector('.rds-zoom')?.remove()
+      else {
+        const card = target.closest<HTMLElement>('.rds-card')
+        if (card) zoom(card)
+      }
+    })
+    sheet.addEventListener('keydown', (event) => {
+      const card = (event.target as HTMLElement).closest<HTMLElement>('.rds-card')
+      if (!card || (event.key !== 'Enter' && event.key !== ' ')) return
+      event.preventDefault()
+      zoom(card)
     })
     this.closeDeck = close
     sheet.querySelector<HTMLButtonElement>('.rds-close')?.focus()
