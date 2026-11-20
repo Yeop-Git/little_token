@@ -348,6 +348,8 @@ export interface ApplyResult {
   healRolled?: number
   convertedDamage?: number
   lifeStolen?: number
+  /** 체력 한도 적용 전 흡혈량. 체력이 가득 차도 화면에는 이 점수를 띄운다. */
+  lifeStealRolled?: number
   killed: number[]
   overflow: number
   /** 문장이 보스 곁에서 퇴치한 호위 소환물 수. */
@@ -902,10 +904,8 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
   if (intent.targetMode === 'both') selfDmg += Math.round(dmg * 0.4)
   state.playerHp = Math.max(0, state.playerHp - selfDmg)
   const hpDamage = [...attack.hits].reduce((sum, hit) => sum + hit.dmg, 0) + summonDisperse.damage
-  const lifeStolen = Math.min(
-    Math.max(0, state.playerMax - state.playerHp),
-    Math.max(0, Math.round(hpDamage * intent.lifeStealRate)),
-  )
+  const lifeStealRolled = Math.max(0, Math.round(hpDamage * intent.lifeStealRate))
+  const lifeStolen = Math.min(Math.max(0, state.playerMax - state.playerHp), lifeStealRolled)
   state.playerHp += lifeStolen
   // 각 적에게 실제 표시된 수치를 기록한다. 약점·방어·면역 적용 전 공격 위력을
   // 피해로 적으면 같은 공격의 적중 숫자와 전투 기록이 서로 달라진다.
@@ -920,6 +920,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     healRolled: healAmt,
     convertedDamage,
     lifeStolen,
+    lifeStealRolled,
     killed: summonDisperse.killed && !attack.killed.includes(target) ? [target, ...attack.killed] : attack.killed,
     overflow: attack.overflow,
     summonsDispersed: summonDisperse.count,
@@ -939,6 +940,11 @@ export function previewIntentHits(state: BattleState, intent: Intent, mult: numb
 }
 
 /** 집계판·피해 숫자용 미리보기 — 체력·막 경계에서 잘리기 전의 타격 수치를 돌려준다. */
+/** 실제 적용 직전 상태로 문장 하나를 미리 돌려 본 전체 결과(회복·흡혈·반동 포함). */
+export function previewIntentResult(state: BattleState, intent: Intent, mult: number, target: number): ApplyResult {
+  return applyIntent(structuredClone(state), intent, mult, target)
+}
+
 export function previewIntentShownHits(state: BattleState, intent: Intent, mult: number, target: number): number[] {
   const result = applyIntent(structuredClone(state), intent, mult, target)
   return [...(result.summonHits ?? []), ...result.hits.map((hit) => hit.shown ?? hit.dmg)]

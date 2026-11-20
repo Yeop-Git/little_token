@@ -144,13 +144,24 @@ export function wordKeywordDetailsHtml(word: Word, omitValues?: ReadonlySet<Word
   </section>`
 }
 
+/**
+ * 카드 문구 안의 핵심 숫자(×1.20, 75%, +1, ▲1)를 따로 감싸 크게 띄운다.
+ * 글자 설명은 그대로 두고 숫자만 키워야 좁은 손패 카드에서도 한눈에 값이 읽힌다.
+ */
+export function emphasizeCardNumbers(text: string): string {
+  return escapeCardText(text).replace(
+    /(×\s?\d+(?:\.\d+)?|\d+(?:\.\d+)?%|[+＋]\d+(?:\.\d+)?|▲\d+|=\s?\d+(?:\.\d+)?)/g,
+    '<b class="card-num">$1</b>',
+  )
+}
+
 function wordCardNoteHtml(word: Word, note: string): string {
   const action = wordActionInline(word)
   // 선택 불가 사유처럼 호출부가 갈아 끼운 문구는 그대로 보여 주고, 정상 카드만
   // 주행동과 키워드를 분리한다. 키워드 이름을 요약 줄과 칩에 두 번 쓰지 않는다.
   const displayNote = note === wordNoteText(word) ? wordCardPrimaryNote(word, note) : note
   const keywordHtml = wordKeywordChipsHtml(word)
-  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
 }
 
 

@@ -47,6 +47,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  previewIntentResult,
   previewIntentShownHits,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
@@ -338,8 +339,19 @@ interface Tally {
   applied?: boolean
   /** 체력·실드 한도를 넘겨 실제로는 담기지 않은 몫. 총합은 그대로 두고 칩으로만 알린다. */
   excess?: { label: string; value: number }
+  /** 한 문장이 피해·실드·회복·반격 등을 함께 낼 때 각각의 실제 점수를 나란히 보여 주는 칸. */
+  lanes?: TallyLane[]
   /** 피해 문장의 공격 속성. 롤링이 끝나면 총합 숫자가 이 감정색으로 물든다. 없으면 무속성. */
   attackEmotion?: Emotion | null
+}
+
+interface TallyLane {
+  kind: 'dmg' | 'guard' | 'heal' | 'lifesteal' | 'counter' | 'magic' | 'recoil'
+  label: string
+  value: string
+  note?: string
+  /** 이 정산판이 큰 숫자로 보여 주는 바로 그 효과. */
+  own?: boolean
 }
 
 export class BattleView {
@@ -3540,6 +3552,48 @@ export class BattleView {
     return { flats, mults, extras, base, mult, hits, hitScale, total, kind }
   }
 
+  /**
+   * 한 문장이 여러 효과를 함께 낼 때 정산판 아래에 나란히 띄울 칸들. 효과가 하나뿐이면 비운다.
+   * 숫자는 모두 실제 적용 로직(applyPreparation·applyIntent)과 같은 값이다. 한도에 걸린 몫은
+   * 0으로 뭉개지 않고 문장이 만든 점수를 그대로 두고, 담기지 않은 몫만 작은 글씨로 덧붙인다.
+   */
+  private effectLanes(
+    intent: Intent,
+    own: Tally['kind'],
+    v: { dmg?: number; guard: number; guardGain: number; heal: number; healApplied: number; lifesteal?: number; lifestealApplied?: number; recoil?: number },
+  ): TallyLane[] | undefined {
+    const text = combatPreviewText()
+    const lanes: TallyLane[] = []
+    if (v.dmg !== undefined) lanes.push({ kind: 'dmg', label: text.laneDamage, value: formatNumber(v.dmg), own: own === 'dmg' })
+    if (v.guard > 0) {
+      lanes.push({
+        kind: 'guard', label: text.laneGuard, value: formatNumber(v.guard), own: own === 'guard',
+        note: v.guard > v.guardGain ? `${text.guardCap} ${formatNumber(v.guard - v.guardGain)}` : undefined,
+      })
+    }
+    if (v.heal > 0) {
+      lanes.push({
+        kind: 'heal', label: text.laneHeal, value: formatNumber(v.heal), own: own === 'heal',
+        note: v.heal > v.healApplied ? `${text.overheal} ${formatNumber(v.heal - v.healApplied)}` : undefined,
+      })
+    }
+    if (intent.lifeStealRate > 0) {
+      lanes.push({
+        kind: 'lifesteal', label: text.laneLifesteal,
+        value: v.lifesteal !== undefined ? formatNumber(v.lifesteal) : `${Math.round(intent.lifeStealRate * 100)}%`,
+        note: v.lifesteal !== undefined && v.lifestealApplied !== undefined && v.lifesteal > v.lifestealApplied
+          ? `${text.overheal} ${formatNumber(v.lifesteal - v.lifestealApplied)}` : undefined,
+      })
+    }
+    if (intent.counter) {
+      const full = intent.kind === 'guard' || intent.kind === 'heal'
+      lanes.push({ kind: 'counter', label: text.laneCounter, value: `${full ? 100 : 50}%`, note: text.laneCounterNote.replace('{value}', String(full ? 100 : 50)) })
+    }
+    if (intent.magicShield > 0) lanes.push({ kind: 'magic', label: text.laneMagic, value: text.laneMagicNote })
+    if ((v.recoil ?? intent.recoil) > 0) lanes.push({ kind: 'recoil', label: text.laneRecoil, value: `-${formatNumber(v.recoil ?? intent.recoil)}` })
+    return lanes.length >= 2 ? lanes : undefined
+  }
+
   // 깡 점수가 하나씩 쌓이고 → 배율이 하나씩 꽂히고 → 총합이 쾅. 발라트로식 콤보 쾌감.
   private async playTally(tally: Tally): Promise<void> {
     const text = combatPreviewText()
@@ -3558,6 +3612,7 @@ export class BattleView {
           <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? text.applied : text.actual) : text.calculation}</div>
           <div class="tally-total"></div>
         </div>
+        ${tally.lanes ? `<div class="tally-lanes pending">${tally.lanes.map((lane) => `<div class="tally-lane ${lane.kind}${lane.own ? ' own' : ''}"><span class="ll">${lane.label}</span><b>${lane.own ? String(tally.total) : lane.value}</b>${lane.note ? `<small>${lane.note}</small>` : ''}</div>`).join('')}</div>` : ''}
       </div>
       <div class="tally-feed tally-flat-feed"></div>
       <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
@@ -3666,6 +3721,14 @@ export class BattleView {
       totalEl.classList.add('attr-tint', `emotion-${attr}`)
       totalEl.dataset.attr = attr
       totalEl.setAttribute('aria-label', `${tally.total}, 공격 속성 ${attr === 'neutral' ? '무속성' : EMOTION_LABEL[attr]}`)
+    }
+
+    // 한 문장이 여러 효과를 함께 냈으면 총합이 꽂힌 뒤 효과별 실제 점수를 나란히 펼친다.
+    const lanesEl = el.querySelector<HTMLElement>('.tally-lanes')
+    if (lanesEl) {
+      lanesEl.classList.remove('pending')
+      // 바로 타격으로 넘어가면 나란히 선 점수를 읽을 틈이 없다 — 이 문장에서만 잠깐 더 머문다.
+      await this.sleep(560)
     }
 
     // 여기서 지우지 않는다 — 준비 효과·선공을 지나 내 공격이 꽂힐 때까지 이 숫자가 머문다.
@@ -3963,6 +4026,10 @@ export class BattleView {
       // 실드 한도를 넘겨도 문장이 만든 수치는 그대로 보여 준다. 담기지 않은 몫은 칩으로만 알린다.
       const applied = applyPreparation(structuredClone(this.state), intent, mult).guardGain
       if (tally.total > applied) tally.excess = { label: combatPreviewText().guardCap, value: tally.total - applied }
+      tally.lanes = this.effectLanes(intent, 'guard', {
+        guard: tally.total, guardGain: applied,
+        heal: baseHealPreview, healApplied: Math.min(baseHealPreview, Math.max(0, this.state.playerMax - this.state.playerHp)),
+      })
       await this.playTally(tally)
     }
 
@@ -4027,6 +4094,18 @@ export class BattleView {
         tally.adjustment = applied - tally.total
         tally.total = applied
         tally.applied = true
+        const preview = previewIntentResult(this.state, intent, mult, this.target)
+        tally.lanes = this.effectLanes(intent, 'dmg', {
+          dmg: applied,
+          guard: prep.guardAttempted, guardGain: prep.guardGain,
+          heal: preview.healRolled ?? 0, healApplied: preview.heal,
+          lifesteal: preview.lifeStealRolled ?? 0, lifestealApplied: preview.lifeStolen ?? 0, recoil: preview.selfDmg,
+        })
+      } else {
+        tally.lanes = this.effectLanes(intent, 'dmg', {
+          dmg: tally.total, guard: prep.guardAttempted, guardGain: prep.guardGain,
+          heal: baseHealPreview, healApplied: Math.min(baseHealPreview, Math.max(0, this.state.playerMax - this.state.playerHp)),
+        })
       }
       if (tally.total > 0 || tally.applied) await this.playTally(tally)
     }
@@ -4035,6 +4114,7 @@ export class BattleView {
       // 체력이 가득 차 있어도 회복 수치는 0으로 뭉개지 않는다. 넘친 몫은 칩으로만 알린다.
       const applied = Math.min(tally.total, Math.max(0, this.state.playerMax - this.state.playerHp))
       if (tally.total > applied) tally.excess = { label: combatPreviewText().overheal, value: tally.total - applied }
+      tally.lanes = this.effectLanes(intent, 'heal', { guard: prep.guardAttempted, guardGain: prep.guardGain, heal: tally.total, healApplied: applied })
       await this.playTally(tally)
     }
 

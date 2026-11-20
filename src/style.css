@@ -4430,6 +4430,31 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   font-size: 23px;
   background: rgba(40, 24, 8, .72);
 }
+/* 한 문장이 낸 효과들 — 피해·실드·회복·반격을 같은 줄에 각자의 실제 점수로 나란히 둔다. */
+.tally-lanes { position: relative; z-index: 1; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin-left: 6px; padding-left: 14px; border-left: 2px solid rgba(255, 242, 218, .35); }
+.tally-lanes.pending { visibility: hidden; }
+.tally-lanes:not(.pending) .tally-lane { animation: tally-chip-in .3s cubic-bezier(.2, 1.5, .4, 1) both; }
+.tally-lanes:not(.pending) .tally-lane:nth-child(2) { animation-delay: .06s; }
+.tally-lanes:not(.pending) .tally-lane:nth-child(3) { animation-delay: .12s; }
+.tally-lanes:not(.pending) .tally-lane:nth-child(4) { animation-delay: .18s; }
+.tally-lanes:not(.pending) .tally-lane:nth-child(n+5) { animation-delay: .24s; }
+.tally-lane {
+  --lane: #fff2da;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 96px; padding: 3px 14px 5px; border-radius: 12px;
+  background: rgba(10, 7, 16, .9);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--lane) 55%, transparent);
+  text-shadow: 0 0 2px #1a1018, 0 0 2px #1a1018, 0 2px 6px rgba(0, 0, 0, .6);
+}
+.tally-lane .ll { font-size: 14px; font-weight: 900; letter-spacing: 2px; color: color-mix(in srgb, var(--lane) 70%, #cfc6b8); }
+.tally-lane b { font-size: 30px; font-weight: 1000; line-height: 1.05; color: var(--lane); white-space: nowrap; }
+.tally-lane small { font-size: 12px; font-weight: 900; color: #cfc6b8; white-space: nowrap; }
+.tally-lane.own { box-shadow: inset 0 0 0 2px var(--lane), 0 0 14px color-mix(in srgb, var(--lane) 40%, transparent); }
+.tally-lane.dmg { --lane: #ffb39a; }
+.tally-lane.guard, .tally-lane.magic { --lane: #9fd8ff; }
+.tally-lane.heal, .tally-lane.lifesteal { --lane: #9ff0b0; }
+.tally-lane.counter { --lane: #ffd27a; }
+.tally-lane.recoil { --lane: #e7a0c0; }
 .tally-chip.extra::before { content: '＋ '; opacity: .7; }
 .tally-chip.excess { color: #cfc6b8; font-size: 17px; opacity: .9; }
 .tally-chip.dmg { color: #fff2da; }
@@ -5764,8 +5789,22 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   font-size: 13px;
   text-shadow: 0 0 2px #000, 0 1px 2px #000, 0 2px 6px rgba(0, 0, 0, 0.95);
 }
-/* 카드 수치(×1.5, 확률 등)는 설명보다 한 단계 크고 진하게 읽혀야 한다. */
-.card-front.art .card-note-text { font-size: 14px; font-weight: 1000; letter-spacing: .01em; }
+/* 카드 점수(×1.5, 확률 등)는 설명보다 확 크게 읽혀야 한다. 숫자만 card-num으로 키운다. */
+.card-front.art .card-note-text { font-size: 15px; font-weight: 1000; letter-spacing: .01em; line-height: 1.15; }
+.card-front.art .card-num {
+  display: inline-block;
+  font-size: 1.55em;
+  font-weight: 1000;
+  line-height: 1;
+  color: #ffe9a8;
+  letter-spacing: 0;
+  text-shadow: 0 0 2px #000, 0 0 3px #000, 0 2px 6px rgba(0, 0, 0, .95), 0 0 12px color-mix(in srgb, var(--wglow, #ffd27a) 55%, transparent);
+}
+/* 손패의 키워드(선공·관통·카운터)와 행동 딱지도 함께 키운다. */
+.card-hand .card-front.art .card-keyword { font-size: 15px; }
+.card-hand .card-front.art .card-action-inline b { font-size: 13px; }
+.card-hand .card-front.art .card-action-inline svg,
+.card-hand .card-front.art .card-action-inline .baked-stat-icon { width: 14px; height: 14px; }
 
 /* 카드 앞면은 감정과 비용만 두 모서리에 둔다. 등급·반복강화 단계는 카드의
    테두리/포일과 우측 상세 패널에서 확인해 일러스트 위의 정보 밀도를 낮춘다. */
