@@ -10,6 +10,7 @@ import { EMOTION_LABEL, type Emotion } from '@core/types'
 import { keywordDetailByLabel } from '@core/wordKeywords'
 import { emotionIconContent } from './EmotionBadge'
 import { icon } from './Icons'
+import type { SpeechTagKind } from '@/localization/tokenSpeechMarkup'
 
 type TagSpec =
   | { kind: 'emotion'; emotion: Emotion }
@@ -177,4 +178,33 @@ function calcTagHtml(shown: string, lines: string): string {
 function cardTagHtml(name: string): string {
   const safe = escapeHtml(name)
   return `<span class="trait-tag is-card" data-tip-card="${safe}" data-tip-title="${safe}" data-tooltip="${safe}"><i class="trait-card-glyph" aria-hidden="true"></i><b>${safe}</b></span>`
+}
+
+
+/**
+ * 토큰 대사의 `[[종류:낱말]]` 표식을 특성 설명과 같은 색 태그로 바꾼다.
+ * 종류가 없으면 언어별 태그 사전에서 찾고, 사전에 없으면 키워드 태그로 둔다.
+ * 감정 태그는 감정 키(joy)·현재 언어 감정명·한국어 감정명을 모두 받아 현재 언어 이름으로 보인다.
+ */
+export function speechTagHtml(term: string, kind?: SpeechTagKind): string {
+  if (kind === 'emo' || (!kind && emotionFromLabel(term))) {
+    const emotion = emotionFromLabel(term)
+    if (emotion) return tagHtml(EMOTION_LABEL[emotion], { kind: 'emotion', emotion })
+    return tagHtml(term, { kind: 'keyword' })
+  }
+  if (kind === 'atk' || kind === 'guard' || kind === 'heal') return tagHtml(term, { kind: 'stat', stat: kind })
+  if (kind === 'ink') return tagHtml(term, { kind: 'ink' })
+  if (kind === 'slot') return tagHtml(term, { kind: 'slot' })
+  if (kind === 'kw') return tagHtml(term, { kind: 'keyword' })
+  const known = termsForLocale().find(([label]) => label === term)
+  return tagHtml(term, known?.[1] ?? { kind: 'keyword' })
+}
+
+const KOREAN_EMOTION: Record<string, Emotion> = { 기쁨: 'joy', 분노: 'anger', 슬픔: 'sorrow', 즐거움: 'pleasure' }
+
+function emotionFromLabel(term: string): Emotion | null {
+  const key = term.trim()
+  if (key === 'joy' || key === 'anger' || key === 'sorrow' || key === 'pleasure') return key
+  const localized = (['joy', 'anger', 'sorrow', 'pleasure'] as Emotion[]).find((emotion) => EMOTION_LABEL[emotion] === key)
+  return localized ?? KOREAN_EMOTION[key] ?? null
 }

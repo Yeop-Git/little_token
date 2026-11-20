@@ -2405,9 +2405,12 @@ html[data-postprocessing='off'] .tip-bubble {
   top: -6px;
   z-index: 5;
   box-sizing: border-box;
-  width: 330px;
-  min-height: 76px;
-  padding: 14px 28px 17px;
+  /* 짧은 말은 작은 쪽지, 긴 말은 넓은 쪽지 — 글 양에 맞춰 종이가 자란다. */
+  width: max-content;
+  min-width: 168px;
+  max-width: 400px;
+  min-height: 64px;
+  padding: 15px 26px 17px;
   /* 말풍선 종이는 한 벌이고 잉크 색만 갈린다 — 평소는 갈색 연필, 핵심 경고는
      빨간 색연필, 파훼 성공은 초록 잉크. 종이 결과 테두리 붓질은 그대로 두어
      경고가 UI 알림이 아니라 같은 그림일기의 한 줄로 읽히게 한다. */
@@ -2416,10 +2419,13 @@ html[data-postprocessing='off'] .tip-bubble {
   --speech-rule: rgba(112, 82, 59, .065);
   --speech-edge: rgba(91, 58, 38, .78);
   --speech-halo: transparent;
+  --speech-strong: #a3361b;
+  --speech-mark: rgba(255, 196, 92, .62);
   color: var(--speech-ink);
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1.35;
+  font-size: 19px;
+  /* 본문은 한 단계 가늘게 두고 **강조**만 가장 굵게 — 다 굵으면 아무것도 안 튄다. */
+  font-weight: 700;
+  line-height: 1.42;
   text-align: center;
   white-space: normal;
   word-break: keep-all;
@@ -2429,9 +2435,10 @@ html[data-postprocessing='off'] .tip-bubble {
   transform: translate(-14px, 12px) rotate(-2deg) scale(.82);
   transform-origin: left bottom;
   border: 2px solid var(--speech-edge);
-  border-radius: 48% 44% 46% 42% / 54% 48% 52% 46%;
+  /* 손으로 오린 둥근 쪽지. 타원(%)이면 세 줄짜리 대사의 모서리 글자가 잘린다. */
+  border-radius: 30px 34px 28px 36px / 28px 30px 34px 26px;
   background:
-    repeating-linear-gradient(0deg, transparent 0 17px, var(--speech-rule) 18px),
+    repeating-linear-gradient(0deg, transparent 0 26px, var(--speech-rule) 27px),
     var(--speech-paper);
   box-shadow:
     inset 0 0 0 3px rgba(255, 251, 231, .52),
@@ -2463,7 +2470,7 @@ html[data-postprocessing='off'] .tip-bubble {
   clip-path: polygon(0 0, 100% 100%, 0 100%);
   transform: rotate(-14deg);
 }
-.token-speech.is-speaking { animation: token-speech-pop 3.6s cubic-bezier(.2, .9, .24, 1) both; }
+.token-speech.is-speaking { animation: token-speech-pop var(--speech-life, 3.6s) cubic-bezier(.2, .9, .24, 1) both; }
 
 /* 말머리 뱃지 — 종이에 눌러 그린 동그라미 안의 「!」·「✓」. */
 .token-speech-mark {
@@ -2484,6 +2491,73 @@ html[data-postprocessing='off'] .tip-bubble {
   animation: token-mark-stamp .46s cubic-bezier(.2, 1.7, .32, 1) both;
 }
 .token-speech-text { display: block; width: 100%; }
+/* 웹소설 한 줄처럼 낱말이 차례로 번져 나온다. 지연(--d)은 TokenSpeech.ts가 글 양에 맞춰 준다. */
+.token-speech .ts-w { display: inline; white-space: nowrap; }
+.token-speech.is-speaking .ts-w { animation: token-speech-word .26s ease-out both; animation-delay: calc(var(--d, 0ms) + 90ms); }
+.token-speech .ts-strong {
+  color: var(--speech-strong);
+  font-weight: 1000;
+  /* 형광펜 밑줄 — 글자 아래 40%만 칠해 종이 줄 위를 그은 것처럼. */
+  background: linear-gradient(transparent 58%, var(--speech-mark) 58%, var(--speech-mark) 92%, transparent 92%) no-repeat 0 0 / 100% 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 2px;
+  text-shadow: none;
+}
+/* 특성 설명의 색 태그를 밝은 종이 위에서 읽히게 다시 칠한다(원본은 어두운 바탕용). */
+.token-speech .trait-tag {
+  margin: 0 3px;
+  padding: 0 7px 0 4px;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--trait-tag-color) 62%, #5a3418);
+  background: color-mix(in srgb, var(--trait-tag-color) 52%, #fff4dc);
+  color: color-mix(in srgb, var(--trait-tag-color) 26%, #2a1206);
+  box-shadow: 0 1px 0 rgba(90, 52, 24, .28);
+  text-shadow: none;
+  vertical-align: 0;
+  line-height: 1.3;
+}
+/* 글자가 다 번진 뒤 형광펜을 왼쪽에서 오른쪽으로 쓱 긋는다. */
+.token-speech.is-speaking .ts-strong { animation: token-speech-marker .38s ease-out .62s both; }
+@keyframes token-speech-marker { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
+/* 조사·어미가 붙는 태그는 오른쪽 여백을 줄여 「매직실드」가 처럼 한 낱말로 읽히게. */
+.token-speech .ts-w > .trait-tag:has(+ .ts-tail) { margin-right: 1px; }
+.token-speech .trait-tag.is-keyword,
+.token-speech .trait-tag.is-slot { padding-left: 7px; }
+.token-speech .trait-tag.is-emotion .emotion-face { filter: drop-shadow(0 1px 0 rgba(60, 30, 10, .35)); }
+.token-speech .trait-tag.is-stat i { color: color-mix(in srgb, var(--trait-tag-color) 55%, #24130a); }
+.token-speech .ts-strong .trait-tag { font-weight: 1000; }
+
+/* 말을 꺼내는 순간의 몸짓 — 평소엔 끄덕, 경고엔 움찔, 안도엔 폴짝. 몸통 transform은
+   매 프레임 JS가 쥐고 있으므로 그 안쪽(모델 그림)에만 건다. */
+.token-actor.is-talking .model-shell > * { animation: token-talk-nod .5s cubic-bezier(.3, 1.6, .4, 1) both; transform-origin: 50% 70%; }
+.token-actor.is-talking[data-tone='warn'] .model-shell > * { animation: token-talk-flinch .45s cubic-bezier(.2, 1.8, .4, 1) both; }
+.token-actor.is-talking[data-tone='relief'] .model-shell > * { animation: token-talk-hop .7s cubic-bezier(.3, 1.5, .4, 1) both; }
+@keyframes token-speech-word {
+  from { opacity: 0; transform: translateY(5px); filter: blur(1.5px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes token-talk-nod {
+  0% { transform: none; }
+  35% { transform: translateY(5px) scale(1.04, .95); }
+  70% { transform: translateY(-3px) scale(.98, 1.03); }
+  100% { transform: none; }
+}
+@keyframes token-talk-flinch {
+  0% { transform: none; }
+  25% { transform: translateX(-6px) rotate(-6deg) scale(.94, 1.05); }
+  55% { transform: translateX(5px) rotate(4deg); }
+  80% { transform: translateX(-2px) rotate(-1deg); }
+  100% { transform: none; }
+}
+@keyframes token-talk-hop {
+  0% { transform: none; }
+  20% { transform: translateY(4px) scale(1.06, .93); }
+  45% { transform: translateY(-16px) scale(.96, 1.05); }
+  65% { transform: translateY(2px) scale(1.04, .96); }
+  80% { transform: translateY(-6px); }
+  100% { transform: none; }
+}
 
 /* 큰낫 예고가 떠 있는 한 턴 동안만 프롬 옆에 남는 작은 방어 목표.
    실제 방어막은 체력바에 계속 표시하고, 이 표식은 “지금 방어해야 한다”만 크게 읽힌다. */
@@ -2546,6 +2620,8 @@ html[data-postprocessing='off'] .tip-bubble {
   --speech-rule: rgba(180, 52, 38, .12);
   --speech-edge: #b8342a;
   --speech-halo: rgba(226, 74, 48, .3);
+  --speech-strong: #c21d10;
+  --speech-mark: rgba(255, 150, 120, .5);
   font-size: 19px;
   letter-spacing: -.01em;
 }
@@ -2563,10 +2639,12 @@ html[data-postprocessing='off'] .tip-bubble {
   --speech-rule: rgba(40, 110, 70, .1);
   --speech-edge: #2f8a58;
   --speech-halo: rgba(96, 206, 138, .28);
+  --speech-strong: #12663a;
+  --speech-mark: rgba(150, 230, 150, .62);
 }
 .token-speech[data-tone='relief'].is-speaking {
   animation:
-    token-speech-pop 4.2s cubic-bezier(.2, .9, .24, 1) both,
+    token-speech-pop var(--speech-life, 4.2s) cubic-bezier(.2, .9, .24, 1) both,
     token-speech-cheer .7s ease-out both;
 }
 
@@ -2606,11 +2684,14 @@ html[data-postprocessing='off'] .tip-bubble {
   from { transform: translateX(-3px) rotate(-3deg) scale(.985); }
   to { transform: translateX(4px) rotate(3.5deg) scale(1.02); }
 }
+/* 톡 튀어나와 살짝 출렁인 뒤 머물고, 끝에는 위로 가볍게 날아가며 사라진다. */
 @keyframes token-speech-pop {
-  0% { opacity: 0; transform: translate(-14px, 12px) rotate(-2deg) scale(.82); }
-  10%, 78% { opacity: 1; transform: translate(0, 0) rotate(-1deg) scale(1); }
-  88% { opacity: 1; transform: translate(2px, -3px) rotate(.5deg) scale(1.01); }
-  100% { opacity: 0; transform: translate(7px, -12px) rotate(1deg) scale(.94); }
+  0% { opacity: 0; transform: translate(-14px, 12px) rotate(-3deg) scale(.7); }
+  5% { opacity: 1; transform: translate(2px, -3px) rotate(.8deg) scale(1.05); }
+  9% { transform: translate(-1px, 1px) rotate(-1.4deg) scale(.985); }
+  12%, 86% { opacity: 1; transform: translate(0, 0) rotate(-1deg) scale(1); }
+  92% { opacity: 1; transform: translate(2px, -3px) rotate(.5deg) scale(1.01); }
+  100% { opacity: 0; transform: translate(6px, -14px) rotate(1deg) scale(.92); }
 }
 /* 경고는 종이를 탁 내려놓듯 두 번 흔들린 뒤 그 자리에 남는다(fill: both). */
 @keyframes token-speech-slam {
@@ -2638,6 +2719,9 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 경고는 계속 떠 있는 요소라 숨쉬기까지 끄고 색과 뱃지만으로 세기를 전한다. */
   .token-speech[data-tone='warn'].is-speaking { animation: token-speech-slam .5s ease both; }
   .token-speech-mark { animation: none; }
+  .token-speech.is-speaking .ts-w,
+  .token-speech.is-speaking .ts-strong,
+  .token-actor.is-talking .model-shell > * { animation: none; }
 }
 /* 배우 */
 .actor {
