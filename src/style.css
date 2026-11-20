@@ -7510,7 +7510,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 /* 판(레이어)은 넘겨 들어오지 않는다 — 카드만 뒤집혀 등장한다(.reward-choice, 11/20). */
 .reward-card.skip-entrance .reward-choice { animation: none; }
-.reward-card.skip-entrance .reward-choice::after { content: none; }
+.reward-card.skip-entrance :is(.reward-card-back, .reward-kindline) { animation: none; }
 .reward-skip {
   position: absolute;
   right: 22px;
@@ -11640,30 +11640,83 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   transform-origin: 50% 50%;
   animation: reward-card-flip .7s cubic-bezier(.45, .1, .25, 1) backwards;
 }
-.reward-choice::after {
-  content: '';
+/* 카드 뒷면 — 전투의 '카드 뽑기' 덱(.deck-stack)과 같은 그림일기 뒷면을 카드 모양 그대로 씌운다.
+   카드(.reward-pick) 안에 있어 모서리·크기가 앞면과 똑같고, 아래 가격 줄은 앞면이 드러날 때 함께 나타난다. */
+.reward-card-back {
   position: absolute;
   inset: 0;
-  z-index: 40; /* New!·강화 스티커(z 높음)까지 덮어야 뒷면에 거울 글씨가 비치지 않는다. */
-  border-radius: 20px;
+  z-index: 30; /* New!·강화 스티커(z 8)까지 덮어야 뒷면에 거울 글씨가 비치지 않는다. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  border-radius: inherit;
   pointer-events: none;
   opacity: 0;
+  color: #f8dda0;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 214, 128, .5) 0 34px, transparent 35px),
-    radial-gradient(circle at 50% 50%, transparent 0 52px, rgba(255, 214, 128, .35) 53px 55px, transparent 56px),
-    repeating-linear-gradient(45deg, rgba(255, 214, 128, .07) 0 2px, transparent 2px 18px),
-    repeating-linear-gradient(-45deg, rgba(255, 214, 128, .07) 0 2px, transparent 2px 18px),
-    linear-gradient(160deg, #3a2546, #1b1022 60%, #120a17);
-  box-shadow: inset 0 0 0 3px rgba(255, 214, 128, .55), inset 0 0 0 9px #1b1022, inset 0 0 0 10px rgba(255, 214, 128, .3);
-  animation: reward-card-back .7s linear backwards;
-  animation-delay: inherit;
+    repeating-linear-gradient(45deg, transparent 0 9px, rgba(255, 217, 135, .06) 9px 11px),
+    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
+  box-shadow: inset 0 0 0 3px #d5ad6b, inset 0 0 0 8px #382a3a, inset 0 0 40px rgba(0, 0, 0, .55);
+  animation: reward-card-back .7s linear backwards;  /* 뒷면이 보이는 동안 카드는 뒤에서 보이므로, 글씨가 거울로 뒤집히지 않게 미리 한 번 뒤집어 둔다. */
+  transform: scaleX(-1);
 }
-.reward-shop-card .reward-choice::after { border-radius: 14px; }
-.reward-choice:nth-child(2) { animation-delay: .1s; }
-.reward-choice:nth-child(3) { animation-delay: .2s; }
-.reward-choice:nth-child(4) { animation-delay: .3s; }
-.reward-choice:nth-child(5) { animation-delay: .36s; }
-.reward-choice:nth-child(6) { animation-delay: .42s; }
+.reward-card-back i:first-child {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-top: 34px;
+  border: 3px double #d9ad63;
+  transform: rotate(45deg);
+  background: radial-gradient(circle, rgba(255, 214, 128, .22), transparent 70%);
+  box-shadow: 0 0 22px rgba(255, 207, 118, .4), inset 0 0 18px rgba(255, 207, 118, .24);
+}
+/* 마름모 안의 작은 마름모 하나와 가운데 빛점 — 덱 버튼보다 큰 카드라 한 겹 더 새긴다. */
+.reward-card-back i:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 22px;
+  border: 2px solid rgba(255, 220, 150, .75);
+  background: radial-gradient(circle, #ffe7a8 0 3px, rgba(255, 210, 120, .35) 4px 10px, transparent 11px);
+  box-shadow: 0 0 12px rgba(255, 207, 118, .5);
+}
+.reward-card-back i:nth-child(2) {
+  position: absolute;
+  inset: 16px;
+  border: 1px solid rgba(229, 190, 118, .45);
+  border-radius: 12px;
+  /* 네 모서리 금 장식점 */
+  background:
+    radial-gradient(circle at 12px 12px, #e8bf72 0 3px, transparent 4px),
+    radial-gradient(circle at calc(100% - 12px) 12px, #e8bf72 0 3px, transparent 4px),
+    radial-gradient(circle at 12px calc(100% - 12px), #e8bf72 0 3px, transparent 4px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #e8bf72 0 3px, transparent 4px);
+}
+.reward-card-back b {
+  font-family: var(--font);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #f6d796;
+  -webkit-text-stroke: .6px currentColor;
+  text-shadow: 0 2px 0 #160f1e, 0 2px 8px #000, 0 0 16px rgba(255, 210, 122, .55);
+}
+.reward-shop-card .reward-card-back { gap: 14px; }
+.reward-shop-card .reward-card-back i:first-child { width: 54px; height: 54px; margin-top: 12px; }
+.reward-shop-card .reward-card-back i:first-child::before { inset: 12px; }
+.reward-shop-card .reward-card-back i:nth-child(2) { inset: 10px; border-radius: 8px; }
+.reward-shop-card .reward-card-back b { font-size: 14px; letter-spacing: 3px; }
+.reward-choice .reward-kindline { animation: reward-kindline-in .7s linear backwards; }
+@keyframes reward-kindline-in {
+  0%, 37% { opacity: 0; }
+  60%, 100% { opacity: 1; }
+}
+.reward-choice:nth-child(2), .reward-choice:nth-child(2) :is(.reward-card-back, .reward-kindline) { animation-delay: .1s; }
+.reward-choice:nth-child(3), .reward-choice:nth-child(3) :is(.reward-card-back, .reward-kindline) { animation-delay: .2s; }
+.reward-choice:nth-child(4), .reward-choice:nth-child(4) :is(.reward-card-back, .reward-kindline) { animation-delay: .3s; }
+.reward-choice:nth-child(5), .reward-choice:nth-child(5) :is(.reward-card-back, .reward-kindline) { animation-delay: .36s; }
+.reward-choice:nth-child(6), .reward-choice:nth-child(6) :is(.reward-card-back, .reward-kindline) { animation-delay: .42s; }
 @keyframes reward-card-flip {
   0% { transform: perspective(1500px) translateY(14px) rotateY(180deg) scale(.92); opacity: 0; }
   12% { opacity: 1; }
@@ -11675,6 +11728,5 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   37.1%, 100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .reward-choice { animation: none; }
-  .reward-choice::after { content: none; }
+  .reward-choice, .reward-card-back, .reward-choice .reward-kindline { animation: none; }
 }
