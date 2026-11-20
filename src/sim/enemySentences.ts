@@ -153,10 +153,6 @@ function queenSentence(state: BattleState, enemy: EnemyInst, eventText?: string)
       timingText(state, enemy),
       damageMeta(state, enemy),
       ...(escorts > 0 ? [tx('guardPierce')] : []),
-      // 아직 부르지 않은 페이지 소환을 미리 말해 둔다. 페이지가 넘어가는 순간이 놀람이 아니라 예고가 되게.
-      ...(enemy.def.summonPattern?.summonFromBar != null && escorts === 0 && summonWavesLeft(enemy) > 0
-        ? [tx('summonAtPage', { page: enemy.def.summonPattern.summonFromBar })]
-        : []),
     ],
     context: escorts > 0
       ? {

@@ -250,15 +250,23 @@ function reachedSummonBar(enemy: EnemyInst, bar: number): boolean {
  * 소환 페이지 전에는 그 페이지의 맨 위(첫 페이지만 깨짐), 소환 페이지에 들어섰지만
  * 아직 턴이 안 넘어가 호위가 없으면 그 페이지를 1 남긴다. 해당 없으면 null.
  */
+/** 소환을 시작하는 체력 페이지 번호. 'last'는 이 보스의 마지막 막이다. */
+export function summonBarOf(enemy: Pick<EnemyInst, 'def' | 'healthBars'>): number | null {
+  const bar = enemy.def.summonPattern?.summonFromBar
+  if (bar == null) return null
+  return bar === 'last' ? Math.max(1, enemy.healthBars) : bar
+}
+
 function pendingSummonHpFloor(enemy: EnemyInst): number | null {
   const pattern = enemy.def.summonPattern
-  if (!pattern || pattern.summonFromBar == null || enemy.healthBars < pattern.summonFromBar) return null
+  const summonBar = summonBarOf(enemy)
+  if (!pattern || summonBar == null || enemy.healthBars < summonBar) return null
   if (pattern.maxWaves != null && enemy.summonWaves >= pattern.maxWaves) return null
   if (summonCount(enemy) > 0) return null
   const bar = currentHealthBar(enemy)
   const barsBelow = (page: number) => (enemy.healthBars - page) * enemy.hpPerBar
-  return bar < pattern.summonFromBar
-    ? barsBelow(pattern.summonFromBar - 1)
+  return bar < summonBar
+    ? barsBelow(summonBar - 1)
     : barsBelow(bar) + 1
 }
 
@@ -286,7 +294,8 @@ export function summonAtTurnStart(state: BattleState): TurnSummon[] {
     if (pattern.refillOnlyWhenEmpty && summonCount(enemy) > 0) return
     if (state.turn < enemy.summonRespawnTurn) return
     if (pattern.maxWaves != null && enemy.summonWaves >= pattern.maxWaves) return
-    if (pattern.summonFromBar != null && !reachedSummonBar(enemy, pattern.summonFromBar)) return
+    const summonBar = summonBarOf(enemy)
+    if (summonBar != null && !reachedSummonBar(enemy, summonBar)) return
     enemy.lastSummonTurn = state.turn
     enemy.summonWaves++
     for (let i = 0; i < pattern.perTurn && summonCount(enemy) < pattern.max; i++) {
@@ -634,8 +643,8 @@ function damageEnemy(
     // 함께 보존한다. 일반 적과 단일 막 보스에는 이 경계를 적용하지 않는다.
     if (barOverflow > 0 && multiBarRequirement > 0 && !barOverflowPassed) appliedDamage = currentBarHp
     // 여왕벌처럼 특정 페이지에서 호위를 부르는 보스는, 그 호위가 서기 전에는 그 페이지를
-    // 건너뛰지 못한다. 초강타 한 방이나 한 턴의 연타로 두 번째 페이지를 통째로 날리면
-    // 일벌이 한 번도 나오지 않은 채 전투가 끝났다(11/20: 두 번째 페이지에 한 번만 소환).
+    // 건너뛰지 못한다. 초강타 한 방이나 한 턴의 연타로 소환 페이지를 통째로 날리면
+    // 일벌이 한 번도 나오지 않은 채 전투가 끝났다(11/20: 마지막 페이지에 한 번만 소환).
     const summonFloor = pendingSummonHpFloor(enemy)
     if (summonFloor != null) {
       const capped = Math.max(0, Math.min(appliedDamage, enemy.hp - summonFloor))
