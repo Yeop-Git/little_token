@@ -1793,11 +1793,11 @@ html[data-postprocessing='off'] .tip-bubble {
   /* 피드백(11/20): 좌하단 고정 체력은 프롬과 떨어져 읽혔다. 일반전처럼 프롬의
      머리(후드) 바로 위에 붙인다. 배우 박스 상단이 곧 후드 끝 바로 위다. */
   position: absolute;
-  left: 46%;
-  top: -8px;
+  left: 42%;
+  top: 56px;
   bottom: auto;
   z-index: 58;
-  width: 320px;
+  width: 290px;
   margin: 0;
   transform: translateX(-50%);
 }
@@ -2159,9 +2159,12 @@ html[data-postprocessing='off'] .tip-bubble {
   text-decoration-thickness: 3px;
 }
 .boss-sentence-event {
-  position: absolute;
+  /* 문장판의 찢긴 종이 clip-path가 판 밖(bottom:-28px)에 둔 말풍선을 통째로 잘라
+     안내 문구가 아예 보이지 않았다. 판 안쪽 마지막 줄로 넣는다. */
+  position: relative;
   left: 50%;
-  bottom: -28px;
+  width: max-content;
+  margin-top: 7px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -2172,10 +2175,10 @@ html[data-postprocessing='off'] .tip-bubble {
   border-radius: 4px 10px 5px 12px;
   background: rgba(35, 24, 27, .9);
   box-shadow: 0 8px 18px rgba(0, 0, 0, .4);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   transform: translateX(-50%) rotate(.4deg);
-  white-space: nowrap;
+  white-space: normal;
 }
 .boss-sentence-event b { color: #ffd27e; font-size: 15px; }
 .boss-sentence-board.is-writing { animation: boss-sentence-write .38s cubic-bezier(.2,.86,.25,1) both; }
@@ -10888,9 +10891,10 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .scene.battle[data-boss='true'] .actor.foe.boss.summoner-exposed.front > .model-shell {
   filter:
     blur(var(--model-blur, 0))
-    drop-shadow(0 0 2px #fff8e0)
-    drop-shadow(0 0 3px #ffd45e)
-    drop-shadow(0 0 18px rgba(255, 196, 64, .85))
+    drop-shadow(0 0 1.5px #fffbe8)
+    drop-shadow(0 0 1.5px #ffe07a)
+    drop-shadow(0 0 4px #ffc840)
+    drop-shadow(0 0 22px rgba(255, 196, 64, .9))
     drop-shadow(0 10px 12px rgba(4, 8, 18, .58));
 }
 @keyframes target-chip-bob {
@@ -10954,7 +10958,7 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .leg-sever-banner {
   position: absolute;
   left: 50%;
-  top: 34%;
+  top: 44%;
   z-index: 102;
   display: grid;
   justify-items: center;
