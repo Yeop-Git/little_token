@@ -7488,9 +7488,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   -webkit-backdrop-filter: blur(9px) saturate(1.05);
   backdrop-filter: blur(9px) saturate(1.05);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
-  animation: page-turn 0.7s cubic-bezier(0.3, 0.9, 0.3, 1);
 }
-.reward-card.skip-entrance { animation: none; }
+/* 판(레이어)은 넘겨 들어오지 않는다 — 카드만 뒤집혀 등장한다(.reward-choice, 11/20). */
+.reward-card.skip-entrance .reward-choice { animation: none; }
+.reward-card.skip-entrance .reward-choice::after { content: none; }
 .reward-skip {
   position: absolute;
   right: 22px;
@@ -7620,6 +7621,9 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   transform: rotate(11deg);
   animation: reward-token-in 0.66s cubic-bezier(0.2, 0.8, 0.3, 1.2) 0.34s both;
 }
+/* 새로고침·다음 장처럼 판이 이미 떠 있던 채로 다시 그릴 땐 토큰도 그대로 둔다. */
+.reward-card.is-layer-shown .reward-token,
+.reward-card.skip-entrance .reward-token { animation: none; }
 .reward-token img {
   position: absolute;
   inset: 0;
@@ -11608,3 +11612,50 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 @keyframes rp-up-pulse { 50% { text-shadow: 0 0 16px rgba(255, 214, 110, 1), 0 2px 0 rgba(0, 0, 0, .75); } }
 @media (prefers-reduced-motion: reduce) { .rp-up-new { animation: none; } }
 .rd-card .rp-up { font-size: .8em; } .rd-card .rp-up-new { font-size: 1.08em; }
+/* ── 보상·상점 카드 뒤집힘 등장(11/20) ──
+   판·도구줄·상세 칸은 가만히 있고, 카드만 뒷면에서 앞면으로 뒤집히며 들어온다.
+   앞 절반은 뒷면 무늬(::after)가 덮고, 90도를 넘는 순간 걷혀 앞면이 드러난다.
+   채움은 backwards — 끝난 뒤에는 transform을 놓아 줘야 hover 들림이 그대로 산다. */
+.reward-choice {
+  position: relative;
+  transform-origin: 50% 50%;
+  animation: reward-card-flip .7s cubic-bezier(.45, .1, .25, 1) backwards;
+}
+.reward-choice::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 40; /* New!·강화 스티커(z 높음)까지 덮어야 뒷면에 거울 글씨가 비치지 않는다. */
+  border-radius: 20px;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 214, 128, .5) 0 34px, transparent 35px),
+    radial-gradient(circle at 50% 50%, transparent 0 52px, rgba(255, 214, 128, .35) 53px 55px, transparent 56px),
+    repeating-linear-gradient(45deg, rgba(255, 214, 128, .07) 0 2px, transparent 2px 18px),
+    repeating-linear-gradient(-45deg, rgba(255, 214, 128, .07) 0 2px, transparent 2px 18px),
+    linear-gradient(160deg, #3a2546, #1b1022 60%, #120a17);
+  box-shadow: inset 0 0 0 3px rgba(255, 214, 128, .55), inset 0 0 0 9px #1b1022, inset 0 0 0 10px rgba(255, 214, 128, .3);
+  animation: reward-card-back .7s linear backwards;
+  animation-delay: inherit;
+}
+.reward-shop-card .reward-choice::after { border-radius: 14px; }
+.reward-choice:nth-child(2) { animation-delay: .1s; }
+.reward-choice:nth-child(3) { animation-delay: .2s; }
+.reward-choice:nth-child(4) { animation-delay: .3s; }
+.reward-choice:nth-child(5) { animation-delay: .36s; }
+.reward-choice:nth-child(6) { animation-delay: .42s; }
+@keyframes reward-card-flip {
+  0% { transform: perspective(1500px) translateY(14px) rotateY(180deg) scale(.92); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: perspective(1500px) translateY(0) rotateY(0) scale(1); opacity: 1; }
+}
+/* 회전 곡선(.45,.1,.25,1)에서 90도를 지나는 지점은 시간 축으로 약 37%. 거기서 뒷면을 걷는다. */
+@keyframes reward-card-back {
+  0%, 37% { opacity: 1; }
+  37.1%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-choice { animation: none; }
+  .reward-choice::after { content: none; }
+}

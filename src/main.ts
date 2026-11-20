@@ -820,8 +820,9 @@ async function goReward(
   phase: RewardPhase = run.reward?.phase === 'subject' || run.reward?.phase === 'verb' ? run.reward.phase : 'item',
 ) {
   const request = ++battleRequest
-  reset()
-  stage.setAttribute('data-theme', 'day')
+  // 보상 화면이 이미 떠 있던 채로 다시 그리는 경우(새로고침·다음 장) — 레이어는 그대로, 카드만 뒤집힌다.
+  const layerShown = !!stage.querySelector('.reward-card')
+  const dockShown = !!stage.querySelector('.reward-dock')
   const seed = run.reward?.seed ?? 0
   const refreshes = run.reward?.refreshes?.[phase] ?? 0
   const options = genRewards(
@@ -835,11 +836,15 @@ async function goReward(
   // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
   // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
   if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {
+    reset()
     advanceReward(grade, phase)
     return
   }
   const { RewardView } = await import('@views/RewardView')
   if (request !== battleRequest) return
+  // 비우기는 모듈을 받은 뒤에 한다 — 새로고침 때 빈 화면이 한 프레임이라도 비치지 않게.
+  reset()
+  stage.setAttribute('data-theme', 'day')
   // 카드 문구의 확률은 운 반영 값으로 적는다 — 보상·상점에서도 전투와 같은 운을 쓴다.
   setCardLuck(run.player.stats.luck)
   current = new RewardView(stage, {
@@ -850,6 +855,8 @@ async function goReward(
     phase,
     refreshes,
     options,
+    layerShown,
+    dockShown,
     onPick: (opt) => {
       const cost = rewardPrice(opt)
       if (run.inspiration < cost) {

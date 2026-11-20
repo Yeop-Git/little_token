@@ -50,6 +50,10 @@ interface Opts {
   mode?: 'reward' | 'shop'
   purchases?: number
   playEntrance?: boolean
+  /** 같은 보상 화면이 이미 떠 있던 채로 다시 그릴 때(새로고침·다음 장). 레이어는 그대로 두고 카드만 뒤집는다. */
+  layerShown?: boolean
+  /** 오른쪽 상세 칸이 이미 떠 있었는지 — 떠 있었으면 다시 밀려 들어오지 않는다. */
+  dockShown?: boolean
   onPick: (opt: RewardOption) => void
   onRefresh: () => boolean
   onSkip: () => void
@@ -57,9 +61,9 @@ interface Opts {
 
 /**
  * 화면이 막 열린 직후의 오클릭 보호. 전투·보스 처치 직후 연타하던 클릭이 그대로
- * 카드 구매로 이어지지 않도록, 넘김 연출(0.7s)이 끝날 때까지 구매·새로고침·나가기를 받지 않는다.
+ * 카드 구매로 이어지지 않도록, 카드 뒤집힘 연출(마지막 카드 ~0.9s)이 끝날 때까지 구매·새로고침·나가기를 받지 않는다.
  */
-const ENTRANCE_INPUT_GUARD_MS = 850
+const ENTRANCE_INPUT_GUARD_MS = 900
 
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
@@ -441,7 +445,7 @@ export class RewardView {
     this.root.innerHTML = `
       <div class="scene reward-scene${shop ? ' reward-shop-scene' : ''}" style="background-image:url(${BACKGROUNDS.bg001})">
         <div class="reward-stage">
-          <div class="reward-card${shop ? ' reward-shop-card' : ''}${opts.playEntrance === false ? ' skip-entrance' : ''}">
+          <div class="reward-card${shop ? ' reward-shop-card' : ''}${opts.playEntrance === false ? ' skip-entrance' : ''}${opts.layerShown ? ' is-layer-shown' : ''}">
             ${shop ? `<img class="reward-shop-art" src="${REWARD_ART.shop}" alt="" aria-hidden="true" />` : `<div class="reward-token" aria-hidden="true">
               <img class="reward-token-shadow" src="${TOKEN_FACES.party}" alt="" />
               <img class="reward-token-main" src="${TOKEN_FACES.party}" alt="" />
@@ -472,7 +476,7 @@ export class RewardView {
             </div>
           </div>
           ${shop ? '<div class="reward-side">' : ''}
-            ${!shop && opts.phase === 'item' ? '' : `<aside class="info-dock glass reward-dock empty${!shop && opts.phase === 'subject' ? ' is-entering' : ''}" id="rdetail" aria-live="polite">
+            ${!shop && opts.phase === 'item' ? '' : `<aside class="info-dock glass reward-dock empty${!shop && opts.phase === 'subject' && !opts.dockShown ? ' is-entering' : ''}" id="rdetail" aria-live="polite">
               <div class="rd-hint">${text('rewardDetailHint', '카드에 마우스를 올리면 상세 정보가 표시된다.')}</div>
             </aside>`}
             ${shop ? `<button class="reward-deck" type="button" style="min-height:48px">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
