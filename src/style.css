@@ -11197,3 +11197,59 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 }
 .scene.battle.is-foes-walking .queen-worker-nameplate { opacity: 0; }
 .queen-worker-nameplate { transition: opacity .35s ease; }
+
+/* 잉크 비용 숫자를 잉크 방울 안쪽 원판 중앙에 맞춘다(11/20 피드백). 원판 중심은 그림의
+   (48.3%, 52.5%)이고 글꼴 숫자는 상자 중앙보다 8%가량 위에 앉는다. 패딩으로 내용 영역을 옮겨 맞춘다. */
+.card-cost,
+.rp-ink-cost,
+.wd-ink-cost {
+  box-sizing: border-box;
+  background-origin: border-box;
+}
+/* 상자 한 변의 약 16%를 위 패딩으로 준다(퍼센트 패딩은 부모 폭 기준이라 px로 적는다). */
+.card-cost { padding: 8px 1px 0 0; }
+.rp-ink-cost { padding: 9px 1px 0 0; }
+.wd-ink-cost { padding: 6px 1px 0 0; }
+
+
+/* ── 읽어야 하는 정보는 크게(11/20 피드백) ──
+   상세 패널·단어장 확대의 수치 칩(배율 ×1.20 등)과 키워드 설명이 12~14px로 작아 놓치기 쉬웠다.
+   전투 상세 도크·보상 상세·단어장 확대가 같은 마크업을 쓰므로 여기서 함께 키운다. */
+.wd-grade { font-size: 16px; }
+.wd-values { gap: 8px; margin-top: 14px; }
+.wd-values .v {
+  padding: 6px 13px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 228, 168, .22);
+  font-size: 21px;
+  font-weight: 1000;
+  line-height: 1.2;
+}
+.word-keyword-details h3 { font-size: 14px; }
+.word-keyword-detail b { font-size: 18px; }
+.word-keyword-detail span { font-size: 16px; line-height: 1.5; }
+.rf-h { font-size: 15px; }
+.rf-row { font-size: 17px; line-height: 1.5; }
+/* 단어장 확대는 화면 가운데 한 장이라 한 단계 더 크게. */
+.rds-zoom-detail .wd-name { font-size: 46px; }
+.rds-zoom-detail .wd-values .v { font-size: 26px; padding: 8px 16px; }
+.rds-zoom-detail .word-keyword-detail b { font-size: 21px; }
+.rds-zoom-detail .word-keyword-detail span { font-size: 18px; }
+/* 카드 앞면 행동 표시(공격·방어·회복)가 11px라 수치 옆에서 묻혔다. */
+.card-action-inline b { font-size: 13px; }
+.card-action-inline svg,
+.card-action-inline .baked-stat-icon { width: 14px; height: 14px; }
+/* 보상 카드 앞면의 효과 문구(배율 ×1.20, 관통 등)도 이름 다음으로 크게. */
+.reward-card:not(.reward-shop-card) .rp-effect {
+  font-size: 21px;
+  font-weight: 1000;
+  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, .85);
+}
+.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline b { font-size: 18px; }
+.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline svg,
+.reward-card:not(.reward-shop-card) .rp-effect .card-action-inline .baked-stat-icon { width: 22px; height: 22px; }
+/* 보상 하단 버튼(내 단어장·다른 발상 비용)도 읽혀야 하는 정보다. */
+.reward-controls .reward-deck,
+.reward-controls .reward-refresh,
+.reward-controls .reward-skip { padding: 10px 16px; font-size: 16px; }
