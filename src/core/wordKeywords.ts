@@ -64,7 +64,16 @@ const COPY: Record<LocaleCode, Record<WordKeywordId, KeywordCopy>> = {
   },
 }
 
-export interface WordKeyword { id: WordKeywordId; label: string; detail: string }
+export interface WordKeyword {
+  id: WordKeywordId
+  /** 이름과 값을 한 줄로 이은 문구 — "방패치기 100%". */
+  label: string
+  detail: string
+  /** 카드 앞면 태그에 들어가는 이름만 — "방패치기". */
+  name: string
+  /** 태그 옆에 따로 적는 값 — "100%". 값이 없는 키워드는 빈 문자열. */
+  value: string
+}
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
@@ -86,8 +95,19 @@ export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>
     ['guardEcho', effects?.guardAttackMultiplier ? percent(effects.guardAttackMultiplier) : null],
     ['overflow', effects?.overhealDamageMultiplier ? percent(effects.overhealDamageMultiplier) : null],
   ]
-  const keywords = entries.flatMap(([id, value]) => value == null ? [] : [{ id, label: `${COPY[currentLocale][id].label}${value && (id === 'repeat' || !omitValues?.has(id)) ? ` ${value}` : ''}`, detail: COPY[currentLocale][id].detail }])
-  if ((effects?.attackRank ?? 0) > 0) keywords.push({ id: 'empower', label: `${COPY[currentLocale].empower.label} +${effects!.attackRank}랭크`, detail: RANK_DETAIL[currentLocale].attack })
-  if ((effects?.guardRank ?? 0) > 0) keywords.push({ id: 'guardEmpower', label: `${COPY[currentLocale].guardEmpower.label} +${effects!.guardRank}랭크`, detail: RANK_DETAIL[currentLocale].guard })
+  const keywords: WordKeyword[] = entries.flatMap(([id, value]) => {
+    if (value == null) return []
+    const name = COPY[currentLocale][id].label
+    const shown = value && (id === 'repeat' || !omitValues?.has(id)) ? value : ''
+    return [{ id, name, value: shown, label: shown ? `${name} ${shown}` : name, detail: COPY[currentLocale][id].detail }]
+  })
+  if ((effects?.attackRank ?? 0) > 0) {
+    const name = COPY[currentLocale].empower.label, value = `+${effects!.attackRank}랭크`
+    keywords.push({ id: 'empower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale].attack })
+  }
+  if ((effects?.guardRank ?? 0) > 0) {
+    const name = COPY[currentLocale].guardEmpower.label, value = `+${effects!.guardRank}랭크`
+    keywords.push({ id: 'guardEmpower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale].guard })
+  }
   return keywords
 }

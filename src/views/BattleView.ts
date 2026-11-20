@@ -19,7 +19,7 @@ import {
   statBiasOf,
   type ResolvedMult,
 } from '@core/compiler'
-import { wordNoteText, wordValueLines } from '@core/wordText'
+import { gambleFailLine, wordNoteText, wordValueLines } from '@core/wordText'
 import {
   carryInkAfterSpend,
   inkExceedsLimit,
@@ -2782,7 +2782,9 @@ export class BattleView {
 
   // 단어 하나의 고유 수치 — 누적하지 않는다. 표기 규칙은 체인·보상과 공용이다.
   private wordOwnValues(w: Word, includeKeywords = true): { text: string; cls: string }[] {
-    return wordValueLines(w, this.combatStats(), includeKeywords)
+    const lines = wordValueLines(w, this.combatStats(), includeKeywords)
+    const fail = gambleFailLine(w)
+    return fail ? [...lines, fail] : lines
   }
 
   // ── 좌상단 아이콘 스탯 바 ──

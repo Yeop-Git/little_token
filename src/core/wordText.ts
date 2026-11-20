@@ -60,6 +60,20 @@ export function gambleText(v: Variance): string {
   return v.lo === 1 ? hi : `${hi} · ${L.rest} ×${v.lo.toFixed(2)}`
 }
 
+const GAMBLE_FAIL_LABEL = {
+  ko: '실패 시 배율', en: 'On a miss, multiplier', ja: '失敗時の倍率', ru: 'При неудаче множитель',
+  'zh-Hans': '失败时倍率', 'zh-Hant': '失敗時倍率',
+}[currentLocale]
+
+/**
+ * 도박 카드의 실패 쪽 결과 — "실패 시 배율 ×1.00". 카드 앞면은 짧게 성공 쪽만 적고,
+ * 상세 팝업에서는 붉은 줄로 실패하면 어떻게 되는지 함께 밝힌다(11/20 피드백).
+ */
+export function gambleFailLine(w: Word): ValueLine | null {
+  if (!w.variance) return null
+  return { text: `${GAMBLE_FAIL_LABEL} ×${w.variance.lo.toFixed(2)}`, cls: 'gamble-fail' }
+}
+
 /** 가산 배율 표기 — "배율 ×1.20". */
 export const multText = (bonus: number): string => `${L.mult} ×${(1 + bonus).toFixed(2)}`
 

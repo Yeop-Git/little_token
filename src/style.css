@@ -5908,16 +5908,33 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   justify-content: center;
   gap: 2px 4px;
 }
+/* 키워드도 주행동(공격·방어·회복)처럼 네모 태그로 그리고 값은 옆에 수치처럼 적는다. */
+.card-keyword-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+}
 .card-keyword {
   position: relative;
+  display: inline-flex;
+  align-items: center;
   max-width: 100%;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .7);
+  color: #51483f;
   cursor: help;
+  font-size: 13px;
   font-weight: 1000;
-  text-decoration: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 2px;
-  overflow-wrap: anywhere;
+  line-height: 1.2;
+  white-space: nowrap;
 }
+.card-front.art .card-keyword { color: #f4ead8; background: rgba(5, 5, 10, .62); }
+.rp-effect .card-keyword { color: #f4ead8; padding: 4px 7px; border-radius: 7px; background: rgba(7, 5, 12, .72); }
+.card-keyword-value { font-weight: 1000; }
 .card-keyword:focus-visible,
 .card-keyword:hover {
   color: #2a1710;
@@ -6731,6 +6748,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .wd-values .v.self { color: #ffc15a; }
 .wd-values .v.heal { color: #fff2da; }
 .wd-values .v.guard { color: #fff2da; }
+/* 도박 카드가 실패했을 때의 결과는 붉은 글씨로 따로 밝힌다. */
+.wd-values .v.gamble-fail { color: #ff7a6b; background: rgba(255, 70, 50, .1); }
+.rd-gamble { display: flex; justify-content: center; margin-top: 8px; }
+.rd-gamble .v { font-size: 17px; }
 .wd-warn {
   margin-top: 10px;
   padding: 6px 12px;
@@ -7909,7 +7930,8 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .reward-shop-card .rp-effect .card-action-inline b { font-size: 18px; }
 .reward-shop-card .rp-effect .card-action-inline svg,
 .reward-shop-card .rp-effect .card-action-inline .baked-stat-icon { width: 22px; height: 22px; }
-.reward-shop-card .rp-effect .card-keyword { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.reward-shop-card .rp-effect .card-keyword,
+.reward-card:not(.reward-shop-card) .rp-effect .card-keyword { font-size: 18px; }
 .reward-shop-card .rp-base-stats,
 .reward-shop-card .rp-item-passive { margin-top: 4px; }
 .reward-shop-card .rp-base-stats { gap: 6px; }

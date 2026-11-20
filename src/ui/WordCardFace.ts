@@ -107,7 +107,8 @@ const escapeCardText = (value: string) => value
 export function wordKeywordChipsHtml(word: Word): string {
   const keywords = wordKeywords(word)
   return keywords.length
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.label}</span>`).join('')}</span>`
+    // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
     : ''
 }
 

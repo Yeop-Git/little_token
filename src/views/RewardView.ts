@@ -23,7 +23,7 @@ import type { RewardPhase } from '@core/run'
 import { reinforceWord } from '@core/run'
 import { STAT_NAME } from '@core/compiler'
 import { EARLY_WORDS, makeEarlyTables } from '@data/earlyWords'
-import { critText, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
+import { critText, gambleFailLine, gambleText, multText, wordNoteText, wordValueLines } from '@core/wordText'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { GameAudio } from '@/audio/GameAudio'
 import { SquareBurst } from '@/ui/SquareBurst'
@@ -266,11 +266,13 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
   }
   const word = opt.word!
   // 키워드 설명은 상세 카드에 표시하므로 수치 칩에는 넣지 않는다.
-  const values = wordValueLines(word, undefined, false)
+  const fail = gambleFailLine(word)
+  const values = [...wordValueLines(word, undefined, false), ...(fail ? [fail] : [])]
   const after = opt.reinforce ? { ...word, tags: [...word.tags], effects: word.effects ? { ...word.effects } : undefined, variance: word.variance ? { ...word.variance } : undefined } : null
   if (after) reinforceWord(after)
   // 강화로 변하는 값은 아래 전후 비교에만 표시한다. 변하지 않는 부가 정보는 남긴다.
-  const unchanged = after ? new Set(wordValueLines(after, undefined, false).map((value) => value.text)) : null
+  const afterFail = after ? gambleFailLine(after) : null
+  const unchanged = after ? new Set([...wordValueLines(after, undefined, false), ...(afterFail ? [afterFail] : [])].map((value) => value.text)) : null
   const visibleValues = unchanged ? values.filter((value) => unchanged.has(value.text)) : values
   const comparedKeywords = new Set<WordKeywordId>()
   if (after && after.crit !== word.crit) comparedKeywords.add('critical')
@@ -291,6 +293,8 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
  */
 function wordDockHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
   const word = opt.word!
+  // 도박 카드는 앞면에 성공 쪽만 적으므로 상세 칸에서 실패 결과를 붉게 밝힌다.
+  const failLine = gambleFailLine(word)
   const comparedKeywords = new Set<WordKeywordId>()
   if (opt.reinforce) {
     const after = { ...word, tags: [...word.tags], effects: word.effects ? { ...word.effects } : undefined, variance: word.variance ? { ...word.variance } : undefined }
@@ -301,6 +305,7 @@ function wordDockHtml(opt: RewardOption, deck?: Record<string, Word[]>): string 
   return `
     <div class="rd-card">${wordCardHtml(word)}</div>
     <div class="rd-grade">✦ ${typeLabel(opt)} · ${RARITY_LABEL[opt.rarity]}</div>
+    ${failLine ? `<div class="wd-values rd-gamble"><div class="v ${failLine.cls}">${failLine.text}</div></div>` : ''}
     ${opt.reinforce ? reinforceDeltas(word) : ''}
     ${wordKeywordDetailsHtml(word, comparedKeywords)}
     ${comboHintHtml(word, { combos: makeEarlyTables(deck ?? EARLY_WORDS).combos, words: deck ?? EARLY_WORDS })}`
