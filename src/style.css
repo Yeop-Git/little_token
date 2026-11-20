@@ -1483,11 +1483,16 @@ html[data-postprocessing='off'] .tip-bubble {
   justify-content: flex-end;
   gap: 10px;
 }
+/* 보유 영감·클리어 보상이 첫 줄, 프롬 스탯 알약은 그 아래 둘째 줄에 선다(일반전·보스전 공통).
+   한 줄로 두면 스탯 알약이 화면 가운데 위 문장 칸 쪽으로 길게 뻗어 나갔다. 스탯이 제자리
+   흐름 안에서 한 줄을 차지하므로 아래의 행동 순서·아이템 열도 그만큼 함께 내려간다. */
 .hud-left-status {
   display: flex;
+  flex-wrap: wrap;
+  width: 392px;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px 10px;
   pointer-events: auto;
 }
 /* 보스전에서는 화면 가운데 위를 보스 체력 HUD가 통째로 쓴다(x 580~1340). 한 줄로
@@ -1628,9 +1633,8 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 보스전 중앙 HUD와 한 줄에서 경쟁하지 않는다. 프롬 수치는 좌측 두 번째 줄,
    행동 순서는 그 아래로 내려 세 정보가 서로 겹치지 않게 한다. */
 .scene.battle[data-boss='true'] .hud-player-stats {
-  position: absolute;
-  top: 58px;
-  left: 4px;
+  /* 일반전과 같이 흐름 안 둘째 줄에 선다. 예전의 absolute(top 58px)는 영감·보상 판
+     아래 가장자리를 5px 덮었고, 행동 순서를 margin으로 따로 밀어야 했다. */
   gap: 2px;
   min-height: 46px;
   padding: 4px 7px;
@@ -1642,7 +1646,6 @@ html[data-postprocessing='off'] .tip-bubble {
   padding: 0 8px;
 }
 .scene.battle[data-boss='true'] .hud-player-stats .hud-stat:first-of-type { min-width: 68px; }
-.scene.battle[data-boss='true'] .action-order { margin-top: 74px; }
 .hud-player-name {
   padding: 0 9px 0 5px;
   border-right: 1px solid rgba(255, 225, 170, .2);
@@ -11817,7 +11820,8 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .scene.battle[data-boss='true'] .hud-player-stats .hud-stat b { font-size: 17px; }
 .hud-player-stats { overflow: visible; }
 /* 랭크 딱지 — 스탯 칩 바로 아래에 스탯 색으로 스르륵 붙는다. 랭크는 스테이지가 끝나면 사라진다. */
-.action-order { margin-top: 20px; }
+/* 스탯 알약 아래에 랭크 딱지(최대 두 장)가 붙을 자리를 비워 두고 행동 순서를 세운다. */
+.action-order { margin-top: 30px; }
 .hud-stat .rank-stickers {
   top: calc(100% + 3px);
   right: auto;
