@@ -1389,7 +1389,7 @@ button {
 .tip-bullets li.is-alt::before { color: #9fd0ff; }
 .tip-bullets .tip-or { color: #9fd0ff; font-weight: 1000; }
 /* 예시 줄 — 윗줄의 부연. ↳로 들여 써 윗줄에 딸린 설명임을 보인다. */
-.tip-bullets li.is-example { padding-left: 30px; }
+.tip-bullets li.is-example { padding-left: 36px; }
 .tip-bullets li.is-example::before { content: '↳'; left: 12px; color: #9fd0ff; }
 /* 계산식 숫자 — 점선 밑줄 숫자. 올리면 그 값이 나온 계산을 옆 쪽지로 보여 준다. */
 .trait-tag.is-calc {
