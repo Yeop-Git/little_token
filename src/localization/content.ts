@@ -115,30 +115,35 @@ const BOSS_TACTIC_LORE: Record<ForeignLocale, Record<string, string>> = {
 
 const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
   en: {
+    nunmulDakeun: "Tears wiped, I", onhim: "with everything I have", kkwakmulgo: "jaw clenched", downpour: "poured down",
     magicVeil: 'raised a veil', storedResolve: 'pushed back',
     overflowingHeart: 'offered my heart', drinkInk: 'drank back the ink',
     stainedTomorrow: 'stained', savedBreath: 'gathered my breath',
     dampenMomentum: 'pinned it down', readAhead: 'read',
   },
   ja: {
+    nunmulDakeun: "涙をぬぐったぼくは", onhim: "ありったけの力で", kkwakmulgo: "歯をぐっと食いしばって", downpour: "浴びせかけた",
     magicVeil: '幕をまとった', storedResolve: '押し返した',
     overflowingHeart: '想いを渡した', drinkInk: 'インクを飲み戻した',
     stainedTomorrow: '染めた', savedBreath: '息をためた',
     dampenMomentum: '押さえ込んだ', readAhead: '読んだ',
   },
   ru: {
+    nunmulDakeun: "Утерев слёзы, я", onhim: "изо всех оставшихся сил", kkwakmulgo: "стиснув челюсти", downpour: "обрушил ливнем",
     magicVeil: 'воздвиг завесу', storedResolve: 'оттеснил',
     overflowingHeart: 'передал сердце', drinkInk: 'выпил чернила обратно',
     stainedTomorrow: 'окрасил', savedBreath: 'сберёг дыхание',
     dampenMomentum: 'прижал к земле', readAhead: 'прочитал',
   },
   'zh-Hans': {
+    nunmulDakeun: "擦干眼泪的我", onhim: "用尽全力", kkwakmulgo: "紧紧咬牙", downpour: "倾泻而下",
     magicVeil: '披上了光幕', storedResolve: '推了回去',
     overflowingHeart: '递出了心意', drinkInk: '饮回了墨水',
     stainedTomorrow: '染上了', savedBreath: '存下了气息',
     dampenMomentum: '牢牢压住了', readAhead: '读过了',
   },
   'zh-Hant': {
+    nunmulDakeun: "擦乾眼淚的我", onhim: "用盡全力", kkwakmulgo: "緊緊咬牙", downpour: "傾瀉而下",
     magicVeil: '披上了光幕', storedResolve: '推了回去',
     overflowingHeart: '遞出了心意', drinkInk: '飲回了墨水',
     stainedTomorrow: '染上了', savedBreath: '存下了氣息',
@@ -171,18 +176,23 @@ const EXTRA_WORD_LORE: Record<ForeignLocale, Record<(typeof UPDATED_LORE_IDS)[nu
 
 const REVISED_RANK_LORE: Record<ForeignLocale, Record<string, string>> = {
   en: {
+    nunmulDakeun:"Hands are steadier after crying. Even without a burst, I have already grown a little.", onhim:"All remaining strength goes into two blows that reach past the guard.", kkwakmulgo:"Holding fast with clenched teeth, I return exactly what I blocked.", downpour:"Held-back strokes pour down three times like a shower, soaking away layered veils one by one.",
     andohan:'A relieved breath becomes a veil that erases the next hit.', kkeutkkaji:'Resolve held to the final line raises the attack stance.', kkuk:'It blocks one painful hit and firmly raises the guard stance.', motdohage:'A feigned opening receives the impact, then raises the guard stance.', ipan:'Relentless momentum pierces guard and raises the attack stance.', pogeunhage:'Pulling the blanket up first, warmth wraps around before the next hit lands.', bangeopge:'A welcome story spreads across three foes with a bright decisive stroke.', aesseo:'Gritting through the strain raises the guard stance.', gyeongkwaehage:'A light rhythm saves Ink and moves before the enemy.',
   },
   ja: {
+    nunmulDakeun:"泣いたあとの指先は強い。はじけなくても、もうひと回り育っている。", onhim:"残った力をすべて乗せ、防御の向こうまで二度打ち込む。", kkwakmulgo:"歯を食いしばって耐えた場所から、防いだぶんだけ返す。", downpour:"こらえた線を夕立のように三度浴びせ、重ねた膜も順にはがす。",
     andohan:'安堵の息が次の一撃を消す光の幕になる。', kkeutkkaji:'最後の一行まで残った意志が攻撃態勢を高める。', kkuk:'痛い一撃を防ぎ、防御態勢をしっかり高める。', motdohage:'隙を見せたふりで衝撃を受け、防御態勢を高める。', ipan:'止まらない勢いで防御を貫き、攻撃態勢を高める。', pogeunhage:'毛布を先に引き上げ、次の一撃より早くぬくもりで包む。', bangeopge:'懐かしい物語を三体へ明るい決め手として広げる。', aesseo:'歯を食いしばって耐え、防御態勢を高める。', gyeongkwaehage:'軽いリズムでインクを節約し、敵より先に動く。',
   },
   ru: {
+    nunmulDakeun:"После слёз рука твёрже. Даже без всплеска я уже подрос.", onhim:"Вся оставшаяся сила уходит в два удара сквозь защиту.", kkwakmulgo:"Стиснув зубы, я возвращаю ровно столько, сколько отразил.", downpour:"Сдержанные штрихи трижды обрушиваются ливнем, смывая слой за слоем.",
     andohan:'Облегчённый вздох становится завесой, стирающей следующий удар.', kkeutkkaji:'Решимость дойти до последней строки повышает ранг атаки.', kkuk:'Блокирует болезненный удар и укрепляет ранг защиты.', motdohage:'Ложная слабость принимает удар и повышает ранг защиты.', ipan:'Неудержимый напор пробивает защиту и повышает ранг атаки.', pogeunhage:'Первым натянув одеяло, тепло укрывает до следующего удара.', bangeopge:'Радостная история ярким решающим штрихом охватывает трёх врагов.', aesseo:'Упрямое сопротивление повышает ранг защиты.', gyeongkwaehage:'Лёгкий ритм экономит чернила и позволяет действовать первым.',
   },
   'zh-Hans': {
+    nunmulDakeun:"哭过之后的指尖更坚定。即使没有爆发，也已经长大了一点。", onhim:"把剩下的力气全部压上，越过防御连打两次。", kkwakmulgo:"咬紧牙关撑住，把挡下的全部还回去。", downpour:"忍住的笔画像骤雨一样倾泻三次，把层层薄膜依次冲掉。",
     andohan:'安心的呼吸化作抹去下一击的光幕。', kkeutkkaji:'坚持到最后一行的决心提高攻击阶级。', kkuk:'挡住痛苦一击，并稳稳提高防御阶级。', motdohage:'故意露出破绽承受冲击，同时提高防御阶级。', ipan:'一往无前的气势贯穿防御并提高攻击阶级。', pogeunhage:'先拉起被子，在下一击到来前用温暖裹住自己。', bangeopge:'把重逢的故事化作明亮决胜一笔，铺向三名敌人。', aesseo:'咬牙坚持，提高防御阶级。', gyeongkwaehage:'轻快节奏节省墨水，并抢先于敌人行动。',
   },
   'zh-Hant': {
+    nunmulDakeun:"哭過之後的指尖更堅定。即使沒有爆發，也已經長大了一點。", onhim:"把剩下的力氣全部壓上，越過防禦連打兩次。", kkwakmulgo:"咬緊牙關撐住，把擋下的全部還回去。", downpour:"忍住的筆畫像驟雨一樣傾瀉三次，把層層薄膜依次沖掉。",
     andohan:'安心的呼吸化作抹去下一擊的光幕。', kkeutkkaji:'堅持到最後一行的決心提高攻擊階級。', kkuk:'擋住痛苦一擊，並穩穩提高防禦階級。', motdohage:'故意露出破綻承受衝擊，同時提高防禦階級。', ipan:'一往無前的氣勢貫穿防禦並提高攻擊階級。', pogeunhage:'先拉起被子，在下一擊到來前用溫暖裹住自己。', bangeopge:'把重逢的故事化作明亮決勝一筆，鋪向三名敵人。', aesseo:'咬牙堅持，提高防禦階級。', gyeongkwaehage:'輕快節奏節省墨水，並搶先於敵人行動。',
   },
 }

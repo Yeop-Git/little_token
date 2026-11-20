@@ -5656,6 +5656,7 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
 .card-hand.input-locked { visibility: hidden; }
 .card-hand .word-card:hover:not(.blocked):not(.drawing) .card-lift,
 .card-hand .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift,
+.card-hand .word-card.tip-hold:not(.blocked):not(.drawing) .card-lift,
 .card-hand .word-card.touch-previewing .card-lift {
   transform: translateY(calc(var(--hand-hover-lift) * -1)) scale(var(--hand-hover-scale));
 }
@@ -5683,6 +5684,7 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
 }
 .word-card:hover:not(.blocked):not(.drawing),
 .word-card:focus-visible:not(.blocked):not(.drawing),
+.word-card.tip-hold:not(.blocked):not(.drawing),
 .word-card.selected {
   z-index: 900 !important;
 }

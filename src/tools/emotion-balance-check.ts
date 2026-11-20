@@ -297,7 +297,8 @@ for (const kind of ACTION_KINDS) {
   console.log(`\n${kind} affordable-answer floor: ${(ratio * 100).toFixed(0)}% (${weakest.toFixed(1)} / ${strongest.toFixed(1)})`)
   // 수식어의 공용 배율을 없앤 뒤에는 감정별 전문 분야가 더 선명하다. 비전문 행동도
   // 초반 적 한 번에 대응할 최소치와 최강 감정의 20%는 남겨 완전한 죽은 선택만 막는다.
-  const absoluteFloor: Record<CheckedAction, number> = { attack: 30, guard: 10, heal: 20 }
+  // 11/20: 잉크 비용을 낮춘 뒤 배율 예산(희귀 1.6→1.5)을 함께 낮춰 공격 하한도 같은 비율로 30→28.
+  const absoluteFloor: Record<CheckedAction, number> = { attack: 28, guard: 10, heal: 20 }
   if (ratio < 0.2) {
     console.error(`  [FAIL] one emotion's best <=${SENTENCE_BASE_INK} ${kind} answer is below 20% of the strongest emotion`)
     failed = true

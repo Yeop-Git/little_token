@@ -9,6 +9,7 @@ import { wordValueLines } from '@core/wordText'
 import { canCompleteSentence } from '@core/validator'
 import { canAddItemWithoutLock, hasCompletableDeck, hasDirectAttackDeck, recoverBattleTables } from '@core/deckSafety'
 import { wordInkCost } from '@core/ink'
+import { CARD_POOL_RARITY_QUOTA } from '@core/budget'
 import { ensureCardInInitialDraw } from '@core/hand'
 import { ALL_REWARD_WORDS, EARLY_WORDS, REWARD_WORDS, makeEarlyTables, tablesForEncounter } from '@data/earlyWords'
 import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, bossEliteRarityForDay, eliteRarityForEncounter, enemyDefForEncounter, enemyRarityWeightsForDay } from '@data/enemies'
@@ -833,7 +834,9 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
 
 {
   const player = startingPlayer()
-  assert(player.deck.subj.length === 2 && player.deck.adv.length === 3 && player.deck.verb.length === 4, 'starting deck uses 2-3-4 cards')
+  assert(player.deck.subj.length === 4 && player.deck.adv.length === 3 && player.deck.verb.length === 4, 'starting deck uses 4-3-4 cards')
+  // 11/20: 시작 주어는 감정마다 한 장씩 둔다.
+  assert(new Set(player.deck.subj.map((word) => word.emotion)).size === 4, 'starting subjects cover all four emotions')
   assert(DECK_LIMITS.subj === 6 && DECK_LIMITS.adv === 6 && DECK_LIMITS.verb === 8, 'deck limits use 6-6-8 cards')
   const first = genRewards(player, 5, 1, 'subject')
   const second = genRewards(player, 5, 1, 'item')
@@ -956,16 +959,15 @@ assert(compile({ subj: legacyWord }, { template: { slots: [{ key: 'subj', label:
 assert(EARLY_WORDS.subj.every((subject) => subject.emotion !== 'neutral'), 'starting subjects carry emotions')
 
 const resonanceCards = [...Object.values(EARLY_WORDS).flat(), ...REWARD_WORDS, ...SPECIAL_REWARD_WORDS]
-assert(resonanceCards.length === 68, `resonance card total (${resonanceCards.length})`)
-for (const slot of ['subj', 'adv', 'verb']) {
+// 카드 수는 등급 정원(CARD_POOL_RARITY_QUOTA)이 정본이다. 11/20 고등급 카드 추가로 칸마다
+// 감정 수가 한 장씩 어긋날 수 있어, 정확히 같은 수 대신 차이 1 이하를 지킨다(check-tables와 같은 기준).
+const quotaTotal = (slot: keyof typeof CARD_POOL_RARITY_QUOTA): number => Object.values(CARD_POOL_RARITY_QUOTA[slot]).reduce((a, b) => a + b, 0)
+assert(resonanceCards.length === quotaTotal('subj') + quotaTotal('adv') + quotaTotal('verb'), `resonance card total (${resonanceCards.length})`)
+for (const slot of ['subj', 'adv', 'verb'] as const) {
   const slotCards = resonanceCards.filter((card) => card.slot === slot)
-  const expectedSlotCards = slot === 'verb' ? 28 : 20
-  const expectedEmotionCards = slot === 'verb' ? 7 : 5
-  assert(slotCards.length === expectedSlotCards, `${slot} card total (${slotCards.length})`)
-  for (const emotion of ['joy', 'anger', 'sorrow', 'pleasure'] as const) {
-    const count = slotCards.filter((card) => card.emotion === emotion).length
-    assert(count === expectedEmotionCards, `${slot} ${emotion} balance (${count})`)
-  }
+  assert(slotCards.length === quotaTotal(slot), `${slot} card total (${slotCards.length})`)
+  const counts = (['joy', 'anger', 'sorrow', 'pleasure'] as const).map((emotion) => slotCards.filter((card) => card.emotion === emotion).length)
+  assert(Math.max(...counts) - Math.min(...counts) <= 1, `${slot} emotion balance (${counts.join('/')})`)
   assert(slotCards.every((card) => card.emotion !== 'neutral'), `${slot} has no forced neutral card`)
 }
 

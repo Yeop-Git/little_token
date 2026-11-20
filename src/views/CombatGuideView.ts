@@ -228,7 +228,7 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">손패와 뽑기</h3>
           <ul class="g-bullets">
-            <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 선택지가 넓은 동사 칸만 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
+            <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 감정마다 시작 주어가 한 장씩 있는 주어 칸은 <b>${CARD_HAND_CONFIG.subjInitialHand}장</b>, 선택지가 넓은 동사 칸은 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
             <li>한 스테이지에서 추가로 뽑을 수 있는 횟수는 <b>${CARD_HAND_CONFIG.drawsPerStage}회</b>, 손패는 최대 <b>${CARD_HAND_CONFIG.maxHand}장</b>까지 늘어난다.</li>
             <li>미사용 무료 뽑기 수와 보스 진행 보너스(<b>5·10·15층 +1·+2·+3</b>) 중 큰 값이 획득 영감에 더해진다. 보상 희귀도에는 영향을 주지 않는다.</li>
             <li>카드를 클릭하면 그 칸이 곧바로 확정된다. 아래 단계 버튼을 누르면 그 칸으로 돌아가 뒤 선택을 다시 고를 수 있다.</li>
