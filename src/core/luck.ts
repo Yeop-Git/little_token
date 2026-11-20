@@ -44,11 +44,11 @@ export function luckRarityShift(luck: number): { epic: number; legendary: number
 }
 
 /**
- * 카드 확률(도박 성공·대성공)에 더하는 운 보정. 운 1당 +1%p, 최대 +15%p.
+ * 카드 확률(도박 성공·대성공)에 더하는 운 보정 — 운 효과량(luckValue 곡선) 1당 +2%p.
+ * 운 자체에는 상한이 없고 곡선이 둔화를 맡는다. 확률 쪽 천장은 아래 상한이 맡는다.
  * 확률이 없는 카드(0%)는 운으로 새로 생기지 않는다 — 확률을 쓰는 카드만 오른다.
  */
-export const LUCK_CHANCE_PER = 1
-export const LUCK_CHANCE_MAX_BONUS = 15
+export const LUCK_CHANCE_PER = 2
 /** 도박 성공 확률은 운이 아무리 높아도 95%에서 멈춘다(실패 가능성은 남긴다). */
 export const LUCK_SUCCESS_CAP = 0.95
 
@@ -62,7 +62,7 @@ export interface LuckChance {
 export function luckChance(base: number, luck: number, ceiling = LUCK_SUCCESS_CAP): LuckChance {
   const safeBase = Number.isFinite(base) ? Math.max(0, base) : 0
   if (safeBase <= 0) return { base: 0, bonus: 0, final: 0 }
-  const want = Math.min(LUCK_CHANCE_MAX_BONUS, Math.max(0, Number.isFinite(luck) ? luck : 0) * LUCK_CHANCE_PER) / 100
+  const want = (luckValue(luck) * LUCK_CHANCE_PER) / 100
   const final = Math.max(safeBase, Math.min(ceiling, safeBase + want))
   return { base: safeBase, bonus: final - safeBase, final }
 }
