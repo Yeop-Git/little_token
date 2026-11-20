@@ -175,7 +175,8 @@ function itemCardEffect(opt: RewardOption): string {
     .map((key) => `<span class="rp-base-stat stat-${key}">${STAT_LABEL[key]} +${item.base[key]}</span>`)
     .join('')
   if (!stats) return ''
-  return `<div class="rp-base-stats"><small class="rp-base-label">${text('rewardItemBaseStats', '고유 기본 스탯')}</small>${stats}</div>`
+  // '고유 기본 스탯' 딱지는 뗐다(11/20 피드백) — 수치 칩만 크게 남긴다.
+  return `<div class="rp-base-stats">${stats}</div>`
 }
 
 /**

@@ -732,15 +732,22 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
   }
 }
 
-/** 일반·희귀 아이템 진열에 이번 클리어 씨앗으로 굴린 특성을 붙인다. 새로고침해도 같다. */
-function withItemTrait(item: ItemDef, seed = run.reward?.seed ?? 0): ItemDef {
+/**
+ * 일반·희귀 아이템 진열에 무작위 특성을 붙인다. 클리어 씨앗과 진열 새로고침 횟수로 굴리므로
+ * 영감을 내고 새로고침하면 특성도 다시 굴러가고, 같은 진열을 다시 열면(이어하기) 그대로다.
+ */
+function itemTraitSeed(refreshes: number): number {
+  return ((run.reward?.seed ?? 0) ^ Math.imul(Math.max(0, refreshes) + 1, 0x9e3779b1)) >>> 0
+}
+
+function withItemTrait(item: ItemDef, seed = itemTraitSeed(run.reward?.shopRefreshes ?? 0)): ItemDef {
   if (item.trait || item.passive) return item
   const trait = rollItemTrait(item.id, item.rarity, seed)
   return trait ? { ...item, trait } : item
 }
 
-function withOptionTrait(option: RewardOption): RewardOption {
-  return option.kind === 'item' && option.item ? { ...option, item: withItemTrait(option.item) } : option
+function withOptionTrait(option: RewardOption, refreshes: number): RewardOption {
+  return option.kind === 'item' && option.item ? { ...option, item: withItemTrait(option.item, itemTraitSeed(refreshes)) } : option
 }
 
 function shopOptionFromRef(ref: RewardPickRef | null): RewardOption | null {
@@ -924,7 +931,7 @@ async function goReward(
     phase,
     rewardOfferRng(seed, phase, refreshes),
     run.inspiration,
-  ).map(withOptionTrait)
+  ).map((option) => withOptionTrait(option, refreshes))
   // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
   // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
   if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {

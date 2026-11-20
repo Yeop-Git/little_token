@@ -77,7 +77,7 @@ import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
 import { PART_WEAKNESS_MULT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
-import { defaultPlayer, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
+import { defaultPlayer, itemTooltipHtml, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
 import { hasSeenCombatCoach, markCombatCoachSeen, type CombatCoachHint } from '@core/save'
 import { discoverCombos, discoveredComboIds } from '@core/comboDiscovery'
@@ -2792,7 +2792,11 @@ export class BattleView {
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
       <div class="relic-icons">
-        ${this.player.items.map((item) => `<span class="relic-icon rarity-${ownedItemRarity(item)}" role="img" tabindex="0" aria-label="${tooltipFor(item)}" data-tooltip="${tooltipFor(item)}">${itemArt(item.art)}</span>`).join('')}
+        ${this.player.items.map((item) => {
+          const rarity = ownedItemRarity(item)
+          const attr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+          return `<span class="relic-icon rarity-${rarity}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item))}">${itemArt(item.art)}</span>`
+        }).join('')}
       </div>`
   }
 

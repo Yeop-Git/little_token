@@ -100,7 +100,7 @@ export class CombatGuideView {
   private chapters: Chapter[] = (currentLocale === 'ko' ? [
     { key: 'flow', title: '전투의 흐름', hint: '한 턴에 벌어지는 일', body: () => this.pageFlow() },
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
-    { key: 'damage', title: '피해가 정해지는 순서', hint: '깡수치 × 배율', body: () => this.pageDamage() },
+    { key: 'damage', title: '피해가 정해지는 순서', hint: '깡점수 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
     { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
@@ -150,7 +150,7 @@ export class CombatGuideView {
             <p class="guide-eyebrow">그림일기 · 전투 설명서</p>
             <h1 id="guide-title">오늘의 전투는 이렇게 쓴다</h1>
             <p class="guide-lede">단어 카드를 이어 문장 하나를 완성하면, 그 문장이 그대로 이번 턴의 행동이 된다.
-              여기 적힌 수치는 모두 지금 돌아가는 전투 규칙에서 그대로 읽어 온 값이다.</p>
+              여기 적힌 점수는 모두 지금 돌아가는 전투 규칙에서 그대로 읽어 온 값이다.</p>
             <button type="button" class="guide-back">로비로 돌아가기<kbd>Esc</kbd></button>
           </header>
           <div class="guide-body">
@@ -238,7 +238,7 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">시작 스탯</h3>
           <ul class="g-stats">${stats}</ul>
-          <p class="g-note g-tight">동사의 깡수치는 카드에 박힌 고정 위력이 아니라 <b>스탯 × 계수</b>에서 나온다.
+          <p class="g-note g-tight">동사의 깡점수는 카드에 박힌 고정 위력이 아니라 <b>스탯 × 계수</b>에서 나온다.
             그래서 같은 카드도 스탯이 오르면 함께 세진다.</p>
         </section>
       </div>`
@@ -257,17 +257,17 @@ export class CombatGuideView {
       ['오른쪽 위 · 비용', '문장을 쓸 때 소비하는 잉크. 감정과 겹치지 않게 반대편에 표시한다.'],
       ['테두리와 상세 · 등급', `${Object.values(RARITY_LABEL).join(' · ')}. 카드에 마우스를 올리면 등급과 반복강화 <b>Lv.</b>를 함께 볼 수 있다.`],
       ['가운데 · 이름', '문장에 실제로 적히는 말. 조사는 칸에 맞춰 자동으로 붙는다.'],
-      ['아래 · 한 줄 효과', '이 카드가 문장에 보태는 값 전부. 숨은 수치는 없다.'],
+      ['아래 · 한 줄 효과', '이 카드가 문장에 보태는 값 전부. 숨은 점수는 없다.'],
     ]
 
     const notes: [string, string][] = [
       ['배율 ×1.20', '주어가 문장에 보태는 배율. 주어의 안정성·고점에 따라 비용이 달라진다.'],
-      ['공격 ×1', '동사가 스탯에서 뽑아내는 깡수치. 공격 스탯이 5면 5가 된다.'],
+      ['공격 ×1', '동사가 스탯에서 뽑아내는 깡점수. 공격 스탯이 5면 5가 된다.'],
       ['75% 확률로 배율 ×1.80', '도박 카드. 확률로 높은 배율과 낮은 배율 중 하나가 정해진다.'],
       ['연타 2', '동사의 본행동이 같은 적에게 두 번 이어진다. 이런 직접 행동 키워드는 동사에만 붙는다.'],
       ['다시 뽑기 +1회', '덱에서 카드를 한 번 더 뽑을 수 있다.'],
       ['공격 1랭크↑', `공격·방어 태세는 1랭크마다 25% 변하고 최대 ±${STAT_RANK_LIMIT}랭크까지 쌓인다.`],
-      ['대상 2명', '대상 수치가 2인 동사는 앞의 두 적에게 이어진다. 뒷줄일수록 피해가 줄어든다.'],
+      ['대상 2명', '대상 점수가 2인 동사는 앞의 두 적에게 이어진다. 뒷줄일수록 피해가 줄어든다.'],
     ]
 
     return `
@@ -320,17 +320,17 @@ export class CombatGuideView {
     const luckMult = 1 + STATS.luck * LUCK_MULT
 
     return `
-      <p class="g-lead">피해는 <b>깡수치</b>를 만들고 거기에 <b>배율</b>을 곱해 정해진다.
+      <p class="g-lead">피해는 <b>깡점수</b>를 만들고 거기에 <b>배율</b>을 곱해 정해진다.
         아래 계산은 시작 덱과 시작 스탯으로 실제 컴파일러를 돌린 결과다.</p>
 
       <p class="g-sentence g-sentence-sm">“${intent.sentence}”</p>
 
       <div class="g-calc">
         <section class="g-calc-col">
-          <h3 class="g-h3">① 깡수치</h3>
+          <h3 class="g-h3">① 깡점수</h3>
           <ul class="g-parts">${flats}</ul>
           <p class="g-calc-sum">합계 <b>${base}</b></p>
-          <p class="g-note g-tight">동사가 정한다. 공격이면 피해, 방어·회복이면 그쪽 수치로 들어간다.</p>
+          <p class="g-note g-tight">동사가 정한다. 공격이면 피해, 방어·회복이면 그쪽 점수로 들어간다.</p>
         </section>
         <span class="g-calc-op" aria-hidden="true">×</span>
         <section class="g-calc-col">

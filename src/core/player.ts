@@ -9,6 +9,7 @@ import { itemTraitText, type ItemTraitId } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { WORDS } from '@data/words'
 import { currentLocale } from '@/localization'
+import { formatNumber } from '@core/numberFormat'
 
 export interface PlayerStats {
   hp: number // 최대 체력
@@ -57,7 +58,7 @@ export interface PlayerState {
 export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; desc: string }[] = [
   { key: 'hp', label: '체력', icon: 'heart', desc: '최대 체력이 늘어난다' },
   { key: 'atk', label: '공격', icon: 'sword', desc: '공격 문장의 피해가 커진다' },
-  { key: 'guard', label: '방어', icon: 'shield', desc: '방어(임시 체력) 수치가 커진다' },
+  { key: 'guard', label: '방어', icon: 'shield', desc: '방어(임시 체력) 점수가 커진다' },
   { key: 'heal', label: '회복', icon: 'cross', desc: '회복량이 커진다' },
   { key: 'luck', label: '운', icon: 'clover', desc: '보상등급의 시작·최저치를 올린다 · 도박 보정' },
 ]
@@ -95,6 +96,28 @@ export function itemStatsText(item: OwnedItem): string {
  * 규칙(영웅·전설) 아이템도 스탯 줄을 함께 적는다. 고유효과만 보여 주면 감탄사로
  * 실제로 오른 수치가 화면 어디에도 안 남는다 — 쪽지가 길어지는 편이 낫다.
  */
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!)
+
+/**
+ * 보유 아이템 팝업 쪽지 본문 — 특성 한 칸과 올라가는 스탯 칩을 표로 세운다.
+ * 제목(이름)과 등급 라벨은 쪽지 머리가 따로 그린다.
+ */
+export function itemTooltipHtml(item: OwnedItem): string {
+  const passive = item.passive ? PASSIVES[item.passive] : null
+  const trait = passive ?? (item.trait ? itemTraitText(item.trait, ownedItemRarity(item)) : null)
+  const traitLabel = currentLocale === 'ko' ? '특성' : currentLocale === 'en' ? 'Trait' : currentLocale === 'ru' ? 'Черта' : '特性'
+  const statsLabel = currentLocale === 'ko' ? '올라가는 스탯' : currentLocale === 'en' ? 'Stats gained' : currentLocale === 'ja' ? '上がる能力値' : currentLocale === 'ru' ? 'Прибавка' : currentLocale === 'zh-Hans' ? '提升属性' : '提升屬性'
+  const stats = ITEM_STAT_ORDER
+    .filter((key) => item.stats[key])
+    .map((key) => `<span class="relic-tip-stat stat-${key}"><small>${escapeHtml(STAT_LABEL[key])}</small><b>+${formatNumber(item.stats[key]!)}</b></span>`)
+    .join('')
+  return [
+    trait ? `<span class="relic-tip-trait"><small>${traitLabel}</small><b>${escapeHtml(trait.name)}</b><em>${escapeHtml(trait.desc)}</em></span>` : '',
+    stats ? `<span class="relic-tip-stats-label">${statsLabel}</span><span class="relic-tip-stats">${stats}</span>` : '',
+    item.line ? `<span class="relic-tip-line">“${escapeHtml(item.line)}”</span>` : '',
+  ].join('')
+}
+
 export function itemTooltipText(item: OwnedItem): string {
   const passive = item.passive ? PASSIVES[item.passive] : null
   const stats = itemStatsText(item)

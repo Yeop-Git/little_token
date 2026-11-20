@@ -1337,6 +1337,39 @@ button {
   font-weight: 700;
   line-height: 1.48;
 }
+.tip-bubble.is-rich { white-space: normal; min-width: 280px; }
+.tip-bubble.is-rich .tip-bubble-body { display: grid; gap: 8px; }
+/* 보유 아이템 쪽지 — 특성 한 칸과 올라가는 스탯 칩. 전부 큰 글씨로 한눈에. */
+.relic-tip-trait {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: rgba(255, 214, 126, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 126, .45);
+}
+.relic-tip-trait small { color: #ffd991; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
+.relic-tip-trait b { color: #fff; font-size: 18px; line-height: 1.25; }
+.relic-tip-trait em { grid-column: 1 / -1; color: #fff4de; font-size: 16px; font-style: normal; line-height: 1.35; }
+.relic-tip-stats-label { color: #cdbfa6; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
+.relic-tip-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
+.relic-tip-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(7, 5, 12, .7);
+  box-shadow: inset 0 0 0 1px rgba(232, 221, 202, .45);
+  line-height: 1;
+}
+.relic-tip-stat small { color: #e8ddca; font-size: 14px; font-weight: 800; }
+.relic-tip-stat b { color: #fff; font-size: 19px; font-weight: 1000; }
+.relic-tip-stat.stat-hp b { color: #ffb3c0; }
+.relic-tip-stat.stat-luck b { color: #ffe070; }
+.relic-tip-line { color: #bfb3a0; font-size: 14px; font-style: italic; line-height: 1.35; }
 .tip-bubble.has-title .tip-bubble-body {
   padding-top: 0;
   color: #d9cebc;

@@ -81,7 +81,11 @@ export class TooltipLayer {
       this.title.textContent = title
       this.title.hidden = !title
       this.head.hidden = !label && !title
-      this.body.textContent = body
+      // `data-tip-html`은 게임이 직접 조립한 표(보유 아이템 쪽지 등)에만 쓴다. 사용자 입력은 넣지 않는다.
+      const html = host.dataset.tipHtml
+      if (html) this.body.innerHTML = html
+      else this.body.textContent = body
+      this.bubble.classList.toggle('is-rich', !!html)
       this.bubble.classList.toggle('has-title', !!title)
       this.bubble.dataset.kind = host.dataset.tipKind ?? ''
       this.bubble.dataset.place = host.dataset.tipPlace === 'above' ? 'above' : 'below'

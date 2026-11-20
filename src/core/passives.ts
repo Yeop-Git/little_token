@@ -64,7 +64,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   twinVerb: {
     id: 'twinVerb',
     name: '겹동사',
-    desc: `동사 칸이 둘이 된다 · 두 번째 동사는 ${Math.round(TWIN_VERB_SCALE * 100)}% 수치 · 최대 잉크 +2`,
+    desc: `동사 칸이 둘이 된다 · 두 번째 동사는 ${Math.round(TWIN_VERB_SCALE * 100)}% 점수 · 최대 잉크 +2`,
   },
   retry: {
     id: 'retry',
@@ -79,7 +79,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   heavyShoe: {
     id: 'heavyShoe',
     name: '무거운 구두',
-    desc: `동사의 깡수치에 +${HEAVY_SHOE_FLAT}`,
+    desc: `동사의 깡점수에 +${HEAVY_SHOE_FLAT}`,
   },
   matchFire: {
     id: 'matchFire',
@@ -89,7 +89,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   luckCloak: {
     id: 'luckCloak',
     name: '운을 두른다',
-    desc: `모든 동사가 운 스탯의 ${Math.round(LUCK_CLOAK_RATE * 100)}%만큼 깡수치를 더 받는다`,
+    desc: `모든 동사가 운 스탯의 ${Math.round(LUCK_CLOAK_RATE * 100)}%만큼 깡점수를 더 받는다`,
   },
   bbq: {
     id: 'bbq',
