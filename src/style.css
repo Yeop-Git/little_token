@@ -5829,22 +5829,14 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   letter-spacing: 1.8px;
 }
 .card-back {
-  justify-content: center;
-  gap: 10px;
   transform: rotateY(180deg);
-  color: #f8dda0;
+  /* 그림은 장식일 뿐이라 예전 보랏빛 톤을 덧씌워 채도를 죽인다 — 위에 얹는 글자가 묻히지 않게. */
   background:
-    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255,217,135,.06) 10px 12px),
-    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
+    radial-gradient(circle, rgba(71, 55, 88, .58) 0%, rgba(36, 25, 46, .7) 62%, rgba(22, 15, 30, .8) 100%),
+    #211827 url('./assets/ui/card_back.webp') center / cover no-repeat;
 }
-.card-back i {
-  width: 74px;
-  height: 74px;
-  border: 3px double #d9ad63;
-  transform: rotate(45deg);
-  box-shadow: 0 0 18px rgba(255,207,118,.34), inset 0 0 18px rgba(255,207,118,.2);
-}
-.card-back b { font-family: var(--font); font-size: 12px; letter-spacing: 3px; }
+.card-back > i,
+.card-back > b { display: none; }
 
 /* 풀 일러스트 맥락카드 — 일러스트 전체 + 감정 BaseColor + 발광·깊은그림자 글자 */
 .card-front.art {
@@ -6394,13 +6386,13 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   height: 218px;
   border-radius: 17px;
   color: #f8dda0;
+  /* 그림은 장식일 뿐이라 예전 보랏빛 톤을 덧씌워 채도를 죽인다 — 위에 얹는 글자가 묻히지 않게. */
   background:
-    repeating-linear-gradient(45deg, transparent 0 9px, rgba(255,217,135,.06) 9px 11px),
-    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
-  box-shadow: 7px 7px 0 #4a3841, 13px 13px 0 #211923, inset 0 0 0 3px #d5ad6b, inset 0 0 0 8px #382a3a;
+    radial-gradient(circle, rgba(71, 55, 88, .58) 0%, rgba(36, 25, 46, .7) 62%, rgba(22, 15, 30, .8) 100%),
+    #211827 url('./assets/ui/card_back.webp') center / cover no-repeat;
+  box-shadow: 7px 7px 0 #4a3841, 13px 13px 0 #211923, 0 12px 24px rgba(0, 0, 0, .44);
 }
-.deck-stack i:first-child { width: 72px; height: 72px; border: 2px double rgba(217, 173, 99, .58); transform: rotate(45deg); }
-.deck-stack i:nth-child(2) { position: absolute; inset: 14px; border: 1px solid rgba(229,190,118,.4); border-radius: 10px; }
+.deck-stack > i { display: none; }
 .deck-overlay {
   position: absolute;
   inset: 0;
@@ -11600,44 +11592,15 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  color: #f8dda0;
+  /* 그림은 장식일 뿐이라 예전 보랏빛 톤을 덧씌워 채도를 죽인다 — 위에 얹는 글자가 묻히지 않게. */
   background:
-    repeating-linear-gradient(45deg, transparent 0 9px, rgba(255, 217, 135, .06) 9px 11px),
-    radial-gradient(circle, #473758 0 28%, #24192e 29% 67%, #160f1e 68%);
-  box-shadow: inset 0 0 0 3px #d5ad6b, inset 0 0 0 8px #382a3a, inset 0 0 40px rgba(0, 0, 0, .55);
+    radial-gradient(circle, rgba(71, 55, 88, .58) 0%, rgba(36, 25, 46, .7) 62%, rgba(22, 15, 30, .8) 100%),
+    #211827 url('./assets/ui/card_back.webp') center / cover no-repeat;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, .22);
   animation: reward-card-back .7s linear backwards;  /* 뒷면이 보이는 동안 카드는 뒤에서 보이므로, 글씨가 거울로 뒤집히지 않게 미리 한 번 뒤집어 둔다. */
   transform: scaleX(-1);
 }
-.reward-card-back i:first-child {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  border: 3px double #d9ad63;
-  transform: rotate(45deg);
-  background: radial-gradient(circle, rgba(255, 214, 128, .22), transparent 70%);
-  box-shadow: 0 0 22px rgba(255, 207, 118, .4), inset 0 0 18px rgba(255, 207, 118, .24);
-}
-/* 마름모 안의 작은 마름모 하나와 가운데 빛점 — 덱 버튼보다 큰 카드라 한 겹 더 새긴다. */
-.reward-card-back i:first-child::before {
-  content: '';
-  position: absolute;
-  inset: 22px;
-  border: 2px solid rgba(255, 220, 150, .75);
-  background: radial-gradient(circle, #ffe7a8 0 3px, rgba(255, 210, 120, .35) 4px 10px, transparent 11px);
-  box-shadow: 0 0 12px rgba(255, 207, 118, .5);
-}
-.reward-card-back i:nth-child(2) {
-  position: absolute;
-  inset: 16px;
-  border: 1px solid rgba(229, 190, 118, .45);
-  border-radius: 12px;
-  /* 네 모서리 금 장식점 */
-  background:
-    radial-gradient(circle at 12px 12px, #e8bf72 0 3px, transparent 4px),
-    radial-gradient(circle at calc(100% - 12px) 12px, #e8bf72 0 3px, transparent 4px),
-    radial-gradient(circle at 12px calc(100% - 12px), #e8bf72 0 3px, transparent 4px),
-    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #e8bf72 0 3px, transparent 4px);
-}
+.reward-card-back > i { display: none; }
 .reward-choice .reward-kindline { animation: reward-kindline-in .7s linear backwards; }
 @keyframes reward-kindline-in {
   0%, 37% { opacity: 0; }
