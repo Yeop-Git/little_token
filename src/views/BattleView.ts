@@ -833,7 +833,7 @@ export class BattleView {
     this.q('#bond-btn').addEventListener('click', () => this.openBondRecord())
     this.q('#codex-btn').addEventListener('click', () => this.openCodex())
     this.q('#settings-btn').addEventListener('click', () => this.openSettings())
-    this.q('#home-btn').addEventListener('click', () => this.onHome?.())
+    this.q('#home-btn').addEventListener('click', () => this.confirmHome())
     this.q('#battle-help-button').addEventListener('click', () => this.setHelpOpen(!this.helpOpen))
     this.q('#steps').addEventListener('click', (event) => {
       const back = (event.target as Element | null)?.closest<HTMLButtonElement>('.step-back')
@@ -2868,6 +2868,50 @@ export class BattleView {
           return `<span class="relic-icon rarity-${rarity}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item))}">${itemArt(item.art)}</span>`
         }).join('')}
       </div>`
+  }
+
+  /**
+   * 홈은 이번 전투를 시작 전으로 되돌린다. 설정·도감 바로 옆 자리라 실수로 누르기
+   * 쉬워서, 한 번 더 묻고 나서만 타이틀로 보낸다.
+   */
+  private confirmHome() {
+    if (!this.onHome) return
+    const host = this.q('#overlay')
+    host.innerHTML = `
+      <div class="ov-backdrop"></div>
+      <section class="ov-panel glass home-confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="home-confirm-title" aria-describedby="home-confirm-body">
+        <div class="ov-head">
+          <div class="ov-title" id="home-confirm-title">${icon('home')} 타이틀로 나갈까요?</div>
+          <button class="ov-close" id="ov-x" type="button" aria-label="닫기">${icon('close')}</button>
+        </div>
+        <p class="home-confirm-body" id="home-confirm-body">지금 나가면 이번 전투는 처음부터 다시 해야 해요.<br />지난 보상까지의 기록은 그대로 남아요.</p>
+        <div class="home-confirm-actions">
+          <button type="button" class="settings-reset-btn" data-home-confirm="stay">계속 싸우기</button>
+          <button type="button" class="settings-reset-btn is-danger" data-home-confirm="leave">타이틀로 나가기</button>
+        </div>
+      </section>`
+    host.classList.add('open')
+    const close = () => {
+      window.removeEventListener('keydown', onKey, true)
+      if (!this.destroyed) this.closeOverlay()
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }
+    window.addEventListener('keydown', onKey, true)
+    host.querySelector('#ov-x')!.addEventListener('click', close)
+    host.querySelector('.ov-backdrop')!.addEventListener('click', close)
+    const stay = host.querySelector<HTMLButtonElement>('[data-home-confirm="stay"]')!
+    stay.addEventListener('click', close)
+    host.querySelector<HTMLButtonElement>('[data-home-confirm="leave"]')!.addEventListener('click', () => {
+      close()
+      this.onHome?.()
+    })
+    // 실수로 엔터·스페이스를 한 번 더 눌러도 나가지 않게 '계속 싸우기'에 둔다.
+    stay.focus()
   }
 
   private openSettings() {
