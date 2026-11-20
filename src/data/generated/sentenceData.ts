@@ -38,13 +38,49 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "targetMode": "enemy",
       "rarity": "rare",
       "art": "1002",
-      "note": "75% 확률로 배율 ×1.80",
+      "note": "75% 확률로 배율 ×1.65",
       "lore": "지난 일은 이미 정해져 있다. 그래서 자주 손에 잡힌다.",
       "variance": {
         "p": 0.75,
-        "hi": 1.8,
+        "hi": 1.65,
         "lo": 1
       }
+    },
+    {
+      "id": "hwanan",
+      "text": "화가 난 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "anger"
+      ],
+      "emotion": "anger",
+      "inkCost": 0,
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "art": "1012",
+      "note": "배율 ×1.20",
+      "lore": "구겨진 페이지를 펴며 씩씩거린다."
+    },
+    {
+      "id": "deultteun",
+      "text": "들뜬 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "play"
+      ],
+      "emotion": "pleasure",
+      "inkCost": 1,
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "art": "1018",
+      "note": "배율 ×1.20",
+      "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
     }
   ],
   "adv": [
@@ -187,11 +223,11 @@ export const REWARD_WORDS: Word[] = [
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1003",
-    "note": "60% 확률로 배율 ×2.00",
+    "note": "60% 확률로 배율 ×1.85",
     "lore": "누가 먼저였는지는 중요하지 않다.",
     "variance": {
       "p": 0.6,
-      "hi": 2,
+      "hi": 1.85,
       "lo": 1
     }
   },
@@ -335,11 +371,11 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "joy",
     "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1010",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "서로의 공책을 꼭 잡아 준다."
   },
   {
@@ -353,33 +389,15 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "joy",
     "inkCost": 2,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1011",
-    "note": "배율 ×1.60 · 매직실드 1",
+    "note": "배율 ×1.50 · 매직실드 1",
     "lore": "안도의 숨이 다음 공격을 지우는 빛의 막이 된다.",
     "effects": {
       "magicShield": 1
     }
-  },
-  {
-    "id": "hwanan",
-    "text": "화가 난 나는",
-    "slot": "subj",
-    "tags": [
-      "self",
-      "anger"
-    ],
-    "emotion": "anger",
-    "inkCost": 0,
-    "person": "first",
-    "bonus": 0.2,
-    "targetMode": "enemy",
-    "rarity": "common",
-    "art": "1012",
-    "note": "배율 ×1.20",
-    "lore": "구겨진 페이지를 펴며 씩씩거린다."
   },
   {
     "id": "matseo",
@@ -392,11 +410,11 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "anger",
     "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1013",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "같은 줄에서 벌레를 마주 본다."
   },
   {
@@ -410,11 +428,11 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "anger",
     "inkCost": 2,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1014",
-    "note": "배율 ×1.60 · 매직실드 1 · 방어 +2랭크",
+    "note": "배율 ×1.50 · 매직실드 1 · 방어 +2랭크",
     "lore": "마지막 한 줄까지 버틴 집념이 빛의 막과 단단한 방어 태세가 된다.",
     "effects": {
       "magicShield": 1,
@@ -468,30 +486,12 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "sorrow",
     "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1017",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "어제의 줄을 다시 읽어 본다."
-  },
-  {
-    "id": "deultteun",
-    "text": "들뜬 나는",
-    "slot": "subj",
-    "tags": [
-      "self",
-      "play"
-    ],
-    "emotion": "pleasure",
-    "inkCost": 1,
-    "person": "first",
-    "bonus": 0.2,
-    "targetMode": "enemy",
-    "rarity": "common",
-    "art": "1018",
-    "note": "배율 ×1.20",
-    "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
   },
   {
     "id": "sinnan",
@@ -523,11 +523,11 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "pleasure",
     "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1020",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "여백에 작은 낙서를 남긴다."
   },
   {
@@ -630,11 +630,11 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 1,
     "rarity": "common",
     "art": "2007",
-    "note": "연타 2회·60%",
+    "note": "연타 2회·62%",
     "lore": "재빠른 발놀림으로 같은 행동을 한 번 더 가볍게 이어 간다.",
     "effects": {
       "castCount": 2,
-      "castScale": 0.6
+      "castScale": 0.62
     }
   },
   {
@@ -820,14 +820,12 @@ export const REWARD_WORDS: Word[] = [
       "lone"
     ],
     "emotion": "sorrow",
-    "inkCost": 2,
+    "inkCost": 1,
+    "crit": 0.3,
     "rarity": "common",
     "art": "2016",
-    "note": "매직실드 1",
-    "lore": "홀로 앉아 마음에 얇은 막을 친다. 다음 공격 한 번은 그 막에 닿지 못한다.",
-    "effects": {
-      "magicShield": 1
-    }
+    "note": "대성공 30%",
+    "lore": "홀로 앉아 숨을 고르다가 아무도 모르는 틈에 정확한 한 줄을 긋는다."
   },
   {
     "id": "aesseo",
@@ -898,6 +896,68 @@ export const REWARD_WORDS: Word[] = [
     "lore": "가벼운 박자로 잉크를 아끼며 상대보다 먼저 움직인다.",
     "effects": {
       "inkDiscount": 2
+    }
+  },
+  {
+    "id": "nunmulDakeun",
+    "text": "눈물 닦은 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "tear"
+    ],
+    "emotion": "sorrow",
+    "inkCost": 2,
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "legendary",
+    "art": "1015",
+    "note": "60% 확률로 배율 ×2.60 · 나머지 ×1.50",
+    "lore": "울고 난 뒤의 손끝은 단단하다. 터지지 않아도 이미 한 뼘 자랐다.",
+    "variance": {
+      "p": 0.6,
+      "hi": 2.6,
+      "lo": 1.5
+    }
+  },
+  {
+    "id": "onhim",
+    "text": "온 힘을 다해",
+    "slot": "adv",
+    "tags": [
+      "force",
+      "rage"
+    ],
+    "emotion": "anger",
+    "inkCost": 2,
+    "rarity": "legendary",
+    "art": "2004",
+    "note": "관통 · 연타 2회·60%",
+    "lore": "남은 힘을 전부 실어 방어 너머까지 두 번 내리친다.",
+    "effects": {
+      "pierceGuard": true,
+      "castCount": 2,
+      "castScale": 0.6
+    }
+  },
+  {
+    "id": "kkwakmulgo",
+    "text": "이를 꽉 물고",
+    "slot": "adv",
+    "tags": [
+      "solid",
+      "counter"
+    ],
+    "emotion": "sorrow",
+    "inkCost": 2,
+    "rarity": "legendary",
+    "art": "2016",
+    "note": "카운터 · 매직실드 1",
+    "lore": "이를 악물고 버틴 자리에서 막아 낸 만큼 되돌려 준다. 다음 공격 한 번은 아예 닿지 못한다.",
+    "effects": {
+      "counter": true,
+      "magicShield": 1
     }
   }
 ]

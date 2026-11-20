@@ -5,21 +5,23 @@ import type { Emotion } from '@core/types'
  * 어느 감정으로도 3장 공명을 안정적으로 만들 수 있다. 성장/문장부호만 무감정이다.
  */
 const WORD_EMOTIONS: Record<string, Emotion> = {
-  // 1번 주어: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
+  // 1번 주어: 기쁨 5 · 분노 5 · 슬픔 6 · 즐거움 5 (시작 주어는 감정마다 한 장)
   'early:na': 'joy', 'early:eoje': 'sorrow', 'reward:nado': 'pleasure', 'reward:oneul': 'joy',
   'reward:gyeop': 'anger', 'reward:naman': 'anger', 'reward:dachin': 'sorrow', 'reward:uri': 'pleasure',
   'reward:utneun': 'joy', 'reward:ttatteutan': 'joy', 'reward:andohan': 'joy',
-  'reward:hwanan': 'anger', 'reward:matseo': 'anger', 'reward:kkeutkkaji': 'anger',
+  'early:hwanan': 'anger', 'reward:matseo': 'anger', 'reward:kkeutkkaji': 'anger',
   'reward:ulmeogin': 'sorrow', 'reward:hollo': 'sorrow', 'reward:gogae': 'sorrow',
-  'reward:deultteun': 'pleasure', 'reward:sinnan': 'pleasure', 'reward:jangnan': 'pleasure',
+  'early:deultteun': 'pleasure', 'reward:sinnan': 'pleasure', 'reward:jangnan': 'pleasure',
+  'reward:nunmulDakeun': 'sorrow',
 
-  // 2번 수식: 기쁨 5 · 분노 5 · 슬픔 5 · 즐거움 5
+  // 2번 수식: 기쁨 5 · 분노 6 · 슬픔 6 · 즐거움 5
   'early:himkkeot': 'anger', 'early:dandanhi': 'joy', 'early:saljjak': 'pleasure', 'reward:naepda': 'anger',
   'reward:kkuk': 'sorrow', 'reward:nunmullo': 'sorrow',
   'reward:jaeppalli': 'pleasure', 'reward:motdohage': 'sorrow', 'reward:michin': 'anger', 'reward:ipan': 'anger',
   'reward:hwanhage': 'joy', 'reward:pogeunhage': 'joy', 'reward:bangeopge': 'joy', 'reward:useumyeo': 'joy',
   'reward:geochilge': 'anger', 'reward:sseulsseulhi': 'sorrow', 'reward:aesseo': 'sorrow',
   'reward:sinnage': 'pleasure', 'reward:deulsseogimyeo': 'pleasure', 'reward:gyeongkwaehage': 'pleasure',
+  'reward:onhim': 'anger', 'reward:kkwakmulgo': 'sorrow',
 
   // 3번 동사: 일반 카드 2장 + 특수 보상 카드 3장씩으로 감정마다 5장.
   'early:ttaeryeot': 'anger', 'early:makat': 'anger', 'early:gamssat': 'joy',

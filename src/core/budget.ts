@@ -11,11 +11,12 @@ export type BudgetRarity = 'common' | 'rare' | 'epic'
 
 /**
  * 배율 칸(주어·어미·문장부호)의 기대 배율 예산.
+ * 11/20: 잉크 비용을 낮춘 뒤 문장이 충분히 강해 희귀 1.6→1.5로 낮췄다. 영웅을 낮추면 도박 주어가 1잉크로 내려가 잉크 아이템과 겹쳐 공격 상한을 넘어 2.1로 둔다.
  * 기대 배율 = (1 + bonus) × 도박 기댓값 × (1 + 0.5 × 대성공률)  ← 대성공은 ×1.5
  */
 export const MULT_BUDGET: Record<BudgetRarity, number> = {
   common: 1.2,
-  rare: 1.6,
+  rare: 1.5,
   epic: 2.1,
 }
 
@@ -36,11 +37,11 @@ export const OFF_STAT_VERB_COEF_BUDGET: Record<BudgetRarity, number> = {
 /** 예산 검사 허용 오차. 표기용 반올림(×1.15 · 대성공 10% = 1.2075)까지만 허용한다. */
 export const BUDGET_TOLERANCE = 0.05
 
-/** 성장·보스 대여 카드를 제외한 3슬롯 실전 카드풀의 4:3:2:1 정수 근사. */
+/** 성장·보스 대여 카드를 제외한 3슬롯 실전 카드풀의 4:3:2:1 정수 근사. 전설은 11/20 고등급 카드 추가로 한두 장 더 둔다. */
 export const CARD_POOL_RARITY_QUOTA: Record<'subj' | 'adv' | 'verb', Record<Rarity, number>> = {
-  subj: { common: 8, rare: 6, epic: 4, legendary: 2 },
-  adv: { common: 8, rare: 6, epic: 4, legendary: 2 },
-  verb: { common: 11, rare: 8, epic: 6, legendary: 3 },
+  subj: { common: 8, rare: 6, epic: 4, legendary: 3 },
+  adv: { common: 8, rare: 6, epic: 4, legendary: 4 },
+  verb: { common: 11, rare: 8, epic: 6, legendary: 4 },
 }
 
 /** 도박 기댓값 — 컴파일러의 굴림과 같은 정의(p로 hi, 나머지는 lo). */

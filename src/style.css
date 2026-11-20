@@ -5679,6 +5679,7 @@ body:has(.combo-flash.show, .resonance-flash.show) .token-speech { opacity: 0 !i
 .card-hand.input-locked { visibility: hidden; }
 .card-hand .word-card:hover:not(.blocked):not(.drawing) .card-lift,
 .card-hand .word-card:focus-visible:not(.blocked):not(.drawing) .card-lift,
+.card-hand .word-card.tip-hold:not(.blocked):not(.drawing) .card-lift,
 .card-hand .word-card.touch-previewing .card-lift {
   transform: translateY(calc(var(--hand-hover-lift) * -1)) scale(var(--hand-hover-scale));
 }
@@ -5706,6 +5707,7 @@ body:has(.combo-flash.show, .resonance-flash.show) .token-speech { opacity: 0 !i
 }
 .word-card:hover:not(.blocked):not(.drawing),
 .word-card:focus-visible:not(.blocked):not(.drawing),
+.word-card.tip-hold:not(.blocked):not(.drawing),
 .word-card.selected {
   z-index: 900 !important;
 }

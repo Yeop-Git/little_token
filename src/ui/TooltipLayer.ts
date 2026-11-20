@@ -80,6 +80,8 @@ export class TooltipLayer {
   private title: HTMLElement
   private body: HTMLElement
   private anchor: HTMLElement | null = null
+  /** 쪽지를 띄운 손패 카드 — 쪽지가 떠 있는 동안 들린 자세를 유지한다. */
+  private heldCard: HTMLElement | null = null
   /** 본 쪽지 안 태그에 올렸을 때 옆에 붙는 두 번째 쪽지(태그 설명이나 카드 앞면). */
   private sub: HTMLElement
   private subAnchor: HTMLElement | null = null
@@ -177,7 +179,13 @@ export class TooltipLayer {
     const text = host.dataset.tooltip
     if (!text) return
     if (host !== this.anchor) {
+      this.releaseCardHold()
       this.anchor = host
+      // 손패 카드의 태그 쪽지는 카드 위로 겹쳐 뜬다. 쪽지로 마우스가 넘어가는 순간 카드의
+      // :hover가 풀려 카드가 내려앉고, 따라 내려온 쪽지 아래로 다시 카드가 잡혀 올라오는
+      // 진동이 생겼다(11/20 피드백). 쪽지가 떠 있는 동안 그 카드를 들린 자세로 붙잡아 둔다.
+      this.heldCard = host.closest<HTMLElement>('.word-card')
+      this.heldCard?.classList.add('tip-hold')
       this.hideSub()
       const label = host.dataset.tipLabel ?? ''
       const lines = text.split('\n')
@@ -209,6 +217,7 @@ export class TooltipLayer {
     this.cancelHide()
     if (!this.anchor) return
     this.anchor = null
+    this.releaseCardHold()
     this.interactive = false
     this.bubble.classList.remove('is-interactive')
     this.hideSub()
@@ -217,6 +226,11 @@ export class TooltipLayer {
       cancelAnimationFrame(this.raf)
       this.raf = 0
     }
+  }
+
+  private releaseCardHold() {
+    this.heldCard?.classList.remove('tip-hold')
+    this.heldCard = null
   }
 
   /** 적이 걸어 들어오거나 레일이 당겨지는 동안에도 쪽지가 아이콘을 따라간다. */

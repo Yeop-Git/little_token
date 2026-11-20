@@ -131,7 +131,8 @@ assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even be
 assert.equal(inkExceedsLimit(6, 5), true, 'sentences cannot exceed five ink')
 assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost != null), 'reward verbs expose Ink cost as part of their identity')
 const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word) => word.id === id)!)
-assert.equal(specialCost('magicVeil'), 3, 'guard-to-damage echo pays for its conversion coefficient')
+// 11/20: 같은 슬픔 3잉크 방어의 「웅크렸다」를 완전히 덮지 않도록 방패치기 100%로 올리고 4잉크로 매긴다.
+assert.equal(specialCost('magicVeil'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('overflowingHeart'), 4, 'overheal-to-damage pays for its conversion coefficient')
 assert.equal(specialCost('stainedTomorrow'), 4, 'high-ratio lifesteal pays by its healing ratio')

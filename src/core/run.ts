@@ -221,7 +221,9 @@ export function reinforceWord(w: Word): void {
   w.level = (w.level ?? 1) + 1
   if (w.power != null) w.power += REINFORCE_STEP.power
   if (w.statMult != null) w.statMult = Math.round((w.statMult + REINFORCE_STEP.statMult) * 100) / 100
-  if (w.bonus != null) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
+  // 도박 카드의 핵심 수치는 고점이다. 배율 풀까지 올리면 실패해도 ×1.15·×1.30이 붙어
+  // 상세 팝업의 "실패 시 배율 ×1.00"과 실제 결과가 어긋났다(11/20 피드백).
+  if (w.bonus != null && !w.variance) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
   if (w.variance) {
     w.variance = { ...w.variance, hi: Math.round((w.variance.hi + REINFORCE_STEP.varianceHi) * 100) / 100 }
   }
