@@ -233,6 +233,8 @@ export class CardHand {
     this.sealedWordIds.add(picked.word.id)
     if (this.selectedId === picked.instanceId) this.selectedId = null
     this.render()
+    // 거미줄이 날아와 닿기 전까지는 봉인 그물을 숨겨 둔다. 닿는 순간(playSealImpact) 붙는다.
+    this.opts.handRoot.querySelector(`[data-instance-id="${picked.instanceId}"]`)?.classList.add('web-pending')
     return { instanceId: picked.instanceId, word: picked.word }
   }
 
@@ -241,6 +243,7 @@ export class CardHand {
     window.setTimeout(() => {
       const button = this.opts.handRoot.querySelector<HTMLButtonElement>(`[data-instance-id="${instanceId}"]`)
       if (!button) return
+      button.classList.remove('web-pending')
       button.classList.add('web-catching')
       window.setTimeout(() => button.isConnected && button.classList.remove('web-catching'), 900)
     }, delay)
@@ -582,7 +585,7 @@ export class CardHand {
       // 풀에 들어가면, 다음에 빌려 쓸 때 그 애니메이션이 이어져 뒷면이 보이거나
       // 엉뚱한 자리에서 시작한다. CSS 애니메이션은 다시 붙을 때 처음부터 돈다.
       button.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
-      button.classList.remove('pressing', 'selected', 'touch-previewing', 'drawing', 'sealed', 'blocked', 'web-catching')
+      button.classList.remove('pressing', 'selected', 'touch-previewing', 'drawing', 'sealed', 'blocked', 'web-catching', 'web-pending')
       button.remove()
       const key = button.dataset.poolKey
       if (!key) return

@@ -2523,7 +2523,7 @@ export class BattleView {
         (other) => other.id === candidate.id || this.cardHand.isSealed(other),
         wasAttackPossible ? canDealDamage : undefined)),
     )
-    if (sealed) this.playSpiderWebProjectile(pending.enemyIdx, sealed.instanceId)
+    if (sealed) void this.playSpiderWebProjectile(pending.enemyIdx, sealed.instanceId)
     this.log(
       sealed
         ? `장로거미가 ${this.t.template.slots.find((slot) => slot.key === slotKey)?.label ?? slotKey} 「${sealed.word.text}」 카드를 봉인했다. · 봉인 ${this.cardHand.sealedCount}/${pending.maxSealed}`
@@ -2537,47 +2537,83 @@ export class BattleView {
   }
 
   /** 장로거미에서 봉인 카드까지 실선과 거미줄 스프라이트가 함께 날아간다. */
-  private playSpiderWebProjectile(enemyIdx: number, instanceId: string) {
+  private async playSpiderWebProjectile(enemyIdx: number, instanceId: string) {
+    // 손패가 덱에서 날아오는 중이면 그 카드(와 손패 영역)의 이동이 끝날 때까지 기다린다.
+    // 끝까지 따라가더라도 날아가는 카드에 맞히면 거미줄이 허공을 향하는 것처럼 보인다.
+    const card = this.root.querySelector<HTMLElement>(`#card-hand [data-instance-id="${instanceId}"]`)
+    if (card) {
+      const moving = document.getAnimations().filter((animation) => {
+        const target = (animation.effect as KeyframeEffect | null)?.target
+        const timing = animation.effect?.getComputedTiming()
+        return target instanceof Element && (target.contains(card) || card.contains(target))
+          && animation.playState === 'running' && timing?.iterations !== Infinity
+      })
+      if (moving.length) {
+        await Promise.race([
+          Promise.allSettled(moving.map((animation) => animation.finished)),
+          new Promise((resolve) => window.setTimeout(resolve, 700)),
+        ])
+        if (this.destroyed) return
+      }
+    }
     const scene = this.q<HTMLElement>('.scene.battle')
     const source = this.root.querySelector<HTMLElement>(`.actor.foe[data-i="${enemyIdx}"] .model-shell`)
-    const target = this.root.querySelector<HTMLElement>(`#card-hand [data-instance-id="${instanceId}"]`)
-    if (!source || !target) {
+    const findTarget = () => this.root.querySelector<HTMLElement>(`#card-hand [data-instance-id="${instanceId}"]`)
+    if (!source || !findTarget()) {
       this.cardHand.playSealImpact(instanceId)
       return
     }
-    const sceneRect = scene.getBoundingClientRect()
-    const sourceRect = source.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    const scaleX = sceneRect.width / scene.offsetWidth || 1
-    const scaleY = sceneRect.height / scene.offsetHeight || 1
-    const fromX = (sourceRect.left + sourceRect.width * .5 - sceneRect.left) / scaleX
-    const fromY = (sourceRect.top + sourceRect.height * .42 - sceneRect.top) / scaleY
-    const toX = (targetRect.left + targetRect.width * .5 - sceneRect.left) / scaleX
-    const toY = (targetRect.top + targetRect.height * .46 - sceneRect.top) / scaleY
-    const dx = toX - fromX
-    const dy = toY - fromY
-    const distance = Math.hypot(dx, dy)
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    // 봉인은 슬롯이 열리는 순간, 즉 손패가 덱에서 막 날아오는 중에 걸린다. 예전엔 그
+    // 순간의 카드 좌표를 한 번만 재서 쐈기 때문에 거미줄이 덱 쪽 허공(아직 카드가
+    // 날아오던 자리)으로 날아가고, 정작 봉인된 카드는 다른 곳에 있었다(11/20 피드백).
+    // 이제 매 프레임 그 카드의 현재 위치를 다시 읽어 끝점이 카드를 따라간다.
+    const toScene = (rect: DOMRect, fx: number, fy: number) => {
+      const sceneRect = scene.getBoundingClientRect()
+      const scaleX = sceneRect.width / scene.offsetWidth || 1
+      const scaleY = sceneRect.height / scene.offsetHeight || 1
+      return {
+        x: (rect.left + rect.width * fx - sceneRect.left) / scaleX,
+        y: (rect.top + rect.height * fy - sceneRect.top) / scaleY,
+      }
+    }
+    const from = toScene(source.getBoundingClientRect(), .5, .42)
 
     const line = document.createElement('i')
-    line.className = 'spider-web-shot-line'
-    line.style.left = `${fromX}px`
-    line.style.top = `${fromY}px`
-    line.style.width = `${distance}px`
-    line.style.setProperty('--web-angle', `${angle}deg`)
+    line.className = 'spider-web-shot-line is-tracking'
+    line.style.left = `${from.x}px`
+    line.style.top = `${from.y}px`
 
     const projectile = document.createElement('img')
     projectile.className = 'spider-web-projectile'
     projectile.src = SPRITES.effect_card_web_seal
     projectile.alt = ''
-    projectile.style.left = `${fromX}px`
-    projectile.style.top = `${fromY}px`
+    projectile.style.left = `${from.x}px`
+    projectile.style.top = `${from.y}px`
+    projectile.style.opacity = '.15'
+    projectile.style.transform = 'translate(-50%, -50%) scale(.08) rotate(-18deg)'
     scene.append(line, projectile)
-    projectile.animate([
-      { opacity: .15, transform: 'translate(-50%, -50%) scale(.08) rotate(-18deg)' },
-      { opacity: .9, offset: .38, transform: `translate(calc(-50% + ${dx * .46}px), calc(-50% + ${dy * .46}px)) scale(.26) rotate(8deg)` },
-      { opacity: 1, transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.58) rotate(0deg)` },
-    ], { duration: 520, easing: 'cubic-bezier(.2,.72,.2,1)', fill: 'forwards' })
+
+    const duration = 520
+    const start = performance.now()
+    const ease = (t: number) => 1 - (1 - t) ** 3
+    const frame = (now: number) => {
+      if (!line.isConnected) return
+      const target = findTarget()
+      const t = Math.min(1, (now - start) / duration)
+      if (target) {
+        const to = toScene(target.getBoundingClientRect(), .5, .46)
+        const dx = to.x - from.x
+        const dy = to.y - from.y
+        line.style.width = `${Math.hypot(dx, dy)}px`
+        line.style.setProperty('--web-angle', `${Math.atan2(dy, dx) * 180 / Math.PI}deg`)
+        const k = ease(t)
+        const scale = .08 + (.58 - .08) * k
+        projectile.style.opacity = String(Math.min(1, .15 + t * 2))
+        projectile.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px)) scale(${scale}) rotate(${-18 + 18 * k}deg)`
+      }
+      if (t < 1) requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
     this.cardHand.playSealImpact(instanceId, 420)
     this.timers.push(window.setTimeout(() => {
       line.remove()

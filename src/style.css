@@ -11253,3 +11253,5 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .reward-controls .reward-deck,
 .reward-controls .reward-refresh,
 .reward-controls .reward-skip { padding: 10px 16px; font-size: 16px; }
+/* 거미줄이 닿기 전에는 봉인 그물을 숨긴다(발사체가 카드에 도착할 때 붙는다). */
+.word-card.web-pending .card-web-overlay { opacity: 0; }
