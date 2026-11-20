@@ -8842,7 +8842,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 
 /* 아이템 일러스트(좌) + 스탯표(우) */
 /* 일러스트(좌) + 스탯표(우). 스탯표는 다섯 줄에 필요한 만큼만 쓰고 가운데로 모은다. */
-.iforge-top { position: relative; z-index: 2; display: grid; grid-template-columns: 360px minmax(0, 480px); gap: 28px; justify-content: center; width: 100%; }
+.iforge-top { position: relative; z-index: 2; display: grid; grid-template-columns: 360px minmax(0, 340px); gap: 28px; justify-content: center; width: 100%; }
 .iforge-illust {
   position: relative;
   overflow: hidden;
