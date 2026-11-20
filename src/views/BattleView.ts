@@ -4615,7 +4615,8 @@ export class BattleView {
       const hitTag = h.transfer ? '' : comboHits > 1
         ? combatPreviewText().hitNo.replace('{n}', String(hitNo))
         : comboCount > 1 ? combatPreviewText().combo.replace('{count}', String(comboCount)) : ''
-      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`, hitTag)
+      // 관통 전이 숫자는 바로 뒤 칼질 숫자와 같은 적 위에 뜨므로 한 단 위로 띄워 겹치지 않게 한다.
+      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`, hitTag, h.transfer ? -70 : 0)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
       if ((h.barsBroken ?? 0) > 0) this.playBossBarBreak(h.target, h.barsBroken ?? 1, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)
