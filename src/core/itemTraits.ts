@@ -131,7 +131,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['방어 집필', '방어 문장 점수 +{v}'],
     healFlat: ['회복 집필', '회복 문장 점수 +{v}'],
     resonanceBoost: ['공명', '공명 배율 +{v}'],
-    comboBoost: ['관용구', '관용구 배율 ×{m}'],
+    comboBoost: ['관용구', '맥락이 맞아 관용구가 발동하면 배율 ×{m}'],
   },
   en: {
     inkMax: ['Spare Ink', 'Max Ink +{v} for every sentence'],
@@ -145,7 +145,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['Guard Focus', 'Guard sentence score +{v}'],
     healFlat: ['Heal Focus', 'Heal sentence score +{v}'],
     resonanceBoost: ['Resonance', 'Emotion resonance multiplier +{v}'],
-    comboBoost: ['Idiom', 'Multiplier ×{m} when an idiom triggers'],
+    comboBoost: ['Idiom', 'Multiplier ×{m} when matching words trigger an idiom'],
   },
   ja: {
     inkMax: ['たっぷりインク', '文ごとの最大インク+{v}'],
@@ -159,7 +159,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['防御の筆', '防御の文の数値+{v}'],
     healFlat: ['回復の筆', '回復の文の数値+{v}'],
     resonanceBoost: ['共鳴', '感情共鳴の倍率+{v}'],
-    comboBoost: ['慣用句', '慣用句が発動すると倍率×{m}'],
+    comboBoost: ['慣用句', '文脈が合って慣用句が発動すると倍率×{m}'],
   },
   ru: {
     inkMax: ['Запас чернил', 'Максимум чернил каждой фразы +{v}'],
@@ -173,7 +173,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['Защита', 'Фразы защиты +{v}'],
     healFlat: ['Лечение', 'Фразы лечения +{v}'],
     resonanceBoost: ['Резонанс', 'Множитель резонанса эмоций +{v}'],
-    comboBoost: ['Идиома', 'Множитель ×{m}, когда срабатывает идиома'],
+    comboBoost: ['Идиома', 'Множитель ×{m}, когда подходящие слова запускают идиому'],
   },
   'zh-Hans': {
     inkMax: ['充足墨水', '每句最大墨水+{v}'],
@@ -187,7 +187,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['防御之笔', '防御句子数值+{v}'],
     healFlat: ['回复之笔', '回复句子数值+{v}'],
     resonanceBoost: ['共鸣', '情绪共鸣倍率+{v}'],
-    comboBoost: ['惯用语', '惯用语发动时倍率×{m}'],
+    comboBoost: ['惯用语', '语境契合、惯用语发动时倍率×{m}'],
   },
   'zh-Hant': {
     inkMax: ['充足墨水', '每句最大墨水+{v}'],
@@ -201,7 +201,7 @@ const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
     guardFlat: ['防禦之筆', '防禦句子數值+{v}'],
     healFlat: ['回復之筆', '回復句子數值+{v}'],
     resonanceBoost: ['共鳴', '情緒共鳴倍率+{v}'],
-    comboBoost: ['慣用語', '慣用語發動時倍率×{m}'],
+    comboBoost: ['慣用語', '語境契合、慣用語發動時倍率×{m}'],
   },
 }
 

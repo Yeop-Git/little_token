@@ -44,9 +44,26 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     ['Attack', { kind: 'stat', stat: 'atk' }], ['Guard', { kind: 'stat', stat: 'guard' }],
     ['Heal', { kind: 'stat', stat: 'heal' }], ['Luck', { kind: 'stat', stat: 'luck' }],
     ['critical', { kind: 'keyword' }], ['Critical', { kind: 'keyword' }], ['combo', { kind: 'keyword' }],
-    ['Combo', { kind: 'keyword' }], ['Resonance', { kind: 'keyword' }], ['resonance', { kind: 'keyword' }],
+    ['Combo', { kind: 'keyword' }], ['Idiom', { kind: 'keyword' }], ['idiom', { kind: 'keyword' }],
+    ['Resonance', { kind: 'keyword' }], ['resonance', { kind: 'keyword' }],
     ['multiplier', { kind: 'keyword' }], ['Multiplier', { kind: 'keyword' }], ['Card draws', { kind: 'keyword' }],
   ],
+  ja: [['慣用句', { kind: 'keyword' }]],
+  ru: [['идиому', { kind: 'keyword' }], ['идиома', { kind: 'keyword' }], ['Идиома', { kind: 'keyword' }]],
+  'zh-Hans': [['惯用语', { kind: 'keyword' }]],
+  'zh-Hant': [['慣用語', { kind: 'keyword' }]],
+}
+
+/**
+ * 관용구 태그 툴팁 — "관용구"가 무슨 뜻인지 모르면 특성 설명이 읽히지 않는다(11/20 피드백).
+ * 한국어는 TAG_TIPS_KO가, 나머지 언어는 이 표가 같은 뜻을 전한다.
+ */
+const IDIOM_TIPS: Record<string, { terms: string[]; tip: string }> = {
+  en: { terms: ['Idiom', 'idiom', 'Combo', 'combo'], tip: 'A good context that triggers when words with matching tags share one sentence.\nIt shows up as "Context activated" in battle, and the idiom multiplier is applied.' },
+  ja: { terms: ['慣用句'], tip: 'タグがかみ合う単語を一つの文に入れると発動する、良い文脈です。\n戦闘では「文脈発動」と表示され、慣用句の倍率がかかります。' },
+  ru: { terms: ['идиому', 'идиома', 'Идиома'], tip: 'Удачный контекст: срабатывает, когда в одной фразе встречаются слова с подходящими метками.\nВ бою появляется надпись «Контекст активирован», и применяется множитель идиомы.' },
+  'zh-Hans': { terms: ['惯用语'], tip: '把标签相契合的词写进同一句话时触发的良好语境。\n战斗中会显示「语境触发」，并乘上惯用语倍率。' },
+  'zh-Hant': { terms: ['慣用語'], tip: '把標籤相契合的詞寫進同一句話時觸發的良好語境。\n戰鬥中會顯示「語境觸發」，並乘上慣用語倍率。' },
 }
 
 const escapeHtml = (value: string): string => value
@@ -71,7 +88,7 @@ const TAG_TIPS_KO: Record<string, string> = {
   잉크: '카드를 낼 때 쓰는 자원이에요.\n카드마다 잉크 비용이 있어요.',
   '최대 잉크': '한 문장에 쓸 수 있는 잉크의 최대치예요.',
   '잉크 최대치': '한 문장에 쓸 수 있는 잉크의 최대치예요.',
-  관용구: '정해진 카드 조합으로 문장을 완성하면 붙는 보너스예요.\n관용구 배율이 곱해져요.',
+  관용구: '태그가 서로 맞는 단어를 한 문장에 함께 쓰면 발동하는 좋은 맥락이에요.\n전투에서는 「맥락 발동」으로 뜨고, 관용구 배율이 곱해져요.',
   공명: '같은 감정 카드를 한 문장에 모으면 일어나요.\n공명 배율이 곱해져요.',
   '공명 배율': '같은 감정 카드가 모였을 때 곱해지는 배율이에요.',
   '관용구 배율': '관용구를 완성했을 때 곱해지는 배율이에요.',
@@ -94,6 +111,8 @@ const TAG_TIPS_KO: Record<string, string> = {
 
 function tagTip(term: string, spec: TagSpec): string {
   if (spec.kind === 'emotion') return currentLocale === 'ko' ? `${term} 감정 카드예요.\n적의 약점 감정으로 공격하면 피해가 커져요.` : ''
+  const idiom = IDIOM_TIPS[currentLocale]
+  if (idiom?.terms.includes(term)) return idiom.tip
   if (currentLocale !== 'ko') return keywordDetailByLabel(term) ?? ''
   return TAG_TIPS_KO[term] ?? TAG_TIPS_KO[term.replace(/ 칸$/, '')] ?? keywordDetailByLabel(term) ?? ''
 }
