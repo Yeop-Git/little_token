@@ -87,7 +87,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '네 다리 약점: 기쁨→분노→슬픔→즐거움, 본체는 약점 없음\n문장마다 카드 1장을 거미줄로 봉인(최대 3장)\n지금 다리 약점으로 공격하면 피해 ×2, 봉인 1장 해제\n약점을 맞힌 관용구만 다음 다리·본체까지 관통\n약점 감정의 방어·회복 문장도 봉인 1장 해제\n다리가 떨어지면 거미줄이 모두 풀림\n거미줄 조이기는 방어 무시, 한 번에 최대 체력 1/5까지',
+    note: '다리 약점: 기쁨→분노→슬픔→즐거움(본체 없음)\n문장마다 카드 1장 봉인, 최대 3장\n약점 공격: 피해 ×2, 봉인 1장 해제\n약점 관용구만 다음 다리까지 관통\n약점 방어·회복도 봉인 1장 해제\n다리가 떨어지면 봉인 모두 해제\n거미줄 조이기: 방어 무시, 최대 체력 1/5',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',

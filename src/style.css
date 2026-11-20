@@ -7394,6 +7394,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   line-height: 1.55;
 }
 .character-note .tip-bullets li { padding-left: 15px; }
+/* 적 상세 안 태그는 줄 높이를 늘리지 않게 납작하게 — 기믹 •목록이 다 들어가야 한다. */
+.character-dock.is-enemy .character-note .tip-bullets { gap: 2px; }
+.character-dock.is-enemy .character-note .trait-tag { line-height: 1.1; margin: 0 1px; padding: 0 4px 0 2px; }
+.character-dock.is-enemy .character-note .trait-tag .emotion-face { width: 1.1em; height: 1.1em; margin: -3px 0; }
 
 /* ==========================================================================
    보상 뷰 · 아이템 뷰 — 같은 배경 + 유리 톤으로 통일
@@ -11485,6 +11489,9 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .trait-tag.is-stat i { display: inline-flex; width: 1em; height: 1em; font-style: normal; }
 .trait-tag.is-stat i svg, .trait-tag.is-stat i img { width: 100%; height: 100%; }
 .trait-tag.is-keyword { padding-left: 6px; --trait-tag-color: #ffd991; }
+/* 팁 안의 「카드 이름」 — 종이색 태그로 카드 자체를 가리킨다. */
+.trait-tag.is-card { padding-left: 6px; --trait-tag-color: #f3e3c2; }
+.tip-bullets .trait-tag { margin: 0 1px; }
 
 /* 효과가 둘 이상인 카드는 효과마다 줄을 나눈다(11/20 피드백): 주행동·수치 한 줄, 키워드 효과는 한 줄씩. */
 .card-note.has-action .card-keywords,

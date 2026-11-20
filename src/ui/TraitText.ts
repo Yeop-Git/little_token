@@ -27,6 +27,10 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     ['대성공', { kind: 'keyword' }], ['관용구', { kind: 'keyword' }], ['공명', { kind: 'keyword' }],
     ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['배율 풀', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],
     ['깡점수', { kind: 'keyword' }], ['최대 체력', { kind: 'keyword' }],
+    // 전장 TIP·적 기믹 설명에 자주 나오는 전투 용어(11/20 피드백: 팁도 태그로).
+    ['매직실드', { kind: 'keyword' }], ['관통', { kind: 'keyword' }], ['카운터', { kind: 'keyword' }],
+    ['방패치기', { kind: 'keyword' }], ['연타', { kind: 'keyword' }], ['그로기', { kind: 'keyword' }],
+    ['흡혈', { kind: 'keyword' }], ['선공', { kind: 'keyword' }], ['봉인', { kind: 'keyword' }],
   ],
   en: [
     ['Max Ink', { kind: 'ink' }], ['Ink', { kind: 'ink' }],
@@ -96,4 +100,15 @@ export function traitDescHtml(desc: string, inline = false): string {
   if (lines.length <= 1) return `<${tag} class="trait-desc">${traitLineHtml(lines[0] ?? '')}</${tag}>`
   const items = lines.map((line) => `<${tag} class="trait-desc-line">${traitLineHtml(line)}</${tag}>`).join('')
   return `<${tag} class="trait-desc is-list">${items}</${tag}>`
+}
+
+/**
+ * 전장 TIP·적 설명 한 줄 — 「카드 이름」은 카드 태그로, 나머지는 특성 설명과 같은 키워드 태그로 감싼다.
+ * 입력은 평문, 출력은 이스케이프된 HTML.
+ */
+export function tipLineHtml(line: string): string {
+  return line.split(/(「[^」]+」)/).map((part) => {
+    const card = /^「([^」]+)」$/.exec(part)
+    return card ? `<span class="trait-tag is-card"><b>${escapeHtml(card[1])}</b></span>` : traitLineHtml(part)
+  }).join('')
 }

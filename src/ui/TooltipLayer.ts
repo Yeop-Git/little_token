@@ -10,6 +10,8 @@
  * 붙는 대상: `[data-tooltip]`. 위로 세울지 아래로 내릴지는 `data-tip-place`가 정한다.
  */
 
+import { tipLineHtml } from './TraitText'
+
 const EDGE_PAD = 16
 const GAP = 9
 
@@ -25,32 +27,16 @@ export function tipBulletItems(text: string): string[] {
     .filter(Boolean)
 }
 
-const escapeTipHtml = (value: string) => value
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-
 /** 상세 칸·도감처럼 HTML 문자열로 그리는 설명도 쪽지와 같은 •목록으로 나눈다. */
 export function tipBulletsHtml(text: string): string {
   const items = tipBulletItems(text)
-  if (items.length <= 1) return escapeTipHtml(items[0] ?? '')
-  return `<ul class="tip-bullets">${items.map((item) => `<li>${escapeTipHtml(item)}</li>`).join('')}</ul>`
+  if (items.length <= 1) return tipLineHtml(items[0] ?? '')
+  return `<ul class="tip-bullets">${items.map((item) => `<li>${tipLineHtml(item)}</li>`).join('')}</ul>`
 }
 
-/** 항목이 둘 이상이면 •목록으로, 하나면 그대로 한 줄로 채운다. 텍스트만 넣으므로 안전하다. */
+/** 쪽지 본문 — •목록과 키워드·카드 태그. tipBulletsHtml이 모든 글자를 이스케이프한다. */
 export function fillTipBody(target: HTMLElement, text: string): void {
-  const items = tipBulletItems(text)
-  target.replaceChildren()
-  if (items.length <= 1) {
-    target.textContent = items[0] ?? ''
-    return
-  }
-  const list = document.createElement('ul')
-  list.className = 'tip-bullets'
-  for (const item of items) {
-    const li = document.createElement('li')
-    li.textContent = item
-    list.appendChild(li)
-  }
-  target.appendChild(list)
+  target.innerHTML = tipBulletsHtml(text)
 }
 
 export class TooltipLayer {
