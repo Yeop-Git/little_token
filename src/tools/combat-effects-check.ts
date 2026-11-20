@@ -828,6 +828,9 @@ assert(stageFor(16).hpMult > stageFor(1).hpMult && stageFor(16).atkMult > stageF
   assert(rarityCurve[3].epic > rarityCurve[2].epic && rarityCurve[5].legendary > rarityCurve[4].legendary, 'the next rarity rises within the rare and epic bands')
   assert(rarityCurve[1].rare > rarityCurve[0].rare, 'rare chance rises through floors one to four')
   assert(rarityCurve[0].epic === 0 && rarityCurve[0].legendary === 0, 'floor one stays free of epic and legendary rewards')
+  assert(rewardRarityWeights(5, 1, 20).epic === 0 && rewardRarityWeights(5, 1, 20).legendary === 0, 'high luck does not open floor-one locks')
+  assert(rewardRarityWeights(5, 8, 8).epic > rewardRarityWeights(5, 8, 3).epic && rewardRarityWeights(5, 8, 8).legendary > rewardRarityWeights(5, 8, 3).legendary, 'luck above base raises epic and legendary reward weights')
+  assert(rewardRarityWeights(5, 8, 40).legendary === rewardRarityWeights(5, 8, 11).legendary, 'luck reward bonus is capped')
   assert(rarityCurve[1].epic > 0 && rarityCurve[1].legendary > 0 && rarityCurve[2].legendary > 0, 'relaxed locks let epic and legendary appear before their home bands')
   for (const [day, rarity] of [[5, 'epic'], [10, 'legendary'], [15, 'legendary']] as const) {
     assert(bossRewardRarity(day) === rarity, `boss floor ${day} uses its milestone rarity`)

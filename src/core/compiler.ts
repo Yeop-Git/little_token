@@ -11,6 +11,7 @@ import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
 import { wordInkCost } from './ink'
+import { LUCK_MULT } from './luck'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -373,8 +374,8 @@ export function compile(
 }
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.
+export { LUCK_MULT } // 운 계수 정본은 ./luck.ts
 export const ROULETTE = { crit: 1.5, fail: 0.25 } as const
-export const LUCK_MULT = 0.02 // 운 1당 기본 배율 +2% (그리 드라마틱하지 않게)
 export const CRIT_STAT_K = 0.01 // 맥락 스탯 1당 대성공 +1%
 const FAIL_STAT_K = 0.01 // 맥락 스탯 1당 실패 −1%
 export const CRIT_CAP = 0.6 // 아무리 높아도 대성공은 60%에서 수렴(실패가 없어진 만큼 천장을 올렸다)
