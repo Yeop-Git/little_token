@@ -3,7 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고 카드 앞면에서 핵심 효과를 바로 읽는다.
  */
 
-import { formatNumber } from '@/core/numberFormat'
+import { formatMult } from '@/core/numberFormat'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import {
   EARLY_BUILD_REWARD_DAY,
@@ -191,7 +191,7 @@ function itemTraitHtml(opt: RewardOption): string {
     ? PASSIVES[opt.item.passive]
     : opt.item.trait ? itemTraitText(opt.item.trait, opt.item.rarity) : null
   if (!trait) return ''
-  return `<div class="reward-kind-trait"><small>${text('rewardItemPassive', '특성')}</small><b>${trait.name}</b>${traitDescHtml(trait.desc)}</div>`
+  return `<div class="reward-kind-trait" aria-label="${text('rewardItemPassive', '특성')}"><b>${trait.name}</b>${traitDescHtml(trait.desc)}</div>`
 }
 
 // 하단 메인 효과 한 줄.
@@ -204,7 +204,7 @@ function mainEffect(opt: RewardOption): string {
   const note = action ? wordCardDisplayNote(word) : wordNoteText(word)
   if (keywords) {
     const prefix = word.statMult != null
-      ? `×${formatNumber(word.statMult)}`
+      ? `×${formatMult(word.statMult)}`
       : word.variance
         ? wordCardDisplayNote(word, note).split(' · ')[0]
         : word.bonus
@@ -240,7 +240,7 @@ function reinforceDeltas(w: Word): string {
   if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatNumber(w.statMult)} → <b>×${formatNumber(after.statMult!)}</b>`)
+  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatMult(w.statMult)} → <b>×${formatMult(after.statMult!)}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
   if (w.variance) rows.push(`${tagLuckChances(gambleText(w.variance), wordLuckChances(w))} → <b>${tagLuckChances(gambleText(after.variance!), wordLuckChances(after))}</b>`)
   if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)
@@ -427,7 +427,7 @@ export class RewardView {
                 <button class="reward-deck" type="button">${text('rewardDeck', '내 단어장')} <b>${Object.values(opts.deck ?? EARLY_WORDS).flat().length}</b></button>
                 <div class="reward-toolbar-center">
                 ${walletHtml}
-                <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" />${text('rewardRefresh', '다른 발상 떠올리기')} <b>◈ ${rewardRefreshCost(opts.refreshes)}</b></button>
+                <button class="reward-refresh" type="button" title="${text('rewardRefreshSinkHint', '연속해서 떠올릴수록 비용이 1씩 오른다. 횟수 제한은 없다.')}"><img src="${REWARD_ART.refresh}" alt="" aria-hidden="true" /><span>${text('rewardRefresh', '새로고침')}</span><b class="reward-refresh-cost"><i aria-hidden="true">◈</i>${rewardRefreshCost(opts.refreshes)}</b></button>
                 </div>
                 <button class="reward-skip" type="button" title="이번 단계에서 아무것도 기록하지 않고 넘어갑니다">그냥 넘어가기</button>
               </div>`}

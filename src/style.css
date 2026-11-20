@@ -11485,3 +11485,61 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .trait-tag.is-stat i { display: inline-flex; width: 1em; height: 1em; font-style: normal; }
 .trait-tag.is-stat i svg, .trait-tag.is-stat i img { width: 100%; height: 100%; }
 .trait-tag.is-keyword { padding-left: 6px; --trait-tag-color: #ffd991; }
+
+/* 효과가 둘 이상인 카드는 효과마다 줄을 나눈다(11/20 피드백): 주행동·수치 한 줄, 키워드 효과는 한 줄씩. */
+.card-note.has-action .card-keywords,
+.rp-effect .card-keywords { flex-basis: 100%; }
+.card-note .card-keywords,
+.rp-effect .card-keywords { flex-direction: column; gap: 3px; }
+.card-note .card-note-text + .card-keywords { margin-top: 2px; }
+
+/* 오른쪽 상세 박스의 키워드: 이름은 굵은 태그로 띄우고 설명은 크게(11/20 피드백). */
+.word-keyword-list { display: grid; gap: 14px; }
+.word-keyword-detail b {
+  justify-self: start;
+  padding: 3px 12px;
+  border: 2px solid rgba(255, 214, 128, .85);
+  border-radius: 7px;
+  color: #fff3cf;
+  background: rgba(70, 46, 16, .72);
+  font-weight: 1000;
+  letter-spacing: .01em;
+  text-shadow: 0 0 10px rgba(255, 200, 90, .45);
+}
+.reward-dock .word-keyword-detail b,
+.rds-zoom-detail .word-keyword-detail b { font-size: 24px; }
+.reward-dock .word-keyword-detail span,
+.rds-zoom-detail .word-keyword-detail span { font-size: 20px; line-height: 1.55; color: #fff7e6; }
+.reward-dock .word-keyword-details h3,
+.rds-zoom-detail .word-keyword-details h3 { font-size: 16px; }
+
+/* 효과마다 줄바꿈: 요약 조각을 카드 문구 줄에 바로 풀어 줄바꿈 표식이 부모 줄을 끊게 한다. */
+.card-note .card-note-text,
+.rp-effect .rp-effect-copy { display: contents; }
+.card-line-break { flex-basis: 100%; width: 100%; height: 0; }
+
+/* 상단 도구줄 글자 크고 두껍게, 새로고침 비용·아이콘 크게(11/20 피드백). */
+.reward-toolbar .reward-deck,
+.reward-toolbar .reward-refresh,
+.reward-toolbar .reward-skip { font-size: 22px; font-weight: 1000; letter-spacing: .01em; }
+.reward-toolbar .reward-deck b { font-size: 22px; }
+.reward-toolbar .reward-refresh { gap: 10px; padding: 8px 20px; }
+.reward-toolbar .reward-refresh img { width: 40px; height: 40px; margin: -6px 0; }
+.reward-toolbar .reward-refresh-cost {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 2px;
+  padding: 2px 10px; border-radius: 999px;
+  color: #ffd166; background: rgba(40, 22, 6, .55);
+  font-size: 26px; font-weight: 1000; line-height: 1.1;
+}
+.reward-toolbar .reward-refresh-cost i { font-style: normal; font-size: 20px; }
+
+/* 아이템 하단: '특성' 딱지 없이 노란 특성 이름과 설명만 크게. */
+.reward-kind-trait { padding: 8px 6px 6px; font-size: 21px; }
+.reward-kind-trait > b { font-size: 28px; color: #ffe27a; }
+.reward-shop-card .reward-kind-trait { padding: 6px 4px 3px; }
+.reward-shop-card .reward-kind-trait > b { font-size: 21px; }
+
+/* 잉크 비용 숫자 더 두껍게. */
+.card-cost,
+.rp-ink-cost,
+.wd-ink-cost { -webkit-text-stroke: 1.4px currentColor; paint-order: stroke fill; }

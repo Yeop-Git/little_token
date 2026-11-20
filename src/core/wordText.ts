@@ -3,7 +3,7 @@
  * 화면마다 따로 조립하면 같은 카드가 화면마다 다르게 읽힌다(도박 표기가 그랬다).
  */
 
-import { formatNumber } from './numberFormat'
+import { formatNumber, formatMult } from './numberFormat'
 import { TARGET_FALLOFF } from './combatRules'
 import { CRIT_CAP, PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
 import type { StatBlock, TargetCount, Variance, Word } from './types'
@@ -112,7 +112,7 @@ export function wordValueLines(w: Word, stats?: StatBlock, includeKeywords = tru
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
   if (w.stat && w.statMult != null && w.statMult > 0) {
     const applied = stats ? ` = ${formatNumber(wordFlat(w, stats))}` : ''
-    out.push({ text: `${STAT_NAME[w.stat]} ×${formatNumber(w.statMult)}${applied}`, cls: lane })
+    out.push({ text: `${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}${applied}`, cls: lane })
   } else if (w.power) {
     out.push({ text: `${L.power} ${w.power}`, cls: lane })
   }
@@ -180,7 +180,7 @@ function noteParts(w: Word): string[] {
   if (w.person && w.person !== 'first') return []
 
   const out: string[] = []
-  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${formatNumber(w.statMult)}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}`)
   else if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.variance) out.push(gambleText(w.variance))
   // 배율 풀에 보태는 칸(주어·어미)은 0이어도 "배율 ×1.00"을 적는다.
@@ -200,7 +200,7 @@ function noteParts(w: Word): string[] {
 
 export function numericNoteParts(w: Word): string[] {
   const out: string[] = []
-  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`×${formatNumber(w.statMult)}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`×${formatMult(w.statMult)}`)
   if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.bonus) out.push(multText(w.bonus))
   if (w.variance) out.push(gambleText(w.variance))

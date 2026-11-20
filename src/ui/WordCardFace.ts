@@ -5,7 +5,7 @@
  * 설명서에 그려지는 카드가 전투에서 집는 카드와 한 글자도 다르지 않게 한다.
  */
 
-import { formatNumber } from '@/core/numberFormat'
+import { formatMult } from '@/core/numberFormat'
 import { INK_UI, SKILL_ART } from '@/assets'
 import { currentLocale, t, type LocaleCode } from '@/localization'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
@@ -92,7 +92,7 @@ export function wordCardDisplayNote(word: Word, note = wordNoteText(word)): stri
 export function wordCardPrimaryNote(word: Word, note = wordNoteText(word)): string {
   const keywords = wordKeywords(word)
   if (!keywords.length) return wordCardDisplayNote(word, note)
-  if (word.statMult != null) return `×${formatNumber(word.statMult)}`
+  if (word.statMult != null) return `×${formatMult(word.statMult)}`
   if (word.variance) return wordCardDisplayNote(word, note).split(' · ')[0]
   if (word.bonus) return `×${(1 + word.bonus).toFixed(2)}`
   return ''
@@ -115,7 +115,7 @@ export function wordKeywordChipsHtml(word: Word): string {
   // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
   const effects = keywords.filter((keyword) => !isRankKeyword(keyword.id))
   const effectHtml = effects.length
-    ? `<span class="card-keywords">${effects.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? (keyword.id === 'critical' && word.crit ? luckChanceHtml(luckChance(word.crit, getCardLuck(), CRIT_CAP), 'card-keyword-value') : `<span class="card-keyword-value">${keyword.value}</span>`) : ''}</span>`).join('')}</span>`
+    ? `<span class="card-keywords">${effects.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.id === 'discount' ? `<img class="refill-ink-icon" src="${INK_UI.costBadge}" alt="" aria-hidden="true" draggable="false">` : ''}${keyword.name}</span>${keyword.value ? (keyword.id === 'critical' && word.crit ? luckChanceHtml(luckChance(word.crit, getCardLuck(), CRIT_CAP), 'card-keyword-value') : `<span class="card-keyword-value">${keyword.value}</span>`) : ''}</span>`).join('')}</span>`
     : ''
   return effectHtml + wordRankTagsHtml(word)
 }
@@ -176,7 +176,8 @@ const MULT_LABEL: Record<LocaleCode, string> = { ko: '배율', en: 'Multiplier',
  */
 export function cardNoteTagsHtml(note: string, chances: readonly LuckChance[] = []): string {
   const tag = (text: string, cls = '') => `<span class="card-value-tag${cls}">${emphasizeCardNumbers(text, chances)}</span>`
-  return note.split(' · ').map((part) => part.trim()).filter(Boolean).map((part) => {
+  // 효과가 둘 이상이면 조각 사이에 줄바꿈 표식을 넣어 효과마다 줄을 나눈다(11/20 피드백).
+  return note.split(' · ').map((part) => part.trim()).filter(Boolean).map((part, index) => (index ? '<span class="card-line-break" aria-hidden="true"></span>' : '') + (() => {
     if (!/\d/.test(part)) return `<span class="card-value-plain">${escapeCardText(part)}</span>`
     if (/^[×x]\s?\d/.test(part)) return `<span class="card-value-bare">${emphasizeCardNumbers(part)}</span>`
     const gamble = part.match(/^(\d+(?:\.\d+)?%)\D*?(×\s?\d+(?:\.\d+)?)$/)
@@ -189,7 +190,7 @@ export function cardNoteTagsHtml(note: string, chances: readonly LuckChance[] = 
       return chanceTag + tag(`${MULT_LABEL[currentLocale]} ${gamble[2]}`)
     }
     return tag(part)
-  }).join('')
+  })()).join('')
 }
 
 function wordCardNoteHtml(word: Word, note: string, noteIsHtml = false): string {

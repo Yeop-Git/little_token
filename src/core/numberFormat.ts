@@ -10,3 +10,9 @@ export function formatNumber(value: number, digits = 2): string {
   // -0 이 "-0"으로 찍히지 않게 0으로 정리한다.
   return String(rounded === 0 ? 0 : rounded)
 }
+
+/** 배율 표기 — 정수 배율도 "×1.0"처럼 소수 한 자리를 남겨 배율임이 읽히게 한다(11/20 피드백). */
+export function formatMult(value: number, digits = 2): string {
+  const text = formatNumber(value, digits)
+  return /^-?\d+$/.test(text) ? `${text}.0` : text
+}

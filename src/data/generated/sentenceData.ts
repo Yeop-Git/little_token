@@ -113,7 +113,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "kind": "attack",
       "rarity": "common",
       "art": "3001",
-      "note": "공격 ×1",
+      "note": "공격 ×1.0",
       "lore": "정직한 한 방."
     },
     {
@@ -130,7 +130,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "kind": "guard",
       "rarity": "common",
       "art": "3002",
-      "note": "방어 ×1",
+      "note": "방어 ×1.0",
       "lore": "한 발 버틴다."
     },
     {
@@ -147,7 +147,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "kind": "heal",
       "rarity": "common",
       "art": "3003",
-      "note": "회복 ×1",
+      "note": "회복 ×1.0",
       "lore": "상처를 매만진다."
     },
     {
@@ -595,7 +595,7 @@ export const REWARD_WORDS: Word[] = [
     "kind": "guard",
     "rarity": "common",
     "art": "3005",
-    "note": "방어 ×1 · 방패치기 50%",
+    "note": "방어 ×1.0 · 방패치기 50%",
     "lore": "빛의 방울을 두르고 벌레 앞을 막아선다. 부딪힌 힘의 절반을 되튕긴다.",
     "effects": {
       "guardAttackMultiplier": 0.5
@@ -667,7 +667,7 @@ export const REWARD_WORDS: Word[] = [
     "kind": "heal",
     "rarity": "common",
     "art": "3008",
-    "note": "회복 ×1",
+    "note": "회복 ×1.0",
     "lore": "삐뚤어진 줄도 신나게 다시 고친다."
   },
   {
@@ -685,7 +685,7 @@ export const REWARD_WORDS: Word[] = [
     "kind": "attack",
     "rarity": "common",
     "art": "3007",
-    "note": "공격 ×1",
+    "note": "공격 ×1.0",
     "lore": "젖은 잉크를 한 획에 멀리 흘려보낸다."
   },
   {
@@ -1126,7 +1126,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "attack",
       "rarity": "common",
-      "note": "공격 ×1",
+      "note": "공격 ×1.0",
       "lore": "그냥, 앞으로."
     },
     {
@@ -1141,7 +1141,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "guard",
       "rarity": "common",
-      "note": "방어 ×1",
+      "note": "방어 ×1.0",
       "lore": "한 발 물러서는 것도 문장이다."
     },
     {
@@ -1171,7 +1171,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "heal",
       "rarity": "common",
-      "note": "회복 ×1",
+      "note": "회복 ×1.0",
       "lore": "잊는 편이 나을 때가 있다."
     },
     {
@@ -1188,7 +1188,7 @@ export const WORDS: Record<string, Word[]> = {
       "kind": "attack",
       "aoe": "all",
       "rarity": "rare",
-      "note": "공격 ×1 · 전체",
+      "note": "공격 ×1.0 · 전체",
       "lore": "빗자루처럼, 페이지 끝에서 끝까지."
     }
   ],

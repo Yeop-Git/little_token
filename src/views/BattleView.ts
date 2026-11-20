@@ -8,7 +8,7 @@
  *  · 우상단: 설정 · 도감 · 홈
  */
 
-import { formatNumber } from '@core/numberFormat'
+import { formatNumber, formatMult } from '@core/numberFormat'
 import {
   compile,
   effectiveBase,
@@ -1985,7 +1985,7 @@ export class BattleView {
       weakBadge.hidden = affinity === 'neutral' || !isFront
       if (affinity !== 'neutral') {
         const lines = [
-          `공격 속성이 ${EMOTION_LABEL[affinity]}이면 피해 ×${formatNumber(weakMult)}`,
+          `공격 속성이 ${EMOTION_LABEL[affinity]}이면 피해 ×${formatMult(weakMult)}`,
           '공격 속성은 문장에서 가장 많이 쓴 감정',
           ...(activePart ? [`지금 부위(${activePart.def.name})의 약점`] : []),
         ]
@@ -1998,7 +1998,7 @@ export class BattleView {
         weakBadge.dataset.signature = signature
         weakBadge.className = `weak-badge emotion-${affinity}`
         weakBadge.innerHTML = affinity === 'neutral' ? '' : emotionIconContent(affinity)
-        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '약점 없음' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
+        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '약점 없음' : `${affinityLabel}, 피해 ×${formatMult(weakMult)}`)
         if (changed) {
           weakBadge.classList.remove('is-changing')
           void weakBadge.offsetWidth
@@ -2153,7 +2153,7 @@ export class BattleView {
             ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
             ...(currentPart?.def.weakness
-              ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×${formatNumber(PART_WEAKNESS_MULT)}`]]
+              ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×${formatMult(PART_WEAKNESS_MULT)}`]]
               : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
