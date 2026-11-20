@@ -308,6 +308,12 @@ export function engageFront(state: BattleState): void {
 export interface HitFx {
   target: number
   dmg: number
+  /**
+   * 화면에 띄우는 타격 수치 — 약점·방어 흡수까지 반영한 실제 위력이다. 남은 체력이나
+   * 보스 체력 막 경계에서 잘린 몫도 버리지 않는다(초과 피해도 숫자는 그대로 읽힌다).
+   * 체력에서 실제로 빠진 양은 `dmg`다.
+   */
+  shown?: number
   /** 살아 있는 호위 때문에 소환자 본체가 이 타격을 받지 않았는가. */
   summonShieldBlocked?: boolean
   guardAbsorbed: number
@@ -338,6 +344,8 @@ export interface ApplyResult {
   selfDmg: number
   /** 최대 체력 한도 적용 후 실제로 회복한 체력. */
   heal: number
+  /** 한도 적용 전 문장이 만든 회복량. 체력이 가득 차도 화면에는 이 수치를 띄운다. */
+  healRolled?: number
   convertedDamage?: number
   lifeStolen?: number
   killed: number[]
@@ -564,6 +572,7 @@ function damageEnemy(
   return {
     target,
     dmg: appliedDamage,
+    shown: dealt,
     summonShieldBlocked: false,
     guardAbsorbed,
     magicShieldBroken: false,
@@ -847,6 +856,7 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
     hits: attack.hits,
     selfDmg,
     heal: actualHeal,
+    healRolled: healAmt,
     convertedDamage,
     lifeStolen,
     killed: summonDisperse.killed && !attack.killed.includes(target) ? [target, ...attack.killed] : attack.killed,
@@ -865,6 +875,12 @@ export function applyIntent(state: BattleState, intent: Intent, mult: number, ta
 export function previewIntentHits(state: BattleState, intent: Intent, mult: number, target: number): number[] {
   const result = applyIntent(structuredClone(state), intent, mult, target)
   return [...(result.summonHits ?? []), ...result.hits.map((hit) => hit.dmg)]
+}
+
+/** 집계판·피해 숫자용 미리보기 — 체력·막 경계에서 잘리기 전의 타격 수치를 돌려준다. */
+export function previewIntentShownHits(state: BattleState, intent: Intent, mult: number, target: number): number[] {
+  const result = applyIntent(structuredClone(state), intent, mult, target)
+  return [...(result.summonHits ?? []), ...result.hits.map((hit) => hit.shown ?? hit.dmg)]
 }
 
 export function applyPendingAttack(state: BattleState): ApplyResult | null {

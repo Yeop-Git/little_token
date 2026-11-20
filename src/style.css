@@ -4112,8 +4112,9 @@ html[data-postprocessing='off'] .tip-bubble {
 .tally.in {
   opacity: 1;
   transform: translate(-50%, -50%) scale(var(--tally-fit));
-  padding: 20px 28px;
 }
+/* 여백·간격은 처음부터 최종값으로 둔다. 등장 도중에 바뀌면 판 크기가 다시 출렁인다. */
+.tally { padding: 20px 28px; gap: 16px; }
 /* ── 열기 곡선 — 수치가 판 크기의 몇 할을 넘길 때마다 한 단계씩 미쳐 간다 ──
    문턱은 BattleView.feverOf가 정한다(깡수치가 아니라 이 판 적 체력 총합의 비율).
    3단계는 액션 컷이 터지는 자리와 같아서, 판이 날뛰다 그대로 컷으로 이어진다.
@@ -4121,10 +4122,9 @@ html[data-postprocessing='off'] .tip-bubble {
 .tally[data-fever] .tally-slots {
   transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
-/* 열기는 화면 밖으로 팽창하지 않는 범위에서만 키운다. */
-.tally[data-fever='1'] { gap: 14px; }
-.tally[data-fever='2'] { gap: 18px; }
-.tally[data-fever='3'] { gap: 22px; }
+/* 열기는 화면 밖으로 팽창하지 않는 범위에서만 키운다. 판의 줄 간격(gap)은 열기에 따라
+   바꾸지 않는다 — 가운데 정렬된 판의 높이가 도중에 늘면 점수가 아래위로 출렁였다.
+   불꽃이 들어갈 여유는 .tally.in의 고정 간격으로 처음부터 잡아 둔다. */
 /* 달아오른 빛은 drop-shadow가 아니라 상자의 box-shadow로 낸다.
    슬롯에 filter를 걸면 그 필터 영역이 곧 가위가 된다 — 상자 밖으로 한참 피어오르는
    화염(.tally-cell::after)이 위아래에서 반듯하게 잘려 나가고 있었다. */
@@ -4228,7 +4228,7 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .tally-box .tl {
   display: block;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: 3px;
   color: var(--ink-faint);
@@ -4275,6 +4275,7 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .tally-phase i { width: 56px; height: 1px; background: linear-gradient(90deg, transparent, currentColor); box-shadow: 0 0 10px currentColor; }
 .tally-phase i:last-child { transform: scaleX(-1); }
+.tally.has-phase .tally-phase { height: 24px; }
 .tally.mult-rising .tally-phase,
 .tally.mult-settled .tally-phase { height: 24px; opacity: 1; }
 .tally.mult-rising .tally-box.mult {
@@ -4282,14 +4283,13 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .tally.mult-rising .tally-box.mult b { animation: mult-reel-glow .42s ease-in-out infinite alternate; }
 .tally-box.mult.rolling b { font-variant-numeric: tabular-nums; }
-.tally.mult-rising .tally-mult-feed { min-height: 28px; }
 .tally.mult-settled .tally-box.mult { animation: mult-settle .42s cubic-bezier(.2, 1.35, .35, 1); }
 @keyframes mult-reel-glow { to { filter: brightness(1.25); transform: translateY(-2px); } }
 @keyframes mult-settle { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
 /* 배율 내역 — 타원 배경 없이 글자+그림자만으로 깔끔하게 */
 .tally-chip {
   padding: 1px 4px;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 900;
   color: #fff2da;
   text-shadow: 0 4px 10px rgba(0, 0, 0, 0.38), 0 0 16px color-mix(in srgb, currentColor 72%, transparent);
@@ -4298,6 +4298,18 @@ html[data-postprocessing='off'] .tip-bubble {
 @keyframes tally-chip-in {
   from { transform: translateY(10px) scale(0.7); opacity: 0; }
 }
+.tally-chip.pending { visibility: hidden; animation: none; }
+/* 같은 위력이 몇 번 꽂히는지 — 배율과 섞이지 않게 테두리 딱지로 세운다. */
+.tally-chip.hits {
+  padding: 2px 12px;
+  border: 2px solid #ffd27a;
+  border-radius: 999px;
+  color: #ffe3a3;
+  font-size: 23px;
+  background: rgba(40, 24, 8, .72);
+}
+.tally-chip.extra::before { content: '＋ '; opacity: .7; }
+.tally-chip.excess { color: #cfc6b8; font-size: 17px; opacity: .9; }
 .tally-chip.dmg { color: #fff2da; }
 .tally-chip.heal { color: #fff2da; }
 .tally-chip.stat { color: #9fd8ff; }
@@ -4337,7 +4349,8 @@ html[data-postprocessing='off'] .tip-bubble {
   color: #fff2da;
   -webkit-text-stroke: 1px rgba(18, 8, 14, .4);
   text-shadow: 0 8px 20px rgba(0, 0, 0, .36), 0 0 42px color-mix(in srgb, currentColor 72%, transparent);
-  transition: font-size 0.3s cubic-bezier(0.2, 1.2, 0.3, 1);
+  /* 문턱을 넘을 때 글자 크기가 아니라 scale로 키운다 — 레이아웃이 변하지 않아 판이 튀지 않는다. */
+  transition: scale 0.3s cubic-bezier(0.2, 1.2, 0.3, 1);
 }
 .tally.heal .tally-total { color: #fff2da; }
 .tally.guard .tally-total { color: #fff2da; }
@@ -4369,17 +4382,17 @@ html[data-postprocessing='off'] .tip-bubble {
   box-shadow: 0 0 14px rgba(255, 200, 110, 0.95), 0 0 30px rgba(255, 160, 60, 0.6);
 }
 /* 총합 문턱 — 넘을수록 판이 화려하게 발광하고 커진다 */
-.tally.hot1 .tally-total { font-size: clamp(76px, 6.6vw, 100px); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 28px currentColor, 0 0 50px rgba(255, 140, 60, 0.62); }
+.tally.hot1 .tally-total { scale: 1.1; text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 28px currentColor, 0 0 50px rgba(255, 140, 60, 0.62); }
 /* 총합의 화염은 이제 filter에 잘리지 않는다. 그래도 무대 밖까지 번지지는 않게
    번짐 반경을 좁히고 알파를 올려, 좁은 대신 진하게 탄다. */
 .tally.hot2 .tally-total {
-  font-size: clamp(84px, 7.1vw, 110px);
+  scale: 1.2;
   color: #ffb04a;
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 34px currentColor, 0 0 62px rgba(255, 150, 50, 0.82);
 }
 .tally.hot2 .tally-box { box-shadow: inset 0 0 0 2px rgba(255, 200, 110, 0.4), 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 26px rgba(255, 150, 50, 0.35); }
 .tally.hot3 .tally-total {
-  font-size: clamp(92px, 7.6vw, 120px);
+  scale: 1.3;
   color: #ffd24a;
   animation: total-blaze 0.5s ease-in-out infinite alternate;
 }
@@ -5608,10 +5621,12 @@ html[data-postprocessing='off'] .tip-bubble {
   position: static;
   width: 100%;
   min-height: 0;
-  color: rgba(255, 246, 230, 0.92);
-  font-size: 10.5px;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+  color: rgba(255, 246, 230, 0.96);
+  font-size: 13px;
+  text-shadow: 0 0 2px #000, 0 1px 2px #000, 0 2px 6px rgba(0, 0, 0, 0.95);
 }
+/* 카드 수치(×1.5, 확률 등)는 설명보다 한 단계 크고 진하게 읽혀야 한다. */
+.card-front.art .card-note-text { font-size: 14px; font-weight: 1000; letter-spacing: .01em; }
 
 /* 카드 앞면은 감정과 비용만 두 모서리에 둔다. 등급·반복강화 단계는 카드의
    테두리/포일과 우측 상세 패널에서 확인해 일러스트 위의 정보 밀도를 낮춘다. */
@@ -5707,7 +5722,7 @@ html[data-postprocessing='off'] .tip-bubble {
 }
 .card-action-inline svg,
 .card-action-inline .baked-stat-icon { width: 12px; height: 12px; }
-.card-action-inline b { font-size: 10px; font-weight: 1000; }
+.card-action-inline b { font-size: 11px; font-weight: 1000; }
 .card-action-inline.action-attack { color: #51483f; }
 .card-action-inline.action-guard { color: #51483f; }
 .card-action-inline.action-heal { color: #51483f; }
@@ -9820,14 +9835,16 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
    번지므로 그 빛이 무대 밖으로 나가 세로로 잘렸다 — 자리를 안쪽으로 물리고 빛도
    상자에 붙게 좁혔다. */
 .mult-now {
+  /* 문장 바로 아래 가운데 — 오른쪽 구석에 작게 있으면 고르는 동안 시선이 닿지 않았다. */
   position: absolute;
-  right: 88px;
-  top: 164px;
+  left: 50%;
+  top: 178px;
   z-index: 86;
-  transform: none;
+  transform: translateX(-50%);
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
+  white-space: nowrap;
   pointer-events: none;
   font-weight: 900;
   padding: 5px 12px;
@@ -9928,21 +9945,21 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   100% { left: 118%; opacity: 0; }
 }
 .mult-now .mn-lane {
-  font-size: 13px;
+  font-size: 16px;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
 }
 .mult-now .mn-flat {
-  font-size: 26px;
+  font-size: 34px;
   color: #9fd8ff;
   text-shadow: 0 0 18px rgba(120, 190, 255, 0.55), 0 4px 11px rgba(0, 0, 0, 0.36);
 }
 .mult-now .mn-x {
-  font-size: 18px;
+  font-size: 22px;
   color: var(--ink-faint);
 }
 .mult-now .mn-mult {
-  font-size: 32px;
+  font-size: 40px;
   color: #ffd27a;
   text-shadow: 0 0 20px rgba(255, 190, 90, 0.66), 0 4px 11px rgba(0, 0, 0, 0.36);
   transition: color 0.2s, text-shadow 0.2s;

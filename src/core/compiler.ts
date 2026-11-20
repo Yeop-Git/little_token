@@ -6,6 +6,7 @@
  * 슬롯을 4칸/6칸으로 바꿔도 컴파일러는 그대로 동작한다.
  */
 
+import { formatNumber } from './numberFormat'
 import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
@@ -195,7 +196,7 @@ export function compile(
       // 동사의 깡수치는 스탯에서 나온다 — 공격이면 위력, 방어/회복이면 그쪽 수치로.
       const flat = wordFlat(w, stats, mods)
       if (flat > 0) {
-        const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${w.statMult}` : undefined
+        const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${formatNumber(w.statMult)}` : undefined
         const lane = w.kind === 'guard' ? 'guard' : w.kind === 'heal' ? 'heal' : 'damage'
         flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane })
         if (lane === 'guard') statGuard += flat

@@ -3,6 +3,7 @@
  * 스킬카드처럼 일러스트로 보여주고 카드 앞면에서 핵심 효과를 바로 읽는다.
  */
 
+import { formatNumber } from '@/core/numberFormat'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import {
   EARLY_BUILD_REWARD_DAY,
@@ -188,7 +189,7 @@ function mainEffect(opt: RewardOption): string {
   const note = action ? wordCardDisplayNote(word) : wordNoteText(word)
   if (keywords) {
     const prefix = word.statMult != null
-      ? `×${word.statMult}`
+      ? `×${formatNumber(word.statMult)}`
       : word.variance
         ? wordCardDisplayNote(word, note).split(' · ')[0]
         : word.bonus
@@ -224,7 +225,7 @@ function reinforceDeltas(w: Word): string {
   if (w.bonus != null) rows.push(`${multText(w.bonus)} → <b>${multText(after.bonus!)}</b>`)
   if (w.effects?.guard) rows.push(`방어 ${w.effects.guard} → <b>${after.effects!.guard}</b>`)
   if (w.effects?.heal) rows.push(`회복 ${w.effects.heal} → <b>${after.effects!.heal}</b>`)
-  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${w.statMult} → <b>×${after.statMult}</b>`)
+  if (w.statMult != null) rows.push(`${w.stat ? STAT_NAME[w.stat] : text('rewardCoefficient', '계수')} ×${formatNumber(w.statMult)} → <b>×${formatNumber(after.statMult!)}</b>`)
   // 도박 카드는 고점이, 성장 카드는 체력이 그 카드의 핵심 수치다(core/run.ts).
   if (w.variance) rows.push(`${gambleText(w.variance)} → <b>${gambleText(after.variance!)}</b>`)
   if (w.growHp) rows.push(`최대 체력 +${w.growHp} → <b>+${after.growHp}</b>`)

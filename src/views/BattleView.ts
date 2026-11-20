@@ -46,7 +46,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
-  previewIntentHits,
+  previewIntentShownHits,
   BOSS_ATTACK_MULTIPLIER,
   bossAttackStage,
   enemyAttackForecast,
@@ -321,12 +321,18 @@ interface TallyPart {
 interface Tally {
   flats: TallyPart[]
   mults: TallyPart[]
+  /** 배율을 받지 않고 배율 뒤에 더해지는 수치(방어도·초과 회복 전환 피해). 타격 1회분. */
+  extras: TallyPart[]
   base: number
   mult: number
+  /** 같은 위력이 몇 번 꽂히는가(연타 × 동사 반복). 1이면 표시하지 않는다. */
+  hits: number
   total: number
   kind: 'dmg' | 'guard' | 'heal'
   adjustment?: number
   applied?: boolean
+  /** 체력·실드 한도를 넘겨 실제로는 담기지 않은 몫. 총합은 그대로 두고 칩으로만 알린다. */
+  excess?: { label: string; value: number }
 }
 
 export class BattleView {
@@ -2380,7 +2386,7 @@ export class BattleView {
       const tally = this.lastResolvedTally
       sentenceLabel = bossText('forecastLastSentence')
       sentenceValue = bossText('forecastExact', {
-        base: Number(tally.base.toFixed(4)),
+        base: formatNumber(tally.base),
         mult: tally.mult.toFixed(2),
         total: tally.total,
       })
@@ -3261,13 +3267,22 @@ export class BattleView {
 
   // ── 점수 분해 — 깡 점수(더하기)와 배율(곱하기)을 출처별로 쪼갠다 ──
   // 문장 자체의 계산값이다. 적의 약점·방어와 선공으로 바뀐 자원은 본행동에서 반영한다.
-  private buildTally(intent: Intent, resolved: ResolvedMult, dealsDamage: boolean): Tally {
+  private buildTally(
+    intent: Intent,
+    resolved: ResolvedMult,
+    dealsDamage: boolean,
+    resource: { guard: number; overheal: number } = { guard: 0, overheal: 0 },
+  ): Tally {
     // 피해·실드·회복 어느 문장이든 같은 배율 정산을 보여 준다.
     // 순수 효과형 카드도 실제 적용값과 일치하도록 아래에서 깡수치를 보충한다.
     const kind: Tally['kind'] = dealsDamage ? 'dmg' : intent.guard > 0 ? 'guard' : 'heal'
-    const repeatPower = intent.castCount * intent.castScale * (dealsDamage ? intent.hitCount : 1)
+    // 피해는 "1타 위력"을 쌓고 마지막에 타격 수를 따로 곱해 보여 준다(2번 타격 명시).
+    // 방어·회복은 반복 발동이 그대로 한 덩어리 수치라 지금처럼 합쳐서 쌓는다.
+    const hits = dealsDamage ? Math.max(1, intent.hitCount * intent.castCount) : 1
+    const repeatPower = dealsDamage ? intent.castScale : intent.castCount * intent.castScale
     const supportBase = (kind === 'guard' ? intent.guard : kind === 'heal' ? intent.heal : 0) * repeatPower
-    if (!dealsDamage && supportBase <= 0) return { flats: [], mults: [], base: 0, mult: 1, total: 0, kind }
+    const empty = { flats: [], mults: [], extras: [], base: 0, mult: 1, hits: 1, total: 0, kind }
+    if (!dealsDamage && supportBase <= 0) return empty
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
     const resonanceEmotion = this.resonantEmotion(intent.emotions)
@@ -3278,13 +3293,15 @@ export class BattleView {
     // 동사가 둘이면 한 문장이 피해와 회복을 동시에 만든다 — 집계판은 자기 풀만 더한다.
     // (안 그러면 방어 깡수치가 피해 총합에 섞여 화면 숫자와 실제 피해가 어긋난다.)
     const lane = kind === 'dmg' ? 'damage' : kind
-    const flats: TallyPart[] = intent.breakdown.flats
-      .filter((p) => (p.lane ?? 'damage') === lane)
-      .map((p) => ({
-        label: p.hint ? `${p.label} (${p.hint})` : p.label,
-        value: p.value * repeatPower,
-        cls: kind,
-      }))
+    const flats: TallyPart[] = kind === 'dmg' && effectiveBase(intent) <= 0
+      ? []
+      : intent.breakdown.flats
+        .filter((p) => (p.lane ?? 'damage') === lane)
+        .map((p) => ({
+          label: p.hint ? `${p.label} (${p.hint})` : p.label,
+          value: p.value * repeatPower,
+          cls: kind,
+        }))
     // effects.guard/effects.heal처럼 동사 깡수치가 아닌 보조 효과도 배율을 받는다.
     // 집계판의 깡수치 합이 실제 방어·회복 적용값과 항상 같도록 남은 값만 보탠다.
     if (supportBase > 0) {
@@ -3297,8 +3314,20 @@ export class BattleView {
         })
       }
     }
-    const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
+    // 방어도·초과 회복 전환 피해는 배율을 받지 않고 배율 뒤에 더해진다.
+    const text = combatPreviewText()
+    const extras: TallyPart[] = []
+    if (kind === 'dmg' && resource.guard > 0) extras.push({ label: text.guardConvert, value: resource.guard, cls: 'guard' })
+    if (kind === 'dmg' && resource.overheal > 0) extras.push({ label: text.overhealConvert, value: resource.overheal, cls: 'heal' })
 
+    // 깡 위력 없이 전환 피해만 있는 문장(방패치기 등)은 "0 × 배율"을 보여 주지 않는다.
+    // 배율은 0에 곱해질 뿐이라 화면만 헷갈리게 한다 — 전환 피해를 바로 깡 점수 칸에 쌓는다.
+    if (kind === 'dmg' && flats.length === 0) {
+      const base = extras.reduce((n, f) => n + f.value, 0)
+      return { flats: extras, mults: [], extras: [], base, mult: 1, hits, total: base * hits, kind }
+    }
+
+    const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
     const p = resolved.parts
     if (p.variance !== 1) mults.push({ label: '도박', value: p.variance, cls: p.variance >= 1 ? 'buff' : 'down' })
     if (p.luck !== 1) mults.push({ label: '운', value: p.luck, cls: 'stat' })
@@ -3309,18 +3338,21 @@ export class BattleView {
 
     const base = flats.reduce((n, f) => n + f.value, 0)
     const mult = mults.reduce((m, x) => m * x.value, 1)
-    const repeats = dealsDamage ? intent.hitCount * intent.castCount : 1
-    const total = dealsDamage && repeats > 1
-      ? Math.floor((base / repeats) * mult) * repeats
-      : dealsDamage ? Math.floor(base * mult) : Math.round(base * mult)
-    return { flats, mults, base, mult, total, kind }
+    const extra = extras.reduce((n, f) => n + f.value, 0)
+    const total = dealsDamage
+      ? (Math.floor(base * mult) + extra) * hits
+      : Math.round(base * mult)
+    return { flats, mults, extras, base, mult, hits, total, kind }
   }
 
   // 깡 점수가 하나씩 쌓이고 → 배율이 하나씩 꽂히고 → 총합이 쾅. 발라트로식 콤보 쾌감.
   private async playTally(tally: Tally): Promise<void> {
+    const text = combatPreviewText()
     const el = document.createElement('div')
     el.className = `tally ${tally.kind}`
-    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : '깡 점수'
+    const convertedOnly = tally.kind === 'dmg' && tally.mults.length === 0 && tally.flats.length > 0
+      && tally.flats.every((f) => f.label === text.guardConvert || f.label === text.overhealConvert)
+    const baseLabel = tally.kind === 'guard' ? '실드' : tally.kind === 'heal' ? '회복' : convertedOnly ? text.converted : '깡 점수'
     el.innerHTML = `
       <div class="tally-slots">
         <div class="tally-cell"><div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div></div>
@@ -3330,33 +3362,59 @@ export class BattleView {
       <div class="tally-feed tally-flat-feed"></div>
       <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
       <div class="tally-feed tally-mult-feed"></div>
-      <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? combatPreviewText().applied : combatPreviewText().actual) : combatPreviewText().calculation}</div>
+      <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? text.applied : text.actual) : text.calculation}</div>
       <div class="tally-total"></div>`
-    this.q('#pbox').appendChild(el)
-    this.fitTallyToStage(el)
-    requestAnimationFrame(() => {
-      this.fitTallyToStage(el)
-      el.classList.add('in')
-    })
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
     const flatFeed = el.querySelector<HTMLElement>('.tally-flat-feed')!
     const multFeed = el.querySelector<HTMLElement>('.tally-mult-feed')!
+    const totalEl = el.querySelector<HTMLElement>('.tally-total')!
+    const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
+    if (hasRisingMultiplier) el.classList.add('has-phase')
+
+    // 모든 칩을 처음부터 자리만 잡아 두고(보이지 않게) 하나씩 드러낸다.
+    // 칩이 붙을 때마다 판의 높이·축척이 바뀌면 가운데 정렬된 판 전체가 위아래로
+    // 출렁여 점수가 "내려갔다 올라오는" 것처럼 보였다. 판 크기는 한 번만 잰다.
+    const flatChips = tally.flats.map((f) => this.tallyChip(flatFeed, `${f.label} +${formatNumber(f.value)}`, f.cls))
+    const multChips = tally.mults.map((m) => this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls))
+    const extraChips = tally.extras.map((f) => this.tallyChip(multFeed, `${f.label} +${formatNumber(f.value)}`, `${f.cls} extra`))
+    const hitChip = tally.hits > 1
+      ? this.tallyChip(multFeed, `${text.hits.replace('{count}', String(tally.hits))} ×${tally.hits}`, 'hits')
+      : null
+    const adjustChip = tally.adjustment
+      ? this.tallyChip(multFeed, `${text.adjustment} ${tally.adjustment > 0 ? '+' : ''}${formatNumber(tally.adjustment)}`, tally.adjustment > 0 ? 'buff' : 'down')
+      : null
+    const excessChip = tally.excess && tally.excess.value > 0
+      ? this.tallyChip(multFeed, `${tally.excess.label} ${formatNumber(tally.excess.value)}`, `${tally.kind} excess`)
+      : null
+
+    // 최종 숫자를 넣은 상태로 한 번 재서 상자·총합 폭을 고정하고 판 축척을 잠근다.
+    baseBox.querySelector('b')!.textContent = formatNumber(tally.base)
+    multBox.querySelector('b')!.textContent = tally.mult.toFixed(2)
+    totalEl.textContent = String(tally.total)
+    this.q('#pbox').appendChild(el)
+    for (const box of [baseBox, multBox, totalEl]) box.style.minWidth = `${Math.ceil(box.offsetWidth)}px`
+    totalEl.style.minHeight = `${Math.ceil(totalEl.offsetHeight)}px`
+    el.dataset.fitFever = String(this.feverOf(tally.total))
+    this.fitTallyToStage(el)
+    el.dataset.fitLocked = '1'
+    baseBox.querySelector('b')!.textContent = '0'
+    multBox.querySelector('b')!.textContent = '1.00'
+    totalEl.textContent = ''
+    requestAnimationFrame(() => el.classList.add('in'))
     await sleep(120)
 
     let base = 0
-    for (const f of tally.flats) {
+    for (const [i, f] of tally.flats.entries()) {
       base += f.value
       baseBox.querySelector('b')!.textContent = formatNumber(base)
-      this.tallyChip(flatFeed, `${f.label} +${formatNumber(f.value)}`, f.cls)
-      this.fitTallyToStage(el)
+      this.revealChip(flatChips[i])
       this.bump(baseBox)
       // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
       this.setFever(el, base)
-      await sleep(100)
+      await sleep(140)
     }
     let mult = 1
-    const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
     if (hasRisingMultiplier) {
       el.classList.add('mult-rising')
       GameAudio.playMultiplierRise()
@@ -3364,8 +3422,7 @@ export class BattleView {
     multBox.classList.add('rolling')
     for (const [i, m] of tally.mults.entries()) {
       const nextMult = mult * m.value
-      this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls)
-      this.fitTallyToStage(el)
+      this.revealChip(multChips[i])
       // 배율이 겹칠수록 판이 뜨거워진다.
       el.style.setProperty('--heat', Math.min(1, (i + 1) / 4).toFixed(2))
       await this.rollMultiplierValue(multBox.querySelector('b')!, mult, nextMult, 220)
@@ -3383,12 +3440,17 @@ export class BattleView {
       await sleep(240)
       el.classList.remove('mult-settled')
     }
-
-    if (tally.adjustment) {
-      const sign = tally.adjustment > 0 ? '+' : ''
-      this.tallyChip(multFeed, `${combatPreviewText().adjustment} ${sign}${tally.adjustment}`, tally.adjustment > 0 ? 'buff' : 'down')
-      this.fitTallyToStage(el)
+    // 배율 뒤에 더해지는 전환 피해 → 타격 수 → 대상 반영 순서로 읽힌다.
+    for (const chip of extraChips) {
+      this.revealChip(chip)
+      await sleep(140)
     }
+    if (hitChip) {
+      this.revealChip(hitChip)
+      await sleep(220)
+    }
+    if (adjustChip) this.revealChip(adjustChip)
+    if (excessChip) this.revealChip(excessChip)
 
     // 깡 × 배율이 다 모이면 잠깐 멈춰 읽을 시간을 준다 — 호버 중이면 더 기다리고, 클릭하면 즉시.
     await this.tallyDwell(el)
@@ -3399,6 +3461,10 @@ export class BattleView {
     // 여기서 지우지 않는다 — 준비 효과·선공을 지나 내 공격이 꽂힐 때까지 이 숫자가 머문다.
     el.classList.add('parked')
     this.parkedTally = el
+  }
+
+  private revealChip(chip: HTMLElement | null) {
+    chip?.classList.remove('pending')
   }
 
   // 집계판 체류 — 기본 0.35초. 패널에 마우스를 올려두면 놓을 때까지(최대 2초) 기다리고,
@@ -3441,6 +3507,8 @@ export class BattleView {
    * 레이아웃 크기는 그대로 두고 최종 표시 비율만 줄이므로, 숫자·칩이 잘리지 않는다.
    */
   private fitTallyToStage(el: HTMLElement) {
+    // 처음 한 번 최종 크기로 잰 뒤에는 잠근다 — 도중에 축척이 바뀌면 판이 출렁인다.
+    if (el.dataset.fitLocked) return
     const stage = this.q('#pbox')
     const safeWidth = Math.max(340, Math.min(680, stage.clientWidth - 420))
     const safeHeight = Math.max(250, Math.round(stage.clientHeight * 0.62))
@@ -3453,7 +3521,7 @@ export class BattleView {
     )
     const height = el.offsetHeight
     if (width <= 0 || height <= 0) return
-    const feverScale = [1, 1.05, 1.1, 1.16][Number(el.dataset.fever ?? 0)] ?? 1.16
+    const feverScale = [1, 1.05, 1.1, 1.16][Number(el.dataset.fitFever ?? el.dataset.fever ?? 0)] ?? 1.16
     const fit = Math.min(1, safeWidth / (width * feverScale), safeHeight / (height * feverScale))
     el.style.setProperty('--tally-fit', Math.max(0.34, fit).toFixed(3))
     el.classList.toggle('compact', fit < 0.86)
@@ -3544,12 +3612,13 @@ export class BattleView {
     el.classList.remove('show')
   }
 
-  private tallyChip(feed: HTMLElement, text: string, cls: string) {
+  /** 칩은 자리를 먼저 잡고(pending) revealChip으로 드러낸다 — 판 높이가 도중에 바뀌지 않게. */
+  private tallyChip(feed: HTMLElement, text: string, cls: string): HTMLElement {
     const chip = document.createElement('span')
-    chip.className = `tally-chip ${cls}`
+    chip.className = `tally-chip pending ${cls}`
     chip.textContent = text
     feed.appendChild(chip)
-    while (feed.children.length > 6) feed.removeChild(feed.firstChild!)
+    return chip
   }
 
   private bump(el: HTMLElement) {
@@ -3653,7 +3722,10 @@ export class BattleView {
     // 4) 점수 확정 — 깡수치와 배율이 팅·팅·팅 순서대로 꽂히고, 총합은 화면에 그대로 머문다.
     //    이 숫자를 들고 준비 효과 → 선공 → 내 공격까지 이어가므로 중간에 다시 계산하지 않는다.
     this.noteSentence(intent.sentence, mult, 0)
-    const tally = this.buildTally(intent, resolved, dealsDamage)
+    const tally = this.buildTally(intent, resolved, dealsDamage, {
+      guard: Math.floor(projectedGuard * intent.guardAttackMultiplier),
+      overheal: overhealDamage,
+    })
     this.lastResolvedTally = tally
     // 보상 카드의 성장과 하늘나물의 첫 문장 성장을 한 번에 보여 준다.
     const passiveGrowth = beanstalkGrowthFor(this.player, !this.beanstalkGrownThisBattle)
@@ -3662,10 +3734,9 @@ export class BattleView {
     if (totalGrowth > 0) await this.growUp(totalGrowth)
 
     if (!dealsDamage && tally.kind === 'guard' && tally.total > 0) {
+      // 실드 한도를 넘겨도 문장이 만든 수치는 그대로 보여 준다. 담기지 않은 몫은 칩으로만 알린다.
       const applied = applyPreparation(structuredClone(this.state), intent, mult).guardGain
-      tally.adjustment = applied - tally.total
-      tally.total = applied
-      tally.applied = true
+      if (tally.total > applied) tally.excess = { label: combatPreviewText().guardCap, value: tally.total - applied }
       await this.playTally(tally)
     }
 
@@ -3724,7 +3795,8 @@ export class BattleView {
     // 대상별 약점·방어·호위와 현재 자원을 합산하되 지연 공격은 예약 위력으로 둔다.
     if (dealsDamage) {
       if (intent.timing !== 'delayed') {
-        const applied = previewIntentHits(this.state, intent, mult, this.target).reduce((sum, hit) => sum + hit, 0)
+        // 남은 체력·보스 막 경계에서 잘리기 전의 실제 타격 수치를 합산한다(초과 피해도 그대로).
+        const applied = previewIntentShownHits(this.state, intent, mult, this.target).reduce((sum, hit) => sum + hit, 0)
         tally.adjustment = applied - tally.total
         tally.total = applied
         tally.applied = true
@@ -3733,10 +3805,9 @@ export class BattleView {
     }
 
     if (!dealsDamage && tally.kind === 'heal' && tally.total > 0) {
+      // 체력이 가득 차 있어도 회복 수치는 0으로 뭉개지 않는다. 넘친 몫은 칩으로만 알린다.
       const applied = Math.min(tally.total, Math.max(0, this.state.playerMax - this.state.playerHp))
-      tally.adjustment = applied - tally.total
-      tally.total = applied
-      tally.applied = true
+      if (tally.total > applied) tally.excess = { label: combatPreviewText().overheal, value: tally.total - applied }
       await this.playTally(tally)
     }
 
@@ -3867,7 +3938,7 @@ export class BattleView {
           else if (hit.guardAbsorbed > 0 && hit.dmg === 0) this.popAt(hit.target, `방어 ${hit.guardAbsorbed}`, 'guard')
           else if (hit.dmg > 0) {
             if (el) SquareBurst.playOn(el, 'damage', { spread: 100 })
-            this.popAt(hit.target, `${hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
+            this.popAt(hit.target, `${hit.shown ?? hit.dmg}`, hit.weak ? 'dmg big weak' : 'dmg big')
             if ((hit.barOverflow ?? 0) > 0) this.playBossBarOverkill(hit.target, hit.barOverflow ?? 0, !!hit.barOverflowPassed)
             if ((hit.barsBroken ?? 0) > 0) this.playBossBarBreak(hit.target, hit.barsBroken ?? 1, !!hit.barOverflowPassed)
           }
@@ -4007,11 +4078,12 @@ export class BattleView {
     const you = this.q<HTMLElement>('.actor.you')
     // 생명력 폭발은 회복 뒤에 넘친 힘이 적에게 향하는 연속 동작이다.
     // 회복 수치와 동작을 먼저 보여 주어 화면에서도 원인과 결과가 뒤집히지 않게 한다.
-    if (res.heal) {
+    const healShown = Math.max(res.heal, res.healRolled ?? 0)
+    if (healShown > 0) {
       GameAudio.play('heal')
       playCharacterAnimation(you, 'heal')
       this.updatePlayer(you)
-      await this.flyToPlayer(`+${res.heal}`, 'heal', 'heal')
+      await this.flyToPlayer(`+${healShown}`, 'heal', 'heal')
     }
     // 여왕벌은 피해를 먼저 일벌 킬체인에 소비하므로 본체 hit가 0건일 수 있다.
     // 그 경우에도 실제 공격은 일어났다. hit만 보면 정확히 30/60/120 피해에서 프롬이
@@ -4115,7 +4187,8 @@ export class BattleView {
         SquareBurst.playOn(el, 'damage', { spread: heavy ? 190 : 120 })
         this.hitOne(el)
       }
-      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
+      // 막·부위 경계에서 잘린 몫까지 포함한 타격 수치를 띄운다 — 체력바는 실제로 깎인 만큼만 준다.
+      this.popAt(h.target, `${h.partName ? `${h.partName} ` : ''}${h.shown ?? h.dmg}`, `dmg big${h.weak ? ' weak' : ''}`)
       if ((h.barOverflow ?? 0) > 0) this.playBossBarOverkill(h.target, h.barOverflow ?? 0, !!h.barOverflowPassed)
       if ((h.barsBroken ?? 0) > 0) this.playBossBarBreak(h.target, h.barsBroken ?? 1, !!h.barOverflowPassed)
       if (h.webBurst) this.playSpiderWebBurst(h.target, h.tensionReduced ?? 0)

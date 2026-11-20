@@ -5,6 +5,7 @@
  * 설명서에 그려지는 카드가 전투에서 집는 카드와 한 글자도 다르지 않게 한다.
  */
 
+import { formatNumber } from '@/core/numberFormat'
 import { INK_UI, SKILL_ART } from '@/assets'
 import { currentLocale, t, type LocaleCode } from '@/localization'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
@@ -87,7 +88,7 @@ export function wordCardDisplayNote(word: Word, note = wordNoteText(word)): stri
 export function wordCardPrimaryNote(word: Word, note = wordNoteText(word)): string {
   const keywords = wordKeywords(word)
   if (!keywords.length) return wordCardDisplayNote(word, note)
-  if (word.statMult != null) return `×${word.statMult}`
+  if (word.statMult != null) return `×${formatNumber(word.statMult)}`
   if (word.variance) return wordCardDisplayNote(word, note).split(' · ')[0]
   if (word.bonus) return `×${(1 + word.bonus).toFixed(2)}`
   return ''
