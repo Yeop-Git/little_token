@@ -81,6 +81,11 @@ export interface WordKeyword {
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
+/** 연타 횟수 단위 — 다른 언어 카드에 한국어 '회'가 섞이지 않게 한다. */
+const TIMES: Record<LocaleCode, (count: number) => string> = {
+  ko: (count) => `${count}회`, en: (count) => `×${count}`, ja: (count) => `${count}回`, ru: (count) => `×${count}`,
+  'zh-Hans': (count) => `${count}次`, 'zh-Hant': (count) => `${count}次`,
+}
 
 export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>): WordKeyword[] {
   const effects = word.effects
@@ -90,9 +95,9 @@ export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>
     ['preempt', word.tags.includes(PREEMPT_TAG) ? '' : null],
     ['critical', word.crit ? percent(luckChance(word.crit, getCardLuck(), CRIT_CHANCE_CAP).final) : null],
     ['repeat', (effects?.hitCount ?? 1) > 1
-      ? `${effects!.hitCount}회`
+      ? TIMES[currentLocale](effects!.hitCount!)
       : (effects?.castCount ?? 1) > 1
-        ? `${effects!.castCount}회${omitValues?.has('repeat') ? '' : `·${percent(effects?.castScale ?? 1)}`}`
+        ? `${TIMES[currentLocale](effects!.castCount!)}${omitValues?.has('repeat') ? '' : `·${percent(effects?.castScale ?? 1)}`}`
         : null],
     ['magicShield', effects?.magicShield ? String(effects.magicShield) : null],
     ['lifesteal', effects?.lifeStealRate ? percent(effects.lifeStealRate) : null],

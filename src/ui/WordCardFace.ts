@@ -92,7 +92,12 @@ export function wordCardDisplayNote(word: Word, note = wordNoteText(word)): stri
 export function wordCardPrimaryNote(word: Word, note = wordNoteText(word)): string {
   const keywords = wordKeywords(word)
   if (!keywords.length) return wordCardDisplayNote(word, note)
-  if (word.statMult != null) return `×${formatMult(word.statMult)}`
+  if (word.statMult != null) {
+    // 대상 수처럼 키워드 칩이 없는 수치는 계수 옆에 남긴다(「쏟아냈다」의 대상 3명이 사라지지 않게).
+    const names = keywords.map((keyword) => keyword.name)
+    const extra = wordCardDisplayNote(word, note).split(' · ').slice(1).filter((part) => !names.some((name) => part.startsWith(name)))
+    return [`×${formatMult(word.statMult)}`, ...extra].join(' · ')
+  }
   if (word.variance) return wordCardDisplayNote(word, note).split(' · ')[0]
   if (word.bonus) return `×${(1 + word.bonus).toFixed(2)}`
   return ''

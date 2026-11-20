@@ -418,7 +418,7 @@ export class CombatGuideView {
 
   private pageCombat(): string {
     const falloff = TARGET_FALLOFF.map((v) => pct(v)).join(' · ')
-    const preempt = rewardWord('sinnage')
+    const preempt = rewardWord('naepda')
     const flurry = rewardWord('michin')
     const pierce = rewardWord('himkkeot')
     const counter = rewardWord('dandanhi')
