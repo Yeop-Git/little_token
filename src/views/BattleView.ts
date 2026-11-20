@@ -222,7 +222,11 @@ const BOSS_WALK_MS = 3380
  * 같아야 한다 — 더 길면 도착한 자리에서 제자리걸음을 하고, 더 짧으면 걷다 말고 미끄러진다.
  */
 const RAIL_ADVANCE_WALK_MS = 420
-const MAX_ACTION_ORDER_ENEMIES = 3
+/** 레일 대기 묶음 줄에 겹쳐 세우는 초상 수. 나머지는 ×N 숫자로만 센다. */
+const MAX_ACTION_ORDER_WAITING_PORTRAITS = 3
+/** 보유 아이템이 이만큼을 넘으면 아이콘을 줄여 잉크 계량기 위에서 멈추게 한다. */
+const RELIC_DENSE_AT = 16
+const RELIC_TIGHT_AT = 25
 
 // ── 강타 한 방의 마디 ──
 // 평소 attack은 440ms로 눌러 쓰지만(원본 2417ms) 강타에서만 늘려서 예비 동작을 보여 준다.
@@ -1409,6 +1413,8 @@ export class BattleView {
       active: boolean
       /** 이번에 움직이는 적의 예상 피해(11/20: 붉은 글씨로 크게). */
       damage?: string
+      /** 레일 대기 묶음 — 작은 초상 몇 장만 겹쳐 세운다. */
+      portraits?: string[]
     }
 
     const entries: OrderEntry[] = []
@@ -1458,11 +1464,13 @@ export class BattleView {
       entries.push(enemyEntry('cooldown', `${enemy.nextAttackTurn - this.state.turn}턴 뒤`))
     }
 
+    // 레일에서 기다리는 적은 몇 마리든 한 줄로 접는다. 한 마리씩 줄을 세우면 적이 많은 날
+    // 목록이 길어져 아래 보유 아이템 칸을 잉크 계량기 위까지 밀어낸다(11/20 피드백).
     const waitingEnemies = aliveIdx(this.state).filter((i) => i !== front)
-    waitingEnemies.slice(0, MAX_ACTION_ORDER_ENEMIES - 1).forEach((i) => {
-      const waiting = this.state.enemies[i]
+    if (waitingEnemies.length === 1) {
+      const waiting = this.state.enemies[waitingEnemies[0]]
       entries.push({
-        key: `enemy-${i}`,
+        key: `enemy-${waitingEnemies[0]}`,
         name: waiting.def.name,
         portrait: this.visualForEnemy(waiting).portrait2d,
         side: 'enemy',
@@ -1470,16 +1478,16 @@ export class BattleView {
         note: '레일 대기',
         active: false,
       })
-    })
-    const hiddenWaiting = Math.max(0, waitingEnemies.length - (MAX_ACTION_ORDER_ENEMIES - 1))
-    if (hiddenWaiting > 0) {
+    } else if (waitingEnemies.length > 1) {
       entries.push({
-        key: 'enemy-overflow',
-        name: `×${hiddenWaiting}`,
+        key: 'enemy-waiting',
+        name: `×${waitingEnemies.length}`,
         portrait: '',
+        portraits: waitingEnemies.slice(0, MAX_ACTION_ORDER_WAITING_PORTRAITS)
+          .map((i) => this.visualForEnemy(this.state.enemies[i]).portrait2d),
         side: 'enemy',
         timing: 'summary',
-        note: '추가 대기',
+        note: '레일 대기',
         active: false,
       })
     }
@@ -1502,7 +1510,9 @@ export class BattleView {
     host.innerHTML = entries.map((entry, index) => `
       <li class="action-order-item ${entry.side} timing-${entry.timing}${entry.active ? ' is-now' : ''}${this.playerPreempting && entry.side === 'player' ? ' priority-taken' : ''}"
         data-order-key="${entry.key}" style="--order-i:${index}" tabindex="0" aria-label="${entry.name} ${entry.note}">
-        <div class="action-order-portrait">${entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
+        <div class="action-order-portrait">${entry.portraits?.length
+          ? `<span class="action-order-stack">${entry.portraits.map((src) => `<img src="${src}" alt="">`).join('')}</span>`
+          : entry.timing === 'summary' ? BUG_COUNT_ICON : `<img src="${entry.portrait}" alt="">`}</div>
         <div class="action-order-copy"><b>${entry.name}${entry.damage ? `<strong class="action-order-damage" aria-label="${t('battleExpectedDamage', '예상 피해 {value}').replace('{value}', String(entry.damage))}" data-tooltip="${tip(t('battleExpectedDamage', '예상 피해 {value}').replace(/[:：]?\s*\{value\}/, ''), t('battleExpectedDamageTip', '이번 행동으로 받을 수 있는 피해 {value}').replace('{value}', String(entry.damage)))}" data-tip-place="above">${icon('sword')}${entry.damage}</strong>` : ''}</b><span>${entry.note}</span></div>
       </li>`).join('')
     host.querySelectorAll<HTMLElement>('[data-order-key]').forEach((item) => {
@@ -3169,7 +3179,7 @@ export class BattleView {
     const tooltipFor = itemTooltipText
     strip.innerHTML = `
       <div class="relic-strip-head"><span>보유</span><b>아이템</b></div>
-      <div class="relic-icons">
+      <div class="relic-icons${this.player.items.length > RELIC_DENSE_AT ? (this.player.items.length > RELIC_TIGHT_AT ? ' is-tight' : ' is-dense') : ''}">
         ${this.player.items.map((item) => {
           const rarity = ownedItemRarity(item)
           const attr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -4345,7 +4355,9 @@ export class BattleView {
         discoverCombos(newlyDiscovered.map((combo) => combo.id))
         newlyDiscovered.forEach((combo) => this.discoveredCombos.add(combo.id))
       }
-      const comboMult = combos.reduce((m, c) => m * c.mult, 1)
+      // 관용구 특성(아이템)이 얹는 배율도 배너에 함께 실어야 정산판·실제 피해와 같은 값이 된다.
+      const traitCombo = this.mods().traitCombo ?? 0
+      const comboMult = combos.reduce((m, c) => m * c.mult, 1) * (1 + traitCombo)
       const el = this.q('#combo')
       // 정산판 내역과 같은 이름·자릿수(배율 ×1.50)로 적는다.
       el.innerHTML = `<div class="kicker">맥락 발동</div><div class="name">${intent.combos.join(' · ')}</div><div class="mult">배율 ×${comboMult.toFixed(2)}</div>`

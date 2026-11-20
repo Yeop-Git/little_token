@@ -1213,10 +1213,14 @@ button {
 .action-order-item.timing-waiting { opacity: .3; transform: scale(.82); transform-origin: left center; }
 .action-order-item.timing-waiting .action-order-portrait { filter: grayscale(.38) blur(1px); }
 .action-order-item.timing-waiting .action-order-copy { background: rgba(18, 14, 23, .32); }
-.action-order-item.timing-summary { opacity: .5; transform: scale(.78); transform-origin: left center; }
+.action-order-item.timing-summary { opacity: .62; transform: scale(.78); transform-origin: left center; }
 .action-order-item.timing-summary .action-order-portrait { color: var(--gold-hi); background: rgba(30, 22, 34, .9); }
 .action-order-item.timing-summary .action-order-portrait svg { width: 42px; height: 42px; }
 .action-order-item.timing-summary .action-order-copy b { color: var(--gold-hi); font-size: 19px; }
+/* 레일 대기 묶음 — 기다리는 적 초상을 작게 겹쳐 한 칸에 담는다. 몇 마리든 이 한 줄이다. */
+.action-order-stack { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 4px 4px; }
+.action-order-stack img { width: 46px; height: 62px; flex: none; margin-left: -22px; object-fit: contain; object-position: center bottom; filter: grayscale(.3); }
+.action-order-stack img:first-child { margin-left: 0; }
 
 /* 가방을 열지 않아도 보이는 Slay the Spire식 보유 아이템 열. */
 .relic-strip {
@@ -1253,6 +1257,8 @@ button {
 }
 .relic-icon .item-illus,
 .relic-icon svg { width: 80%; height: 80%; object-fit: contain; }
+.relic-icons.is-dense .relic-icon { width: 46px; height: 46px; border-radius: 12px 5px 10px 6px; }
+.relic-icons.is-tight .relic-icon { width: 38px; height: 38px; border-radius: 10px 4px 9px 5px; }
 .relic-icon.rarity-rare { color: #a7d8ff; border-color: rgba(129, 193, 255, .65); }
 .relic-icon.rarity-legendary { color: #ffe28a; border-color: rgba(255, 206, 86, .82); box-shadow: inset 0 0 0 3px rgba(255, 246, 218, .08), 0 0 14px rgba(255, 188, 64, .24); }
 /* ── 아이콘 호버 툴팁 (공용) ──
@@ -4790,9 +4796,16 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   border-radius: 24px;
 }
 /* 짧아진 보스 HUD 아래에 문장 캐스트 전용 레일을 고정한다. */
-.scene.battle[data-boss='true'] .chain-rail {
-  top: clamp(286px, 31vh, 338px);
+.scene.battle[data-boss='true'] {
+  --boss-chain-top: clamp(286px, 31vh, 338px);
 }
+.scene.battle[data-boss='true'] .chain-rail {
+  top: var(--boss-chain-top);
+}
+/* 보스전에서는 문장 칸이 보스 문장판 아래로 내려가므로, 문장 칸에 딸린 「지금 배율」과
+   공명 띠도 같은 간격(일반전 74 → 186 · 206)을 지키며 함께 내려간다. 그대로 두면 보스
+   문장판(z 88) 뒤에 깔려 단어를 고를 때마다 뜨는 배율 칸이 보이지 않았다. */
+.scene.battle[data-boss='true'] .mult-now { top: calc(var(--boss-chain-top) + 112px); }
 .chain-rail.has-sentence {
   background: linear-gradient(105deg, rgba(10, 7, 16, .82), rgba(26, 17, 25, .74) 52%, rgba(10, 7, 16, .82));
   border: 1px solid rgba(255, 228, 168, .18);
@@ -5056,7 +5069,7 @@ body:has(.combo-flash.show, .resonance-flash.show) .token-speech { opacity: 0 !i
 .resonance-value small { color: color-mix(in srgb, var(--resonance-color) 82%, #fff); font-size: 12px; font-weight: 800; }
 .resonance-value b { color: var(--resonance-color); font-size: 28px; line-height: 1; text-shadow: 0 0 18px color-mix(in srgb, var(--resonance-color) 74%, transparent); }
 .resonance-note { padding-left: 10px; border-left: 1px solid color-mix(in srgb, var(--resonance-color) 38%, transparent); color: #e3d8c8; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
-.scene.battle[data-boss='true'] .resonance-flash { top: 252px; }
+.scene.battle[data-boss='true'] .resonance-flash { top: calc(var(--boss-chain-top) + 132px); }
 @keyframes resonance-show {
   0% { opacity: 0; transform: translate(-50%, -40%) scale(.94); }
   18%, 72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
