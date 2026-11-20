@@ -9,6 +9,7 @@ import {
   nextEnemyAttackStep,
   spiderWebTension,
   summonCount,
+  summonWavesLeft,
   type BattleState,
   type EnemyInst,
 } from './reference'
@@ -128,7 +129,11 @@ function queenSentence(state: BattleState, enemy: EnemyInst, eventText?: string)
       label: tx('correctedEnding'),
       tone: 'relief',
       tokens: tokens(['subject', tx('queenSubject')], ['modifier', tx('queenStagger')], ['verb', tx('queenRest')]),
-      meta: [tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }), tx('nextActionSkip'), tx('respawnWorkers')],
+      meta: [
+        tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }),
+        tx('nextActionSkip'),
+        ...(summonWavesLeft(enemy) > 0 ? [tx('respawnWorkers')] : []),
+      ],
       eventText,
     }
   }

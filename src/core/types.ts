@@ -323,6 +323,8 @@ export interface EnemyDef {
     releaseAt?: number
     /** 일부만 남았을 때 채우지 않고, 전멸한 다음 턴에만 한 묶음을 다시 소환한다. */
     refillOnlyWhenEmpty?: boolean
+    /** 전투 전체에서 호위 묶음을 부를 수 있는 횟수. 비우면 제한 없이 다시 부른다. */
+    maxWaves?: number
     /** 호위가 한 마리라도 살아 있으면 소환자의 공격이 플레이어 방어를 관통한다. */
     pierceWhileEscorted?: boolean
     /** 호위 하나를 흩뜨릴 때 소환자 최대 체력에서 직접 깎는 비율. */

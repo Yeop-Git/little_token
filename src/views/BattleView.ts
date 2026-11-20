@@ -63,6 +63,7 @@ import {
   spiderWebTension,
   summonAtTurnStart,
   summonCount,
+  summonWavesLeft,
   type ApplyResult,
   type TurnSummon,
   type BattleState,
@@ -1469,13 +1470,10 @@ export class BattleView {
   }
 
   private paintBossSentence(host: HTMLElement, view: EnemySentenceView) {
-    const context = view.context
-      ? `<div class="boss-sentence-context">
-          <span class="boss-sentence-side-label">${view.context.label}</span>
-          ${this.bossSentenceLineHtml(view.context)}
-          <div class="boss-sentence-meta">${view.context.meta.map((text) => `<span>${text}</span>`).join('')}</div>
-        </div>`
-      : ''
+    // 보스 공격창은 한눈에 "무엇을 언제 얼마나"만 읽히면 된다. 예전의 이어지는
+    // 문장 줄은 본문과 같은 내용을 한 번 더 써서 창만 키웠으므로, 그 규칙 태그만
+    // 본문 태그 줄에 합친다.
+    const metaTags = [...view.meta, ...(view.context?.meta ?? [])]
     const manuscript = view.manuscript?.length
       ? `<div class="boss-manuscript" aria-label="${bossText('manuscriptAria')}">
           <span class="boss-sentence-side-label">${bossText('damagedLongSentence')}</span>
@@ -1488,9 +1486,8 @@ export class BattleView {
     host.className = `boss-sentence-board tone-${view.tone}`
     host.innerHTML = `
       <div class="boss-sentence-heading"><span>${view.label}</span><b>${bossText(view.tone === 'danger' ? 'executeSoon' : view.tone === 'relief' ? 'endingRevision' : 'enemyIntent')}</b></div>
-      ${context}
       <div class="boss-sentence-main">${this.bossSentenceLineHtml(view)}</div>
-      <div class="boss-sentence-meta">${view.meta.map((text) => `<span>${text}</span>`).join('')}</div>
+      <div class="boss-sentence-meta">${metaTags.map((text) => `<span>${text}</span>`).join('')}</div>
       ${manuscript}
       ${view.eventText ? `<div class="boss-sentence-event"><b>✎</b><span>${view.eventText}</span></div>` : ''}`
     host.hidden = false
@@ -1736,11 +1733,28 @@ export class BattleView {
         nameplate?.setAttribute('aria-label', `일벌 체력 ${hp} / ${maxHp}`)
         if (hpText) hpText.textContent = `${hp}/${maxHp}`
         if (fill) fill.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`
-        this.queueDeferredCharacterModel(worker, CHARACTER_VISUALS.workerBee, 2)
+        // 이미 보이던 일벌을 매 렌더마다 다시 마운트하면 idle 첫 프레임으로 되감겨,
+        // 여왕벌이 공격할 때마다 호위 전체가 "새로고침"되듯 튀었다. 새로 나타났거나
+        // 아직 모델이 준비되지 않은 일벌만 마운트한다.
+        if (wasHidden || !isCharacterModelReady(worker, CHARACTER_VISUALS.workerBee)) {
+          this.queueDeferredCharacterModel(worker, CHARACTER_VISUALS.workerBee, 2)
+        }
       } else {
         suspendCharacterModel(worker)
       }
     })
+    // 다음 문장이 실제로 먼저 닿는 대상을 테두리로 알린다. 피해는 일벌 킬체인을
+    // 먼저 소비하므로(summonTargets와 같은 순서) 호위가 남아 있으면 그 맨 앞 일벌,
+    // 다 쓰러졌으면 여왕벌 본체가 타깃이다.
+    const nextSide = enemy.summonsRight >= enemy.summonsLeft && enemy.summonsRight > 0 ? 'right' : 'left'
+    const nextSlot = nextSide === 'right' ? enemy.summonsRight : enemy.summonsLeft
+    host.querySelectorAll<HTMLElement>('.queen-worker').forEach((worker) => {
+      worker.classList.toggle(
+        'next-target',
+        !enemy.dead && worker.dataset.side === nextSide && Number(worker.dataset.slot) === nextSlot && !worker.hidden,
+      )
+    })
+    el.classList.toggle('summoner-exposed', !enemy.dead && summonCount(enemy) === 0)
     host.setAttribute('aria-label', `${enemy.def.summonPattern?.name ?? '호위'} ${summonCount(enemy)}마리`)
     host.classList.toggle('swarm-ready', summonCount(enemy) >= (enemy.def.summonPattern?.releaseAt ?? Infinity))
   }
@@ -4161,11 +4175,33 @@ export class BattleView {
     }
     actor?.classList.add('leg-dissolving')
     dissolveCharacterParts(actor ?? null, partId, count)
+    this.playLegSeverFx(actor ?? null, count)
     actor?.dispatchEvent(new CustomEvent('enemy-part-break', {
       detail: { partId, count },
       bubbles: true,
     }))
-    this.timers.push(window.setTimeout(() => actor?.classList.remove('leg-dissolving'), 820))
+    this.timers.push(window.setTimeout(() => actor?.classList.remove('leg-dissolving'), 1700))
+  }
+
+  /** 다리가 잘리는 순간을 베는 섬광 + 오래 남는 배너로 읽히게 한다. */
+  private playLegSeverFx(actor: HTMLElement | null, count: number) {
+    const pbox = this.q<HTMLElement>('#pbox')
+    const shell = actor?.querySelector<HTMLElement>(':scope > .model-shell') ?? actor
+    if (shell && !this.motionOff()) {
+      const at = this.toStageCenter(shell.getBoundingClientRect())
+      const slash = document.createElement('div')
+      slash.className = 'leg-sever-fx'
+      slash.style.left = `${at.x}px`
+      slash.style.top = `${at.y + 60}px`
+      slash.innerHTML = '<i class="cut"></i><i class="cut echo"></i><i class="flash"></i>'
+      pbox.append(slash)
+      this.timers.push(window.setTimeout(() => slash.remove(), 1100))
+    }
+    const banner = document.createElement('div')
+    banner.className = 'leg-sever-banner'
+    banner.innerHTML = `<small>장로거미</small><b>다리 절단${count > 1 ? ` ×${count}` : ''}!</b>`
+    pbox.append(banner)
+    this.timers.push(window.setTimeout(() => banner.remove(), 2600))
   }
 
   /** 막을 넘긴 충격을 상단 보스 체력바 안에서 직접 읽히게 한다. */
@@ -4247,14 +4283,14 @@ export class BattleView {
       scene.append(strand)
       this.timers.push(window.setTimeout(() => strand.remove(), 940))
     }
-    this.popAt(enemyIdx, '다리 절단! 거미줄 전부 해제!', 'buff big')
+    this.popAt(enemyIdx, '거미줄 전부 해제!', 'buff big long')
     this.log(`다리가 떨어지는 충격에 카드 봉인 ${released}개가 즉시 풀렸다.`)
     // 다리가 바뀌면 노려야 할 감정도 바뀐다. 부위 목록의 작은 뱃지만으로는
     // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
     const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
     this.showBossSentenceEvent(nextWeak
       ? bossText('nextLegRecover', { weakness: currentLocale === 'ko' ? eul(nextWeak) : nextWeak })
-      : bossText('allClausesErased'))
+      : bossText('allClausesErased'), 4200)
     this.resolveBossPattern(spiderNextWeaknessLine(nextWeak))
     this.timers.push(window.setTimeout(() => scene.classList.remove('spider-web-burst'), 880))
   }
@@ -5050,7 +5086,10 @@ export class BattleView {
     }
     if (groggyTriggered) {
       this.popAt(enemyIdx, '일벌 전멸! 다음 턴 행동 불가!', 'buff big')
-      this.log('일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 그 다음 턴에 일벌 넷을 다시 부른다.')
+      const enemy = this.state.enemies[enemyIdx]
+      this.log(enemy && summonWavesLeft(enemy) > 0
+        ? '일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 그 다음 턴에 일벌 넷을 다시 부른다.'
+        : '일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 일벌은 더 이상 돌아오지 않는다.')
       this.resolveBossPattern(bossTokenLine('queenOpportunity', 'relief'))
       this.showBossSentenceEvent(bossText('workersGone'))
       await sleep(260)
@@ -5326,7 +5365,8 @@ export class BattleView {
     p.style.left = `${x - 24}px`
     p.style.top = `${Math.max(10, y)}px`
     this.q('#pbox').appendChild(p)
-    this.timers.push(window.setTimeout(() => p.remove(), 1000))
+    // 'long' 팝업은 읽어야 하는 안내 문구라 두 배 넘게 머문다.
+    this.timers.push(window.setTimeout(() => p.remove(), cls.includes('long') ? 2600 : 1000))
   }
   private hitOne(el: HTMLElement) {
     el.classList.remove('hit')

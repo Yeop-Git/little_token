@@ -368,8 +368,10 @@ for (const day of [5, 10, 15]) {
     for (const [policy, runs] of byPolicy) {
       const waves = total(runs, (run) => run.summonWaves)
       const groggies = total(runs, (run) => run.queenGroggies)
-      if (waves < runs.length * 1.5) failures.push(`10층 ${policy}: 6~7턴 전투에서 일벌 웨이브가 충분히 반복되지 않습니다 (${waves}/${runs.length}).`)
-      if (groggies < runs.length * 1.5) failures.push(`10층 ${policy}: 호위 전멸 보상이 충분히 열리지 않습니다 (${groggies}/${runs.length}).`)
+      // 11/20 피드백: 여왕벌전 일벌은 재소환하지 않는다. 전투마다 한 웨이브를
+      // 세우고, 그 웨이브를 정리해 그로기를 한 번 여는지만 본다.
+      if (waves < runs.length) failures.push(`10층 ${policy}: 일벌 웨이브가 세워지지 않은 전투가 있습니다 (${waves}/${runs.length}).`)
+      if (groggies < runs.length) failures.push(`10층 ${policy}: 호위 전멸 보상이 충분히 열리지 않습니다 (${groggies}/${runs.length}).`)
     }
     const greedyGroggyRate = total(greedy, (run) => run.queenGroggies) / Math.max(1, total(greedy, (run) => run.summonWaves))
     const smartGroggyRate = total(smart, (run) => run.queenGroggies) / Math.max(1, total(smart, (run) => run.summonWaves))

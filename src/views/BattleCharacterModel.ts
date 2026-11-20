@@ -1159,7 +1159,9 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       root,
       materials,
       elapsed: 0,
-      duration: .92,
+      // 피드백(11/20): 0.9초 디졸브는 다른 타격 연출에 묻혀 다리가 사라지는 게
+      // 안 보였다. 먼저 꺾여 떨어지는 게 보이고, 그다음 천천히 녹아 사라진다.
+      duration: 1.7,
       fallDirection: SPIDER_PART_ORDER.indexOf(partId as typeof SPIDER_PART_ORDER[number]) % 2 ? 1 : -1,
     })
   }
@@ -1168,14 +1170,16 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.spiderPartDissolves = this.spiderPartDissolves.filter((entry) => {
       entry.elapsed += delta
       const progress = THREE.MathUtils.clamp(entry.elapsed / entry.duration, 0, 1)
-      const eased = progress * progress * (3 - 2 * progress)
-      entry.materials.forEach((material) => { material.userData.partDissolveUniform.value = eased })
+      // 처음 25%는 형태를 유지한 채 꺾여 떨어지기만 하고, 그 뒤에 녹는다.
+      const dissolve = THREE.MathUtils.clamp((progress - .25) / .75, 0, 1)
+      entry.materials.forEach((material) => { material.userData.partDissolveUniform.value = dissolve * dissolve * (3 - 2 * dissolve) })
       const original = this.spiderPartOriginals.get(entry.id)
       if (original) {
+        const fall = 1 - (1 - progress) ** 3
         entry.root.position.copy(original.position)
-        entry.root.position.y -= eased * .18
+        entry.root.position.y -= fall * .5
         entry.root.rotation.copy(original.rotation)
-        entry.root.rotation.z += entry.fallDirection * eased * .16
+        entry.root.rotation.z += entry.fallDirection * fall * .5
       }
       if (progress < 1) return true
       entry.root.visible = false

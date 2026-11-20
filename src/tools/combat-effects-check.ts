@@ -515,6 +515,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(!tactic.effects?.hitCount && tactic.statMult === 1.5 && tactic.tags.includes('adapt'), 'spider tactic uses a strong single hit and always counts as the current weakness')
 }
 { const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
+{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); applyIntent(s, attack({ base: 999, targetCount: 'all' }), 1, 0); assert(summonCount(queen) === 0, 'an area sentence clears the whole escort'); for (let turn = 2; turn <= 6; turn++) { s.turn = turn; summonAtTurnStart(s) } assert(summonCount(queen) === 0 && queen.summonWaves === 1, 'queen workers do not respawn after the first wave is cleared') }
 {
   const queen = makeEnemy(ENEMIES.queenBee)
   const s = state([queen]); summonAtTurnStart(s)
@@ -546,7 +547,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(summonCount(queen) === 0 && enemyTurn(s, () => 0, 'second').length === 0, 'queen spends exactly one full turn recovering after all four workers fall')
   s.turn++
   summonAtTurnStart(s)
-  assert(summonCount(queen) === 4, 'queen recovers and summons one complete four-worker wave at the start of the following turn')
+  assert(summonCount(queen) === 0, 'queen recovers but never resummons workers after the first wave falls')
 }
 {
   const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
@@ -559,7 +560,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   s.turn = 2; summonAtTurnStart(s)
   assert(summonCount(queen) === 0 && enemyTurn(s, () => 0, 'second').length === 0, 'queen spends the whole next turn recovering without summoning or attacking')
   s.turn = 3; summonAtTurnStart(s)
-  assert(summonCount(queen) === 4, 'queen summons a fresh four-worker wave at the start of the turn after recovery')
+  assert(summonCount(queen) === 0, 'queen does not summon a fresh wave after recovery')
 }
 {
   const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); s.guard = 99

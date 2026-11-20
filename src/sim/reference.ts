@@ -63,6 +63,8 @@ export interface EnemyInst {
   summonsDefeated: number
   /** 호위 전멸 뒤 회복 턴을 보낸 다음, 새 묶음을 부를 수 있는 첫 턴. */
   summonRespawnTurn: number
+  /** 지금까지 호위를 불러 세운 묶음 수. maxWaves와 비교한다. */
+  summonWaves: number
   /** 같은 전투 턴에 턴 시작 소환을 두 번 처리하지 않기 위한 표식. */
   lastSummonTurn: number
   /** 거미 다리와 본체처럼 순서대로 피해를 받는 보스 부위. */
@@ -165,6 +167,7 @@ export function makeEnemy(def: EnemyDef, atkMult = 1, hpMult = 1, healthBars = 1
     summonHpRight: [],
     summonsDefeated: 0,
     summonRespawnTurn: 1,
+    summonWaves: 0,
     lastSummonTurn: 0,
     parts: (def.parts ?? []).map((part) => ({
       def: part,
@@ -218,6 +221,12 @@ export function spiderWebAtTurnStart(state: BattleState): SpiderWebTurn | null {
 export const summonCount = (enemy: Pick<EnemyInst, 'summonsLeft' | 'summonsRight'>): number =>
   enemy.summonsLeft + enemy.summonsRight
 
+/** 앞으로 더 부를 수 있는 호위 묶음 수. maxWaves가 없으면 무제한이다. */
+export const summonWavesLeft = (enemy: Pick<EnemyInst, 'def' | 'summonWaves'>): number => {
+  const maxWaves = enemy.def.summonPattern?.maxWaves
+  return maxWaves == null ? Infinity : Math.max(0, maxWaves - enemy.summonWaves)
+}
+
 export interface TurnSummon {
   idx: number
   name: string
@@ -235,7 +244,9 @@ export function summonAtTurnStart(state: BattleState): TurnSummon[] {
     if (!pattern || enemy.dead || enemy.lastSummonTurn === state.turn) return
     if (pattern.refillOnlyWhenEmpty && summonCount(enemy) > 0) return
     if (state.turn < enemy.summonRespawnTurn) return
+    if (pattern.maxWaves != null && enemy.summonWaves >= pattern.maxWaves) return
     enemy.lastSummonTurn = state.turn
+    enemy.summonWaves++
     for (let i = 0; i < pattern.perTurn && summonCount(enemy) < pattern.max; i++) {
       const canLeft = enemy.summonsLeft < pattern.maxPerSide
       const canRight = enemy.summonsRight < pattern.maxPerSide
