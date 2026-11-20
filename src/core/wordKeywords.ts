@@ -11,13 +11,17 @@ export type WordKeywordId =
 
 interface KeywordCopy { label: string; detail: string }
 
-const RANK_DETAIL: Record<LocaleCode, { attack: string; guard: string }> = {
-  ko: { attack: '이 카드를 쓴 턴에 플레이어의 공격 랭크가 오르고 현재 스테이지 동안 유지됩니다. 랭크 1마다 기준 공격 +25%.', guard: '이 카드를 쓴 턴에 플레이어의 방어 랭크가 오르고 현재 스테이지 동안 유지됩니다. 랭크 1마다 기준 방어 +25%.' },
-  en: { attack: 'Raises the player’s Attack rank for the current stage.', guard: 'Raises the player’s Guard rank for the current stage.' },
-  ja: { attack: '現在のステージ中、プレイヤーの攻撃ランクを上げます。', guard: '現在のステージ中、プレイヤーの防御ランクを上げます。' },
-  ru: { attack: 'Повышает ранг атаки игрока до конца текущего этапа.', guard: 'Повышает ранг защиты игрока до конца текущего этапа.' },
-  'zh-Hans': { attack: '在当前关卡中提高玩家的攻击阶级。', guard: '在当前关卡中提高玩家的防御阶级。' },
-  'zh-Hant': { attack: '在目前關卡中提高玩家的攻擊階級。', guard: '在目前關卡中提高玩家的防禦階級。' },
+/**
+ * 랭크업 툴팁 — 랭크 1마다 기준 수치 +25%(combatRules.statRankScale)라서
+ * 이 카드 한 장이 이번 전투에서 몇 % 올리는지 숫자로 바로 적는다.
+ */
+const RANK_DETAIL: Record<LocaleCode, (stat: 'attack' | 'guard', rank: number, pct: number) => string> = {
+  ko: (stat, rank, pct) => `이번 전투 동안 기준 ${stat === 'attack' ? '공격' : '방어'} +${pct}%. 이 카드를 쓴 턴에 ${stat === 'attack' ? '공격' : '방어'} 랭크가 ${rank} 오르고 현재 스테이지 동안 유지됩니다(랭크 1마다 +25%).`,
+  en: (stat, rank, pct) => `+${pct}% base ${stat === 'attack' ? 'Attack' : 'Guard'} for this battle. Raises the rank by ${rank} on the turn it is played (each rank +25%).`,
+  ja: (stat, rank, pct) => `この戦闘中、基本${stat === 'attack' ? '攻撃' : '防御'}+${pct}%。使ったターンにランクが${rank}上がります（1ランクごとに+25%）。`,
+  ru: (stat, rank, pct) => `+${pct}% к базовой ${stat === 'attack' ? 'атаке' : 'защите'} до конца боя. Ранг растёт на ${rank} в ход розыгрыша (каждый ранг +25%).`,
+  'zh-Hans': (stat, rank, pct) => `本场战斗中基础${stat === 'attack' ? '攻击' : '防御'}+${pct}%。使用的回合阶级提高${rank}（每阶+25%）。`,
+  'zh-Hant': (stat, rank, pct) => `本場戰鬥中基礎${stat === 'attack' ? '攻擊' : '防禦'}+${pct}%。使用的回合階級提高${rank}（每階+25%）。`,
 }
 
 const COPY: Record<LocaleCode, Record<WordKeywordId, KeywordCopy>> = {
@@ -103,11 +107,11 @@ export function wordKeywords(word: Word, omitValues?: ReadonlySet<WordKeywordId>
   })
   if ((effects?.attackRank ?? 0) > 0) {
     const name = COPY[currentLocale].empower.label, value = `+${effects!.attackRank}랭크`
-    keywords.push({ id: 'empower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale].attack })
+    keywords.push({ id: 'empower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale]('attack', effects!.attackRank!, effects!.attackRank! * 25) })
   }
   if ((effects?.guardRank ?? 0) > 0) {
     const name = COPY[currentLocale].guardEmpower.label, value = `+${effects!.guardRank}랭크`
-    keywords.push({ id: 'guardEmpower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale].guard })
+    keywords.push({ id: 'guardEmpower', name, value, label: `${name} ${value}`, detail: RANK_DETAIL[currentLocale]('guard', effects!.guardRank!, effects!.guardRank! * 25) })
   }
   return keywords
 }

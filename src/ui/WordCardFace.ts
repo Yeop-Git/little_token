@@ -104,13 +104,31 @@ export function wordActionInline(word: Word): string {
 const escapeCardText = (value: string) => value
   .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+const isRankKeyword = (id: WordKeywordId) => id === 'empower' || id === 'guardEmpower'
+
 export function wordKeywordChipsHtml(word: Word): string {
   const keywords = wordKeywords(word)
-  return keywords.length
-    // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
-    // 리필은 잉크 아이콘을 태그 안에 박아 잉크 회복임을 한눈에 보이게 한다(11/20 피드백).
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.id === 'discount' ? `<img class="refill-ink-icon" src="${INK_UI.costBadge}" alt="" aria-hidden="true" draggable="false">` : ''}${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
+  // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
+  const effects = keywords.filter((keyword) => !isRankKeyword(keyword.id))
+  const effectHtml = effects.length
+    ? `<span class="card-keywords">${effects.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
     : ''
+  return effectHtml + wordRankTagsHtml(word)
+}
+
+/**
+ * 랭크업 전용 태그 — "공격 ▲1"처럼 한 덩어리로 쓰고, 카운터 같은 다른 효과와 섞이지
+ * 않게 다음 줄에 따로 둔다. 툴팁은 이번 전투에서 몇 % 오르는지 적는다(11/20 피드백).
+ */
+export function wordRankTagsHtml(word: Word): string {
+  const ranks = wordKeywords(word).filter((keyword) => isRankKeyword(keyword.id))
+  if (!ranks.length) return ''
+  return `<span class="card-rank-tags">${ranks.map((keyword) => {
+    const kind = keyword.id === 'empower' ? 'atk' : 'guard'
+    const amount = kind === 'atk' ? word.effects?.attackRank ?? 0 : word.effects?.guardRank ?? 0
+    const short = ACTION_LABELS[currentLocale][kind === 'atk' ? 'attack' : 'guard']
+    return `<span class="card-rank-tag rank-${kind}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${short} ▲${amount}</span>`
+  }).join('')}</span>`
 }
 
 export function wordKeywordDetailsHtml(word: Word, omitValues?: ReadonlySet<WordKeywordId>): string {
@@ -135,21 +153,6 @@ function wordCardNoteHtml(word: Word, note: string): string {
   return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${displayNote}</span>` : ''}${keywordHtml}</span>`
 }
 
-/**
- * 공격·방어 랭크를 올리는 카드에 붙는 딱지. 키워드 칩보다 먼저 눈에 띄도록 카드
- * 왼쪽 모서리에 스티커처럼 붙고, 올려 두면 이번 턴에 오른다는 설명이 뜬다.
- */
-export function wordRankStickersHtml(word: Word): string {
-  const stickers = wordKeywords(word).filter((keyword) => keyword.id === 'empower' || keyword.id === 'guardEmpower')
-  if (!stickers.length) return ''
-  return `<span class="card-rank-stickers">${stickers.map((keyword) => {
-    const amount = keyword.id === 'empower' ? word.effects?.attackRank ?? 0 : word.effects?.guardRank ?? 0
-    const kind = keyword.id === 'empower' ? 'atk' : 'guard'
-    const short = ACTION_LABELS[currentLocale][kind === 'atk' ? 'attack' : 'guard']
-    const tooltip = escapeCardText(`${keyword.label}\n${keyword.detail}`)
-    return `<span class="card-rank-sticker rank-${kind}" role="img" tabindex="-1" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above"><small>${short}</small>▲${amount}</span>`
-  }).join('')}</span>`
-}
 
 export interface WordCardFaceOpts {
   /** 선택 불가 사유처럼 카드 문구를 갈아 끼울 때 쓴다. 기본은 단어의 note. */
@@ -178,7 +181,8 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
   const resourceBadge = hideMeta
     ? ''
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
-  const badges = resourceBadge + (hideMeta ? '' : wordRankStickersHtml(word))
+  // 랭크업은 모서리 딱지 대신 효과 줄 아래 전용 태그로 보여 준다.
+  const badges = resourceBadge
   if (artUrl) {
     // 이름과 효과는 한 덩이로 아래에 붙인다. 둘을 따로 바닥에 못 박아 두면 효과가 세 줄로
     // 늘어난 카드에서 글자가 이름 위로 올라타 서로를 지운다.

@@ -5807,34 +5807,31 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
     0 -1px 0 #1c1a5d;
 }
 .card-resource-meta.without-emotion .card-cost { top: 0; right: 0; }
-/* 랭크 딱지 — 감정 배지 아래, 카드 왼쪽 모서리에 비스듬히 붙는다. */
-.card-rank-stickers {
-  position: absolute;
-  top: 56px;
-  left: 4px;
-  z-index: 6;
+/* 랭크업 전용 태그 — 효과 태그 아래 줄에 따로 선다. 공격은 금빛, 방어는 하늘빛. */
+.card-rank-tags {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
+  flex-basis: 100%;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 2px;
 }
-.card-rank-sticker {
+.card-rank-tag {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 6px 2px 5px;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 1000;
+  line-height: 1.25;
+  white-space: nowrap;
   color: #2b1500;
   background: linear-gradient(160deg, #ffe58a, #f2a93b);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, .4), 0 0 0 1.5px #fff6d8;
-  transform: rotate(-7deg);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .4), 0 0 0 1px #fff6d8;
   cursor: help;
+  text-shadow: none;
 }
-.card-rank-sticker small { font-size: 11px; font-weight: 900; }
-.card-rank-sticker.rank-guard { color: #06223a; background: linear-gradient(160deg, #bfe6ff, #5fb2ec); }
+.card-rank-tag.rank-guard { color: #06223a; background: linear-gradient(160deg, #bfe6ff, #5fb2ec); }
+.reward-card .rp-effect .card-rank-tag { font-size: 18px; padding: 2px 8px; }
 .cw-cost {
   position: absolute;
   top: -12px;
