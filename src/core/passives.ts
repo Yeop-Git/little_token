@@ -79,7 +79,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   heavyShoe: {
     id: 'heavyShoe',
     name: '무거운 구두',
-    desc: `동사의 깡점수에 +${HEAVY_SHOE_FLAT}`,
+    desc: `동사 점수 +${HEAVY_SHOE_FLAT}`,
   },
   matchFire: {
     id: 'matchFire',
@@ -89,7 +89,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   luckCloak: {
     id: 'luckCloak',
     name: '운을 두른다',
-    desc: `모든 동사가 운 스탯의 ${Math.round(LUCK_CLOAK_RATE * 100)}%만큼 깡점수를 더 받는다`,
+    desc: `동사 점수 +운 스탯의 ${Math.round(LUCK_CLOAK_RATE * 100)}%`,
   },
   bbq: {
     id: 'bbq',

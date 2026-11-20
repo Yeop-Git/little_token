@@ -15,6 +15,7 @@ type TagSpec =
   | { kind: 'ink' }
   | { kind: 'stat'; stat: 'atk' | 'guard' | 'heal' | 'luck' }
   | { kind: 'keyword' }
+  | { kind: 'slot' }
 
 const STAT_ICON = { atk: 'sword', guard: 'shield', heal: 'cross', luck: 'clover' } as const
 
@@ -26,7 +27,9 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     ['회복', { kind: 'stat', stat: 'heal' }], ['운 스탯', { kind: 'stat', stat: 'luck' }],
     ['대성공', { kind: 'keyword' }], ['관용구', { kind: 'keyword' }], ['공명', { kind: 'keyword' }],
     ['공명 배율', { kind: 'keyword' }], ['관용구 배율', { kind: 'keyword' }], ['배율 풀', { kind: 'keyword' }], ['배율', { kind: 'keyword' }], ['카드 뽑기', { kind: 'keyword' }],
-    ['깡점수', { kind: 'keyword' }], ['최대 체력', { kind: 'keyword' }],
+    ['최대 체력', { kind: 'keyword' }],
+    ['문장부호 칸', { kind: 'slot' }], ['문장부호', { kind: 'slot' }], ['주어 칸', { kind: 'slot' }], ['동사 칸', { kind: 'slot' }],
+    ['수식어 칸', { kind: 'slot' }], ['서술어', { kind: 'slot' }], ['주어', { kind: 'slot' }], ['수식어', { kind: 'slot' }], ['동사', { kind: 'slot' }],
     // 전장 TIP·적 기믹 설명에 자주 나오는 전투 용어(11/20 피드백: 팁도 태그로).
     ['매직실드', { kind: 'keyword' }], ['관통', { kind: 'keyword' }], ['카운터', { kind: 'keyword' }],
     ['방패치기', { kind: 'keyword' }], ['연타', { kind: 'keyword' }], ['그로기', { kind: 'keyword' }],
@@ -66,6 +69,7 @@ function tagHtml(term: string, spec: TagSpec): string {
   if (spec.kind === 'stat') {
     return `<span class="trait-tag is-stat stat-${spec.stat}"><i aria-hidden="true">${icon(STAT_ICON[spec.stat])}</i><b>${label}</b></span>`
   }
+  if (spec.kind === 'slot') return `<span class="trait-tag is-slot"><b>${label}</b></span>`
   return `<span class="trait-tag is-keyword"><b>${label}</b></span>`
 }
 
