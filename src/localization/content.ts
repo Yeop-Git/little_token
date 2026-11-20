@@ -32,7 +32,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'I', 'Yesterday, I', 'I too', 'Today, I', 'I, gritting my teeth', 'I, standing firm', 'Wounded, I', 'We', 'Smiling brightly, I', 'Warmly, we',
     'Relieved, I', 'Angry, I', 'Standing together, we', 'Still here, I', 'Holding back tears, I', 'Left alone, I', 'Head bowed, I', 'Excited, I', 'Joyfully, we', 'Mischievously, I',
     'with all my might', 'gently', 'carefully', 'headlong', 'holding on', 'through tears', 'struck', 'blocked', 'embraced', 'dodged',
-    'protected', 'curled up', 'swiftly', 'pretending to yield', 'mended', 'let it flow away', 'madly', 'with nothing to lose', 'brightly', 'warmly',
+    'stood in the way', 'curled up', 'swiftly', 'pretending to yield', 'mended', 'let it flow away', 'madly', 'with nothing to lose', 'brightly', 'warmly',
     'gladly', 'with a smile', 'fiercely', 'lonely', 'trying hard', 'cheerfully', 'to the beat', 'lightly',
     'You', 'That child', 'alone', 'quietly', 'madly', 'slowly', 'far and wide', 'the battle', 'the flame', 'the silence', 'the memory', 'the rain',
     'advanced', 'evaded', 'ignited', 'forgot', 'swept away', 'did it', 'tried to do it', 'did I do it?', 'ended up doing it!', '!', '.', '?', 'growing',
@@ -43,7 +43,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'ぼくは', '昨日のぼくは', 'ぼくも', '今日のぼくは', '歯を食いしばったぼくは', '奮い立つぼくは', '傷ついたぼくは', 'ぼくたちは', '明るく笑うぼくは', 'あたたかなぼくたちは',
     'ほっとしたぼくは', '怒ったぼくは', '立ち向かうぼくたちは', '最後まで残ったぼくは', '涙ぐむぼくは', 'ひとり残ったぼくは', 'うつむいたぼくは', '浮き立つぼくは', 'わくわくするぼくたちは', 'いたずらっぽいぼくは',
     '力いっぱい', 'やさしく', 'そっと', 'いきなり', 'ぐっとこらえて', '涙ながらに', 'たたいた', '防いだ', '包みこんだ', 'かわした',
-    '守った', '身を丸めた', 'すばやく', '負けたふりをして', '直した', '受け流した', '狂ったように', 'いちかばちか', '明るく', 'ふんわり',
+    '立ちはだかった', '身を丸めた', 'すばやく', '負けたふりをして', '直した', '受け流した', '狂ったように', 'いちかばちか', '明るく', 'ふんわり',
     'うれしそうに', '笑いながら', '荒々しく', '寂しく', '懸命に', '楽しげに', '弾みながら', '軽やかに',
     'きみは', 'あの子は', 'ひとりで', '静かに', '狂ったように', 'ゆっくり', '広く', '戦い', '炎', '沈黙', '記憶', '雨',
     '進めた', 'かわした', '灯した', '忘れた', 'なぎ払った', 'した', 'しようとした', 'したっけ？', 'してしまった！', '！', '。', '？', 'すくすく',
@@ -54,7 +54,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     'Я', 'Вчера я', 'Я тоже', 'Сегодня я', 'Стиснув зубы, я', 'Встав во весь рост, я', 'Раненый, я', 'Мы', 'Сияя улыбкой, я', 'Согретые теплом, мы',
     'С облегчением я', 'Разозлённый, я', 'Встав плечом к плечу, мы', 'Оставшийся до конца, я', 'Сдерживая слёзы, я', 'Оставшись один, я', 'Опустив голову, я', 'Воодушевлённый, я', 'Ликуя, мы', 'Озорной, я',
     'изо всех сил', 'ласково', 'осторожно', 'с ходу', 'терпеливо', 'сквозь слёзы', 'ударил', 'защитился', 'укрыл', 'увернулся',
-    'защитил', 'сжался', 'молниеносно', 'будто уступая', 'исправил', 'отпустил', 'безумно', 'ва-банк', 'ярко', 'с теплом',
+    'встал на пути', 'сжался', 'молниеносно', 'будто уступая', 'исправил', 'отпустил', 'безумно', 'ва-банк', 'ярко', 'с теплом',
     'радостно', 'с улыбкой', 'яростно', 'одиноко', 'из последних сил', 'весело', 'в такт', 'легко',
     'Ты', 'Тот ребёнок', 'в одиночку', 'тихо', 'безумно', 'медленно', 'широко', 'битву', 'пламя', 'тишину', 'память', 'дождь',
     'продолжил', 'уклонился', 'зажёг', 'забыл', 'смёл', 'сделал это', 'попытался сделать', 'я сделал это?', 'всё-таки сделал!', '!', '.', '?', 'всё выше',
@@ -65,7 +65,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '我', '昨天的我', '我也', '今天的我', '咬紧牙关的我', '挺身而出的我', '受伤的我', '我们', '灿烂笑着的我', '温暖的我们',
     '松了口气的我', '生气的我', '并肩迎战的我们', '坚持到最后的我', '含着泪的我', '独自留下的我', '低着头的我', '兴奋的我', '开心的我们', '调皮的我',
     '全力地', '温柔地', '轻轻地', '猛然', '强忍着', '含泪', '打了下去', '挡住了', '拥住了', '躲开了',
-    '守住了', '蜷缩起来了', '飞快地', '装作不敌地', '修好了', '让它流走了', '疯狂地', '孤注一掷地', '明亮地', '暖暖地',
+    '挡在了前面', '蜷缩起来了', '飞快地', '装作不敌地', '修好了', '让它流走了', '疯狂地', '孤注一掷地', '明亮地', '暖暖地',
     '欣喜地', '笑着', '猛烈地', '寂寞地', '努力地', '开心地', '雀跃地', '轻快地',
     '你', '那个孩子', '独自', '安静地', '疯狂地', '慢慢地', '广泛地', '战斗', '火焰', '沉默', '记忆', '雨水',
     '推进了', '回避了', '点燃了', '忘却了', '横扫了', '做了', '本想去做', '做过吗？', '终究还是做了！', '！', '。', '？', '茁壮成长',
@@ -76,7 +76,7 @@ const WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     '我', '昨天的我', '我也', '今天的我', '咬緊牙關的我', '挺身而出的我', '受傷的我', '我們', '燦爛笑著的我', '溫暖的我們',
     '鬆了口氣的我', '生氣的我', '並肩迎戰的我們', '堅持到最後的我', '含著淚的我', '獨自留下的我', '低著頭的我', '興奮的我', '開心的我們', '調皮的我',
     '全力地', '溫柔地', '輕輕地', '猛然', '強忍著', '含淚', '打了下去', '擋住了', '擁住了', '躲開了',
-    '守住了', '蜷縮起來了', '飛快地', '裝作不敵地', '修好了', '讓它流走了', '瘋狂地', '孤注一擲地', '明亮地', '暖暖地',
+    '擋在了前面', '蜷縮起來了', '飛快地', '裝作不敵地', '修好了', '讓它流走了', '瘋狂地', '孤注一擲地', '明亮地', '暖暖地',
     '欣喜地', '笑著', '猛烈地', '寂寞地', '努力地', '開心地', '雀躍地', '輕快地',
     '你', '那個孩子', '獨自', '安靜地', '瘋狂地', '慢慢地', '廣泛地', '戰鬥', '火焰', '沉默', '記憶', '雨水',
     '推進了', '迴避了', '點燃了', '忘卻了', '橫掃了', '做了', '本想去做', '做過嗎？', '終究還是做了！', '！', '。', '？', '茁壯成長',
@@ -118,31 +118,31 @@ const EXTRA_WORD_TEXT: Record<ForeignLocale, Record<string, string>> = {
     magicVeil: 'raised a veil', storedResolve: 'pushed back',
     overflowingHeart: 'offered my heart', drinkInk: 'drank back the ink',
     stainedTomorrow: 'stained', savedBreath: 'gathered my breath',
-    dampenMomentum: 'wrote', readAhead: 'read',
+    dampenMomentum: 'pinned it down', readAhead: 'read',
   },
   ja: {
     magicVeil: '幕をまとった', storedResolve: '押し返した',
     overflowingHeart: '想いを渡した', drinkInk: 'インクを飲み戻した',
     stainedTomorrow: '染めた', savedBreath: '息をためた',
-    dampenMomentum: '書いた', readAhead: '読んだ',
+    dampenMomentum: '押さえ込んだ', readAhead: '読んだ',
   },
   ru: {
     magicVeil: 'воздвиг завесу', storedResolve: 'оттеснил',
     overflowingHeart: 'передал сердце', drinkInk: 'выпил чернила обратно',
     stainedTomorrow: 'окрасил', savedBreath: 'сберёг дыхание',
-    dampenMomentum: 'записал', readAhead: 'прочитал',
+    dampenMomentum: 'прижал к земле', readAhead: 'прочитал',
   },
   'zh-Hans': {
     magicVeil: '披上了光幕', storedResolve: '推了回去',
     overflowingHeart: '递出了心意', drinkInk: '饮回了墨水',
     stainedTomorrow: '染上了', savedBreath: '存下了气息',
-    dampenMomentum: '写下了', readAhead: '读过了',
+    dampenMomentum: '牢牢压住了', readAhead: '读过了',
   },
   'zh-Hant': {
     magicVeil: '披上了光幕', storedResolve: '推了回去',
     overflowingHeart: '遞出了心意', drinkInk: '飲回了墨水',
     stainedTomorrow: '染上了', savedBreath: '存下了氣息',
-    dampenMomentum: '寫下了', readAhead: '讀過了',
+    dampenMomentum: '牢牢壓住了', readAhead: '讀過了',
   },
 }
 
@@ -153,19 +153,19 @@ const UPDATED_LORE_IDS = [
 
 const EXTRA_WORD_LORE: Record<ForeignLocale, Record<(typeof UPDATED_LORE_IDS)[number], string>> = {
   en: {
-    focusStrike:'Anger drives every drop of Ink into one decisive point.', pourThree:'Poured-out tears wash the wound, and the overflow bursts against the enemy.', doubleTap:'A rough tap restarts the heart, and the excess beat strikes back at the enemy.', magicVeil:'A bright veil braces the body and pushes the enemy back with its force.', overflowingHeart:'Healing that cannot fit becomes damage and reaches the enemy.', drinkInk:'Drinking the Ink back turns overflowing life into a lively counterblow.', stainedTomorrow:'The stain reaches tomorrow’s line and draws life back.', dampenMomentum:'Writing the scattered feeling down restores its calm.', kkuk:'It blocks one painful hit and saves the remaining breath for the next sentence.', ipan:'Only a sentence paid with life gains these fierce extra hits.', pogeunhage:'Warmth steadies the guard and carries breath into the next sentence.', bangeopge:'A welcome story opens across three foes and opens the next choices too.', gyeongkwaehage:'A light rhythm restores both Ink and choices for a flowing chain.', geochilge:'A fierce rhythm repeats the verb and raises the attack stance.',
+    focusStrike:'Anger drives every drop of Ink into one decisive point.', pourThree:'Poured-out tears wash the wound, and the overflow bursts against the enemy.', doubleTap:'A rough tap restarts the heart, and the excess beat strikes back at the enemy.', magicVeil:'A bright veil braces the body and pushes the enemy back with its force.', overflowingHeart:'Healing that cannot fit becomes damage and reaches the enemy.', drinkInk:'Drinking the Ink back turns overflowing life into a lively counterblow.', stainedTomorrow:'The stain reaches tomorrow’s line and draws life back.', dampenMomentum:'Light arrows pin the bug down, buying a moment to catch my breath.', kkuk:'It blocks one painful hit and saves the remaining breath for the next sentence.', ipan:'Only a sentence paid with life gains these fierce extra hits.', pogeunhage:'Warmth steadies the guard and carries breath into the next sentence.', bangeopge:'A welcome story opens across three foes and opens the next choices too.', gyeongkwaehage:'A light rhythm restores both Ink and choices for a flowing chain.', geochilge:'A fierce rhythm repeats the verb and raises the attack stance.',
   },
   ja: {
-    focusStrike:'怒りで全てのインクを一点へ叩き込む決め技。', pourThree:'こらえた涙で傷を洗い、あふれた思いを敵へ爆ぜさせる。', doubleTap:'止まりかけた心を叩き、あふれた鼓動を敵へ打ち返す。', magicVeil:'光の幕で身を固め、その力で敵を押し返す。', overflowingHeart:'収まりきらない回復をダメージに変えて敵へ渡す。', drinkInk:'インクを飲み戻し、あふれた命を楽しい反撃に変える。', stainedTomorrow:'明日の行まで染めた跡から命を取り戻す。', dampenMomentum:'乱れた気持ちを日記に書き、静かに整える。', kkuk:'痛い一撃を防ぎ、残った息を次の文へためる。', ipan:'体力をインクにした文だけに激しい追加打撃を乗せる。', pogeunhage:'温もりで守りながら、残った息を次の文へつなぐ。', bangeopge:'懐かしい物語を三体へ広げ、次の選択も開く。', gyeongkwaehage:'軽いリズムがインクと選択肢を戻し、連鎖を始める。', geochilge:'荒い勢いで動詞をもう一度繰り返し、攻撃態勢を上げる。',
+    focusStrike:'怒りで全てのインクを一点へ叩き込む決め技。', pourThree:'こらえた涙で傷を洗い、あふれた思いを敵へ爆ぜさせる。', doubleTap:'止まりかけた心を叩き、あふれた鼓動を敵へ打ち返す。', magicVeil:'光の幕で身を固め、その力で敵を押し返す。', overflowingHeart:'収まりきらない回復をダメージに変えて敵へ渡す。', drinkInk:'インクを飲み戻し、あふれた命を楽しい反撃に変える。', stainedTomorrow:'明日の行まで染めた跡から命を取り戻す。', dampenMomentum:'光の矢で虫を押さえ込み、その隙に息を整える。', kkuk:'痛い一撃を防ぎ、残った息を次の文へためる。', ipan:'体力をインクにした文だけに激しい追加打撃を乗せる。', pogeunhage:'温もりで守りながら、残った息を次の文へつなぐ。', bangeopge:'懐かしい物語を三体へ広げ、次の選択も開く。', gyeongkwaehage:'軽いリズムがインクと選択肢を戻し、連鎖を始める。', geochilge:'荒い勢いで動詞をもう一度繰り返し、攻撃態勢を上げる。',
   },
   ru: {
-    focusStrike:'Гнев вбивает всю силу и чернила в одну решающую точку.', pourThree:'Пролитые слёзы смывают рану, а избыток чувств взрывается на враге.', doubleTap:'Толчок запускает сердце вновь, а лишний удар возвращается врагу.', magicVeil:'Светлая завеса укрепляет тело и своей силой отталкивает врага.', overflowingHeart:'Лишнее лечение превращается в урон и достигает врага.', drinkInk:'Возвращённые чернила превращают избыток жизни в весёлый ответный удар.', stainedTomorrow:'След на завтрашней строке возвращает часть жизни.', dampenMomentum:'Записанное в дневнике смятение снова становится спокойным.', kkuk:'Блокирует болезненный удар и бережёт дыхание для следующей фразы.', ipan:'Лишь фраза, оплаченная здоровьем, получает эти яростные удары.', pogeunhage:'Тепло укрепляет защиту и переносит дыхание в следующую фразу.', bangeopge:'Знакомая история раскрывается на трёх врагов и открывает новые варианты.', gyeongkwaehage:'Лёгкий ритм возвращает чернила и выбор для непрерывной цепочки.', geochilge:'Яростный ритм повторяет глагол и усиливает атакующую стойку.',
+    focusStrike:'Гнев вбивает всю силу и чернила в одну решающую точку.', pourThree:'Пролитые слёзы смывают рану, а избыток чувств взрывается на враге.', doubleTap:'Толчок запускает сердце вновь, а лишний удар возвращается врагу.', magicVeil:'Светлая завеса укрепляет тело и своей силой отталкивает врага.', overflowingHeart:'Лишнее лечение превращается в урон и достигает врага.', drinkInk:'Возвращённые чернила превращают избыток жизни в весёлый ответный удар.', stainedTomorrow:'След на завтрашней строке возвращает часть жизни.', dampenMomentum:'Световые стрелы прижимают жука к земле, и есть миг перевести дух.', kkuk:'Блокирует болезненный удар и бережёт дыхание для следующей фразы.', ipan:'Лишь фраза, оплаченная здоровьем, получает эти яростные удары.', pogeunhage:'Тепло укрепляет защиту и переносит дыхание в следующую фразу.', bangeopge:'Знакомая история раскрывается на трёх врагов и открывает новые варианты.', gyeongkwaehage:'Лёгкий ритм возвращает чернила и выбор для непрерывной цепочки.', geochilge:'Яростный ритм повторяет глагол и усиливает атакующую стойку.',
   },
   'zh-Hans': {
-    focusStrike:'将愤怒与全部墨水压进一点的决胜一击。', pourThree:'倾泻泪水洗净伤口，让溢出的心绪在敌人身上爆发。', doubleTap:'敲醒将停的心，把溢出的心跳反击给敌人。', magicVeil:'披上明亮光幕，借它的力量推开敌人。', overflowingHeart:'把容不下的恢复化成伤害送向敌人。', drinkInk:'饮回墨水，把溢出的生命化为欢快反击。', stainedTomorrow:'从染到明日一行的墨痕中取回生命。', dampenMomentum:'把纷乱心绪写进日记，重新平静下来。', kkuk:'挡住痛苦一击，把剩余气息留到下一句。', ipan:'只有以生命支付墨水的句子才会获得猛烈追加攻击。', pogeunhage:'温暖稳住防御，也把余力带到下一句。', bangeopge:'把重逢的故事铺向三名敌人，也打开下一次选择。', gyeongkwaehage:'轻快节奏同时补回墨水与选择，开启连写。', geochilge:'猛烈节奏让动词再发动一次，并抬高攻击态势。',
+    focusStrike:'将愤怒与全部墨水压进一点的决胜一击。', pourThree:'倾泻泪水洗净伤口，让溢出的心绪在敌人身上爆发。', doubleTap:'敲醒将停的心，把溢出的心跳反击给敌人。', magicVeil:'披上明亮光幕，借它的力量推开敌人。', overflowingHeart:'把容不下的恢复化成伤害送向敌人。', drinkInk:'饮回墨水，把溢出的生命化为欢快反击。', stainedTomorrow:'从染到明日一行的墨痕中取回生命。', dampenMomentum:'用光箭把虫子牢牢压住，趁机喘口气。', kkuk:'挡住痛苦一击，把剩余气息留到下一句。', ipan:'只有以生命支付墨水的句子才会获得猛烈追加攻击。', pogeunhage:'温暖稳住防御，也把余力带到下一句。', bangeopge:'把重逢的故事铺向三名敌人，也打开下一次选择。', gyeongkwaehage:'轻快节奏同时补回墨水与选择，开启连写。', geochilge:'猛烈节奏让动词再发动一次，并抬高攻击态势。',
   },
   'zh-Hant': {
-    focusStrike:'將憤怒與全部墨水壓進一點的決勝一擊。', pourThree:'傾瀉淚水洗淨傷口，讓溢出的心緒在敵人身上爆發。', doubleTap:'敲醒將停的心，把溢出的心跳反擊給敵人。', magicVeil:'披上明亮光幕，借它的力量推開敵人。', overflowingHeart:'把容不下的恢復化成傷害送向敵人。', drinkInk:'飲回墨水，把溢出的生命化為歡快反擊。', stainedTomorrow:'從染到明日一行的墨痕中取回生命。', dampenMomentum:'把紛亂心緒寫進日記，重新平靜下來。', kkuk:'擋住痛苦一擊，把剩餘氣息留到下一句。', ipan:'只有以生命支付墨水的句子才會獲得猛烈追加攻擊。', pogeunhage:'溫暖穩住防禦，也把餘力帶到下一句。', bangeopge:'把重逢的故事鋪向三名敵人，也打開下一次選擇。', gyeongkwaehage:'輕快節奏同時補回墨水與選擇，開啟連寫。', geochilge:'猛烈節奏讓動詞再發動一次，並抬高攻擊態勢。',
+    focusStrike:'將憤怒與全部墨水壓進一點的決勝一擊。', pourThree:'傾瀉淚水洗淨傷口，讓溢出的心緒在敵人身上爆發。', doubleTap:'敲醒將停的心，把溢出的心跳反擊給敵人。', magicVeil:'披上明亮光幕，借它的力量推開敵人。', overflowingHeart:'把容不下的恢復化成傷害送向敵人。', drinkInk:'飲回墨水，把溢出的生命化為歡快反擊。', stainedTomorrow:'從染到明日一行的墨痕中取回生命。', dampenMomentum:'用光箭把蟲子牢牢壓住，趁機喘口氣。', kkuk:'擋住痛苦一擊，把剩餘氣息留到下一句。', ipan:'只有以生命支付墨水的句子才會獲得猛烈追加攻擊。', pogeunhage:'溫暖穩住防禦，也把餘力帶到下一句。', bangeopge:'把重逢的故事鋪向三名敵人，也打開下一次選擇。', gyeongkwaehage:'輕快節奏同時補回墨水與選擇，開啟連寫。', geochilge:'猛烈節奏讓動詞再發動一次，並抬高攻擊態勢。',
   },
 }
 

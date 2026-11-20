@@ -582,7 +582,7 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "jikyeot",
-    "text": "지켰다",
+    "text": "막아섰다",
     "slot": "verb",
     "tags": [
       "grd",
@@ -596,7 +596,7 @@ export const REWARD_WORDS: Word[] = [
     "rarity": "common",
     "art": "3005",
     "note": "방어 ×1 · 방패치기 50%",
-    "lore": "한 뼘도 안 내준다.",
+    "lore": "빛의 방울을 두르고 벌레 앞을 막아선다. 부딪힌 힘의 절반을 되튕긴다.",
     "effects": {
       "guardAttackMultiplier": 0.5
     }
