@@ -11308,3 +11308,7 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 /* 상점(보상 페이지) 카드는 손패보다 두 배 넓어 잉크 배지가 상대적으로 작아 보였다(11/20 피드백). */
 .rp-ink-cost { width: 78px; height: 78px; padding: 12px 1px 0 0; font-size: 32px; }
 .reward-shop-card .rp-ink-cost { width: 56px; height: 56px; padding: 9px 1px 0 0; font-size: 24px; }
+
+/* 리필 태그: 잉크 아이콘을 박은 키워드 태그(11/20 피드백). */
+.card-keyword.keyword-discount { gap: 2px; }
+.card-keyword .refill-ink-icon { display: block; width: 1.2em; height: 1.2em; margin: -2px 0 -2px -1px; flex: none; object-fit: contain; pointer-events: none; }

@@ -108,7 +108,8 @@ export function wordKeywordChipsHtml(word: Word): string {
   const keywords = wordKeywords(word)
   return keywords.length
     // 주행동(공격·방어·회복)과 같은 네모 태그에 이름만 넣고, 값은 그 옆에 수치처럼 적는다.
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
+    // 리필은 잉크 아이콘을 태그 안에 박아 잉크 회복임을 한눈에 보이게 한다(11/20 피드백).
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword-group"><span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.id === 'discount' ? `<img class="refill-ink-icon" src="${INK_UI.costBadge}" alt="" aria-hidden="true" draggable="false">` : ''}${keyword.name}</span>${keyword.value ? `<span class="card-keyword-value">${keyword.value}</span>` : ''}</span>`).join('')}</span>`
     : ''
 }
 
