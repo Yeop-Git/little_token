@@ -55,6 +55,12 @@ const TITLE_UI_HOLD_MS = 850
 const AMBIENT_THAW_MS = 260
 const STAGE_TRANSITION_COVER_MS = 320
 const STAGE_TRANSITION_REVEAL_MS = 520
+/**
+ * 전투 진입이 리소스 예열을 기다리는 최대 시간. 예열은 로딩 프레임을 감추려는
+ * 것일 뿐이라, 오디오 스트림의 canplaythrough처럼 끝내 오지 않는 신호 하나 때문에
+ * 덮개가 걷히지 않은 채 화면이 멈추면 안 된다. 넘기면 남은 준비는 뒤에서 계속된다.
+ */
+const BATTLE_PRELOAD_WAIT_MS = 6000
 /** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
 const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
@@ -596,7 +602,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
   const background = backgroundFor(run.day, st.isBoss, st.encounter[0])
   const [{ BattleView }] = await Promise.all([
     import('@views/BattleView'),
-    preloadUpcomingBattle(),
+    Promise.race([preloadUpcomingBattle(), waitForMs(BATTLE_PRELOAD_WAIT_MS)]),
   ])
   if (request !== battleRequest) return
   reset()
