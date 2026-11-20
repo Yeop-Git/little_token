@@ -134,8 +134,8 @@ import {
 import { TokenActor } from '@views/TokenActor'
 import { sharedTokenPlaystyle } from '@core/tokenPlaystyle'
 import { sharedTokenMind } from '@core/tokenMind'
+import { DisposedViewError } from '@/ui/RuntimeErrorBoundary'
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const hudTip = (key: string, korean: string, values: Record<string, string | number> = {}): string => {
   let text = t(key, korean)
@@ -987,7 +987,23 @@ export class BattleView {
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
+    // 내려간 전투의 연출 체인이 같은 무대에 새로 선 화면(타이틀·다음 전투)의 같은 id를
+    // 집어 건드리지 못하게 여기서 끊는다. 이 오류는 오류창 없이 조용히 버려진다.
+    if (this.destroyed) throw new DisposedViewError()
     return this.root.querySelector(sel) as T
+  }
+
+  /**
+   * 연출용 대기. 전투가 내려가면(홈·완전 초기화·장면 전환) 영영 풀리지 않아서, 뒤에
+   * 남은 연출 체인이 다음 화면 위에서 깨어나 오류창을 띄우거나 승패 처리를 다시
+   * 부르지 않는다. 타이머는 destroy가 함께 걷는다.
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.timers.push(window.setTimeout(() => {
+        if (!this.destroyed) resolve()
+      }, ms))
+    })
   }
   private order() {
     return this.t.template.slots.map((s) => s.key)
@@ -1456,7 +1472,7 @@ export class BattleView {
     cue.classList.remove('breaking')
     void cue.offsetWidth
     cue.classList.add('breaking')
-    await sleep(380)
+    await this.sleep(380)
     cue.hidden = true
     cue.classList.remove('breaking')
   }
@@ -2985,9 +3001,9 @@ export class BattleView {
       <small>${comboCodexText('recorded')} · ${comboCodexText('found')} ${this.t.combos.filter((combo) => this.discoveredCombos.has(combo.id)).length} / ${this.t.combos.length}</small>`
     this.root.append(note)
     GameAudio.play('paper')
-    await sleep(900)
+    await this.sleep(900)
     note.classList.add('leaving')
-    await sleep(220)
+    await this.sleep(220)
     note.remove()
   }
 
@@ -3354,7 +3370,7 @@ export class BattleView {
     this.q('.word-zone').classList.add('is-resolving')
     const rail = this.q('#chain')
     rail.classList.add('sparkle')
-    await sleep(300)
+    await this.sleep(300)
     rail.classList.remove('sparkle')
     await this.execute()
   }
@@ -3505,7 +3521,7 @@ export class BattleView {
     multBox.querySelector('b')!.textContent = '1.00'
     totalEl.textContent = ''
     requestAnimationFrame(() => el.classList.add('in'))
-    await sleep(120)
+    await this.sleep(120)
 
     let base = 0
     for (const [i, f] of tally.flats.entries()) {
@@ -3515,7 +3531,7 @@ export class BattleView {
       this.bump(baseBox)
       // 깡수치만으로도 판을 뒤흔들 만큼 쌓였으면 이미 달아오르기 시작한다.
       this.setFever(el, base)
-      await sleep(140)
+      await this.sleep(140)
     }
     let mult = 1
     if (hasRisingMultiplier) {
@@ -3534,23 +3550,23 @@ export class BattleView {
       // 배율이 한 칸 꽂힐 때마다 지금까지의 예상 총합으로 열기를 다시 잰다 —
       // 곱이 겹칠수록 판이 커지고 흔들리고 불이 붙는다.
       this.setFever(el, base * mult)
-      await sleep(20)
+      await this.sleep(20)
     }
     multBox.classList.remove('rolling')
     if (hasRisingMultiplier) {
       el.classList.remove('mult-rising')
       el.classList.add('mult-settled')
-      await sleep(240)
+      await this.sleep(240)
       el.classList.remove('mult-settled')
     }
     // 배율 뒤에 더해지는 전환 피해 → 타격 수 → 대상 반영 순서로 읽힌다.
     for (const chip of extraChips) {
       this.revealChip(chip)
-      await sleep(140)
+      await this.sleep(140)
     }
     if (hitChip) {
       this.revealChip(hitChip)
-      await sleep(220)
+      await this.sleep(220)
     }
     if (adjustChip) this.revealChip(adjustChip)
     if (excessChip) this.revealChip(excessChip)
@@ -3664,7 +3680,7 @@ export class BattleView {
     for (let i = 1; i <= steps; i++) {
       const eased = 1 - Math.pow(1 - i / steps, 2)
       void this.flingSpark(i % 2 ? baseBox : multBox, total, el)
-      await sleep(i === steps ? 100 : 55)
+      await this.sleep(i === steps ? 100 : 55)
       total.textContent = String(Math.round(tally.total * eased))
       total.classList.remove('tick')
       void total.offsetWidth
@@ -3675,7 +3691,7 @@ export class BattleView {
     this.applyHeatTier(el, tally.total)
     total.classList.remove('tick')
     total.classList.add('slam')
-    await sleep(180)
+    await this.sleep(180)
   }
 
   // 상자 중심 → 총합 중심으로 날아가는 불꽃 하나. 무대가 scale()로 줄어 있으므로
@@ -3735,7 +3751,7 @@ export class BattleView {
     el.classList.remove('show')
     void el.offsetWidth
     el.classList.add('show')
-    await sleep(520)
+    await this.sleep(520)
     el.classList.remove('show')
   }
 
@@ -3783,7 +3799,7 @@ export class BattleView {
       this.popPlayer(`잉크 초과 · 체력 -${overdraw}`, 'dmg big')
       this.log(`잉크 ${inkCost}/${availableInk} · 초과한 ${overdraw}만큼 체력이 깎였다.`)
       this.renderActors()
-      await sleep(420)
+      await this.sleep(420)
       this.clearNormalTokenWarning()
       if (this.state.playerHp <= 0) {
         await this.lose()
@@ -3819,10 +3835,10 @@ export class BattleView {
       const el = chainEls[i]
       if (el) el.classList.add('wave')
       if (c && el) this.popEl(el, c.text, `tick ${c.cls}`)
-      await sleep(70)
+      await this.sleep(70)
     }
     this.q('#flash').classList.add('go')
-    await sleep(110)
+    await this.sleep(110)
 
     if (intent.emotionResonance > 1) await this.showEmotionResonance(intent)
 
@@ -3841,7 +3857,7 @@ export class BattleView {
       el.classList.remove('show')
       void el.offsetWidth
       el.classList.add('show')
-      await sleep(520)
+      await this.sleep(520)
       el.classList.remove('show')
       if (newlyDiscovered.length) await this.showComboDiscovery(newlyDiscovered)
     }
@@ -3902,7 +3918,7 @@ export class BattleView {
       this.playerPreempting = true
       this.setPhase('선수 · 먼저 움직였다')
       this.log('느낌표 — 상대보다 먼저 움직였다.')
-      await sleep(260)
+      await this.sleep(260)
     } else {
       this.setPhase('선공 상대 행동')
       await this.enemyPhase('first')
@@ -4082,7 +4098,7 @@ export class BattleView {
           this.log(`예약 문장이 일벌에게 ${result.summonDamage} 피해${result.summonsDispersed > 0 ? ` · ${result.summonsDispersed}마리 퇴치` : ''}.`)
         }
         this.log(result.text)
-        await sleep(300)
+        await this.sleep(300)
         for (const k of result.killed) await this.playDeath(k, 1)
         if (result.killed.length > 0) engageFront(this.state)
         this.renderActors()
@@ -4145,7 +4161,8 @@ export class BattleView {
     this.log('일기장이 너무 상했다…')
     this.renderActors()
     const defeatDuration = playCharacterAnimation(this.q<HTMLElement>('.actor.you'), 'defeat')
-    await sleep(defeatDuration || 520)
+    await this.sleep(defeatDuration || 520)
+    if (this.destroyed) return
     this.onLose(this.lastHurtBy)
   }
 
@@ -4162,7 +4179,7 @@ export class BattleView {
     this.log(text.log)
     this.renderStats()
     this.renderActors()
-    await sleep(420)
+    await this.sleep(420)
   }
 
   /**
@@ -4184,7 +4201,7 @@ export class BattleView {
     banner.classList.remove('show')
     void banner.offsetWidth
     banner.classList.add('show')
-    await sleep(420)
+    await this.sleep(420)
 
     const res = applyIntent(this.state, intent, mult, this.target)
     for (const hit of res.hits) this.noteBestHit(intent.sentence, hit.dmg)
@@ -4231,15 +4248,15 @@ export class BattleView {
       // heavy-lunge는 접점에서 한 박자 버티는 돌진이다 — 정지 프레임이 붙는 순간에
       // 프롬이 이미 물러나고 있으면 "맞부딪친 채로 멈춘" 그림이 안 된다.
       you.classList.add('lunge', 'heavy-lunge')
-      await sleep(HEAVY_LUNGE_LEAD_MS)
-      await sleep(this.heavyRelease(you))
+      await this.sleep(HEAVY_LUNGE_LEAD_MS)
+      await this.sleep(this.heavyRelease(you))
     } else if (attacking) {
       // 메아리처럼 이미 칼을 놓은 뒤의 재타격은 평범한 칼질로 이어 간다.
       if (this.heavyHeld) this.heavyRelease(you)
       GameAudio.play('paperAttack')
       playCharacterAnimation(you, 'attack')
       you.classList.add('lunge')
-      await sleep(sweep ? 120 : 170)
+      await this.sleep(sweep ? 120 : 170)
     } else {
       // 강타 예비 동작으로 칼을 들어올렸는데 실제 적중이 없으면(전부 막힘 등) 여기서
       // 반드시 풀어 준다 — 안 그러면 다음 턴까지 그 자세로 굳는다.
@@ -4247,7 +4264,7 @@ export class BattleView {
         this.heavyRelease(you)
         playCharacterAnimation(you, 'idle')
       }
-      await sleep(40)
+      await this.sleep(40)
     }
     // 꽂히는 순간 늘어졌던 시간이 풀리고 레일이 고속 모드로 전환된다.
     // 강타는 여기서 확대를 풀지 않는다 — 프레임 정지가 풀리는 순간에 같이 터져야
@@ -4268,7 +4285,7 @@ export class BattleView {
       if (heavy) {
         this.heavyStopUsed = true
         const tier = this.heavyTier()
-        await sleep(HEAVY_FLASH_BLOOM_MS)
+        await this.sleep(HEAVY_FLASH_BLOOM_MS)
         await this.attackHitStop(you, target, stopMs + HEAVY_HIT_STOP_BONUS_MS + Math.round(tier * 34))
         this.shakeStage(1 + tier * .7)
         this.endSlowmo()
@@ -4338,7 +4355,7 @@ export class BattleView {
       else if (h.webCut) this.playSpiderWebCut(h.target, h.tensionReduced ?? 0)
       if ((h.barsBroken ?? 0) > 0 && h.partId) this.playSpiderPartBreak(h.target, h.partId, h.barsBroken ?? 1)
       if (el) await stopFirstHit(el)
-      if (remainingSwordHits > 0) await sleep(SWORD_HIT_GAP_MS)
+      if (remainingSwordHits > 0) await this.sleep(SWORD_HIT_GAP_MS)
     }
     if (res.supportWebCut) this.playSpiderWebCut(res.supportWebCut.target, res.supportWebCut.tensionReduced)
     // 실제로 attack 애니메이션이 닿은 첫 대상만 붙든다. 보호막·무적 때문에 대상 연출이
@@ -4349,7 +4366,7 @@ export class BattleView {
     if (attacking) {
       if (heavy) this.timers.push(window.setTimeout(() => you.classList.remove('lunge', 'heavy-lunge'), 250))
       else {
-        await sleep(250)
+        await this.sleep(250)
         you.classList.remove('lunge', 'heavy-lunge')
       }
     }
@@ -4534,7 +4551,7 @@ export class BattleView {
     this.spawnSparks(el, 8 + combo * 5)
     const gateMs = fast ? 190 : 560
     const visualMs = fast ? 250 : 610
-    await sleep(gateMs)
+    await this.sleep(gateMs)
     if (!enemy?.def.boss) {
       const release = window.setTimeout(() => {
         if (el.isConnected && el.classList.contains('dying')) this.releaseFoe(el)
@@ -4591,7 +4608,7 @@ export class BattleView {
     overlay.classList.add(removed ? 'shattering' : 'cracking')
     this.popAt(target, removed ? '매직실드 파괴!' : `매직실드 ${remaining}겹`, 'guard')
     if (removed) this.spawnCrystalShards(hpbar)
-    await sleep(removed ? 360 : 180)
+    await this.sleep(removed ? 360 : 180)
     const enemy = this.state.enemies[target]
     if (removed && enemy?.def.id === 'elderSpider') {
       const weak = activeEnemyPart(enemy)?.def.weakness?.label
@@ -4682,7 +4699,7 @@ export class BattleView {
     const swing = playCharacterAnimation(you, 'attack', HEAVY_SWING_MS) || HEAVY_SWING_MS
     const beats = this.playerVisual.animations?.attackBeats
     // 실측 마디가 없는 모델은 절반쯤을 정점으로 본다 — 대개 그 근처에서 팔이 가장 높다.
-    await sleep(swing * (beats?.raise ?? 0.45))
+    await this.sleep(swing * (beats?.raise ?? 0.45))
     freezeCharacterAnimation(you, true)
     you.classList.add('blade-charge')
     this.heavyHeld = true
@@ -4695,13 +4712,13 @@ export class BattleView {
     // 컷은 들어오고, 한창 돌고, 그 그림을 들고 물러나는 한 덩이여야 한다.
     const opened = this.attackCine?.open(cut) ?? false
     if (opened) {
-      await sleep((this.attackCine?.enterMs ?? 0) + (this.attackCine?.holdMsFor(cut) ?? HEAVY_HOLD_MS))
+      await this.sleep((this.attackCine?.enterMs ?? 0) + (this.attackCine?.holdMsFor(cut) ?? HEAVY_HOLD_MS))
       // 컷이 스스로 물러나는 것과 같은 방식으로 치운다(멈춘 그림을 들고 왼쪽으로).
       await this.attackCine?.close()
-      await sleep(HEAVY_PANEL_CLEAR_MS)
+      await this.sleep(HEAVY_PANEL_CLEAR_MS)
     } else {
       // 컷이 아직 안 데워졌으면 정점만 짧게 붙들고 곧바로 내리친다.
-      await sleep(HEAVY_HOLD_MS)
+      await this.sleep(HEAVY_HOLD_MS)
     }
   }
 
@@ -4822,7 +4839,7 @@ export class BattleView {
     this.q('#actors').classList.add('slowmo')
     // 딤은 씬 전체에 건다 — 무대(.stage-area)에 걸면 하단 350px에서 잘린다.
     this.q('.scene.battle').classList.add('slowmo-veil')
-    await sleep(340)
+    await this.sleep(340)
   }
 
   private endSlowmo() {
@@ -4919,7 +4936,7 @@ export class BattleView {
       // 쓸어담기 중이면 아예 고속도로 — 죽고 당겨오고가 끊김 없이 이어진다.
       // 검기가 날아가는 중이면 그게 도착하는 순간이 곧 타격 순간이다.
       const gap = sweep ? Math.max(70, 180 - combo * 30) : Math.max(200, 480 - combo * 66)
-      await sleep(beamMs > 0 ? beamMs : gap)
+      await this.sleep(beamMs > 0 ? beamMs : gap)
       // 오버킬 전이는 일반 방어막과 매직실드를 소모하지 않고 체력에 직접 꽂힌다.
       // 실제 상태 변경은 코어가 맡아 부위 보스의 체력 막도 함께 동기화한다.
       const transfer = applyOverkillTransfer(this.state, front, overflow, {
@@ -4962,7 +4979,7 @@ export class BattleView {
         overflow = 0
         beamCarriesOn = false
         this.renderActors(false)
-        await sleep(sweep ? 160 : heavy ? 90 : 320)
+        await this.sleep(sweep ? 160 : heavy ? 90 : 320)
       }
     }
     engageFront(this.state)
@@ -5063,13 +5080,14 @@ export class BattleView {
     const victory = Math.random() < 0.5 ? 'victory1' : 'victory2'
     playCharacterAnimation(this.q<HTMLElement>('.actor.you'), victory)
     const victoryHighlightMs = CHARACTER_VISUALS.player.animations?.victoryHighlightMs ?? 2000
-    await sleep(pause)
+    await this.sleep(pause)
     await this.gradeFinale()
     this.token?.feel(this.isBoss ? 'bossDown' : 'runCleared')
     if (this.isBoss) this.token?.bindCloser('bossDown')
     await this.collectClearInspiration()
     const victoryRemaining = victoryHighlightMs - (performance.now() - victoryStartedAt)
-    if (victoryRemaining > 0) await sleep(victoryRemaining)
+    if (victoryRemaining > 0) await this.sleep(victoryRemaining)
+    if (this.destroyed) return
     this.onWin(this.grade, this.combatResources(), clearRewardValue(this.grade, this.cardHand.savedDraws, this.day))
   }
 
@@ -5104,9 +5122,9 @@ export class BattleView {
       { duration: 700, easing: 'cubic-bezier(0.2, 1.2, 0.3, 1)', fill: 'forwards' },
     )
     // 애니메이션이 끝나지 않는 환경에서도 보상 화면으로는 반드시 넘어가야 한다.
-    await Promise.race([anim.finished.catch(() => undefined), sleep(900)])
+    await Promise.race([anim.finished.catch(() => undefined), this.sleep(900)])
     // CLEAR 원화와 최종 보상등급을 빵빠레 첫 구절 동안 읽을 수 있게 유지한다.
-    await sleep(1300)
+    await this.sleep(1300)
   }
 
   /** 클리어 보상을 중앙 배지에서 좌상단 보유 영감으로 옮기고 실제 지급값까지 카운트업한다. */
@@ -5166,7 +5184,7 @@ export class BattleView {
     }
     requestAnimationFrame(count)
     GameAudio.play('contextBonus')
-    await sleep(duration + (reduceMotion ? 20 : 430))
+    await this.sleep(duration + (reduceMotion ? 20 : 430))
     balance.textContent = String(finalBalance)
     wallet.classList.remove('is-collecting')
     pop.remove()
@@ -5216,7 +5234,7 @@ export class BattleView {
     )
     // 애니메이션이 진행되지 않는 상황에서도 턴은 흘러가야 한다 — 여기서 멈추면
     // 손패가 사라진 채로 전투가 갇힌다.
-    await Promise.race([fly.finished.catch(() => undefined), sleep(700)])
+    await Promise.race([fly.finished.catch(() => undefined), this.sleep(700)])
     SquareBurst.playOn(you, theme, { spread: 95 })
     this.hitOne(you)
     p.remove()
@@ -5243,7 +5261,7 @@ export class BattleView {
       ],
       { duration: 620, easing: 'cubic-bezier(.3,.1,.25,1)' },
     )
-    await Promise.race([fly.finished.catch(() => undefined), sleep(760)])
+    await Promise.race([fly.finished.catch(() => undefined), this.sleep(760)])
     SquareBurst.playOn(foe, 'heal', { spread: 80 })
     this.popAt(enemyIdx, `${amount}`, 'heal')
     fx.remove()
@@ -5261,7 +5279,7 @@ export class BattleView {
       worker.classList.add('summoning')
       this.popAt(summon.idx, `${summon.name} ${summon.count}/${summon.max}`, 'buff')
       this.log(`${this.state.enemies[summon.idx].def.name}이 ${summon.name}을 불렀다 — 호위 ${summon.count}/${summon.max}`)
-      await sleep(260)
+      await this.sleep(260)
       worker.classList.remove('summoning')
     }
   }
@@ -5295,12 +5313,12 @@ export class BattleView {
       SquareBurst.playOn(worker, 'damage', { spread: 72 + index * 10 })
     })
     this.popAt(enemyIdx, count > 0 ? `일벌 ${damage} 피해 · ${count}마리 퇴치` : `일벌 ${damage} 피해`, count > 0 ? 'guard big' : 'dmg')
-    await sleep(count > 0 ? Math.min(250, 130 + count * 28) : 120)
+    await this.sleep(count > 0 ? Math.min(250, 130 + count * 28) : 120)
     if (carriesToBody && queen) {
       const from = workers[workers.length - 1] ?? queen
       this.playQueenChainLink(from, queen)
       this.popAt(enemyIdx, '연쇄 관통 → 본체!', 'dmg big weak')
-      await sleep(90)
+      await this.sleep(90)
     }
     if (backlashDamage > 0) {
       this.popAt(enemyIdx, focusedBacklash ? `분노 집중! 본체 ${backlashDamage}` : `본체 ${backlashDamage}`, 'dmg big')
@@ -5314,7 +5332,7 @@ export class BattleView {
         : '일벌 네 마리를 모두 퇴치해 여왕벌이 그로기됐다. 다음 턴은 회복만 하고, 일벌은 더 이상 돌아오지 않는다.')
       this.resolveBossPattern(bossTokenLine('queenOpportunity', 'relief'))
       this.showBossSentenceEvent(bossText('workersGone'))
-      await sleep(260)
+      await this.sleep(260)
     } else if (count > 0) {
       this.showBossSentenceEvent(bossText('workersErased', { count }))
     }
@@ -5365,7 +5383,7 @@ export class BattleView {
       )
     })
     this.popAt(enemyIdx, '벌떼 돌격!', 'dmg big')
-    await sleep(500)
+    await this.sleep(500)
   }
 
   // 적 턴 연출 — 최전방 적이 돌진해 플레이어에게 사각 블라스트.
@@ -5408,7 +5426,7 @@ export class BattleView {
       const swarmFlight = st.summonsReleased > 0
         ? this.playSwarmRelease(st.idx)
         : Promise.resolve()
-      await sleep(170)
+      await this.sleep(170)
       // 적의 타격이 닿는 순간 실제 흡수 뒤 남은 방어막을 체력바에 반영한다.
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       // 실제로 체력을 깎은 벌레를 기억한다 — 여기서 쓰러지면 이 벌레가 결과 화면의
@@ -5475,7 +5493,7 @@ export class BattleView {
         await swarmFlight
         this.log(`모인 일벌 ${st.summonsReleased}마리가 돌격하고 여왕의 양옆이 비었다.`)
       }
-      await sleep(240)
+      await this.sleep(240)
       if (mantisTelegraph) {
         const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
         poseCharacterAt(foe ?? null, animation, beats?.telegraph ?? beats?.raise ?? 0.2)
@@ -5544,9 +5562,9 @@ export class BattleView {
       }
       requestAnimationFrame(tick)
     })
-    await Promise.race([rollUp, sleep(dur + 220)])
+    await Promise.race([rollUp, this.sleep(dur + 220)])
     el.textContent = String(val)
-    await sleep(160)
+    await this.sleep(160)
     el.classList.add('out')
     this.timers.push(window.setTimeout(() => el.remove(), 400))
   }
@@ -5606,7 +5624,7 @@ export class BattleView {
 
     stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, true))
     animations.forEach((animation) => animation.pause())
-    await sleep(durationMs)
+    await this.sleep(durationMs)
     stoppedActors.forEach((stoppedActor) => freezeCharacterAnimation(stoppedActor, false))
     animations.forEach((animation) => {
       if (animation.playState === 'paused') animation.play()

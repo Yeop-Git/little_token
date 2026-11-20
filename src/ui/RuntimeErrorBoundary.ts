@@ -2,6 +2,17 @@ import type { LocaleCode } from '@/localization'
 import { runtimeErrorText } from '@/localization/runtimeError'
 
 let installed = false
+
+/**
+ * 이미 내려간 화면의 비동기 연출이 뒤늦게 깨어났을 때 던지는 표식. 진짜 고장이
+ * 아니라 "주인이 떠난 체인"이 멈춘 것이라 오류창 없이 버린다.
+ */
+export class DisposedViewError extends Error {
+  constructor() {
+    super('view already disposed')
+    this.name = 'DisposedViewError'
+  }
+}
 let displayed = false
 
 /**
@@ -43,6 +54,18 @@ export function installRuntimeErrorBoundary(stage: HTMLElement, locale: LocaleCo
     reload.focus()
   }
 
-  window.addEventListener('error', (event) => reveal('error', event.error ?? event.message))
-  window.addEventListener('unhandledrejection', (event) => reveal('unhandledrejection', event.reason))
+  window.addEventListener('error', (event) => {
+    if (event.error instanceof DisposedViewError) {
+      event.preventDefault()
+      return
+    }
+    reveal('error', event.error ?? event.message)
+  })
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason instanceof DisposedViewError) {
+      event.preventDefault()
+      return
+    }
+    reveal('unhandledrejection', event.reason)
+  })
 }
