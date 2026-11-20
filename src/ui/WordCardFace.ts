@@ -220,6 +220,23 @@ export interface WordCardFaceOpts {
   hideEmotion?: boolean
 }
 
+/**
+ * 강화 단계 장식 — 코스트 아래로 반짝이를 한 개씩 쌓는다. 강화할수록 아래 반짝이가 더 크고 화려해진다.
+ * level 1(기본)은 없음, 2부터 (level-1)개. showNext면 다음 강화로 생길 반짝이를 미리 깜빡여 보여 준다.
+ */
+export const LEVEL_STAR_MAX = 6
+export function levelStarsHtml(level = 1, showNext = false, className = 'card-level-stars'): string {
+  const owned = Math.max(0, level - 1)
+  const total = Math.min(LEVEL_STAR_MAX, owned + (showNext ? 1 : 0))
+  if (total <= 0) return ''
+  const stars = Array.from({ length: total }, (_, index) => {
+    const tier = Math.min(LEVEL_STAR_MAX, index + 1)
+    const next = showNext && index === total - 1 && index >= owned
+    return `<i class="lv-star tier-${tier}${next ? ' is-next' : ''}" style="--i:${index}"></i>`
+  }).join('')
+  return `<span class="${className}" aria-label="강화 +${owned}">${stars}</span>`
+}
+
 /** 카드 앞면 한 겹. 일러스트가 있으면 원화 카드, 없으면 문양 카드로 그린다. */
 export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): string {
   const { note = wordNoteText(word), footer = 'WORD CARD', overlay = '', hideMeta = false, hideEmotion = false } = opts
@@ -233,7 +250,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
     ? ''
     : `<span class="card-resource-meta${hideEmotion ? ' without-emotion' : ''}">${emotionBadge}${costBadge}</span>`
   // 랭크업은 모서리 딱지 대신 효과 줄 아래 전용 태그로 보여 준다.
-  const badges = resourceBadge
+  const badges = resourceBadge + (hideMeta ? '' : levelStarsHtml(word.level))
   if (artUrl) {
     // 이름과 효과는 한 덩이로 아래에 붙인다. 둘을 따로 바닥에 못 박아 두면 효과가 세 줄로
     // 늘어난 카드에서 글자가 이름 위로 올라타 서로를 지운다.

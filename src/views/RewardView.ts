@@ -14,7 +14,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { cardNoteTagsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
+import { cardNoteTagsHtml, levelStarsHtml, wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
@@ -202,7 +202,7 @@ function itemTraitHtml(opt: RewardOption): string {
  * 강화 카드 앞면 — 강화 전·후 효과 문구에서 숫자만 짝지어, 바뀐 숫자는 "이전(회색) → 강화 후(강조)"로 바꿔 적는다.
  * 태그 안 속성값은 건드리지 않고 글자 부분의 숫자만 비교한다. 숫자 개수가 다르면 강화 후 문구만 쓴다.
  */
-const NUMBER = /\d+(?:\.\d+)?/g
+const NUMBER = /[×+]?\d+(?:\.\d+)?%?/g
 function textNumbers(html: string): string[] {
   return html.split(/(<[^>]*>)/).filter((part) => !part.startsWith('<')).flatMap((part) => part.match(NUMBER) ?? [])
 }
@@ -253,7 +253,10 @@ function rewardWordMeta(opt: RewardOption): string {
   const ink = wordInkCost(opt.word)
   return `<div class="rp-word-meta">
     ${emotionIconBadge(emotion, 'rp-emotion')}
-    <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
+    <span class="rp-cost-col">
+      <span class="rp-ink-cost" style="--ink-cost-badge-image:url('${INK_UI.costBadge}')" aria-label="잉크 ${ink}" title="잉크 비용">${ink}</span>
+      ${levelStarsHtml(opt.word.level, opt.reinforce, 'card-level-stars rp-level-stars')}
+    </span>
   </div>`
 }
 
@@ -278,7 +281,12 @@ function reinforceDeltas(w: Word): string {
   if (w.effects?.castScale != null && w.effects.castScale !== after.effects?.castScale) {
     rows.push(`${text('rewardRepeatStrength', '반복 위력')} ${Math.round(w.effects.castScale * 100)}% → <b>${Math.round(after.effects!.castScale! * 100)}%</b>`)
   }
-  return `<div class="rf-deltas"><div class="rf-h">강화 시</div>${rows.map((row) => `<div class="rf-row">${row}</div>`).join('')}</div>`
+  const rowHtml = (row: string) => {
+    const [before, after] = row.split(' → ')
+    if (after == null) return `<div class="rf-row">${row}</div>`
+    return `<div class="rf-row"><span class="rf-old">${before}</span><i class="rf-arrow" aria-hidden="true">➜</i><span class="rf-new">${after.replace(/^<b>|<\/b>$/g, '')}</span></div>`
+  }
+  return `<div class="rf-deltas"><div class="rf-h"><span class="rf-h-badge">✦ 강화 +1</span><span>강화하면 이렇게 바뀌어요</span></div>${rows.map(rowHtml).join('')}</div>`
 }
 
 function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
