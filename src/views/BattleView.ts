@@ -1737,9 +1737,9 @@ export class BattleView {
     return `
       <div class="actor foe${e.def.boss ? ' boss' : ''}" data-i="${i}" data-character="${visual.id}" role="button" tabindex="0" aria-label="${e.def.name} 상세 보기">
         <div class="nameplate glass">
+          <span class="weak-badge" hidden></span>
           <div class="row">
             <span class="nm">${e.def.name}</span>
-            <span class="weak-badge" hidden></span>
             <span class="hpn"></span>
           </div>
           <div class="hp-row">
@@ -1966,31 +1966,35 @@ export class BattleView {
       : e.def.weakEmotion ?? 'neutral'
     const affinityLabel = affinity === 'neutral' ? '무속성' : `${EMOTION_LABEL[affinity]} 약점`
     const weakMult = activePart ? PART_WEAKNESS_MULT : WEAKNESS_MULT
-    const affinityTooltip = affinity === 'neutral'
-      ? tip('무속성', '감정 약점이 없어 추가 피해를 받지 않는다')
-      : tip(affinityLabel, `${EMOTION_LABEL[affinity]} 카드를 문장에 넣고 때리면 피해 ×${formatNumber(weakMult)}`)
     ;(['joy', 'anger', 'sorrow', 'pleasure', 'neutral'] as const).forEach((emotion) => {
       plate.classList.toggle(`emotion-${emotion}`, emotion === affinity)
     })
-    plate.dataset.tooltip = affinityTooltip
-    plate.dataset.tipPlace = 'above'
-    plate.tabIndex = 0
-    // 약점 감정은 체력바 바로 옆 배지로 늘 보인다. 이름 글자색만으로는 어느 감정인지
-    // 매번 번역해야 해서, 카드 모서리와 같은 감정 얼굴과 이름을 그대로 세운다.
+    // 약점 설명은 이름표 전체가 아니라 약점 아이콘에만 붙는다.
+    delete plate.dataset.tooltip
+    delete plate.dataset.tipPlace
+    // 약점 감정 아이콘은 체력바 왼쪽에 두 줄 높이로 선다. 무속성은 약점이 아니므로
+    // 아이콘을 띄우지 않고, 일반 적은 지금 맞는 맨 앞 적에게만 보인다.
+    const isFront = bossHud || this.state.enemies.find((enemy) => !enemy.dead) === e
     const weakBadge = plate.querySelector<HTMLElement>('.weak-badge')
     if (weakBadge) {
       const signature = `${affinity}-${weakMult}`
-      weakBadge.hidden = false
+      weakBadge.hidden = affinity === 'neutral' || !isFront
+      if (affinity !== 'neutral') {
+        const lines = [
+          `공격 속성이 ${EMOTION_LABEL[affinity]}이면 피해 ×${formatNumber(weakMult)}`,
+          '공격 속성은 문장에서 가장 많이 쓴 감정',
+          ...(activePart ? [`지금 부위(${activePart.def.name})의 약점`] : []),
+        ]
+        weakBadge.dataset.tooltip = tip(affinityLabel, lines.join('\n'))
+        weakBadge.dataset.tipPlace = 'above'
+      }
       if (weakBadge.dataset.signature !== signature) {
         // 장로거미처럼 다리마다 약점이 바뀌면, 바뀐 순간을 배지가 튀어 알린다.
         const changed = !!weakBadge.dataset.signature && !!signature
         weakBadge.dataset.signature = signature
         weakBadge.className = `weak-badge emotion-${affinity}`
-        // 무속성 적은 회색 「._.」 얼굴로 약점이 없다는 사실도 같은 자리에서 보여 준다.
-        weakBadge.innerHTML = affinity === 'neutral'
-          ? `${emotionIconContent('neutral')}<b>무속성</b>`
-          : `${emotionIconContent(affinity)}<b>약점</b><small>×${formatNumber(weakMult)}</small>`
-        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '무속성, 약점 없음' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
+        weakBadge.innerHTML = affinity === 'neutral' ? '' : emotionIconContent(affinity)
+        weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '약점 없음' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
         if (changed) {
           weakBadge.classList.remove('is-changing')
           void weakBadge.offsetWidth
@@ -2146,13 +2150,12 @@ export class BattleView {
             ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
             ...(currentPart?.def.weakness
               ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×${formatNumber(PART_WEAKNESS_MULT)}`]]
-              : currentPart ? [['현재 속성', '무속성 · 감정 추가 피해 없음']] : []),
+              : []),
             ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
             ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
-            ...(!currentPart
-              ? [[enemy.def.weakEmotion ? '약점' : '속성', enemy.def.weakEmotion
-                ? `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`
-                : `<span class="enemy-weakness emotion-neutral">${emotionBadgeContent('neutral')}</span>`]]
+            // 약점이 없는 적은 약점 줄을 아예 두지 않는다(무속성은 약점으로 등장하지 않는다).
+            ...(!currentPart && enemy.def.weakEmotion
+              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
               : []),
             ['행동 주기', `${enemy.def.every}턴`],
             ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
