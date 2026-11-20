@@ -3533,12 +3533,16 @@ html[data-postprocessing='off'] .tip-bubble {
 .actor.foe[data-enemy-rarity='legendary'] > .model-shell { filter: drop-shadow(0 0 12px rgba(145, 214, 255, .62)) drop-shadow(0 0 18px rgba(229, 119, 255, .34)); }
 /* 매직실드 — 3D 모델은 셰이더가 금빛 막을 씌우고, 2D 대체 그림은 금빛 테두리 광채로 대신한다. */
 .actor > .model-shell[data-magic-shield='on'] {
-  filter: drop-shadow(0 0 6px rgba(255, 214, 92, .85)) drop-shadow(0 0 16px rgba(255, 180, 40, .45));
+  filter: drop-shadow(0 0 6px rgba(240, 160, 20, .9)) drop-shadow(0 0 16px rgba(200, 120, 0, .55));
   animation: magic-shield-aura 1.6s ease-in-out infinite alternate;
 }
+/* 필드 색조 회전(밤엔 수십 도)이 금빛을 초록으로 돌리지 않게, 실드가 있는 동안엔 회전을 뺀다. */
+.actor > .model-shell[data-magic-shield='on'] .battle-model {
+  filter: sepia(var(--model-grade, 0.1)) saturate(1.06);
+}
 @keyframes magic-shield-aura {
-  from { filter: drop-shadow(0 0 5px rgba(255, 214, 92, .7)) drop-shadow(0 0 12px rgba(255, 180, 40, .35)); }
-  to { filter: drop-shadow(0 0 9px rgba(255, 228, 120, .95)) drop-shadow(0 0 22px rgba(255, 190, 50, .55)); }
+  from { filter: drop-shadow(0 0 5px rgba(240, 160, 20, .8)) drop-shadow(0 0 12px rgba(200, 120, 0, .45)); }
+  to { filter: drop-shadow(0 0 9px rgba(255, 176, 30, 1)) drop-shadow(0 0 22px rgba(214, 130, 0, .65)); }
 }
 .enemy-intel-icon.ready { box-shadow: inset 0 0 0 2px rgba(255, 242, 212, .08), 0 0 12px rgba(255, 105, 70, .48); animation: swarm-warning .72s ease-in-out infinite alternate; }
 .actor.foe { cursor: default; }
@@ -3957,7 +3961,12 @@ html[data-postprocessing='off'] .tip-bubble {
   text-shadow: 0 5px 12px rgba(0, 0, 0, .38), 0 0 24px color-mix(in srgb, currentColor 68%, transparent);
   animation: pop-up 0.95s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
-.pop.dmg { color: #fff2da; }
+.pop.dmg {
+  color: #fff0d0;
+  -webkit-text-stroke: 6px #24101a;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 #24101a, 0 6px 14px rgba(0, 0, 0, .5), 0 0 22px rgba(255, 210, 150, .45);
+}
 .pop.heal { color: #fff2da; }
 .pop.self { color: #ffc15a; font-size: 34px; }
 .pop.guard { color: #fff2da; font-size: 34px; }
@@ -3974,30 +3983,32 @@ html[data-postprocessing='off'] .tip-bubble {
 /* 단어 기여 수치(팅) — 작게 톡 */
 .pop.tick { font-size: 27px; animation: pop-tick 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 .pop.big { font-size: 58px; }
-/* 매직실드가 삼킨 피해 — 계산된 숫자는 그대로 읽히되 금빛 결정색으로 막혔음을 알린다. */
-/* 매직실드가 삼킨 피해 — 크기는 작게, 대신 두꺼운 짙은 테두리로 어떤 배경에서도 읽힌다. */
+/* 매직실드가 삼킨 피해 — 「N 막힘」 아래 「매직실드 파괴!」를 같은 덩어리의 글자 줄로 붙여 서로 겹치지 않게 한다.
+   상자 없이 굵은 짙은 테두리만 둘러 어떤 배경에서도 읽힌다. */
 .pop.shield-blocked {
-  color: #ffe45c;
+  color: #ffd23a;
   font-size: 40px;
   line-height: 1.05;
   text-align: center;
+  white-space: nowrap;
   -webkit-text-stroke: 7px #2a1500;
   paint-order: stroke fill;
-  text-shadow: 0 3px 0 #2a1500, 0 0 14px rgba(255, 200, 40, .55);
+  text-shadow: 0 3px 0 #2a1500, 0 0 14px rgba(255, 180, 20, .55);
 }
 .pop.shield-blocked .pop-sub {
-  margin-top: 4px;
-  padding: 2px 10px;
-  border: 2px solid #ffe45c;
-  background: #2a1500;
-  color: #fff6c8;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: .02em;
-  -webkit-text-stroke: 0;
-  text-shadow: none;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff3b0;
+  font-size: 21px;
+  font-weight: 1000;
+  -webkit-text-stroke: 6px #2a1500;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #2a1500;
 }
-.pop.shield-blocked.shield-status-only { font-size: 22px; -webkit-text-stroke: 5px #2a1500; }
+.pop.shield-blocked.shield-status-only { font-size: 24px; -webkit-text-stroke: 6px #2a1500; }
 .queen-chain-link {
   position: absolute;
   z-index: 98;

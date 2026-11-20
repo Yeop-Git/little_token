@@ -798,11 +798,15 @@ if (uMagicShield > 0.01) {
   float shieldCore = 1.0 - smoothstep(0.03, 0.14, length(shieldLocal));
   float shieldTwinkle = pow(0.5 + 0.5 * sin(uEliteTime * (2.6 + shieldSeed * 1.8) + shieldSeed * 40.0), 7.0);
   float shieldSpark = step(0.62, shieldSeed) * max(shieldCross, shieldCore) * shieldTwinkle;
-  vec3 shieldGold = vec3(1.0, 0.70, 0.16);
-  outgoingLight = mix(outgoingLight, outgoingLight * 0.92 + shieldGold * 0.14, 0.22 * uMagicShield);
-  outgoingLight += shieldGold * shieldRim * 0.55 * uMagicShield;
-  outgoingLight += vec3(1.0, 0.86, 0.45) * shieldBand * (0.18 + shieldFacing * 0.14) * uMagicShield;
-  outgoingLight += vec3(1.0, 0.95, 0.75) * shieldSpark * 1.10 * uMagicShield;
+  // 짙은 황금빛(선형 색공간 값이라 sRGB보다 G·B를 낮게 잡는다): 밝은 금을 더해 바래게 하지 않고, 원래 색을 금빛으로 곱해 깊이를 남긴다.
+  vec3 shieldGold = vec3(1.0, 0.34, 0.0);
+  // 날씨 색조(숲의 초록 등)에 끌려가지 않게 밝기만 남기고 색은 금빛으로 고정한다.
+  float shieldLuma = dot(outgoingLight, vec3(0.299, 0.587, 0.114));
+  vec3 shieldGoldTint = shieldLuma * vec3(1.55, 0.62, 0.06) + shieldGold * 0.06;
+  outgoingLight = mix(outgoingLight, shieldGoldTint, 0.80 * uMagicShield);
+  outgoingLight += shieldGold * shieldRim * 0.75 * uMagicShield;
+  outgoingLight += vec3(1.0, 0.55, 0.08) * shieldBand * (0.20 + shieldFacing * 0.16) * uMagicShield;
+  outgoingLight += vec3(1.0, 0.88, 0.50) * shieldSpark * 1.10 * uMagicShield;
 }
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
@@ -810,7 +814,7 @@ if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveEdge = partDissolveActive * (1.0 - smoothstep(0.0, 0.09, partDissolveNoise - uPartDissolve));
 outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolve);`)
     }
-    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v5-${weather}`
+    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v10-${weather}`
   }
 
   private fitModel(model: THREE.Object3D): THREE.Box3 | null {

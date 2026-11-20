@@ -1994,14 +1994,19 @@ export class BattleView {
           ? `평소보다 ${step.bonusAtk} 세게 때린다`
           : '평소 위력으로 때린다'
     if (attackStep) {
-      const detail = attackStep.damageScale === 0
-        ? '이번엔 안 때리고 다음 공격을 준비한다'
+      // 기술 이름(「껍질 튕기기」 등) 대신 무엇을 하는지만 짧게 말한다(11/20 피드백).
+      const charging = attackStep.damageScale === 0
+      const power = charging
+        ? ''
         : attackStep.damageScale != null && attackStep.damageScale !== 1
-          ? `평소 위력의 ${Math.round(attackStep.damageScale * 100)}%로 때린다`
+          ? `\n평소 위력의 ${Math.round(attackStep.damageScale * 100)}%`
           : attackStep.bonusAtk > 0
-            ? `평소보다 ${attackStep.bonusAtk} 세게 때린다`
-            : '평소 위력으로 때린다'
-      if (!e.def.boss) add('attack', icon('sword'), tip(`다음 행동 · ${attackStep.name}`, detail))
+            ? `\n평소보다 ${attackStep.bonusAtk} 세게`
+            : ''
+      // 보스의 다음 행동은 바로 아래 문장판이 말하므로 뱃지로 한 번 더 세우지 않는다.
+      if (!e.def.boss) add('attack', icon('sword'), charging
+        ? tip('공격 준비', '이 캐릭터는 다음 턴에 공격하지 않고 힘을 모읍니다.')
+        : tip('공격', `이 캐릭터는 다음 턴에 공격합니다.${power}`))
     }
     if (e.def.boss && !e.dead) {
       // 11/20 피드백: 보스의 선·후공은 체력바 아래 공격 아이콘 하나로 알린다(예상 피해는 행동 순서에).
@@ -2010,7 +2015,7 @@ export class BattleView {
         ? `${left}턴 뒤에 움직인다`
         : e.initiativePhase === 'first' ? '선공: 내 문장 직후, 내가 때리기 전에 먼저 때린다' : '후공: 내 문장이 끝난 뒤에 때린다'
       const label = left > 0 ? `${left}턴 뒤` : e.initiativePhase === 'first' ? '선공' : '후공'
-      add(`attack boss-attack${left === 0 && e.initiativePhase === 'first' ? ' is-first' : ''}`, `${icon('sword')}<em>${label}</em>`, tip(`${label} · ${attackStep?.name ?? e.def.name}`, [timing, attackStep ? attackDetail(attackStep) : ''].filter(Boolean).join('\n')))
+      add(`attack boss-attack${left === 0 && e.initiativePhase === 'first' ? ' is-first' : ''}`, `${icon('sword')}<em>${label}</em>`, tip(`공격 · ${label}`, [timing, attackStep ? attackDetail(attackStep) : ''].filter(Boolean).join('\n')))
     }
     // 공격 단계는 1단계(×1.00)일 때는 알릴 것이 없다. 올라간 뒤에만 세운다.
     if (e.def.boss && bossAttackStage(e) > 1) {
