@@ -8549,15 +8549,15 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .reward-dock {
   position: static;
   inset: auto;
-  width: 382px;
+  width: 430px;
   flex: none;
   align-self: stretch;
   min-height: 468px;
-  /* 높이는 옆 보상 판에 맞춰 늘어나고(stretch), 내용이 길면 그 안에서 스크롤한다.
+  /* 짧은 카드는 옆 보상 판 높이에 맞추고(stretch), 긴 카드는 스크롤 없이 위아래로 늘어난다.
      예전 max-height: 80vh는 실제 창 높이 기준이라, 1920×1080 무대를 축소해 보여 주는
-     1080px 미만 창에서는 무대 단위로 576px쯤에서 잘려 옆 판보다 짧아졌다(11/21).
-     contain: size로 내용이 행 높이를 밀어 올리지 못하게 한다. */
-  contain: size;
+     1080px 미만 창에서는 무대 단위로 576px쯤에서 잘려 스크롤이 생겼다(11/21).
+     상한은 무대(1080) 안쪽 여백을 남긴 값 — 가장 긴 카드(끝까지 남은 나는 강화)가 약 1000이다. */
+  max-height: 1040px;
   padding: 26px 24px;
   overflow: auto;
 }
@@ -8570,12 +8570,13 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 /* 단어 상세 — 카드 앞면을 크게, 그 밑에 하단 효과를 큰 글씨로. */
 .reward-dock.is-word-card { padding: 20px 22px 24px; }
-.rd-card { position: relative; flex: none; width: 316px; height: 436px; margin: 0 auto; }
+.rd-card { position: relative; flex: none; width: 269px; height: 371px; margin: 0 auto; }
 .rd-card .word-card {
   position: absolute;
   left: 0;
   top: 0;
-  transform: scale(2);
+  /* 키워드 설명까지 스크롤 없이 한 칸에 담으려고 2배에서 1.7배로 줄였다(11/21). */
+  transform: scale(1.7);
   transform-origin: 0 0;
   pointer-events: none;
 }
@@ -11656,6 +11657,10 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .rds-zoom-detail .word-keyword-detail b { font-size: 24px; }
 .reward-dock .word-keyword-detail span,
 .rds-zoom-detail .word-keyword-detail span { font-size: 20px; line-height: 1.55; color: #fff7e6; }
+/* 보상 상세 칸은 스크롤 없이 한 칸에 담는다 — 넓힌 칸(430px)에 맞춰 줄 간격만 조인다. */
+.reward-dock .word-keyword-detail b { font-size: 22px; }
+.reward-dock .word-keyword-detail span { font-size: 18px; line-height: 1.45; }
+.reward-dock .word-keyword-list { gap: 10px; }
 .reward-dock .word-keyword-details h3,
 .rds-zoom-detail .word-keyword-details h3 { font-size: 16px; }
 
