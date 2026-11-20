@@ -123,7 +123,8 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
 {
   const player = startingPlayer()
   player.deck.adv = player.deck.adv.map((word) => ({ ...word, inkCost: 1, effects: undefined }))
-  player.deck.verb = player.deck.verb.map((word) => ({ ...word, inkCost: 4 }))
+  // 같은 카드를 두 칸에 골라도 찍힌 비용만 내므로(숨은 +1 없음) 동사 비용으로 한도를 넘긴다.
+  player.deck.verb = player.deck.verb.map((word) => ({ ...word, inkCost: 5 }))
   for (const passive of ['twinSubj', 'punct'] as const) {
     player.items.push({ id: `item-guard-${passive}`, name: passive, rarity: 'legendary', art: '', line: '', stats: {}, passive })
   }
