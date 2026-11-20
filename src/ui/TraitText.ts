@@ -37,7 +37,7 @@ const TERMS: Record<string, Array<[string, TagSpec]>> = {
     // 전장 TIP·적 기믹 설명에 자주 나오는 전투 용어(11/20 피드백: 팁도 태그로).
     ['매직실드', { kind: 'keyword' }], ['관통', { kind: 'keyword' }], ['카운터', { kind: 'keyword' }],
     ['방패치기', { kind: 'keyword' }], ['연타', { kind: 'keyword' }], ['그로기', { kind: 'keyword' }],
-    ['흡혈', { kind: 'keyword' }], ['선공', { kind: 'keyword' }], ['봉인', { kind: 'keyword' }],
+    ['흡혈', { kind: 'keyword' }], ['선공', { kind: 'keyword' }], ['후공', { kind: 'keyword' }], ['봉인', { kind: 'keyword' }],
   ],
   en: [
     ['Max Ink', { kind: 'ink' }], ['Ink', { kind: 'ink' }],
@@ -81,6 +81,8 @@ const TAG_TIPS_KO: Record<string, string> = {
   랭크: '공격·방어를 25%씩 올리거나 내리는 단계예요.\n그 스테이지가 끝나면 사라져요.',
   무럭무럭: '문장을 쓰면 최대 체력이 영구히 자라요.\n배율을 받지 않는 고정 점수예요.',
   그로기: '큰 기믹이 막히면 빠지는 상태예요.\n주는 피해가 커지고 예정된 공격을 한 턴 걸러요.',
+  선공: '내 문장 직후, 내가 때리기 전에 먼저 움직여요.\n선공 카드를 쓴 문장은 선공 적보다도 먼저 움직여요.',
+  후공: '내 문장이 끝난 뒤에 움직여요.',
   봉인: '거미줄에 묶인 카드는 풀릴 때까지 쓸 수 없어요.',
   '카드 뽑기': '손패를 새로 채우는 행동이에요.',
   주어: '문장의 주인공 카드를 놓는 칸이에요.',

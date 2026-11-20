@@ -40,7 +40,7 @@ import { traitDescHtml } from '@/ui/TraitText'
 import { emotionOrNeutral, EMOTION_LABEL, RARITY_LABEL, type Combo, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ALL_REWARD_WORDS, ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, tablesForEncounter } from '@data/earlyWords'
-import { ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, enemyDefForEncounter } from '@data/enemies'
+import { ELITE_ENEMY_TEXT, ENEMIES, QUEEN_ESCORT_IMMUNITY_LABEL, enemyDefForEncounter } from '@data/enemies'
 import { tacticalGuideForEnemy } from '@data/tacticalCards'
 import {
   activeEnemyPart,
@@ -82,7 +82,7 @@ import { enemyDamageRange, enemySentenceFor, type EnemySentenceToken, type Enemy
 import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
-import { TooltipLayer, tipBulletsHtml } from '@/ui/TooltipLayer'
+import { TooltipLayer, tipBulletItems, tipBulletsHtml } from '@/ui/TooltipLayer'
 import { clearRewardValue, gradeFloor, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
 import { PART_WEAKNESS_MULT, PLAYER_GUARD_LIMIT_PER_GUARD_STAT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
 import { defaultPlayer, itemTooltipHtml, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
@@ -2248,7 +2248,6 @@ export class BattleView {
         ['운', formatNumber(p.luck)],
       ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
     } else {
-      const waiting = enemyIndex != null && enemyIndex !== frontIdx(this.state)
       const attackStage = enemy ? bossAttackStage(enemy) : 1
       const attackMultiplier = BOSS_ATTACK_MULTIPLIER[attackStage]
       const attackStep = enemy ? nextEnemyAttackStep(enemy) : null
@@ -2258,25 +2257,18 @@ export class BattleView {
       // 상세 정보도 실행부와 같은 공용 예상값을 쓴다. 공격 감소·거미줄 상한·다음
       // 공격 턴의 압박 배율을 따로 재구현하지 않는다.
       const [attackLow, attackHigh] = enemy ? enemyAttackForecast(this.state, enemy).raw : [0, 0]
+      // 11/20 피드백: 모든 적이 매 턴 움직여 '행동 주기 1턴'은 늘 같은 말이었고, 공격 단계
+      // 1단계(×1.00)·선후공·약점은 아래 •목록의 태그 줄이 더 잘 말한다. 칸에는 숫자만 남긴다.
+      const partWeak = currentPart?.def.weakness
       stats = enemy
         ? [
             ['체력', `${Math.max(0, enemy.hp)} / ${enemy.maxHp}`],
-            ['공격', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
-            ...(attackStep ? [['다음 기술', attackStep.name]] : []),
-            ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`]] : []),
-            ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}`]] : []),
-            ...(currentPart?.def.weakness
-              ? [['현재 약점', `${currentPart.def.weakness.label} · 피해 ×${formatMult(PART_WEAKNESS_MULT)}`]]
-              : []),
-            ...(enemy.def.webPattern ? [['거미줄', `카드 봉인 최대 ${enemy.def.webPattern.maxSealedCards}장`]] : []),
-            ...(enemy.def.boss ? [['공격 단계', `${attackStage}단계 · ×${attackMultiplier.toFixed(2)}`]] : []),
-            // 약점이 없는 적은 약점 줄을 아예 두지 않는다(무속성은 약점으로 등장하지 않는다).
-            ...(!currentPart && enemy.def.weakEmotion
-              ? [['약점', `<span class="enemy-weakness emotion-${enemy.def.weakEmotion}">${emotionBadgeContent(enemy.def.weakEmotion)}</span>`]]
-              : []),
-            ['행동 주기', `${enemy.def.every}턴`],
-            ...(waiting ? [] : [['다음 순서', enemy.initiativePhase === 'first' ? '선공' : '후공']]),
-          ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')
+            ['예상 피해', `${attackLow === attackHigh ? String(attackLow) : `${attackLow}–${attackHigh}`}${enemy.attackRank ? ` (${enemy.attackRank > 0 ? '↑' : '↓'}${Math.abs(enemy.attackRank)})` : ''}`],
+            ...(enemy.def.boss && attackStep ? [['다음 행동', attackStep.name, 'wide']] : []),
+            ...(summonPattern ? [['호위', `${summonPattern.name} ${summons}/${summonPattern.max}`, 'wide']] : []),
+            ...(enemy.def.boss && attackStage > 1 ? [['공격 단계', `${attackStage}단계 ×${attackMultiplier.toFixed(2)}`]] : []),
+            ...(currentPart ? [['현재 부위', `${currentPart.def.name} ${Math.max(0, currentPart.hp)}/${currentPart.maxHp}${partWeak?.kind === 'emotion' ? ` <span class="enemy-weakness emotion-${partWeak.value}">${emotionBadgeContent(partWeak.value as Emotion)}</span>` : ''}`, 'wide']] : []),
+          ].map(([label, value, wide]) => `<div${wide ? ' class="is-wide"' : ''}><span>${label}</span><b>${value}</b></div>`).join('')
         : ''
     }
     // 적 상세는 마우스를 움직이면 사라지는 호버 팝업이라 스크롤할 수 없다. 읽을거리
@@ -2292,9 +2284,38 @@ export class BattleView {
           <h3>${visual.title}</h3>
           ${enemy ? '' : `<p>${visual.description}</p>`}
           <div class="character-stats">${stats}</div>
-          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${tipBulletsHtml(this.state.enemies[enemyIndex ?? 0]?.def.note ?? '')}</div>`}
+          ${id === 'player' ? '<div class="character-note">문장을 조립해 이야기를 올바른 방향으로 이끈다.</div>' : `<div class="character-note">${enemy ? tipBulletsHtml(this.enemyDetailLines(enemy, enemyIndex !== frontIdx(this.state)).join('\n')) : ''}</div>`}
         </div>
       </article>`
+  }
+
+  /**
+   * 적 상세 •목록. 줄마다 태그(선공·방어·매직실드·관통·감정)로 시작해 "무엇을 하는 적인가"만 말한다.
+   * 일반 적의 분위기 문장(「종이 섬유를 갉아 먹는다」)은 전투 판단에 쓸모가 없어 빼고(11/20 피드백),
+   * 실제로 가진 능력을 지금 수치로 적는다. 보스는 이어서 기믹 •목록(def.note)을 그대로 붙인다.
+   */
+  private enemyDetailLines(enemy: EnemyInst, waiting: boolean): string[] {
+    const def = enemy.def
+    const lines: string[] = []
+    if (!waiting && !enemy.dead) {
+      lines.push(enemy.initiativePhase === 'first' ? '선공: 내가 때리기 전에 먼저 때린다' : '후공: 내 문장이 끝난 뒤에 때린다')
+    }
+    // 장로거미는 다리마다 약점이 바뀌어 '현재 부위' 칸이 감정 뱃지로 함께 보여 준다.
+    if (!activeEnemyPart(enemy) && def.weakEmotion) {
+      lines.push(`${EMOTION_LABEL[def.weakEmotion]} 약점: 받는 피해 ×${formatMult(WEAKNESS_MULT)}`)
+    }
+    if (!def.boss) {
+      const guard = enemy.guard > 0 ? enemy.guard : def.guard ?? 0
+      if (guard > 0) lines.push(`방어 ${guard}: 내 문장 피해를 먼저 받아 낸다`)
+      const shield = enemy.magicShield
+      if (shield > 0) lines.push(`매직실드 ${shield}: 공격 한 번을 통째로 막는다`)
+      if (def.pierceGuard || def.attackPattern?.some((step) => step.pierceGuard)) lines.push('관통: 내 방어를 무시하고 체력을 깎는다')
+      const leech = def.attackPattern?.find((step) => (step.lifeStealRate ?? 0) > 0)?.lifeStealRate
+      if (leech) lines.push(`흡혈 ${Math.round(leech * 100)}%: 체력에 준 피해 일부를 회복한다`)
+      if (def.elite?.trait === 'raging') lines.push(ELITE_ENEMY_TEXT.trait.raging.note)
+      return lines
+    }
+    return [...lines, ...tipBulletItems(def.note ?? '')]
   }
 
   private clearDetailDock() {
