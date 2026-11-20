@@ -11125,3 +11125,21 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   82% { transform: translateX(-50%) scale(1); opacity: 1; }
   100% { transform: translateX(-50%) translateY(-18px) scale(1); opacity: 0; }
 }
+
+/* 약점이 바뀐 순간(장로거미 다리 교체) 배지가 튀며 새 감정색으로 번쩍인다. */
+.weak-badge.is-changing { animation: weak-badge-change .9s cubic-bezier(.2, .9, .25, 1); }
+@keyframes weak-badge-change {
+  0% { transform: scale(.6) rotate(-8deg); filter: brightness(2.2); }
+  35% { transform: scale(1.35) rotate(3deg); filter: brightness(1.6) drop-shadow(0 0 12px currentColor); }
+  100% { transform: scale(1) rotate(0); filter: none; }
+}
+
+/* ── 여왕벌 등장 보정 (11/20 캡처 검수) ──
+   보스 배우 박스 바닥은 모델 발끝보다 한참 아래라, 그림자가 발에서 떨어져 바닥에
+   따로 떠 있었다. 멀리서 작게 걸어올 때 특히 "공중에 뜬" 느낌이 컸다. 발끝으로 올린다. */
+.scene.battle[data-boss='true'] .actor.foe.boss[data-character='queenBee'] > .shadow {
+  bottom: 84px;
+  width: 210px;
+}
+.scene.battle.is-foes-walking .queen-worker-nameplate { opacity: 0; }
+.queen-worker-nameplate { transition: opacity .35s ease; }

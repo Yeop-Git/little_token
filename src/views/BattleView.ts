@@ -671,10 +671,15 @@ export class BattleView {
     // 여태 안 쓰이고 있었다(어택 클립으로 대신해 봤지만 440ms짜리라 앞부분만 달리고
     // 끝의 휘두르는 동작 때문에 등장하면서 공격하는 것처럼 보였다).
     // walk는 idle처럼 계속 도는 클립이라 도착할 때까지 반복되고, 다 오면 idle로 돌린다.
-    this.root.querySelectorAll<HTMLElement>('.actor.foe').forEach((foe) => {
+    // 여왕벌의 일벌은 여왕 배우 안에 붙어 함께 다가온다. 예전엔 여왕만 걷고 일벌은
+    // 선 자세 그대로 미끄러져 와서 어색했다 — 같은 걸음으로 걷게 한다.
+    this.root.querySelectorAll<HTMLElement>('.actor.foe, .actor.foe .queen-worker:not([hidden])').forEach((foe) => {
       playCharacterAnimation(foe, 'walk')
       this.timers.push(window.setTimeout(() => playCharacterAnimation(foe, 'idle'), walkMs))
     })
+    // 걸어오는 동안에는 작게 줄어든 일벌 이름표·타깃 표시를 숨겼다가 도착하면 켠다.
+    scene.classList.add('is-foes-walking')
+    this.timers.push(window.setTimeout(() => scene.classList.remove('is-foes-walking'), walkMs))
     this.timers.push(window.setTimeout(() => this.onEnemiesArrived(), walkMs))
   }
 
@@ -1947,6 +1952,8 @@ export class BattleView {
       const signature = `${affinity}-${weakMult}`
       weakBadge.hidden = false
       if (weakBadge.dataset.signature !== signature) {
+        // 장로거미처럼 다리마다 약점이 바뀌면, 바뀐 순간을 배지가 튀어 알린다.
+        const changed = !!weakBadge.dataset.signature && !!signature
         weakBadge.dataset.signature = signature
         weakBadge.className = `weak-badge emotion-${affinity}`
         // 무속성 적은 회색 「._.」 얼굴로 약점이 없다는 사실도 같은 자리에서 보여 준다.
@@ -1954,6 +1961,11 @@ export class BattleView {
           ? `${emotionIconContent('neutral')}<b>무속성</b>`
           : `${emotionIconContent(affinity)}<b>약점</b><small>×${formatNumber(weakMult)}</small>`
         weakBadge.setAttribute('aria-label', affinity === 'neutral' ? '무속성, 약점 없음' : `${affinityLabel}, 피해 ×${formatNumber(weakMult)}`)
+        if (changed) {
+          weakBadge.classList.remove('is-changing')
+          void weakBadge.offsetWidth
+          weakBadge.classList.add('is-changing')
+        }
       }
     }
     plate.querySelector<HTMLElement>('.hpn')!.textContent = e.healthBars > 1
@@ -4466,6 +4478,8 @@ export class BattleView {
     // 다리가 바뀌면 노려야 할 감정도 바뀐다. 부위 목록의 작은 뱃지만으로는
     // 순서가 넘어간 순간을 놓치므로, 토큰이 다음 약점을 이름으로 불러 준다.
     const nextWeak = activeEnemyPart(this.state.enemies[enemyIdx])?.def.weakness?.label ?? null
+    const bossHud = this.root.querySelector<HTMLElement>('#boss-health-hud')
+    if (bossHud && this.state.enemies[enemyIdx]) this.updateFoePlate(bossHud, this.state.enemies[enemyIdx], true)
     this.showBossSentenceEvent(nextWeak
       ? bossText('nextLegRecover', { weakness: currentLocale === 'ko' ? eul(nextWeak) : nextWeak })
       : bossText('allClausesErased'), 4200)
