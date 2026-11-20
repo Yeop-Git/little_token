@@ -288,7 +288,9 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
       // 실측 마디와 보기 좋은 마디는 다를 수 있다 — 예고 자세는 렌더된 프레임을
       // 훑어 눈으로 정한다.
       attackBeats: { raise: 0.2, impact: 0.26, telegraph: 0.34 },
-      durationsMs: { attack: 440, attack3: 440, defeat: 560 },
+      // 피드백(11/20): 8.1초짜리 강공격 클립을 0.44초에 넣어 프레임이 뚝뚝 끊겼다.
+      // 1초로 늘려 도약·내려베기가 이어져 보이게 한다(예고 자세 0.34 = 0.34초 지점).
+      durationsMs: { attack: 440, attack3: 1000, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: BOSS_MODEL_YAW,
@@ -305,11 +307,14 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     animations: {
       idle: 'Armature|idle|BaseLayer',
       walk: 'Armature|walk|BaseLayer',
+      // 피드백(11/20): 원본 attack2(11.4초)·attack3(13.5초)은 여왕벌이 화면 밖으로 날아갔다
+      // 돌아오는 긴 동작이라 0.44초에 욱여넣으면 순간이동·깜빡임으로 보였다. 제자리에서
+      // 찌르는 attack1(2.3초)을 모든 공격 단계에 쓴다.
       attack: 'Armature|attack1|BaseLayer',
-      attack2: 'Armature|attack2|BaseLayer',
-      attack3: 'Armature|attack3|BaseLayer',
+      attack2: 'Armature|attack1|BaseLayer',
+      attack3: 'Armature|attack1|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
-      durationsMs: { attack: 440, attack2: 440, attack3: 440, defeat: 560 },
+      durationsMs: { attack: 520, attack2: 520, attack3: 520, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: BOSS_MODEL_YAW,
@@ -327,11 +332,13 @@ export const CHARACTER_VISUALS: Record<CharacterVisualDef['id'], CharacterVisual
     model3d: MODELS.boss_elder_spider,
     animations: {
       idle: 'Armature|idle|BaseLayer',
+      // 원본 attack3(7.8초)은 플레이어 앞까지 기어 왔다 돌아가는 동작이라 0.44초에 넣으면
+      // 거대한 몸이 튀어 나갔다 오는 것처럼 보였다. 제자리 휘두르기 attack2를 조금 더 길게 쓴다.
       attack: 'Armature|attack1|BaseLayer',
       attack2: 'Armature|attack2|BaseLayer',
-      attack3: 'Armature|attack3|BaseLayer',
+      attack3: 'Armature|attack2|BaseLayer',
       defeat: 'Armature|defeat|BaseLayer',
-      durationsMs: { attack: 440, attack2: 440, attack3: 440, defeat: 560 },
+      durationsMs: { attack: 520, attack2: 640, attack3: 720, defeat: 560 },
       idleLoopBlendMs: ENEMY_IDLE_LOOP_BLEND_MS,
     },
     modelYaw: BOSS_MODEL_YAW,

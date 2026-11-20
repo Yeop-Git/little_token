@@ -388,6 +388,8 @@ class BattleCharacterModel {
   private frozen = false
   /** 정지 프레임으로 붙들고 있는 중인가(`poseAt`). 붙든 동안은 시간이 흐르지 않는다. */
   private posed = false
+  /** `playAndHold`가 멈춰 설 클립 시각(초). 닿으면 null로 비우고 posed가 된다. */
+  private holdAt: number | null = null
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
   private healMaterials: THREE.ShaderMaterial[] = []
@@ -1261,7 +1263,22 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
    *   강타 연출은 같은 attack 클립을 느리게 늘려 예비 동작을 읽히게 한다.
    */
   play(animation: BattleAnimation, stretchMs?: number): number {
+    // 예고 자세로 붙들어 둔 바로 그 클립을 다시 틀면, 처음(0)으로 되감지 않고 붙든 마디에서
+    // 이어 간다. 예전에는 reset()으로 첫 프레임에 뚝 떨어졌다가 다시 휘둘러 끊겨 보였다.
+    const held = this.posed ? this.current : null
+    this.holdAt = null
     this.releasePose()
+    if (held && held === this.actions[animation] && animation !== 'idle' && animation !== 'idle2' && animation !== 'walk') {
+      const clip = held.getClip()
+      const fullMs = stretchMs ?? this.visual.animations?.durationsMs?.[animation as OneShotAnimation] ?? clip.duration * 1000
+      const remaining = Math.max(0.05, 1 - held.time / clip.duration)
+      held.paused = false
+      held.setEffectiveTimeScale(clip.duration / (fullMs / 1000))
+      this.requestedAnimation = animation
+      this.shell.dataset.modelAnimation = animation
+      this.shell.dataset.modelLastAction = animation
+      return fullMs * remaining
+    }
     this.requestedAnimation = animation
     this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
     this.shell.dataset.modelAnimation = animation
@@ -1309,6 +1326,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   /** 풀에서 재사용할 때 이전 one-shot 자세를 한 프레임도 노출하지 않고 idle로 되돌린다. */
   resetToIdle() {
+    this.holdAt = null
     this.releasePose()
     this.requestedAnimation = 'idle'
     this.cameraZoom = 1
@@ -1427,6 +1445,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.lastRenderedAt = now
     const motionDelta = this.frozen || this.posed ? 0 : frameDelta
     this.mixer?.update(motionDelta)
+    this.applyHold()
     this.updateModelYawReturn(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
@@ -1502,6 +1521,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.shell.dataset.modelAnimation = animation
     this.shell.dataset.modelLastAction = animation
     this.shell.dataset.modelPose = `${animation}@${at.toFixed(2)}`
+    this.holdAt = null
     this.stopEffect()
     // 이전 동작을 완전히 걷어낸다. 크로스페이드가 남아 있으면 자세가 섞여 흐려진다.
     this.mixer?.stopAllAction()
@@ -1519,6 +1539,30 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.current = action
     this.posed = true
     return true
+  }
+
+  /**
+   * 클립을 처음부터 **평소 속도로** 틀다가 `at` 마디에 닿으면 그 자리에 멈춰 붙든다.
+   * `poseAt`은 지금 자세에서 그 마디로 순간이동하므로, 공격을 다 휘두른 뒤 예고 자세로
+   * 뚝 끊겨 돌아가 보였다(사마귀 강공격 예고, 11/20 피드백). 이쪽은 이어진 한 동작이다.
+   */
+  playAndHold(animation: BattleAnimation, at: number): boolean {
+    const action = this.actions[animation]
+    if (!action) return false
+    this.play(animation)
+    this.holdAt = action.getClip().duration * Math.max(0, Math.min(1, at))
+    return true
+  }
+
+  private applyHold() {
+    if (this.holdAt == null || !this.current) return
+    if (this.current.time < this.holdAt) return
+    this.current.time = this.holdAt
+    this.current.paused = true
+    this.mixer?.update(0)
+    this.holdAt = null
+    this.posed = true
+    this.shell.dataset.modelPose = `${this.requestedAnimation}@hold`
   }
 
   /** 붙들고 있던 자세를 놓는다. 다음 동작이 이어받을 수 있게 표시만 지운다. */
@@ -1627,6 +1671,13 @@ export function playCharacterAnimation(
  * 클립의 한 마디를 정지 프레임으로 붙든다 — 강공격 예고처럼 "딱 멈춰 선 위협적인
  * 자세"를 만들 때 쓴다. 재생+타이머 정지와 달리 재렌더에 풀리지 않는다.
  */
+export function playCharacterAndHold(actor: HTMLElement | null, animation: BattleAnimation, at: number): boolean {
+  if (!actor) return false
+  const shell = modelShellFor(actor)
+  if (!shell) return false
+  return mountedModels.get(shell)?.playAndHold(animation, at) ?? false
+}
+
 export function poseCharacterAt(actor: HTMLElement | null, animation: BattleAnimation, at: number): boolean {
   if (!actor) return false
   const shell = modelShellFor(actor)

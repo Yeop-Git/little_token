@@ -1834,9 +1834,11 @@ html[data-postprocessing='off'] .tip-bubble {
    밀린다(실측: 셸 너비의 약 25%). 모델은 로드 시점의 대기 자세를 기준으로 가운데를
    맞춰 두므로, 한 프레임을 붙들면 그 기준에서 벗어난다. 붙든 동안만 되민다.
    `translate`는 아래 `transform: scale(...)`과 별개 속성이라 서로 덮지 않는다. */
-.actor.foe.boss > .model-shell[data-model-pose^='attack3'] {
+.actor.foe.boss > .model-shell[data-model-pose^='attack3']:not([data-model-pose$='@hold']) {
   translate: -35% 0;
 }
+/* playAndHold로 흘러가다 멈춘 예고 자세(@hold)는 되밀지 않는다. 휘두르던 흐름 그대로
+   멈춘 자리라 여기서 셸을 옮기면 오히려 그 순간 옆으로 뚝 튄다. */
 .actor.foe.boss > .model-shell {
   transform: scale(calc(var(--model-scale, 1) * var(--boss-display-scale)));
 }
@@ -2898,9 +2900,12 @@ html[data-postprocessing='off'] .tip-bubble {
   filter: drop-shadow(0 0 15px rgba(255, 133, 47, .76)) drop-shadow(0 10px 12px rgba(30, 18, 6, .32));
 }
 .queen-worker.summoning { animation: worker-summon .34s cubic-bezier(.18, 1.35, .34, 1); }
+/* 차례를 기다리는 일벌 — 렌더가 넷을 한꺼번에 세워도 소환 연출 전까지는 보이지 않는다. */
+.queen-worker.summon-pending { opacity: 0 !important; }
+/* transform을 덮으면 오른쪽 일벌의 좌우 반전이 소환 순간 풀렸다 — 개별 속성으로 얹는다. */
 @keyframes worker-summon {
-  from { opacity: 0; transform: translateY(-80px) scale(.25) rotate(-14deg); filter: brightness(1.8) drop-shadow(0 0 24px #ffe87d); }
-  to { opacity: 1; }
+  from { opacity: 0; translate: 0 -80px; scale: .25; rotate: -14deg; filter: brightness(1.8) drop-shadow(0 0 24px #ffe87d); }
+  to { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
 }
 @keyframes worker-danger {
   from { translate: 0 0; }
@@ -4544,13 +4549,29 @@ body:has(.word-zone.is-resolving) .mult-now { opacity: 0; transition: opacity .1
   42% { transform: translate(300px, 56px) scale(1.06); }
   100% { transform: translate(0, 0); }
 }
-.scene.battle[data-boss='true'] .actor.foe.boss.lunge {
-  animation-name: lunge-foe-boss;
+/* 피드백(11/20): 보스 돌진·피격을 배우 상자 전체에 걸면 그 안의 일벌 호위·부위 이름표까지
+   한꺼번에 들썩였다. 보스는 모델 셸과 그림자만 움직이고, 거리도 줄여 큰 몸이 튀지 않게 한다.
+   transform 대신 translate·scale 개별 속성을 써서 셸에 이미 걸린 transform과 겹치지 않는다. */
+.scene.battle[data-boss='true'] .actor.foe.boss.lunge,
+.scene.battle[data-boss='true'] .actor.foe.boss.hit { animation: none; }
+.scene.battle[data-boss='true'] .actor.foe.boss.lunge > .model-shell,
+.scene.battle[data-boss='true'] .actor.foe.boss.lunge > .shadow {
+  animation: lunge-foe-boss .44s cubic-bezier(.5, 0, .25, 1);
 }
 @keyframes lunge-foe-boss {
-  0% { transform: translate(0, 0); }
-  42% { transform: translate(-260px, 56px) scale(1.06); }
-  100% { transform: translate(0, 0); }
+  0%, 100% { translate: 0 0; scale: 1; }
+  42% { translate: -120px 30px; scale: 1.03; }
+}
+.scene.battle[data-boss='true'] .actor.foe.boss.hit > .model-shell {
+  animation: shake-boss .3s ease;
+}
+.scene.battle[data-boss='true'] .actor.foe.boss.hit > .model-shell[data-model-pose] { animation: none; }
+.actor.foe .queen-worker.hit { animation: shake-boss .3s ease; }
+@keyframes shake-boss {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -7px 0; }
+  55% { translate: 6px 0; }
+  80% { translate: -3px 0; }
 }
 
 /* 상단 발광 체인(선택 단어) — 테두리/배경 없음, 글자 발광만 */
@@ -11531,23 +11552,6 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
   .ink-meter-vial.is-refilled img { animation: none; }
 }
 
-/* 보스 최대 체력 태그 — 뱃지 줄 맨 앞. 숫자가 주인공이라 아이콘 뱃지보다 납작한 알약형으로 둔다. */
-.boss-maxhp-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 33px;
-  padding: 0 11px 0 8px;
-  color: #ffd9cf;
-  border: 1px solid rgba(255, 150, 130, .45);
-  border-radius: 999px;
-  background: linear-gradient(150deg, rgba(92, 30, 30, .95), rgba(40, 14, 16, .95));
-  box-shadow: 0 3px 8px rgba(0, 0, 0, .45);
-  pointer-events: auto;
-  cursor: help;
-}
-.boss-maxhp-tag svg, .boss-maxhp-tag .baked-stat-icon { width: 18px; height: 18px; }
-.boss-maxhp-tag > b { color: #fff1e6; font-size: 15px; font-weight: 900; letter-spacing: .02em; }
 /* 연타 — 합계가 몇 번의 타격으로 나뉘어 들어가는지 합계 바로 아래에 딱지로 붙인다(11/20 피드백). */
 .tally-combo {
   margin-top: 4px;

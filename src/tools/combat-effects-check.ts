@@ -40,6 +40,9 @@ import {
 import { enemyDamageRange, enemySentenceFor } from '../sim/enemySentences'
 
 const assert = (ok: unknown, message: string) => { if (!ok) throw new Error(message) }
+// 일벌 규칙 검사는 호위가 선 상태에서 시작한다. 실제 여왕벌은 두 번째 페이지에서야 부르므로
+// (summonFromBar) 소환 시점 자체는 아래 전용 검사가 따로 본다.
+const QUEEN_ESCORTED = { ...ENEMIES.queenBee, summonPattern: { ...ENEMIES.queenBee.summonPattern!, summonFromBar: undefined } }
 const foe = (id: string, extra: Partial<EnemyDef> = {}): EnemyDef => ({ id, name: id, hp: 30, atk: 4, every: 2, initiative: 'second', sprite: 'enemy_moth', note: '', weakEmotion: null, ...extra })
 const state = (enemies = [makeEnemy(foe('a'))]): BattleState => {
   if (enemies[0]) enemies[0].engaged = true
@@ -291,7 +294,7 @@ const attack = (extra: Partial<Intent> = {}): Intent => ({ sentence: 'check', ta
     const result = applyIntent(battle, intent, 1, 0)
     assert(predicted.join(',') === result.hits.map((hit) => hit.dmg).join(',') && predicted[0] > 0, 'resource conversion preview matches the applied hit')
   }
-  for (const enemy of [foe('weak-preview', { weakEmotion: 'joy', hp: 30 }), foe('shield-preview', { magicShield: 1, hp: 30 }), ENEMIES.queenBee]) {
+  for (const enemy of [foe('weak-preview', { weakEmotion: 'joy', hp: 30 }), foe('shield-preview', { magicShield: 1, hp: 30 }), QUEEN_ESCORTED]) {
     const battle = state([makeEnemy(enemy)])
     if (enemy.summonPattern) summonAtTurnStart(battle)
     const intent = attack({ emotions: ['joy'], targetCount: 2 })
@@ -449,7 +452,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
 { const queen = makeEnemy(foe('queen-summon', { atk: 10, summonPattern: { name: '일벌', sprite: 'enemy_worker_bee', perTurn: 1, max: 4, maxPerSide: 2, attackBonusPerUnit: .5, releaseAt: 4 } })); const s = state([queen]); summonAtTurnStart(s); summonAtTurnStart(s); assert(queen.summonsLeft === 1 && queen.summonsRight === 0, 'queen summons only once at the same turn start'); s.turn = 2; summonAtTurnStart(s); s.turn = 3; summonAtTurnStart(s); s.turn = 4; summonAtTurnStart(s); assert(queen.summonsLeft === 2 && queen.summonsRight === 2, 'queen alternates summons up to two workers per side'); queen.nextAttackTurn = 1; const r = enemyTurn(s, () => 0, 'second')[0]; assert(r.dealt === 12 && r.summonsReleased === 4 && summonCount(queen) === 0, 'four workers add only two damage then all leave on swarm charge') }
 {
   for (const [damage, targets, pierce] of [[29, 2, false], [30, 1, true], [40, 2, false], [60, 'all', false]] as const) {
-    const queen = makeEnemy(ENEMIES.queenBee)
+    const queen = makeEnemy(QUEEN_ESCORTED)
     const battle = state([queen])
     summonAtTurnStart(battle)
     queen.summonHpRight[queen.summonHpRight.length - 1] = 9
@@ -460,9 +463,9 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
     assert(predicted === actual.summonsDispersed, `escort prediction matches actual defeats: ${damage}/${targets}/${pierce}`)
   }
 }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 30, targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'a 30-damage single-target attack defeats one full-health worker'); r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'a two-target attack carries its damage through two reachable workers'); r = applyIntent(s, attack({ base: 30, targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'an all-target attack can reach the final worker') }
+{ const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 30, targetCount: 1 }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 3, 'a 30-damage single-target attack defeats one full-health worker'); r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonsDispersed === 2 && summonCount(queen) === 1, 'a two-target attack carries its damage through two reachable workers'); r = applyIntent(s, attack({ base: 30, targetCount: 'all', aoe: 'all' }), 1, 0); assert(r.summonsDispersed === 1 && summonCount(queen) === 0, 'an all-target attack can reach the final worker') }
 {
-  const queen = makeEnemy(ENEMIES.queenBee)
+  const queen = makeEnemy(QUEEN_ESCORTED)
   const s = state([queen]); summonAtTurnStart(s)
   const focused = applyIntent(s, attack({ base: 30, emotions: ['anger'] }), 1, 0)
   assert(focused.summonsDispersed === 1 && focused.summonFocusedBacklash && focused.summonBacklashDamage === 6, 'anger single-target worker defeat doubles queen backlash')
@@ -470,19 +473,19 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(wide.summonsDispersed === 2 && !wide.summonFocusedBacklash && wide.summonBacklashDamage === 6, 'wide anger attack keeps normal backlash while progressing faster toward groggy')
   assert(QUEEN_ESCORT_IMMUNITY_LABEL === '호위 중 : 본체 무적' && ENEMIES.queenBee.note.includes(QUEEN_ESCORT_IMMUNITY_LABEL), 'queen escort immunity uses the required visible copy')
 }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); const r = applyIntent(s, attack({ base: 17 }), 1, 0); assert(r.summonDamage === 17 && r.summonsDispersed === 0 && queen.summonHpRight[queen.summonHpRight.length - 1] === 13 && summonCount(queen) === 4, 'partial damage remains on the front worker and keeps its health bar visible') }
+{ const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s); const r = applyIntent(s, attack({ base: 17 }), 1, 0); assert(r.summonDamage === 17 && r.summonsDispersed === 0 && queen.summonHpRight[queen.summonHpRight.length - 1] === 13 && summonCount(queen) === 4, 'partial damage remains on the front worker and keeps its health bar visible') }
 {
-  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s)
+  const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s)
   const r = applyIntent(s, attack({ base: 11, pierceGuard: true }), 1, 0)
   assert(r.summonDamage === 22 && r.summonsDispersed === 0 && queen.summonHpLeft.join(',') === '30,19' && queen.summonHpRight.join(',') === '30,19', 'partial piercing damage reaches two different workers')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s)
+  const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s)
   queen.summonHpRight[1] = 5
   const r = applyIntent(s, attack({ base: 20, targetCount: 2 }), 1, 0)
   assert(r.summonsDispersed === 1 && queen.summonHpRight.join(',') === '30' && queen.summonHpLeft.join(',') === '30,16', 'wide damage moves to a distinct worker after a partial-health kill and applies falloff')
 }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 2 && r.summonDamage === 60 && r.summonBacklashDamage === 6 && r.hits.length === 1 && r.hits[0].summonShieldBlocked && queen.hp === hp - 6 && !r.summonGroggyTriggered && queen.summonsDefeated === 2, 'single-target pierce reaches exactly two workers and the surviving escort blocks its remaining damage'); assert(queen.nextAttackTurn === 1 && queen.groggyUntilTurn === 0 && queen.summonRespawnTurn === 1, 'a partial piercing clear does not open queen recovery') }
+{ const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1; const hp = queen.hp; const r = applyIntent(s, attack({ base: 120, targetCount: 1, pierceGuard: true }), 1, 0); assert(r.summonsDispersed === 2 && r.summonDamage === 60 && r.summonBacklashDamage === 6 && r.hits.length === 1 && r.hits[0].summonShieldBlocked && queen.hp === hp - 6 && !r.summonGroggyTriggered && queen.summonsDefeated === 2, 'single-target pierce reaches exactly two workers and the surviving escort blocks its remaining damage'); assert(queen.nextAttackTurn === 1 && queen.groggyUntilTurn === 0 && queen.summonRespawnTurn === 1, 'a partial piercing clear does not open queen recovery') }
 { const t = tablesForEncounter(makeEarlyTables(EARLY_WORDS), 'queenBee'); assert(t.words.verb.some((word) => word.id === 'queenBeeTactic' && word.targetCount === 2), 'queen encounter lends a two-target tactic') }
 // ── 보스 전용 공략 단어 세 장 ──
 // 전용이라는 말은 두 가지를 뜻한다. 그 보스에서만 손에 들어오고, 어떤 보상으로도
@@ -515,10 +518,10 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   const tactic = tables.words.verb.find((word) => word.id === 'elderSpiderTactic')!
   assert(!tactic.effects?.hitCount && tactic.statMult === 1.5 && tactic.tags.includes('adapt'), 'spider tactic uses a strong single hit and always counts as the current weakness')
 }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
-{ const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s); applyIntent(s, attack({ base: 999, targetCount: 'all' }), 1, 0); assert(summonCount(queen) === 0, 'an area sentence clears the whole escort'); for (let turn = 2; turn <= 6; turn++) { s.turn = turn; summonAtTurnStart(s) } assert(summonCount(queen) === 0 && queen.summonWaves === 1, 'queen workers do not respawn after the first wave is cleared') }
+{ const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s); let r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(!r.summonGroggyTriggered && queen.summonsDefeated === 2, 'queen worker defeats accumulate between sentences'); s.turn = 2; summonAtTurnStart(s); queen.nextAttackTurn = 2; r = applyIntent(s, attack({ base: 60, targetCount: 2 }), 1, 0); assert(r.summonGroggyTriggered && queen.summonsDefeated === 0 && queen.nextAttackTurn === 3 && queen.summonRespawnTurn === 4, 'the fourth cumulative worker opens a recovery turn before the next wave') }
+{ const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s); applyIntent(s, attack({ base: 999, targetCount: 'all' }), 1, 0); assert(summonCount(queen) === 0, 'an area sentence clears the whole escort'); for (let turn = 2; turn <= 6; turn++) { s.turn = turn; summonAtTurnStart(s) } assert(summonCount(queen) === 0 && queen.summonWaves === 1, 'queen workers do not respawn after the first wave is cleared') }
 {
-  const queen = makeEnemy(ENEMIES.queenBee)
+  const queen = makeEnemy(QUEEN_ESCORTED)
   const s = state([queen]); summonAtTurnStart(s)
   assert(summonCount(queen) === 4, 'queen opens with a complete four-worker wave')
   const hp = queen.hp
@@ -531,7 +534,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(r.summonsDispersed === 2 && summonCount(queen) === 1 && r.hits.length === 0 && queen.hp === hp - 9, 'pierce carries through reachable workers but does not duplicate spent damage onto the body')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee)
+  const queen = makeEnemy(QUEEN_ESCORTED)
   const s = state([queen]); summonAtTurnStart(s)
   for (let defeated = 1; defeated <= 4; defeated++) {
     const r = applyIntent(s, attack({ base: 30 }), 1, 0)
@@ -551,7 +554,7 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(summonCount(queen) === 0, 'queen recovers but never resummons workers after the first wave falls')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
+  const queen = makeEnemy(QUEEN_ESCORTED, 1, 1, 3)
   const s = state([queen]); summonAtTurnStart(s); queen.nextAttackTurn = 1
   const hp = queen.hp
   const r = applyIntent(s, attack({ base: 150, targetCount: 2, pierceGuard: true }), 1, 0)
@@ -564,14 +567,34 @@ assert([1, 2, 3, 4, 5, 6].map((turn) => spiderSealSlotForTurn(['subj', 'adv', 'v
   assert(summonCount(queen) === 0, 'queen does not summon a fresh wave after recovery')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); s.guard = 99
+  const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); s.guard = 99
   summonAtTurnStart(s); queen.nextAttackTurn = 1
   const r = enemyTurn(s, () => 0, 'second')[0]
   assert(r.piercedGuard && r.absorbed === 0 && s.guard === 99, 'queen attack pierces player guard while a worker escort survives')
 }
 // 10층에 도착한 플레이어의 실제 최대 체력(시작 20 + 아홉 층의 아이템 보상)을 기준으로 잰다.
 // 픽스처 기본값 30은 1층 언저리 수치라 중간 보스의 한 방 판정 기준이 되지 못한다.
-{ const stage = stageFor(10); const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); s.playerHp = s.playerMax = 52; summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax * .3 && queen.nextAttackTurn === 2, 'day-10 queen trades the old three-turn spike for a disclosed low-power action every turn') }
+{ const stage = stageFor(10); const queen = makeEnemy(QUEEN_ESCORTED, stage.atkMult, stage.hpMult, stage.bossHealthBars); const s = state([queen]); s.playerHp = s.playerMax = 52; summonAtTurnStart(s); const r = enemyTurn(s, () => .999, 'second')[0]; assert(r.dealt < s.playerMax * .3 && queen.nextAttackTurn === 2, 'day-10 queen trades the old three-turn spike for a disclosed low-power action every turn') }
+{
+  // 11/20 피드백: 여왕벌은 첫 페이지를 혼자 싸우고, 두 번째 페이지에 들어선 다음 턴에 일벌 넷을 한 번만 부른다.
+  const stage = stageFor(10)
+  const queen = makeEnemy(ENEMIES.queenBee, stage.atkMult, stage.hpMult, stage.bossHealthBars)
+  const s = state([queen])
+  assert(queen.healthBars >= 2, 'day-10 queen has at least two health pages')
+  summonAtTurnStart(s)
+  assert(summonCount(queen) === 0 && queen.summonWaves === 0, 'queen starts the fight without workers on page one')
+  const hp = queen.hp
+  const r = applyIntent(s, attack({ base: queen.hpPerBar + 5, targetCount: 1, pierceGuard: true }), 1, 0)
+  assert(queen.hp < hp && !r.hits.some((hit) => hit.summonShieldBlocked), 'page-one damage reaches the queen body directly')
+  assert(queen.hp === (queen.healthBars - 1) * queen.hpPerBar, 'a hit cannot skip past page two before the workers arrive')
+  applyIntent(s, attack({ base: 999, targetCount: 1, pierceGuard: true }), 1, 0)
+  assert(!queen.dead && queen.hp === (queen.healthBars - 2) * queen.hpPerBar + 1, 'more damage in the same turn keeps page two until the workers are called')
+  s.turn = 2; summonAtTurnStart(s)
+  assert(summonCount(queen) === 4 && queen.summonWaves === 1, 'entering page two summons four workers at the next turn start')
+  applyIntent(s, attack({ base: 35, targetCount: 'all', aoe: 'all' }), 1, 0)
+  for (let turn = 3; turn <= 8; turn++) { s.turn = turn; summonAtTurnStart(s) }
+  assert(summonCount(queen) === 0 && queen.summonWaves === 1 && !queen.dead, 'page-two workers come only once')
+}
 assert(ENEMIES.queenBee.every === 1 && ENEMIES.elderSpider.every === 1, 'queen bee and elder spider always have a direct action available each turn outside explicit groggy skips')
 // 모여든 호위가 한꺼번에 덤비면 방패 위로 넘어온다 — 방어로 버티는 길을 막아
 // "모이기 전에 넓게 흩어 놓는다"만 답으로 남긴다.
@@ -943,7 +966,7 @@ for (const kind of ['attack', 'guard', 'heal'] as const) {
   assert(sentence.tokens.some((token) => token.text === '휘청거린다'), 'mantis counter rewrites the promised attack into a stagger sentence')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee, 1, 1, 3)
+  const queen = makeEnemy(QUEEN_ESCORTED, 1, 1, 3)
   const s = state([queen])
   summonAtTurnStart(s)
   let sentence = enemySentenceFor(s, queen)!
@@ -981,7 +1004,7 @@ console.log('combat effects: ok')
   assert(all.length === 6, 'a repeated all-target verb hits every enemy on every cast')
 }
 {
-  const queen = makeEnemy(ENEMIES.queenBee); const s = state([queen]); summonAtTurnStart(s)
+  const queen = makeEnemy(QUEEN_ESCORTED); const s = state([queen]); summonAtTurnStart(s)
   const wipe = applyIntent(s, attack({ base: 40, targetCount: 'all', aoe: 'all' }), 1, 0)
   assert(wipe.summonGroggyTriggered && summonCount(queen) === 0, 'an all-target sentence clears the worker wave')
   s.turn = 2

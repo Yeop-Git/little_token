@@ -130,7 +130,7 @@ import {
   destroyCharacterModels,
   dissolveCharacterParts,
   freezeCharacterAnimation,
-  poseCharacterAt,
+  playCharacterAndHold,
   isCharacterModelReady,
   mountCharacterModel,
   playCharacterAnimation,
@@ -1607,7 +1607,10 @@ export class BattleView {
     const boss = this.state.enemies[0]
     if (!boss) return null
     if (boss.def.id === 'mantis') return TOKEN_BOSS_HINTS.mantisStart
-    if (boss.def.id === 'queenBee') return TOKEN_BOSS_HINTS.queenBeeStart
+    if (boss.def.id === 'queenBee') {
+      // 일벌은 두 번째 페이지에서야 나온다. 이미 호위가 서 있으면(재시작 등) 기존 안내를 쓴다.
+      return summonCount(boss) > 0 ? TOKEN_BOSS_HINTS.queenBeeStart : bossTokenLine('queenBeeOpening')
+    }
     if (boss.def.id === 'elderSpider') {
       const weak = activeEnemyPart(boss)?.def.weakness?.label
       return weak
@@ -1904,15 +1907,6 @@ export class BattleView {
     const icons: string[] = []
     const add = (kind: string, glyph: string, tooltip: string) => {
       icons.push(`<span class="enemy-intel-icon ${kind}" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${glyph}</span>`)
-    }
-
-    // 보스는 최대 체력을 태그로 먼저 세운다(11/20 피드백). 체력바 오른쪽의 현재/최대 숫자는 줄어드는 값이고,
-    // 이 태그는 "이 보스가 얼마나 단단한가"만 말한다.
-    if (e.def.boss) {
-      const tooltip = e.healthBars > 1
-        ? tip(`최대 체력 ${e.maxHp}`, `체력바 ${e.healthBars}칸\n한 칸 ${e.hpPerBar}`)
-        : `최대 체력 ${e.maxHp}`
-      icons.push(`<span class="boss-maxhp-tag" role="img" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}" data-tip-place="above">${icon('heart')}<b>${e.maxHp}</b></span>`)
     }
 
     // 공략 쪽지가 줄의 초입에 선다. 뒤따르는 능력 뱃지와 섞이지 않도록 모양·색·라벨이 모두 다르다.
@@ -4333,7 +4327,15 @@ export class BattleView {
     this.token?.noteSelectionStart()
     const turnSummons = summonAtTurnStart(this.state)
     this.renderActors()
-    if (turnSummons.length > 0) await this.playTurnSummons(turnSummons)
+    if (turnSummons.length > 0) {
+      await this.playTurnSummons(turnSummons)
+      // 여왕벌이 두 번째 페이지에서 일벌을 부른 순간 — 이제부터 본체가 막힌다는 것을 바로 알린다.
+      if (turnSummons.some((summon) => this.state.enemies[summon.idx]?.def.id === 'queenBee')) {
+        this.showBossTokenHint(TOKEN_BOSS_HINTS.queenBeeStart)
+        this.showBossSentenceEvent(bossText('workersSummoned'), 3200)
+        this.renderBossSentence()
+      }
+    }
     // 세 문장을 쓸 때마다 등급이 한 번 식는다. 방어·회복이 공격보다 한 문장 길다는
     // 이유만으로 매번 보상을 잃지 않되, 아주 오래 끄는 전투에는 여전히 비용이 남는다.
     const prevGrade = this.grade
@@ -5541,11 +5543,16 @@ export class BattleView {
   }
 
   private async playTurnSummons(summons: TurnSummon[]) {
+    const workerFor = (summon: TurnSummon) => this.root.querySelector<HTMLElement>(
+      `.actor.foe[data-i="${summon.idx}"] .queen-worker[data-side="${summon.side}"][data-slot="${summon.slot}"]`,
+    )
+    // renderActors가 이미 네 마리를 모두 세워 둔다. 차례가 오기 전까지 가려 두지 않으면
+    // 넷이 한꺼번에 번쩍 섰다가 하나씩 다시 튀어나와 깜빡였다.
+    summons.forEach((summon) => workerFor(summon)?.classList.add('summon-pending'))
     for (const summon of summons) {
-      const worker = this.root.querySelector<HTMLElement>(
-        `.actor.foe[data-i="${summon.idx}"] .queen-worker[data-side="${summon.side}"][data-slot="${summon.slot}"]`,
-      )
+      const worker = workerFor(summon)
       if (!worker) continue
+      worker.classList.remove('summon-pending')
       playCharacterAnimation(worker, 'appear')
       worker.classList.remove('summoning')
       void worker.offsetWidth
@@ -5578,8 +5585,10 @@ export class BattleView {
       playCharacterAnimation(worker, 'defeat')
       worker.animate(
         [
-          { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
-          { transform: `translate(${index % 2 ? 105 : -105}px, -110px) rotate(${index % 2 ? 24 : -24}deg) scale(.55)`, opacity: 0 },
+          // transform을 통째로 덮으면 오른쪽 일벌의 좌우 반전(scaleX(-1))이 풀려 날아가는
+          // 순간 몸이 홱 뒤집혔다. 개별 속성으로 얹어 원래 방향을 유지한다.
+          { translate: '0 0', rotate: '0deg', scale: '1', opacity: 1 },
+          { translate: `${index % 2 ? 105 : -105}px -110px`, rotate: `${index % 2 ? 24 : -24}deg`, scale: '.55', opacity: 0 },
         ],
         { duration: 240, delay: index * 34, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' },
       )
@@ -5643,9 +5652,9 @@ export class BattleView {
       const dy = target.top + target.height * .45 - (from.top + from.height / 2)
       worker.animate(
         [
-          { transform: 'translate(0,0) scale(1)', opacity: 1 },
-          { transform: `translate(${dx * .22}px, ${dy * .08 - 34}px) scale(1.12)`, opacity: 1, offset: .3 },
-          { transform: `translate(${dx}px, ${dy}px) scale(.5)`, opacity: 0 },
+          { translate: '0 0', scale: '1', opacity: 1 },
+          { translate: `${dx * .22}px ${dy * .08 - 34}px`, scale: '1.12', opacity: 1, offset: .3 },
+          { translate: `${dx}px ${dy}px`, scale: '.5', opacity: 0 },
         ],
         {
           duration: 390 + index * 35,
@@ -5670,20 +5679,32 @@ export class BattleView {
       // 방어가 피해를 전부 흡수하거나 카운터가 발동해도 적은 실제 공격 행동을
       // 수행했다. 결과 수치와 무관하게 먼저 attack 클립과 돌진을 보여 준다.
       const mantisTelegraph = enemy?.def.id === 'mantis' && !!st.telegraphText
-      const animation: BattleAnimation = mantisTelegraph
+      const mantisPosed = enemy?.def.id === 'mantis'
+        && !!foe?.querySelector<HTMLElement>(':scope > .model-shell')?.dataset.modelPose
+      const animation: BattleAnimation = mantisTelegraph || mantisPosed
         ? 'attack3'
         : st.animationStage === 1 ? 'attack' : `attack${st.animationStage}`
-      // 사마귀 예고도 이제 견제 공격이다. 공격 클립과 돌진을 먼저 끝까지 보여 준 뒤
-      // 타격이 닿은 다음 예고 프레임에 세워, 로그만 찍히고 자세로 순간이동하는 느낌을
-      // 없앤다. 예고 자세 고정은 이 행동의 **결과**이지 행동 전체가 아니다.
-      playCharacterAnimation(foe ?? null, animation)
+      // 사마귀 예고도 견제 공격이다. 클립을 처음부터 틀어 견제 타격을 보여 주고, 흐름이
+      // 예고 마디에 닿는 순간 그대로 멈춰 선다(되감기·순간이동 없음, 11/20 피드백).
+      // 사마귀는 지난 턴 예고 자세를 붙든 채 서 있다. 그 자세에서 이어 휘두르므로
+      // 내려베기가 닿는 순간이 클립 뒤쪽(0.8 부근)이다 — 타격 시점을 그 마디에 맞춘다.
+      const mantisBeats = enemy?.def.id === 'mantis' ? CHARACTER_VISUALS.mantis.animations?.attackBeats : undefined
+      const mantisHeldSwing = mantisPosed && !mantisTelegraph
+      if (mantisTelegraph) playCharacterAndHold(foe ?? null, animation, mantisBeats?.telegraph ?? mantisBeats?.raise ?? 0.2)
+      else playCharacterAnimation(foe ?? null, animation)
+      const mantisMs = CHARACTER_VISUALS.mantis.animations?.durationsMs?.attack3 ?? 440
+      const impactDelay = mantisTelegraph
+        ? Math.round((mantisBeats?.impact ?? 0.26) * mantisMs)
+        : mantisHeldSwing ? Math.round(mantisMs * .46) : 170
       GameAudio.playEnemyAttack(st.animationStage)
       if (st.telegraphText) {
         foe?.querySelector<HTMLElement>(':scope > .model-shell')?.animate(
+          // 보스 셸의 transform에는 표시 배율(scale)이 걸려 있다. transform을 덮으면 그 배율이
+          // 0.52초 동안 1로 풀려 보스 크기가 튀었다 — 개별 속성으로 얹는다.
           [
-            { transform: 'rotate(0deg) scale(1)' },
-            { transform: 'rotate(-2deg) scale(1.035)', offset: .55 },
-            { transform: 'rotate(0deg) scale(1)' },
+            { rotate: '0deg', scale: '1' },
+            { rotate: '-2deg', scale: '1.035', offset: .55 },
+            { rotate: '0deg', scale: '1' },
           ],
           { duration: 520, easing: 'cubic-bezier(.25,.8,.3,1)' },
         )
@@ -5699,7 +5720,7 @@ export class BattleView {
       const swarmFlight = st.summonsReleased > 0
         ? this.playSwarmRelease(st.idx)
         : Promise.resolve()
-      await this.sleep(170)
+      await this.sleep(impactDelay)
       // 적의 타격이 닿는 순간 실제 흡수 뒤 남은 방어막을 체력바에 반영한다.
       this.updatePlayer(this.q<HTMLElement>('.actor.you'))
       // 실제로 체력을 깎은 벌레를 기억한다 — 여기서 쓰러지면 이 벌레가 결과 화면의
@@ -5767,10 +5788,7 @@ export class BattleView {
         this.log(`모인 일벌 ${st.summonsReleased}마리가 돌격하고 여왕의 양옆이 비었다.`)
       }
       await this.sleep(240)
-      if (mantisTelegraph) {
-        const beats = CHARACTER_VISUALS.mantis.animations?.attackBeats
-        poseCharacterAt(foe ?? null, animation, beats?.telegraph ?? beats?.raise ?? 0.2)
-      }
+      // 예고 자세는 playCharacterAndHold가 휘두르던 흐름 그대로 그 마디에서 멈춰 붙든다.
       foe?.classList.remove('lunge')
     }
     this.renderActors()

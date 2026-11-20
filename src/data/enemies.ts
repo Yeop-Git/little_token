@@ -48,20 +48,22 @@ export const ENEMIES: Record<string, EnemyDef> = {
       // 10층 덱의 평범한 문장은 한두 마리를 순서대로 정리하고, 덱 상한(약 160)은
       // 네 마리 총 120 체력을 한 번에 관통할 수 있는 기준이다.
       hp: 30,
-      // 전투 시작에만 네 마리를 한꺼번에 세운다. 다 쓰러뜨린 일벌이 다시 살아나면
-      // 쌓아 온 진행이 "새로고침"된 것처럼 느껴져, 재소환 없이 한 묶음으로 끝낸다.
+      // 피드백(11/20): 첫 페이지는 여왕벌 혼자 싸우고, 두 번째 페이지에 들어선 다음 턴에
+      // 네 마리를 한꺼번에 단 한 번 세운다. 다 쓰러뜨린 일벌이 다시 살아나면 쌓아 온 진행이
+      // "새로고침"된 것처럼 느껴져, 재소환 없이 한 묶음으로 끝낸다.
       perTurn: 4,
       max: 4,
       maxPerSide: 2,
       refillOnlyWhenEmpty: true,
       maxWaves: 1,
+      summonFromBar: 2,
       pierceWhileEscorted: true,
       backlashMaxHpRatePerUnit: 0.05,
       focusedBacklash: { emotion: 'anger', multiplier: 2 },
       groggyEvery: 4,
       groggyDamageMult: 2.5,
     },
-    note: `시작할 때 체력 30 일벌 넷을 호위로 세움\n${QUEEN_ESCORT_IMMUNITY_LABEL}\n일벌이 남아 있으면 여왕벌 공격이 방어 관통\n문장 피해는 일벌부터 차례로, 남은 만큼 본체로\n일벌 1마리 퇴치마다 여왕벌 최대 체력 5% 반동 피해(분노 단일 비관통 공격은 2배)\n넷을 모두 퇴치하면 그로기: 그 턴 피해 ×2.5, 다음 턴 행동 없음\n일벌은 다시 나오지 않음`,
+    note: `두 번째 페이지에 들어서면 체력 30 일벌 넷을 한 번만 호위로 세움\n${QUEEN_ESCORT_IMMUNITY_LABEL}\n일벌이 남아 있으면 여왕벌 공격이 방어 관통\n문장 피해는 일벌부터 차례로, 남은 만큼 본체로\n일벌 1마리 퇴치마다 여왕벌 최대 체력 5% 반동 피해(분노 단일 비관통 공격은 2배)\n넷을 모두 퇴치하면 그로기: 그 턴 피해 ×2.5, 다음 턴 행동 없음\n일벌은 다시 나오지 않음`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
