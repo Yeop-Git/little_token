@@ -2375,6 +2375,7 @@ export class BattleView {
     // 랭크 카드를 고르면 스탯 칩에 「이번 턴 +1」 딱지가 바로 붙는다.
     this.renderStats()
     this.renderMultNow(anyPicked)
+    this.fitChain()
   }
 
   private comboChainNote(c: Combo): string {
@@ -2392,6 +2393,32 @@ export class BattleView {
       void slot.offsetWidth
       slot.classList.add('revealed')
     }
+    // 이름이 「?」보다 길어졌으니 한 줄 폭을 다시 맞춘다.
+    this.fitChain()
+  }
+
+  /**
+   * 문장 칸은 한 줄로만 선다. 맥락 칸(「?」·새로운 맥락?)이 여럿 붙어 길어지면 예전엔
+   * 두 줄로 접히며 아래로 자라 「지금 배율」 칸·공명 띠와 겹쳤다. 줄을 접는 대신 칸 전체를
+   * 축소해 왼쪽 상태판(영감·보상·스탯) 오른쪽 끝과 대칭이 되는 폭 안에 담는다.
+   */
+  private fitChain() {
+    const rail = this.root.querySelector<HTMLElement>('#chain')
+    const stage = this.root.querySelector<HTMLElement>('#pbox')
+    if (!rail || !stage) return
+    rail.style.setProperty('--chain-fit', '1')
+    const natural = rail.offsetWidth
+    if (natural <= 0) return
+    const stageRect = stage.getBoundingClientRect()
+    const scale = stageRect.width / Math.max(1, stage.offsetWidth) || 1
+    const center = stage.clientWidth / 2
+    const leftHud = this.root.querySelector<HTMLElement>('.hud-left-status')
+    // 보스전의 문장 칸은 보스 HUD 아래 낮은 자리라 왼쪽 상태판과 높이가 겹치지 않는다.
+    const leftEdge = !this.isBoss && leftHud && leftHud.offsetParent !== null
+      ? (leftHud.getBoundingClientRect().right - stageRect.left) / scale + 24
+      : 0
+    const limit = Math.min(1120, Math.max(420, 2 * (center - Math.max(0, leftEdge))))
+    rail.style.setProperty('--chain-fit', Math.min(1, limit / natural).toFixed(3))
   }
 
   private renderInk(): void {
