@@ -353,7 +353,7 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
       </div>
       <div class="reward-kindline rarity-${p.rarity}${itemTraitHtml(p) ? ' has-trait' : ''}">
         <span class="reward-rarity-label rarity-${p.rarity}"><i aria-hidden="true">◆</i>${RARITY_LABEL[p.rarity]}</span>
-        <span class="reward-type-label">${typeLabel(p)}</span>
+        ${itemTraitHtml(p) ? '' : `<span class="reward-type-label">${typeLabel(p)}</span>`}
         ${shop ? `<span class="reward-kind-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>` : ''}
         ${itemTraitHtml(p)}
       </div>
