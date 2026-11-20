@@ -9723,8 +9723,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 }
 .intro-word-chip[data-hint]::before { font-size: 70px; }
 
-/* 차례가 된 칩 둘레의 금빛 고리 — 어느 카드를 눌러야 하는지 화살표와 함께 못 박는다. */
-.intro-word-chip.is-next::after {
+/* 차례가 된 칩 둘레의 금빛 고리 — 어느 카드를 눌러야 하는지 화살표와 함께 못 박는다.
+   호버 때 카드면(.card-lift)이 떠오르므로 고리도 그 상자에 붙여 같이 움직이게 한다. */
+.intro-word-chip.is-next .card-lift::after {
   content: '';
   position: absolute;
   inset: -7px;
@@ -9746,7 +9747,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-word-chip.is-next::after { animation: none; opacity: 1; }
+  .intro-word-chip.is-next .card-lift::after { animation: none; opacity: 1; }
   .intro-word-chip.is-next::before,
   .intro-word-chip[data-hint]::before {
     animation: none;
