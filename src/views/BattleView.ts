@@ -448,6 +448,8 @@ export class BattleView {
   // 배율 릴 세대 — 새 선택이 들어오면 이전 릴은 조용히 물러난다.
   private multReelToken = 0
   private parkedTally: HTMLElement | null = null
+  /** 문장 칸의 원래 폭이 바뀔 때마다(단어 추가·맥락 이름 공개·폰트 로드·창 크기) 한 줄 축척을 다시 맞춘다. */
+  private chainFitObserver: ResizeObserver | null = null
   /** 정산이 끝난 문장의 실제 값. 다음 문장에서 첫 단어를 고를 때까지 손패 위에 남긴다. */
   private lastResolvedTally: Tally | null = null
   private dockRestore: (() => void) | null = null
@@ -612,6 +614,8 @@ export class BattleView {
 
   destroy() {
     this.destroyed = true
+    this.chainFitObserver?.disconnect()
+    this.chainFitObserver = null
     this.timers.forEach((t) => clearTimeout(t))
     clearTimeout(this.autoCompleteTimer)
     clearTimeout(this.dockTimer)
@@ -912,6 +916,10 @@ export class BattleView {
     })
     document.addEventListener('pointerdown', this.onHelpOutside)
     window.addEventListener('keydown', this.onHelpKeydown)
+    if (typeof ResizeObserver !== 'undefined') {
+      this.chainFitObserver = new ResizeObserver(() => this.fitChain())
+      this.chainFitObserver.observe(this.q('#chain'))
+    }
 
     this.cardHand = new CardHand({
       handRoot: this.q('#card-hand'),
@@ -2406,7 +2414,8 @@ export class BattleView {
     const rail = this.root.querySelector<HTMLElement>('#chain')
     const stage = this.root.querySelector<HTMLElement>('#pbox')
     if (!rail || !stage) return
-    rail.style.setProperty('--chain-fit', '1')
+    // offsetWidth는 transform(scale)과 무관한 원래 폭이라 축척을 되돌리지 않고 잰다 —
+    // 되돌렸다 다시 줄이면 CSS 전환이 매번 1에서 출발해 칸이 출렁인다.
     const natural = rail.offsetWidth
     if (natural <= 0) return
     const stageRect = stage.getBoundingClientRect()
@@ -2414,8 +2423,10 @@ export class BattleView {
     const center = stage.clientWidth / 2
     const leftHud = this.root.querySelector<HTMLElement>('.hud-left-status')
     // 보스전의 문장 칸은 보스 HUD 아래 낮은 자리라 왼쪽 상태판과 높이가 겹치지 않는다.
+    // 스탯 알약은 상태판 상자(392px)보다 넓어 밖으로 삐져나온다 — 자식들의 오른쪽 끝을 잰다.
+    const hudRight = leftHud ? Math.max(0, ...[...leftHud.children].map((child) => child.getBoundingClientRect().right)) : 0
     const leftEdge = !this.isBoss && leftHud && leftHud.offsetParent !== null
-      ? (leftHud.getBoundingClientRect().right - stageRect.left) / scale + 24
+      ? (hudRight - stageRect.left) / scale + 24
       : 0
     const limit = Math.min(1120, Math.max(420, 2 * (center - Math.max(0, leftEdge))))
     rail.style.setProperty('--chain-fit', Math.min(1, limit / natural).toFixed(3))
