@@ -7158,6 +7158,10 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 }
 
 .reward-stage {
+  /* 장면의 어둑한 ::before 막보다 위에 선다. 위치 없는 상점 옆줄 버튼(내 단어장·새로고침)이
+     막 아래에 깔려 눌리지 않던 문제(11/20 피드백). */
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7680,12 +7684,30 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .reward-shop-card .rp-name { font-size: 22px; }
 .reward-shop-card .reward-pick.has-medium-name .rp-name,
 .reward-shop-card .reward-pick.has-long-name .rp-name { font-size: 18px; }
-.reward-shop-card .rp-effect { min-height: 18px; margin-top: 2px; font-size: 10px; line-height: 1.15; }
-.reward-shop-card .rp-effect .card-action-inline { padding: 2px 5px; font-size: 10px; }
+/* 상점 카드의 능력 문구는 카드 이름 다음으로 크게 읽혀야 한다(11/20 피드백). */
+.reward-shop-card .rp-effect {
+  gap: 4px 8px;
+  min-height: 28px;
+  margin-top: 4px;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, .85);
+}
+.reward-shop-card .rp-effect .card-action-inline { gap: 5px; padding: 3px 9px; font-size: 18px; }
+.reward-shop-card .rp-effect .card-action-inline b { font-size: 18px; }
 .reward-shop-card .rp-effect .card-action-inline svg,
-.reward-shop-card .rp-effect .card-action-inline .baked-stat-icon { width: 14px; height: 14px; }
+.reward-shop-card .rp-effect .card-action-inline .baked-stat-icon { width: 22px; height: 22px; }
+.reward-shop-card .rp-effect .card-keyword { text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .reward-shop-card .rp-base-stats,
-.reward-shop-card .rp-item-passive { margin-top: 3px; transform: scale(.82); transform-origin: center bottom; }
+.reward-shop-card .rp-item-passive { margin-top: 4px; }
+.reward-shop-card .rp-base-stats { gap: 6px; }
+.reward-shop-card .rp-base-stat { padding: 6px 11px; font-size: 18px; }
+.reward-shop-card .rp-base-label { padding: 6px 9px; font-size: 13px; }
+.reward-shop-card .rp-item-passive { padding: 7px 11px; }
+.reward-shop-card .rp-item-passive small { font-size: 13px; }
+.reward-shop-card .rp-item-passive b { font-size: 17px; }
+.reward-shop-card .rp-item-passive span { font-size: 15px; line-height: 1.3; }
 .reward-shop-card .rp-actions { margin-top: 4px; }
 .reward-shop-card .rp-cost { padding: 4px 8px; font-size: 11px; }
 .reward-shop-card .reward-kindline {
@@ -7737,6 +7759,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 .reward-side .reward-refresh {
   width: 100%;
   margin: 0;
+  font-size: 16px;
 }
 .reward-side .reward-skip {
   position: static;
@@ -8127,45 +8150,125 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
 }
 .reward-pick.touch-previewing .reward-touch-confirm-hint { display: block; }
 .reward-shop-card .reward-touch-confirm-hint { top: 43px; padding: 4px 7px; font-size: 9px; }
-.rd-deck-head {
+/* 내 단어장 펼쳐 보기 — 보상·상점 위에 덮는 한 장. 카드는 손패와 같은 앞면을 쓴다. */
+.reward-deck-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 40px 60px;
+  box-sizing: border-box;
+  background: rgba(6, 4, 10, .72);
+  animation: reward-deck-sheet-in .2s ease both;
+}
+@keyframes reward-deck-sheet-in { from { opacity: 0; } to { opacity: 1; } }
+.rds-panel {
   display: flex;
+  flex-direction: column;
+  width: min(1640px, 100%);
+  max-height: 100%;
+  box-sizing: border-box;
+  padding: 22px 30px 26px;
+  border-radius: 24px;
+  background: rgba(20, 14, 24, .94);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 0 0 1px rgba(255, 231, 180, .18);
+  animation: page-turn .36s cubic-bezier(.3, .9, .3, 1);
+}
+.rds-head {
+  display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  color: #fff3d5;
-  font-size: 21px;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+.rds-head h2 { margin: 0; color: #fff3d5; font-size: 30px; font-weight: 1000; }
+.rds-head h2 b,
+.rds-slot h3 b,
+.rds-combos h3 b { margin-left: 6px; color: #9fe9f4; }
+.rds-close {
+  min-width: 110px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff6e3;
+  background: rgba(54, 91, 105, .82);
+  box-shadow: inset 0 0 0 1px rgba(159, 233, 244, .4);
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.rds-close:hover,
+.rds-close:focus-visible { background: rgba(70, 118, 136, .92); outline: none; }
+.rds-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px 4px 0;
+}
+.rds-slot { padding: 10px 0 14px; border-bottom: 1px dashed rgba(255, 236, 196, .16); }
+.rds-slot h3,
+.rds-combos h3 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+  color: rgba(255, 241, 213, .86);
+  font-size: 18px;
   font-weight: 900;
 }
-.rd-deck-head b,
-.rd-deck-slots h3 b,
-.rd-deck-combos h3 b { color: #9fe9f4; }
-.rd-deck-slots { display: grid; gap: 13px; }
-.rd-deck-slots section { padding-bottom: 12px; border-bottom: 1px dashed rgba(255, 236, 196, .16); }
-.rd-deck-slots h3,
-.rd-deck-combos h3 { margin: 0 0 7px; color: rgba(255, 241, 213, .72); font-size: 12px; font-weight: 900; }
-.rd-deck-slots section > div { display: flex; flex-wrap: wrap; gap: 5px; }
-.rd-deck-slots section span {
-  padding: 5px 7px;
-  border-radius: 4px;
-  color: #fff;
-  background: rgba(255, 255, 255, .07);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
-  font-size: 12px;
-  font-weight: 800;
+.rds-slot h3 i {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border-radius: 50%;
+  color: #2a1710;
+  background: #ffd48d;
+  font-size: 15px;
+  font-style: normal;
 }
-.rd-deck-slots em { color: #ffd48d; font-size: 10px; font-style: normal; }
-.rd-deck-combos { margin-top: 17px; }
-.rd-deck-combos > span {
-  display: flex;
-  justify-content: space-between;
+.rds-cards { display: flex; flex-wrap: wrap; gap: 14px 12px; }
+.rds-card { position: relative; width: 182px; height: 251px; flex: none; }
+.rds-card .word-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(1.15);
+  transform-origin: 0 0;
+  will-change: auto;
+}
+.rds-level {
+  position: absolute;
+  right: -4px;
+  bottom: -6px;
+  z-index: 12;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #2a1710;
+  background: #ffd48d;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .45);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 1000;
+}
+.rds-combos { margin-top: 16px; }
+.rds-combos > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.rds-combos span {
+  display: inline-flex;
   gap: 10px;
-  padding: 7px 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
   color: #fff2d6;
-  border-bottom: 1px solid rgba(255, 255, 255, .07);
-  font-size: 12px;
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+  font-size: 16px;
 }
-.rd-deck-combos em { color: #ffd27a; font-style: normal; font-weight: 900; }
-.rd-deck-combos p { color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+.rds-combos em { color: #ffd27a; font-style: normal; font-weight: 900; }
+.rds-combos p { margin: 0; color: var(--ink-faint); font-size: 15px; line-height: 1.5; }
 .rf-deltas {
   margin-top: 14px; padding: 12px 14px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);

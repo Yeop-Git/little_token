@@ -1067,6 +1067,13 @@ if (start === 'reward') {
   if (!run.reward) prepareReward(grade, Math.max(1, Math.round(grade)))
   openPreparedReward(grade)
 }
+else if ((start as string) === 'shop') {
+  // 검수용: 보스 클리어 영감 상점으로 바로 들어간다.
+  const grade = startGrade(run.player.stats.luck)
+  if (!run.reward) prepareReward(grade, Math.max(1, Math.round(grade)))
+  run.inspiration = Math.max(run.inspiration, 30)
+  void goInspirationShop(grade)
+}
 else if (start === 'item') goItem(ITEMS.candle)
 else if (start === 'ending') goEnding()
 else if (start === 'defeat' && params.get('demo') === '1') {

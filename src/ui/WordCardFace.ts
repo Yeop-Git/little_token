@@ -106,7 +106,7 @@ const escapeCardText = (value: string) => value
 export function wordKeywordChipsHtml(word: Word): string {
   const keywords = wordKeywords(word)
   return keywords.length
-    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}">${keyword.label}</span>`).join('')}</span>`
+    ? `<span class="card-keywords">${keywords.map((keyword) => `<span class="card-keyword keyword-${keyword.id}" aria-label="${escapeCardText(`${keyword.label}. ${keyword.detail}`)}" data-tooltip="${escapeCardText(keyword.detail)}" data-tip-title="${escapeCardText(keyword.label)}" data-tip-place="above">${keyword.label}</span>`).join('')}</span>`
     : ''
 }
 

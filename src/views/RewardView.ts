@@ -13,7 +13,7 @@ import {
 } from '@data/rewards'
 import { BACKGROUNDS, INK_UI, ITEM_ART, REWARD_ART, SKILL_ART, TOKEN_FACES } from '@/assets'
 import { itemArt } from '@/ui/Icons'
-import { wordActionInline, wordCardDisplayNote, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
+import { wordActionInline, wordCardDisplayNote, wordCardHtml, wordKeywordChipsHtml, wordKeywordDetailsHtml } from '@/ui/WordCardFace'
 import { PASSIVES } from '@core/passives'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
@@ -50,6 +50,12 @@ interface Opts {
   onRefresh: () => boolean
   onSkip: () => void
 }
+
+/**
+ * 화면이 막 열린 직후의 오클릭 보호. 전투·보스 처치 직후 연타하던 클릭이 그대로
+ * 카드 구매로 이어지지 않도록, 넘김 연출(0.7s)이 끝날 때까지 구매·새로고침·나가기를 받지 않는다.
+ */
+const ENTRANCE_INPUT_GUARD_MS = 850
 
 // 문장 순서 번호 — 전투의 "1 주어 · 2 수식 · 3 동사" 스텝과 같은 순서.
 const SLOT_NO: Record<string, string> = { subj: '1', adv: '2', verb: '3' }
@@ -93,23 +99,39 @@ function stageProgressLabel(day: number): string {
   return `${cycle} · ${text('hudStageLabel', '스테이지')} ${stage.floor}/${DISPLAY_FLOORS}`
 }
 
-function deckSummaryHtml(deck: Record<string, Word[]>): string {
+/**
+ * 내 단어장 펼쳐 보기 — 보상·상점 위에 덮는 한 장. 이름만 나열하던 도크 요약 대신
+ * 전투 손패와 같은 카드 앞면(WordCardFace)으로 슬롯별 보유 카드를 그대로 보여 준다.
+ */
+function deckSheetHtml(deck: Record<string, Word[]>): string {
   const slotEntries = Object.entries(deck).filter(([, words]) => words.length > 0)
   const words = slotEntries.flatMap(([, list]) => list)
   const discovered = discoveredComboIds()
   const combos = availableCombos(deck, makeEarlyTables(deck).combos).filter((combo) => discovered.has(combo.id))
+  const title = text('rewardDeckTitle', '현재 단어장')
   return `
-    <div class="rd-deck-head"><span>${text('rewardDeckTitle', '현재 단어장')}</span><b>${words.length}</b></div>
-    <div class="rd-deck-slots">${slotEntries.map(([slot, list]) => `
-      <section><h3>${slotLabel(slot)} <b>${list.length}</b></h3>
-        <div>${list.map((word) => `<span>${word.text}${(word.level ?? 1) > 1 ? ` <em>Lv.${word.level}</em>` : ''}</span>`).join('')}</div>
-      </section>`).join('')}
-    </div>
-    <div class="rd-deck-combos">
-      <h3>${text('rewardDeckCombos', '완성 가능한 관용구')} <b>${combos.length}</b></h3>
-      ${combos.length
-        ? combos.map((combo) => `<span><b>「${combo.name}」</b><em>×${combo.mult.toFixed(2)}</em></span>`).join('')
-        : `<p>${text('rewardDeckNone', '아직 완성 가능한 관용구가 없다.')}</p>`}
+    <div class="reward-deck-sheet" role="dialog" aria-modal="true" aria-label="${title}">
+      <div class="rds-panel glass">
+        <header class="rds-head">
+          <h2>${title} <b>${words.length}</b></h2>
+          <button class="rds-close" type="button">${text('rewardDeckClose', '닫기')}</button>
+        </header>
+        <div class="rds-body">
+          ${slotEntries.map(([slot, list]) => `
+            <section class="rds-slot">
+              <h3>${SLOT_NO[slot] ? `<i>${SLOT_NO[slot]}</i>` : ''}${slotLabel(slot)} <b>${list.length}</b></h3>
+              <div class="rds-cards">${list.map((word) => `
+                <div class="rds-card">${wordCardHtml(word)}${(word.level ?? 1) > 1 ? `<em class="rds-level">Lv.${word.level}</em>` : ''}</div>`).join('')}
+              </div>
+            </section>`).join('')}
+          <section class="rds-combos">
+            <h3>${text('rewardDeckCombos', '완성 가능한 관용구')} <b>${combos.length}</b></h3>
+            <div>${combos.length
+              ? combos.map((combo) => `<span><b>「${combo.name}」</b><em>×${combo.mult.toFixed(2)}</em></span>`).join('')
+              : `<p>${text('rewardDeckNone', '아직 완성 가능한 관용구가 없다.')}</p>`}</div>
+          </section>
+        </div>
+      </div>
     </div>`
 }
 
@@ -330,6 +352,9 @@ export class RewardView {
   private tooltips: TooltipLayer | null = null
   private lastPointerType = ''
   private touchPreviewIndex: number | null = null
+  private inputReadyAt = 0
+  private closeDeck: (() => void) | null = null
+  private guardTimer = 0
 
   constructor(root: HTMLElement, opts: Opts) {
     this.root = root
@@ -414,6 +439,14 @@ export class RewardView {
       })
     })
     this.tooltips = new TooltipLayer(this.root.querySelector<HTMLElement>('.reward-scene')!)
+    if (opts.playEntrance !== false) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const guardMs = reduceMotion ? 300 : ENTRANCE_INPUT_GUARD_MS
+      this.inputReadyAt = performance.now() + guardMs
+      const scene = this.root.querySelector<HTMLElement>('.reward-scene')
+      scene?.classList.add('is-input-guarded')
+      this.guardTimer = window.setTimeout(() => scene?.classList.remove('is-input-guarded'), guardMs)
+    }
     this.root.querySelector<HTMLButtonElement>('.reward-skip')?.addEventListener('click', (event) => {
       event.stopPropagation()
       this.skip()
@@ -429,12 +462,30 @@ export class RewardView {
   }
 
   private showDeck() {
-    const dock = this.root.querySelector<HTMLElement>('#rdetail')!
-    dock.className = 'info-dock glass reward-dock deck-overview'
-    dock.innerHTML = deckSummaryHtml(this.opts.deck ?? EARLY_WORDS)
-    this.root.querySelectorAll<HTMLElement>('.reward-pick').forEach((pick) => {
-      pick.classList.remove('detailing')
+    const scene = this.root.querySelector<HTMLElement>('.reward-scene')
+    if (!scene || scene.querySelector('.reward-deck-sheet')) return
+    scene.insertAdjacentHTML('beforeend', deckSheetHtml(this.opts.deck ?? EARLY_WORDS))
+    const sheet = scene.querySelector<HTMLElement>('.reward-deck-sheet')!
+    const close = () => {
+      sheet.remove()
+      document.removeEventListener('keydown', onKey, true)
+      this.closeDeck = null
+      this.root.querySelector<HTMLButtonElement>('.reward-deck')?.focus()
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }
+    document.addEventListener('keydown', onKey, true)
+    // 카드 밖 빈 곳이나 닫기를 누르면 접는다. 카드를 눌러도 아무것도 사지 않는다.
+    sheet.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement
+      if (target === sheet || target.closest('.rds-close')) close()
     })
+    this.closeDeck = close
+    sheet.querySelector<HTMLButtonElement>('.rds-close')?.focus()
   }
 
   private showDetail(opt: RewardOption, el: HTMLElement) {
@@ -448,8 +499,13 @@ export class RewardView {
     el.classList.add('detailing')
   }
 
+  /** 화면이 열린 직후의 보호 시간인가 — 이때 들어온 클릭은 구매로 치지 않는다. */
+  private guarded(): boolean {
+    return performance.now() < this.inputReadyAt
+  }
+
   private take(el: HTMLElement, opt: RewardOption) {
-    if (this.locked) return
+    if (this.locked || this.guarded()) return
     const price = rewardPrice(opt)
     if (this.opts.inspiration < price) {
       this.denyPurchase(el, `영감이 ${price - this.opts.inspiration} 부족해 이 보상을 기록하지 못했다.`)
@@ -549,7 +605,7 @@ export class RewardView {
   }
 
   private refresh() {
-    if (this.locked) return
+    if (this.locked || this.guarded()) return
     if (this.opts.inspiration < rewardRefreshCost(this.opts.refreshes) || !this.opts.onRefresh()) {
       this.showSystemMessage('영감이 부족해 다른 발상을 떠올릴 수 없다.')
     }
@@ -566,7 +622,7 @@ export class RewardView {
   }
 
   private skip() {
-    if (this.locked) return
+    if (this.locked || this.guarded()) return
     this.locked = true
     this.disableChoices()
     window.setTimeout(() => this.opts.onSkip(), 120)
@@ -585,6 +641,8 @@ export class RewardView {
   }
 
   destroy() {
+    window.clearTimeout(this.guardTimer)
+    this.closeDeck?.()
     this.tooltips?.destroy()
     this.tooltips = null
   }
