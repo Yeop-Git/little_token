@@ -6730,6 +6730,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
   flex-direction: column;
   gap: 5px;
 }
+.id-passive small { color: #ffd991; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
 .id-passive b { font-size: 18px; font-weight: 900; color: #ffe9a8; letter-spacing: 0.02em; }
 .id-passive span { font-size: 15px; line-height: 1.45; color: var(--ink); }
 .wd-flavor { margin-top: 10px; font-size: 14px; font-style: italic; color: var(--ink-faint); opacity: 0.8; }
@@ -7852,7 +7853,7 @@ html[data-effects='low'].foil-shader-ready .reward-pick.rarity-legendary .rp-foi
 .reward-shop-card .rp-base-stats,
 .reward-shop-card .rp-item-passive { margin-top: 4px; }
 .reward-shop-card .rp-base-stats { gap: 6px; }
-.reward-shop-card .rp-base-stat { padding: 6px 11px; font-size: 18px; }
+.reward-shop-card .rp-base-stat { padding: 7px 14px; font-size: 24px; }
 .reward-shop-card .rp-base-label { padding: 6px 9px; font-size: 13px; }
 .reward-shop-card .rp-item-passive { padding: 7px 11px; }
 .reward-shop-card .rp-item-passive small { font-size: 13px; }
@@ -8108,6 +8109,45 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   text-shadow: 0 0 8px color-mix(in srgb, var(--stat-color, var(--gold)) 70%, transparent);
 }
 .rp-base-label { --stat-color: var(--gold); font-size: 10px; letter-spacing: .7px; }
+/* 아이템의 기본 제공 수치는 카드에서 가장 먼저 읽혀야 한다(11/20 피드백). */
+.rp-base-stat { padding: 7px 13px; font-size: 22px; }
+
+/* 아이템 특성 — 카드 아래 종류 줄 빈자리에 배지 줄 아래로 큰 글씨로 적는다. 자르지 않고 줄을 늘린다. */
+.reward-kindline.has-trait {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  row-gap: 8px;
+}
+.reward-kindline.has-trait .reward-rarity-label,
+.reward-kindline.has-trait .reward-kind-cost { top: 9px; }
+.reward-kind-trait {
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 7px 10px 5px;
+  border-top: 1px dashed rgba(var(--reward-bar-rgb), .4);
+  color: #fff4de;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  white-space: normal;
+}
+.reward-kind-trait small {
+  margin-right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #2a1710;
+  background: #ffd991;
+  font-size: 12px;
+  font-weight: 1000;
+  vertical-align: 2px;
+}
+.reward-kind-trait b { margin-right: 6px; color: #ffe9a8; font-size: 18px; font-weight: 1000; }
+.reward-kind-trait span { color: #fff4de; }
 .rp-base-stat.stat-hp { --stat-color: #ff9faf; }
 .rp-base-stat.stat-atk { --stat-color: #e8ddca; }
 .rp-base-stat.stat-guard { --stat-color: #e8ddca; }
@@ -8305,8 +8345,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   position: absolute;
   inset: 0;
   z-index: 60;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 40px 60px;
   box-sizing: border-box;
   background: rgba(6, 4, 10, .72);
@@ -8317,7 +8358,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   display: flex;
   flex-direction: column;
   width: min(1640px, 100%);
+  /* 시트 높이를 넘으면 몸통만 스크롤한다(폰 가로처럼 무대가 낮아도 아래가 잘리지 않게). */
   max-height: 100%;
+  min-height: 0;
   box-sizing: border-box;
   padding: 22px 30px 26px;
   border-radius: 24px;
@@ -8390,6 +8433,12 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   transform: scale(1.15);
   transform-origin: 0 0;
   will-change: auto;
+}
+/* 손패의 호버 들어올림(-54px)이 펼침 시트에서는 윗줄 카드를 덮는다. 제자리에서 살짝만 빛낸다. */
+.rds-card .word-card:hover:not(.blocked):not(.drawing) { z-index: 2 !important; }
+.rds-card .word-card:hover:not(.blocked):not(.drawing) .card-lift {
+  transform: none;
+  filter: drop-shadow(0 0 10px var(--wglow)) drop-shadow(0 8px 10px rgba(0, 0, 0, .45));
 }
 .rds-level {
   position: absolute;

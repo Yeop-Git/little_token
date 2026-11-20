@@ -166,17 +166,26 @@ function typeLabel(opt: RewardOption): string {
     : label
 }
 
+/** 카드 앞면에는 기본 제공 수치만 크게 세운다. 특성은 아래 종류 줄(itemTraitHtml)에 따로 적는다. */
 function itemCardEffect(opt: RewardOption): string {
   if (opt.kind !== 'item' || !opt.item) return ''
   const item = opt.item
-  if (item.passive) {
-    const passive = PASSIVES[item.passive]
-    return `<div class="rp-item-passive"><small>${text('rewardItemPassive', '패시브')}</small><b>${passive.name}</b><span>${passive.desc}</span></div>`
-  }
   const stats = STAT_ORDER.filter((key) => item.base[key])
     .map((key) => `<span class="rp-base-stat stat-${key}">${STAT_LABEL[key]} +${item.base[key]}</span>`)
     .join('')
+  if (!stats) return ''
   return `<div class="rp-base-stats"><small class="rp-base-label">${text('rewardItemBaseStats', '고유 기본 스탯')}</small>${stats}</div>`
+}
+
+/**
+ * 아이템 특성(예전 이름 '패시브') — 카드 아래 종류 줄의 빈자리에 큰 글씨로 적는다.
+ * 일반·희귀 아이템에도 특성이 붙을 수 있으므로 길어지면 줄을 늘리지 자르지 않는다.
+ */
+function itemTraitHtml(opt: RewardOption): string {
+  if (opt.kind !== 'item' || !opt.item?.passive) return ''
+  const trait = PASSIVES[opt.item.passive]
+  if (!trait) return ''
+  return `<div class="reward-kind-trait"><small>${text('rewardItemPassive', '특성')}</small><b>${trait.name}</b><span>${trait.desc}</span></div>`
 }
 
 // 하단 메인 효과 한 줄.
@@ -246,7 +255,7 @@ function detailHtml(opt: RewardOption, deck?: Record<string, Word[]>): string {
     return `
       <div class="wd-name">${item.name}</div>
       <div class="wd-grade">✦ 아이템 · ${RARITY_LABEL[item.rarity]}</div>
-      ${passive ? `<div class="id-passive"><b>${passive.name}</b><span>${passive.desc}</span></div>` : ''}
+      ${passive ? `<div class="id-passive"><small>${text('rewardItemPassive', '특성')}</small><b>${passive.name}</b><span>${passive.desc}</span></div>` : ''}
       <div class="id-stats">${rows}</div>
       <div class="wd-flavor">${item.flavor}</div>
       <div class="id-art">${itemArt(item.art)}</div>`
@@ -338,10 +347,11 @@ function rewardPickHtml(p: RewardOption | null, i: number, shop = false): string
           </div>`}
         </div>
       </div>
-      <div class="reward-kindline rarity-${p.rarity}">
+      <div class="reward-kindline rarity-${p.rarity}${itemTraitHtml(p) ? ' has-trait' : ''}">
         <span class="reward-rarity-label rarity-${p.rarity}"><i aria-hidden="true">◆</i>${RARITY_LABEL[p.rarity]}</span>
         <span class="reward-type-label">${typeLabel(p)}</span>
         ${shop ? `<span class="reward-kind-cost" aria-label="${currency} ${price}"><i aria-hidden="true">◈</i>${currency} ${price}</span>` : ''}
+        ${itemTraitHtml(p)}
       </div>
     </div>`
 }
