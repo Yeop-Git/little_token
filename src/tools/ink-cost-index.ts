@@ -9,6 +9,9 @@
  * 3) 기준 카드(나는 0 · 살짝 1 · 때렸다 2)의 비용을 고정하고, 시작 문장 가치/잉크를 1잉크의 값으로
  *    삼아 기여도를 잉크로 환산한다. 시작 잉크 5에 세 칸을 모두 채워야 하므로 칸별 상한
  *    (주어 1 · 수식어 2 · 동사 3)으로 자른다.
+ * 4) 단(보스 공략 카드 제외), 상한보다 PREMIUM_MARGIN(3)잉크 이상 값어치가 큰 카드는 상한에 눌려 너무 싸지므로
+ *    한 단계 위(주어 2 · 수식어 3 · 동사 4)로 매긴다. 이런 카드를 쓰면 나머지 두 칸은
+ *    기본 카드로 채워야 시작 잉크 5에 들어간다(2026-11-20 재점검).
  *
  * 실행: npx tsx src/tools/ink-cost-index.ts [--md]
  */
@@ -23,6 +26,8 @@ import { ALL_REWARD_WORDS, BOSS_TACTIC_WORDS, EARLY_COMBOS, EARLY_WORDS, makeEar
 
 export const SLOT_CAP = { subj: 1, adv: 2, verb: 3 } as const
 export const SLOT_FLOOR = { subj: 0, adv: 0, verb: 1 } as const
+/** 상한을 이만큼 넘는 값어치의 카드는 상한 +1 단계로 매긴다. */
+export const PREMIUM_MARGIN = 3
 const REFERENCE = { subj: 'na', adv: 'saljjak', verb: 'ttaeryeot' } as const
 type Slot = keyof typeof REFERENCE
 
@@ -36,6 +41,7 @@ for (const word of [...Object.values(EARLY_WORDS).flat(), ...ALL_REWARD_WORDS, .
   seen.add(word.id)
   catalog.push(word)
 }
+const BOSS_TACTIC_IDS = new Set(BOSS_TACTIC_WORDS.map((word) => word.id))
 const bySlot = (slot: Slot) => catalog.filter((word) => word.slot === slot)
 
 function targetWeight(intent: Intent): number {
@@ -114,7 +120,9 @@ export function cardIndex(): CardIndex[] {
       const contribution = trimmedMean(deltas)
       const raw = wordInkCost(ref[slot]) + contribution / VALUE_PER_INK
       const refund = Math.max(0, word.effects?.inkDiscount ?? 0)
-      const proposed = Math.max(SLOT_FLOOR[slot], Math.min(SLOT_CAP[slot], Math.round(raw))) + (refund > 0 ? 0 : 0)
+      // 보스 공략 카드는 기믹의 정답으로 빌려주는 카드라 한 단계 위로 올리지 않는다.
+      const premium = raw >= SLOT_CAP[slot] + PREMIUM_MARGIN && !BOSS_TACTIC_IDS.has(word.id) ? 1 : 0
+      const proposed = Math.max(SLOT_FLOOR[slot], Math.min(SLOT_CAP[slot], Math.round(raw))) + premium + (refund > 0 ? 0 : 0)
       out.push({ word, slot, samples: deltas.length, contribution, raw, current: wordInkCost(word), proposed })
     }
   }

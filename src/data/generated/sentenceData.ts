@@ -204,7 +204,7 @@ export const REWARD_WORDS: Word[] = [
       "now"
     ],
     "emotion": "joy",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -227,7 +227,7 @@ export const REWARD_WORDS: Word[] = [
       "grit"
     ],
     "emotion": "anger",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -268,17 +268,17 @@ export const REWARD_WORDS: Word[] = [
       "hurt"
     ],
     "emotion": "sorrow",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
     "rarity": "epic",
     "art": "1007",
-    "note": "55% 확률로 배율 ×3.00",
-    "lore": "아픈 자리가 오히려 뜨겁다.",
+    "note": "30% 확률로 배율 ×4.70",
+    "lore": "아픈 자리가 오히려 뜨겁다. 좀처럼 터지지 않지만, 터지면 가장 크게 터진다.",
     "variance": {
-      "p": 0.55,
-      "hi": 3,
+      "p": 0.3,
+      "hi": 4.7,
       "lo": 1
     }
   },
@@ -291,7 +291,7 @@ export const REWARD_WORDS: Word[] = [
       "both"
     ],
     "emotion": "pleasure",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
@@ -351,7 +351,7 @@ export const REWARD_WORDS: Word[] = [
       "calm"
     ],
     "emotion": "joy",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0.6,
     "targetMode": "enemy",
@@ -408,7 +408,7 @@ export const REWARD_WORDS: Word[] = [
       "grit"
     ],
     "emotion": "anger",
-    "inkCost": 1,
+    "inkCost": 2,
     "person": "first",
     "bonus": 0.6,
     "targetMode": "enemy",
@@ -624,15 +624,18 @@ export const REWARD_WORDS: Word[] = [
     "text": "재빨리",
     "slot": "adv",
     "tags": [
-      "swift",
-      "preempt"
+      "swift"
     ],
     "emotion": "pleasure",
     "inkCost": 1,
     "rarity": "common",
     "art": "2007",
-    "note": "선공",
-    "lore": "상대의 공격이 닿기 전에 먼저 움직인다."
+    "note": "연타 2회·60%",
+    "lore": "재빠른 발놀림으로 같은 행동을 한 번 더 가볍게 이어 간다.",
+    "effects": {
+      "castCount": 2,
+      "castScale": 0.6
+    }
   },
   {
     "id": "motdohage",
@@ -746,17 +749,17 @@ export const REWARD_WORDS: Word[] = [
     "text": "포근하게",
     "slot": "adv",
     "tags": [
-      "warm"
+      "warm",
+      "preempt"
     ],
     "emotion": "joy",
     "inkCost": 2,
     "rarity": "rare",
     "art": "2012",
-    "note": "매직실드 1 · 방어 +1랭크",
-    "lore": "포근한 온기로 다음 공격을 막고 방어 태세를 단단하게 만든다.",
+    "note": "선공 · 매직실드 1",
+    "lore": "포근한 이불을 먼저 끌어올려, 상대가 덤비기 전에 다음 공격을 막을 온기를 두른다.",
     "effects": {
-      "magicShield": 1,
-      "guardRank": 1
+      "magicShield": 1
     }
   },
   {
@@ -820,10 +823,10 @@ export const REWARD_WORDS: Word[] = [
     "inkCost": 2,
     "rarity": "common",
     "art": "2016",
-    "note": "카운터",
-    "lore": "이 턴에 받은 충격을 행동 종류에 따라 되돌린다.",
+    "note": "매직실드 1",
+    "lore": "홀로 앉아 마음에 얇은 막을 친다. 다음 공격 한 번은 그 막에 닿지 못한다.",
     "effects": {
-      "counter": true
+      "magicShield": 1
     }
   },
   {
@@ -852,11 +855,14 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
-    "crit": 0.3,
+    "crit": 0.25,
     "rarity": "rare",
     "art": "2018",
-    "note": "대성공 30%",
-    "lore": "신나는 기세로 결정적인 한 수를 끌어낼 가능성을 높인다."
+    "note": "대성공 25% · 공격 +1랭크",
+    "lore": "신나게 계단을 뛰어오르며 결정적인 한 수를 노리고, 오른 기세만큼 공격 태세도 끌어올린다.",
+    "effects": {
+      "attackRank": 1
+    }
   },
   {
     "id": "deulsseogimyeo",
@@ -866,7 +872,7 @@ export const REWARD_WORDS: Word[] = [
       "bounce"
     ],
     "emotion": "pleasure",
-    "inkCost": 2,
+    "inkCost": 3,
     "rarity": "legendary",
     "art": "2019",
     "note": "카운터 · 방어 +3랭크",

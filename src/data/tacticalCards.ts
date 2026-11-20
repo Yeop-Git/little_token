@@ -64,7 +64,7 @@ export const TACTICAL_CARD_GUIDES: readonly TacticalCardGuide[] = [
     rewardFloors: [4],
     title: '카운터 방어',
     tooltip: '사마귀가 큰 베기를 예고하면 카운터로 받아쳐요\n「다정히」나 「못 이기는 척」을 방어 동사와 함께 쓰면 카운터 방어가 돼요\n큰 베기를 막아 내면 사마귀가 그로기에 빠져요\n혹은 카운터 카드가 없으면 방어 동사로 피해만 줄여요',
-    cardIds: ['dandanhi', 'motdohage', 'sseulsseulhi'],
+    cardIds: ['dandanhi', 'motdohage'],
   },
   {
     id: 'queen-area',
