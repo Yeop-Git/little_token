@@ -192,19 +192,21 @@ export function cardNoteTagsHtml(note: string, chances: readonly LuckChance[] = 
   }).join('')
 }
 
-function wordCardNoteHtml(word: Word, note: string): string {
+function wordCardNoteHtml(word: Word, note: string, noteIsHtml = false): string {
   const action = wordActionInline(word)
   // 선택 불가 사유처럼 호출부가 갈아 끼운 문구는 그대로 보여 주고, 정상 카드만
   // 주행동과 키워드를 분리한다. 키워드 이름을 요약 줄과 칩에 두 번 쓰지 않는다.
   const displayNote = note === wordNoteText(word) ? wordCardPrimaryNote(word, note) : note
   const keywordHtml = wordKeywordChipsHtml(word)
-  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${note === wordNoteText(word) ? cardNoteTagsHtml(displayNote, wordLuckChances(word)) : emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
+  return `<span class="card-note${action ? ' has-action' : ''}">${action}${displayNote ? `<span class="card-note-text">${noteIsHtml ? displayNote : note === wordNoteText(word) ? cardNoteTagsHtml(displayNote, wordLuckChances(word)) : emphasizeCardNumbers(displayNote)}</span>` : ''}${keywordHtml}</span>`
 }
 
 
 export interface WordCardFaceOpts {
   /** 선택 불가 사유처럼 카드 문구를 갈아 끼울 때 쓴다. 기본은 단어의 note. */
   note?: string
+  /** note가 호출부에서 이미 만든 HTML일 때(제련 카드의 주·보너스 스탯 줄). */
+  noteIsHtml?: boolean
   /** 일러스트 없는 카드 하단의 작은 글자. */
   footer?: string
   /** 거미줄 봉인처럼 앞면 위에 덮는 겹. */
@@ -242,7 +244,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
           ${badges}
           <span class="card-caption">
             <strong class="card-title" ${cardTitleStyle(word.text, true)}>${word.text}</strong>
-            ${wordCardNoteHtml(word, note)}
+            ${wordCardNoteHtml(word, note, opts.noteIsHtml)}
           </span>
           ${overlay}
         </span>`
@@ -252,7 +254,7 @@ export function wordCardFrontHtml(word: Word, opts: WordCardFaceOpts = {}): stri
           ${badges}
           <span class="card-art" aria-hidden="true"><i></i><b>${wordArtGlyph(word)}</b></span>
           <strong class="card-title" ${cardTitleStyle(word.text)}>${word.text}</strong>
-          ${wordCardNoteHtml(word, note)}
+          ${wordCardNoteHtml(word, note, opts.noteIsHtml)}
           <small>${footer}</small>
           ${overlay}
         </span>`

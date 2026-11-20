@@ -1354,9 +1354,9 @@ button {
   background: rgba(255, 214, 126, .08);
   box-shadow: inset 0 0 0 1px rgba(255, 214, 126, .45);
 }
-.relic-tip-trait small { color: #ffd991; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
-.relic-tip-trait b { color: #fff; font-size: 18px; line-height: 1.25; }
-.relic-tip-trait em { grid-column: 1 / -1; color: #fff4de; font-size: 16px; font-style: normal; line-height: 1.35; }
+.relic-tip-trait > small { color: #ffd991; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
+.relic-tip-trait > b { color: #fff; font-size: 18px; line-height: 1.25; }
+.relic-tip-trait > em { grid-column: 1 / -1; color: #fff4de; font-size: 16px; font-style: normal; line-height: 1.35; }
 .relic-tip-stats-label { color: #cdbfa6; font-size: 13px; font-weight: 900; letter-spacing: .06em; }
 .relic-tip-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
 .relic-tip-stat {
@@ -8254,7 +8254,7 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   word-break: keep-all;
   white-space: normal;
 }
-.reward-kind-trait small {
+.reward-kind-trait > small {
   position: absolute;
   top: 9px;
   left: 50%;
@@ -8267,11 +8267,11 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   font-weight: 1000;
   vertical-align: 2px;
 }
-.reward-kind-trait b { display: block; margin: 2px 0 2px; color: #ffe9a8; font-size: 24px; font-weight: 1000; line-height: 1.2; }
-.reward-kind-trait span { color: #fff4de; }
+.reward-kind-trait > b { display: block; margin: 2px 0 2px; color: #ffe9a8; font-size: 24px; font-weight: 1000; line-height: 1.2; }
+.reward-kind-trait > .trait-desc { color: #fff4de; }
 .reward-shop-card .reward-kind-trait { padding: 28px 4px 3px; font-size: 16px; }
-.reward-shop-card .reward-kind-trait b { font-size: 19px; }
-.reward-shop-card .reward-kind-trait small { top: 7px; font-size: 11px; }
+.reward-shop-card .reward-kind-trait > b { font-size: 19px; }
+.reward-shop-card .reward-kind-trait > small { top: 7px; font-size: 11px; }
 .rp-base-stat.stat-hp { --stat-color: #ff9faf; }
 .rp-base-stat.stat-atk { --stat-color: #e8ddca; }
 .rp-base-stat.stat-guard { --stat-color: #e8ddca; }
@@ -9015,9 +9015,9 @@ html:not(.foil-shader-ready) .reward-shop-card .reward-pick.rarity-legendary .rp
   text-align: center;
   overflow-wrap: anywhere;
 }
-.iforge-trait small { color: #ffd991; font-size: 14px; font-weight: 900; letter-spacing: .06em; }
-.iforge-trait b { color: #fff; font-size: 20px; }
-.iforge-trait span { flex-basis: 100%; color: #fff4de; font-size: 17px; line-height: 1.3; }
+.iforge-trait > small { color: #ffd991; font-size: 14px; font-weight: 900; letter-spacing: .06em; }
+.iforge-trait > b { color: #fff; font-size: 20px; }
+.iforge-trait > .trait-desc { flex-basis: 100%; color: #fff4de; font-size: 17px; line-height: 1.3; }
 .iforge-illust.forge-impact {
   animation: forge-panel-impact .4s ease-out;
 }
@@ -11452,3 +11452,36 @@ html[data-postprocessing='medium'] .title-vignette { opacity: .55; }
 .card-value-tag.luck-chance-tag.boosted { box-shadow: 0 0 8px rgba(184, 245, 196, .45); }
 .card-value-tag.luck-chance-tag:hover,
 .card-value-tag.luck-chance-tag:focus-visible { outline: none; box-shadow: 0 0 0 1px currentColor, 0 0 12px rgba(184, 245, 196, .7); }
+/* 아이템 특성 설명: 키워드 색 태그 + •글머리표 줄 (11/20 피드백). 세 표면(보상 카드·보유 툴팁·획득 연출) 모두 어두운 바탕이다. */
+.trait-desc { display: block; }
+.trait-desc.is-list { display: grid; gap: 4px; text-align: left; }
+.trait-desc-line { display: block; position: relative; padding-left: 1.05em; }
+.trait-desc-line::before { content: '•'; position: absolute; left: .15em; top: 0; color: #ffd991; font-weight: 1000; }
+.trait-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  padding: 0 6px 0 3px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--trait-tag-color) 75%, transparent);
+  background: color-mix(in srgb, var(--trait-tag-color) 22%, rgba(0, 0, 0, .35));
+  color: color-mix(in srgb, var(--trait-tag-color) 55%, #fff);
+  line-height: 1.25;
+  vertical-align: -1px;
+  white-space: nowrap;
+  --trait-tag-color: #ffd991;
+}
+.trait-tag b { color: inherit; font-size: inherit; font-weight: 1000; margin: 0; display: inline; }
+.trait-tag.is-emotion { --trait-tag-color: var(--emotion-color); }
+.trait-tag.is-emotion .emotion-face { width: 1.3em; height: 1.3em; object-fit: contain; margin: -2px 0; }
+.trait-tag.is-emotion .emotion-symbol { font-size: .95em; }
+.trait-tag.is-ink { --trait-tag-color: #8fb7ff; }
+.trait-tag-ink { width: 1.15em; height: 1.15em; object-fit: contain; }
+.trait-tag.is-stat.stat-atk { --trait-tag-color: #ff8a6b; }
+.trait-tag.is-stat.stat-guard { --trait-tag-color: #8fc4ff; }
+.trait-tag.is-stat.stat-heal { --trait-tag-color: #8fe0a2; }
+.trait-tag.is-stat.stat-luck { --trait-tag-color: #c7e27a; }
+.trait-tag.is-stat i { display: inline-flex; width: 1em; height: 1em; font-style: normal; }
+.trait-tag.is-stat i svg, .trait-tag.is-stat i img { width: 100%; height: 100%; }
+.trait-tag.is-keyword { padding-left: 6px; --trait-tag-color: #ffd991; }

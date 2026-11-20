@@ -109,18 +109,18 @@ const fmt = (value: number) => (Number.isInteger(value) ? String(value) : value.
 /** {v}는 등급 값으로 바뀐다. 이름은 한 단어 태그처럼 짧게 유지한다. */
 const TRAIT_TEXT: Record<LocaleCode, TraitText> = {
   ko: {
-    inkMax: ['넉넉한 잉크', '매 문장 잉크 최대치 +{v}'],
+    inkMax: ['넉넉한 잉크', '최대 잉크 +{v}'],
     extraDraw: ['한 장 더', '전투마다 카드 뽑기 +{v}회'],
     angerScore: ['분노 집필', '분노 카드마다 점수 +{v}'],
     joyScore: ['기쁨 집필', '기쁨 카드마다 점수 +{v}'],
     sorrowScore: ['슬픔 집필', '슬픔 카드마다 점수 +{v}'],
     pleasureScore: ['즐거움 집필', '즐거움 카드마다 점수 +{v}'],
-    poolBonus: ['배율', '모든 문장 배율 풀 +{v}'],
+    poolBonus: ['배율', '모든 문장 배율 +{v}'],
     attackFlat: ['공격 집필', '공격 문장 점수 +{v}'],
     guardFlat: ['방어 집필', '방어 문장 점수 +{v}'],
     healFlat: ['회복 집필', '회복 문장 점수 +{v}'],
-    resonanceBoost: ['공명', '감정 공명이 일어나면 공명 배율 +{v}'],
-    comboBoost: ['관용구', '관용구가 발동하면 배율 ×{m}'],
+    resonanceBoost: ['공명', '공명 배율 +{v}'],
+    comboBoost: ['관용구', '관용구 배율 ×{m}'],
   },
   en: {
     inkMax: ['Spare Ink', 'Max Ink +{v} for every sentence'],

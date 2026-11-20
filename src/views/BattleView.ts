@@ -33,6 +33,7 @@ import { eul, josa } from '@core/josa'
 import { canCompleteSentence, conflictReason, pruneConflicts } from '@core/validator'
 import { comboHintHtml } from '@/ui/ComboHint'
 import { emotionBadgeContent, emotionIconBadge, emotionIconContent } from '@/ui/EmotionBadge'
+import { traitDescHtml } from '@/ui/TraitText'
 import { emotionOrNeutral, EMOTION_LABEL, RARITY_LABEL, type Combo, type CompileMods, type Emotion, type Intent, type Selection, type Tables, type Word, type FieldDef } from '@core/types'
 import { TABLES } from '@data/tables'
 import { ALL_REWARD_WORDS, ANY_SLOT, EARLY_WORDS, growCardFor, PUNCT_WORDS, tablesForEncounter } from '@data/earlyWords'
@@ -2887,7 +2888,7 @@ export class BattleView {
         ${this.player.items.map((item) => {
           const rarity = ownedItemRarity(item)
           const attr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
-          return `<span class="relic-icon rarity-${rarity}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item))}">${itemArt(item.art)}</span>`
+          return `<span class="relic-icon rarity-${rarity}" role="img" tabindex="0" aria-label="${attr(tooltipFor(item))}" data-tooltip="${attr(tooltipFor(item))}" data-tip-title="${attr(item.name)}" data-tip-label="${RARITY_LABEL[rarity]}" data-tip-kind="relic" data-tip-html="${attr(itemTooltipHtml(item, (desc) => traitDescHtml(desc, true)))}">${itemArt(item.art)}</span>`
         }).join('')}
       </div>`
   }

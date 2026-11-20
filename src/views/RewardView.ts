@@ -19,6 +19,7 @@ import { PASSIVES } from '@core/passives'
 import { itemTraitText } from '@core/itemTraits'
 import { STAT_LABEL, type StatKey } from '@data/items'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
+import { traitDescHtml } from '@/ui/TraitText'
 import type { RewardPhase } from '@core/run'
 import { reinforceWord } from '@core/run'
 import { STAT_NAME } from '@core/compiler'
@@ -190,7 +191,7 @@ function itemTraitHtml(opt: RewardOption): string {
     ? PASSIVES[opt.item.passive]
     : opt.item.trait ? itemTraitText(opt.item.trait, opt.item.rarity) : null
   if (!trait) return ''
-  return `<div class="reward-kind-trait"><small>${text('rewardItemPassive', '특성')}</small><b>${trait.name}</b><span>${trait.desc}</span></div>`
+  return `<div class="reward-kind-trait"><small>${text('rewardItemPassive', '특성')}</small><b>${trait.name}</b>${traitDescHtml(trait.desc)}</div>`
 }
 
 // 하단 메인 효과 한 줄.

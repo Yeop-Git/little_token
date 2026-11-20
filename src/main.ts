@@ -15,7 +15,7 @@ import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
-import { rollItemTrait } from '@core/itemTraits'
+import { isItemTraitId, rollItemTrait } from '@core/itemTraits'
 import { makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
@@ -1128,7 +1128,12 @@ else if ((start as string) === 'shop') {
   run.inspiration = Math.max(run.inspiration, 30)
   void goInspirationShop(grade)
 }
-else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'item') {
+  // 검수용: ?item=아이템id&trait=특성id 로 특성 표시를 바로 확인한다.
+  const devItem = (ALL_ITEMS as Record<string, ItemDef>)[params.get('item') ?? ''] ?? ITEMS.candle
+  const devTrait = params.get('trait')
+  goItem(devTrait && isItemTraitId(devTrait) && !devItem.passive ? { ...devItem, trait: devTrait } : withItemTrait(devItem, Math.floor(Math.random() * 2 ** 31)))
+}
 else if (start === 'ending') goEnding()
 else if (start === 'defeat' && params.get('demo') === '1') {
   prepareDemoResultFixture()

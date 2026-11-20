@@ -102,7 +102,8 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (ch) => ({ '&': 
  * 보유 아이템 팝업 쪽지 본문 — 특성 한 칸과 올라가는 스탯 칩을 표로 세운다.
  * 제목(이름)과 등급 라벨은 쪽지 머리가 따로 그린다.
  */
-export function itemTooltipHtml(item: OwnedItem): string {
+/** renderDesc: 특성 설명을 태그·글머리표로 그리는 UI 함수(코어는 기본으로 평문 이스케이프만 한다). */
+export function itemTooltipHtml(item: OwnedItem, renderDesc: (desc: string) => string = escapeHtml): string {
   const passive = item.passive ? PASSIVES[item.passive] : null
   const trait = passive ?? (item.trait ? itemTraitText(item.trait, ownedItemRarity(item)) : null)
   const traitLabel = currentLocale === 'ko' ? '특성' : currentLocale === 'en' ? 'Trait' : currentLocale === 'ru' ? 'Черта' : '特性'
@@ -112,7 +113,7 @@ export function itemTooltipHtml(item: OwnedItem): string {
     .map((key) => `<span class="relic-tip-stat stat-${key}"><small>${escapeHtml(STAT_LABEL[key])}</small><b>+${formatNumber(item.stats[key]!)}</b></span>`)
     .join('')
   return [
-    trait ? `<span class="relic-tip-trait"><small>${traitLabel}</small><b>${escapeHtml(trait.name)}</b><em>${escapeHtml(trait.desc)}</em></span>` : '',
+    trait ? `<span class="relic-tip-trait"><small>${traitLabel}</small><b>${escapeHtml(trait.name)}</b><em>${renderDesc(trait.desc)}</em></span>` : '',
     stats ? `<span class="relic-tip-stats-label">${statsLabel}</span><span class="relic-tip-stats">${stats}</span>` : '',
     item.line ? `<span class="relic-tip-line">“${escapeHtml(item.line)}”</span>` : '',
   ].join('')

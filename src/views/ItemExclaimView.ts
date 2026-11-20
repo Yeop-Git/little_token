@@ -19,6 +19,7 @@ import { GameAudio } from '@/audio/GameAudio'
 import { PASSIVES } from '@core/passives'
 import { itemTraitText, TRAIT_LABEL } from '@core/itemTraits'
 import { currentLocale } from '@/localization'
+import { traitDescHtml } from '@/ui/TraitText'
 
 interface Opts {
   item: ItemDef
@@ -91,7 +92,7 @@ export class ItemExclaimView {
     const item = this.opts.item
     const trait = item.passive ? PASSIVES[item.passive] : item.trait ? itemTraitText(item.trait, item.rarity) : null
     if (!trait) return ''
-    return `<div class="iforge-trait"><small>${TRAIT_LABEL[currentLocale]}</small><b>${trait.name}</b><span>${trait.desc}</span></div>`
+    return `<div class="iforge-trait"><small>${TRAIT_LABEL[currentLocale]}</small><b>${trait.name}</b>${traitDescHtml(trait.desc)}</div>`
   }
 
   private complete() {
@@ -371,6 +372,7 @@ export class ItemExclaimView {
           style="--card-x:0px;--card-z:1;--refill-index:${choiceIndex}" data-id="${w.id}" aria-label="${w.text}, ${accessibleNote} 선택">
           ${wordCardInnerHtml(cardWord, {
             note: cardNote,
+            noteIsHtml: true,
             footer: slot.label,
             overlay: bonuses,
             artUrl: ITEM_ART[this.opts.item.art],
