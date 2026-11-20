@@ -60,7 +60,7 @@ export const STAT_META: { key: keyof PlayerStats; label: string; icon: string; d
   { key: 'atk', label: '공격', icon: 'sword', desc: '공격 문장의 피해가 커진다' },
   { key: 'guard', label: '방어', icon: 'shield', desc: '방어(임시 체력) 점수가 커진다' },
   { key: 'heal', label: '회복', icon: 'cross', desc: '회복량이 커진다' },
-  { key: 'luck', label: '운', icon: 'clover', desc: '보상등급과 영웅·전설 등장 확률을 올린다 · 도박 보정' },
+  { key: 'luck', label: '운', icon: 'clover', desc: '보상등급과 영웅·전설 등장 확률을 올린다 · 도박·대성공 확률 보정' },
 ]
 
 export function defaultPlayer(): PlayerState {

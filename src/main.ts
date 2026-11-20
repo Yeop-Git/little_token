@@ -1005,6 +1005,9 @@ if (import.meta.env.DEV && STRICT_RESOURCE_LOADING && params.get('qaMissingResou
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
+// 검수용: ?luck=8 로 운 수치별 확률 표기(카드·운 툴팁)를 바로 확인한다.
+const luckParam = Number(params.get('luck'))
+if (params.has('luck') && Number.isFinite(luckParam) && luckParam >= 0) run.player.stats.luck = luckParam
 // 1MB에 가까운 장식 폰트가 내려오는 동안 화면 전체를 비워 두지 않는다.
 // 폴백으로 즉시 첫 씬을 그리고, 로드가 끝나면 FontManager가 같은 CSS 변수만 교체한다.
 void FontManager.load()

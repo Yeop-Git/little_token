@@ -29,10 +29,15 @@ export function luckMultiplier(luck: number): number {
 
 /** 운 0에서도 예전 시작 운 3과 같은 보상등급 바닥을 주는 기준값. */
 export const LUCK_GRADE_OFFSET = 3
+/**
+ * 운 효과량 1당 보상등급 바닥 +0.5(2026-11-20, 1 → 0.5).
+ * 1일 때는 시작 운 2만으로 바닥 5·시작 7, 운 8이면 이미 최고 등급 10에 닿아 운이 등급을 너무 빨리 채웠다.
+ */
+export const LUCK_GRADE_PER = 0.5
 
-/** 운 효과량 1당 보상·상점 영웅 가중치 +1.5%p, 전설 +0.75%p. */
-export const LUCK_RARITY_EPIC_PER = 1.5
-export const LUCK_RARITY_LEGENDARY_PER = 0.75
+/** 운 효과량 1당 보상·상점 영웅 가중치 +1%p, 전설 +0.5%p(2026-11-20, 1.5·0.75에서 낮춤). */
+export const LUCK_RARITY_EPIC_PER = 1
+export const LUCK_RARITY_LEGENDARY_PER = 0.5
 
 /** 보상·상점 희귀도에 더할 운 보정(%p). 상한 없이 곡선을 따라 둔화된다. */
 export function luckRarityShift(luck: number): { epic: number; legendary: number } {
@@ -44,13 +49,15 @@ export function luckRarityShift(luck: number): { epic: number; legendary: number
 }
 
 /**
- * 카드 확률(도박 성공·대성공)에 더하는 운 보정 — 운 효과량(luckValue 곡선) 1당 +2%p.
+ * 카드 확률(도박 성공·대성공)에 더하는 운 보정 — 운 효과량(luckValue 곡선) 1당 +1%p.
+ * 2026-11-20 플레이테스트에서 확률이 너무 많이 오른다는 피드백으로 2%p → 1%p로 낮췄다
+ * (운 4 → +4%p, 운 8 → +6%p, 운 16 → +9%p).
  * 운 자체에는 상한이 없고 곡선이 둔화를 맡는다. 확률 쪽 천장은 아래 상한이 맡는다.
  * 확률이 없는 카드(0%)는 운으로 새로 생기지 않는다 — 확률을 쓰는 카드만 오른다.
  */
-export const LUCK_CHANCE_PER = 2
-/** 도박 성공 확률은 운이 아무리 높아도 95%에서 멈춘다(실패 가능성은 남긴다). */
-export const LUCK_SUCCESS_CAP = 0.95
+export const LUCK_CHANCE_PER = 1
+/** 도박 성공 확률은 운이 아무리 높아도 90%에서 멈춘다(실패 가능성은 남긴다). 카드 기본값이 이미 더 높으면 기본값을 지킨다. */
+export const LUCK_SUCCESS_CAP = 0.9
 
 /** 운 보정 확률. 모두 0~1 비율이고 bonus는 상한까지 실제로 더해진 몫이다. */
 export interface LuckChance {

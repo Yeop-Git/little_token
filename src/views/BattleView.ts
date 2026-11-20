@@ -11,6 +11,7 @@
 import { formatNumber, formatMult } from '@core/numberFormat'
 import {
   compile,
+  CRIT_CAP,
   effectiveBase,
   isDamageIntent,
   matchCombos,
@@ -82,7 +83,7 @@ import { INK_UI, REWARD_ART, SKILL_ART, SPRITES, TOKEN_FACES } from '@/assets'
 import { icon, itemArt } from '@/ui/Icons'
 import { SquareBurst } from '@/ui/SquareBurst'
 import { TooltipLayer, tipBulletsHtml } from '@/ui/TooltipLayer'
-import { clearRewardValue, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
+import { clearRewardValue, gradeFloor, gradeForElapsedTurns, gradeInspirationValue, gradeTier, stageInspirationBonus, startGrade } from '@core/grade'
 import { PART_WEAKNESS_MULT, PLAYER_GUARD_LIMIT_PER_GUARD_STAT, STAT_RANK_LIMIT, WEAKNESS_MULT, rankedStat, statRankScale } from '@core/combatRules'
 import { defaultPlayer, itemTooltipHtml, itemTooltipText, ITEM_STAT_ORDER, ownedItemRarity, STAT_META, type PlayerState } from '@core/player'
 import { emptyRunRecord, type DefeatCause, type RunRecord } from '@core/run'
@@ -110,7 +111,7 @@ import { openSettingsModal } from '@/ui/SettingsModal'
 import { currentLocale, t } from '@/localization'
 import { growthText } from '@/localization/growth'
 import { localizedWordText } from '@/localization/content'
-import { luckMultiplier, setCardLuck } from '@core/luck'
+import { LUCK_CHANCE_PER, LUCK_SUCCESS_CAP, luckMultiplier, luckRarityShift, luckValue, setCardLuck } from '@core/luck'
 import { luckChanceHtml, tagLuckChances, wordLuckChances } from '@/ui/luckChance'
 import { CHANCE_LABEL, MULT_LABEL } from '@/ui/WordCardFace'
 import { combatPreviewText } from '@/localization/combatPreview'
@@ -3014,8 +3015,9 @@ export class BattleView {
     } else {
       lines.push(
         `문장 배율 ×${formatMult(luckMultiplier(stats.luck))}`,
-        '대성공·확률 카드가 터질 확률을 올린다',
-        '보상 등급과 영웅·전설 등장 확률을 올린다',
+        `확률 카드 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(LUCK_SUCCESS_CAP * 100)}%)`,
+        `대성공 +${formatNumber(luckValue(stats.luck) * LUCK_CHANCE_PER, 0)}%p (최대 ${Math.round(CRIT_CAP * 100)}%)`,
+        `보상 등급 최저 ${gradeFloor(stats.luck)} · 영웅 +${formatNumber(luckRarityShift(stats.luck).epic, 1)}%p · 전설 +${formatNumber(luckRarityShift(stats.luck).legendary, 1)}%p`,
         examples((w) => (w.crit ?? 0) > 0 || !!w.variance),
       )
     }
