@@ -330,6 +330,8 @@ interface Tally {
   mult: number
   /** 같은 위력이 몇 번 꽂히는가(연타 × 동사 반복). 1이면 표시하지 않는다. */
   hits: number
+  /** 반복 발동의 회당 위력 비율(미친듯이 67% 등). 1이면 표시하지 않는다. */
+  hitScale: number
   total: number
   kind: 'dmg' | 'guard' | 'heal'
   adjustment?: number
@@ -3371,9 +3373,12 @@ export class BattleView {
     // 피해는 "1타 위력"을 쌓고 마지막에 타격 수를 따로 곱해 보여 준다(2번 타격 명시).
     // 방어·회복은 반복 발동이 그대로 한 덩어리 수치라 지금처럼 합쳐서 쌓는다.
     const hits = dealsDamage ? Math.max(1, intent.hitCount * intent.castCount) : 1
-    const repeatPower = dealsDamage ? intent.castScale : intent.castCount * intent.castScale
+    // 피해의 반복 비율(castScale)은 깡 점수를 깎아 보여 주지 않고 타격 딱지에 "회당 67%"로 적는다.
+    // 깡 점수 칸이 카드·실시간 수치와 다른 숫자(6.5 → 4.36)로 시작하면 어디서 줄었는지 안 읽힌다.
+    const repeatPower = dealsDamage ? 1 : intent.castCount * intent.castScale
+    const hitScale = dealsDamage ? intent.castScale : 1
     const supportBase = (kind === 'guard' ? intent.guard : kind === 'heal' ? intent.heal : 0) * repeatPower
-    const empty = { flats: [], mults: [], extras: [], base: 0, mult: 1, hits: 1, total: 0, kind }
+    const empty = { flats: [], mults: [], extras: [], base: 0, mult: 1, hits: 1, hitScale: 1, total: 0, kind }
     if (!dealsDamage && supportBase <= 0) return empty
 
     // 깡수치·배율의 출처는 컴파일러가 이미 순서대로 쌓아 뒀다(문장 왼쪽부터 → 관용구 → 어긋남).
@@ -3416,7 +3421,7 @@ export class BattleView {
     // 배율은 0에 곱해질 뿐이라 화면만 헷갈리게 한다 — 전환 피해를 바로 깡 점수 칸에 쌓는다.
     if (kind === 'dmg' && flats.length === 0) {
       const base = extras.reduce((n, f) => n + f.value, 0)
-      return { flats: extras, mults: [], extras: [], base, mult: 1, hits, total: base * hits, kind }
+      return { flats: extras, mults: [], extras: [], base, mult: 1, hits, hitScale: 1, total: base * hits, kind }
     }
 
     const mults: TallyPart[] = intent.breakdown.mults.map((p) => ({ label: p.label, value: p.value, cls: cls(p) }))
@@ -3432,9 +3437,9 @@ export class BattleView {
     const mult = mults.reduce((m, x) => m * x.value, 1)
     const extra = extras.reduce((n, f) => n + f.value, 0)
     const total = dealsDamage
-      ? (Math.floor(base * mult) + extra) * hits
+      ? (Math.floor(base * mult * hitScale) + extra) * hits
       : Math.round(base * mult)
-    return { flats, mults, extras, base, mult, hits, total, kind }
+    return { flats, mults, extras, base, mult, hits, hitScale, total, kind }
   }
 
   // 깡 점수가 하나씩 쌓이고 → 배율이 하나씩 꽂히고 → 총합이 쾅. 발라트로식 콤보 쾌감.
@@ -3450,12 +3455,15 @@ export class BattleView {
         <div class="tally-cell"><div class="tally-box base"><span class="tl">${baseLabel}</span><b>0</b></div></div>
         <div class="tally-x">×</div>
         <div class="tally-cell"><div class="tally-box mult"><span class="tl">배율</span><b>1.00</b></div></div>
+        <div class="tally-eq">=</div>
+        <div class="tally-result">
+          <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? text.applied : text.actual) : text.calculation}</div>
+          <div class="tally-total"></div>
+        </div>
       </div>
       <div class="tally-feed tally-flat-feed"></div>
       <div class="tally-phase" aria-hidden="true"><i></i><span>배율 누적</span><i></i></div>
-      <div class="tally-feed tally-mult-feed"></div>
-      <div class="tally-caption">${tally.applied ? (tally.kind === 'dmg' ? text.applied : text.actual) : text.calculation}</div>
-      <div class="tally-total"></div>`
+      <div class="tally-feed tally-mult-feed"></div>`
     const baseBox = el.querySelector<HTMLElement>('.tally-box.base')!
     const multBox = el.querySelector<HTMLElement>('.tally-box.mult')!
     const flatFeed = el.querySelector<HTMLElement>('.tally-flat-feed')!
@@ -3463,6 +3471,8 @@ export class BattleView {
     const totalEl = el.querySelector<HTMLElement>('.tally-total')!
     const hasRisingMultiplier = tally.mults.some((part) => part.value > 1)
     if (hasRisingMultiplier) el.classList.add('has-phase')
+    // 배율이 하나도 붙지 않는 정산(전환 피해만 있는 문장)은 "× 1.00" 칸을 세우지 않는다.
+    if (tally.mults.length === 0) el.classList.add('no-mult')
 
     // 모든 칩을 처음부터 자리만 잡아 두고(보이지 않게) 하나씩 드러낸다.
     // 칩이 붙을 때마다 판의 높이·축척이 바뀌면 가운데 정렬된 판 전체가 위아래로
@@ -3470,8 +3480,9 @@ export class BattleView {
     const flatChips = tally.flats.map((f) => this.tallyChip(flatFeed, `${f.label} +${formatNumber(f.value)}`, f.cls))
     const multChips = tally.mults.map((m) => this.tallyChip(multFeed, `${m.label} ×${m.value.toFixed(2)}`, m.cls))
     const extraChips = tally.extras.map((f) => this.tallyChip(multFeed, `${f.label} +${formatNumber(f.value)}`, `${f.cls} extra`))
-    const hitChip = tally.hits > 1
-      ? this.tallyChip(multFeed, `${text.hits.replace('{count}', String(tally.hits))} ×${tally.hits}`, 'hits')
+    const scaleNote = tally.hitScale !== 1 ? ` · ${text.perHit.replace('{value}', String(Math.round(tally.hitScale * 100)))}` : ''
+    const hitChip = tally.hits > 1 || tally.hitScale !== 1
+      ? this.tallyChip(multFeed, `${text.hits.replace('{count}', String(tally.hits))} ×${tally.hits}${scaleNote}`, 'hits')
       : null
     const adjustChip = tally.adjustment
       ? this.tallyChip(multFeed, `${text.adjustment} ${tally.adjustment > 0 ? '+' : ''}${formatNumber(tally.adjustment)}`, tally.adjustment > 0 ? 'buff' : 'down')
@@ -3611,8 +3622,23 @@ export class BattleView {
     // 처음 한 번 최종 크기로 잰 뒤에는 잠근다 — 도중에 축척이 바뀌면 판이 출렁인다.
     if (el.dataset.fitLocked) return
     const stage = this.q('#pbox')
-    const safeWidth = Math.max(340, Math.min(680, stage.clientWidth - 420))
-    const safeHeight = Math.max(250, Math.round(stage.clientHeight * 0.62))
+    const safeWidth = Math.max(340, Math.min(960, stage.clientWidth - 420))
+    // 판의 위쪽은 상단 HUD(보스전은 보스 체력판) 바로 아래, 아래쪽은 적 이름표 바로 위에서
+    // 끝나게 한다. 총합 숫자가 적 체력바 위에 얹혀 읽히지 않던 겹침을 막는다.
+    const stageRect = stage.getBoundingClientRect()
+    const scale = stageRect.height / Math.max(1, stage.offsetHeight) || 1
+    const localY = (y: number) => (y - stageRect.top) / scale
+    // 보스전은 체력판 아래 뱃지 줄(선공·TIP·능력)까지 비켜 선다.
+    const bossBottoms = [...stage.querySelectorAll<HTMLElement>('.boss-health-hud, .boss-badge-row')]
+      .filter((node) => node.offsetParent !== null)
+      .map((node) => localY(node.getBoundingClientRect().bottom) + 8)
+    const top = Math.round(Math.max(80, ...bossBottoms))
+    const plates = [...stage.querySelectorAll<HTMLElement>('#actors .actor.foe .nameplate')]
+      .map((plate) => localY(plate.getBoundingClientRect().top))
+      .filter((y) => y > top + 160)
+    const floor = plates.length ? Math.min(...plates) - 8 : Math.round(stage.clientHeight * 0.7)
+    el.style.setProperty('--tally-top', `${top}px`)
+    const safeHeight = Math.max(220, floor - top)
     // 집계판의 폭은 CSS로 고정돼 있어 offsetWidth만 재면 내용이 아무리 넘쳐도 항상
     // 같은 값이 나온다. 상자와 총합은 이제 자르지 않고 내용만큼 넓어지므로, 실제로
     // 무대를 밀어내는 건 이 자식들의 폭이다 — 가장 넓은 쪽을 기준으로 줄인다.
