@@ -196,6 +196,8 @@ export interface Intent {
   attackRank: number
   guardRank: number
   emotions: Emotion[]
+  /** 문장의 공격 속성(가장 많이 쓴 감정, 동률이면 영향이 큰 감정). 약점 판정은 이것 하나로 한다. */
+  attackEmotion?: Emotion | null
   emotionResonance: number
   tags: string[]
   combos: string[] // 발동 관용구 이름
@@ -222,6 +224,15 @@ export interface IntentPart {
    * 피해·방어·회복이 동시에 생기므로, 집계판이 자기 풀만 골라 쓴다.
    */
   lane?: 'damage' | 'guard' | 'heal'
+  /** 이 조각을 낸 카드의 문장 칸(subj·adv·verb…). 집계판이 1번 카드부터 순서대로 띄운다. */
+  key?: string
+  /** 배율 풀(가산) 칩을 카드별로 쪼개 보여 줄 때 쓰는 기여분. 합은 value - 1과 같다. */
+  poolParts?: { label: string; bonus: number; key?: string; itemTags?: string[] }[]
+  /**
+   * 이 조각을 낸 보유 아이템 — 고유효과는 PassiveId, 특성은 `trait:<ItemTraitId>`.
+   * 화면이 이 조각을 꽂는 순간 보유 아이템창의 해당 아이콘을 맥동시킨다(컴파일러는 아이템 id를 모른다).
+   */
+  itemTags?: string[]
 }
 
 /**
@@ -239,6 +250,22 @@ export interface CompileMods {
   stageMult?: number
   /** 피노키오의 미아핑 — 완성한 문장 끝에 "…근데?" 한 번을 굴린다(굴림은 resolveMultiplier). */
   doubt?: boolean
+  /** 아이템 특성 — 감정 카드 1장마다 문장 주 수치에 더하는 값. */
+  traitEmotionFlat?: Partial<Record<Emotion, number>>
+  /** 아이템 특성 — 배율 풀에 더하는 값. */
+  traitPool?: number
+  /** 아이템 특성 — 해당 행동 문장에 한 번 더하는 수치. */
+  traitKindFlat?: { damage?: number; guard?: number; heal?: number }
+  /** 아이템 특성 — 감정 공명이 일어났을 때 공명 배율에 더하는 값. */
+  traitResonance?: number
+  /** 아이템 특성 — 관용구가 발동했을 때 (1+값)배. */
+  traitCombo?: number
+  /** 빨간망토의 불씨 — 완성한 문장에서 남은 잉크 1당 배율 +rate(최대 max 잉크). available은 이번 문장 잉크 한도. */
+  inkFire?: { available: number; rate: number; max: number }
+  /** 잭의 하늘나물 — 무럭무럭 카드의 성장량 배수. */
+  growMult?: number
+  /** 잭의 하늘나물 — 자란 최대 체력에서 나온 방어·회복 문장 가산. */
+  beanstalkFlat?: number
 }
 
 export interface Tables {
@@ -323,6 +350,10 @@ export interface EnemyDef {
     releaseAt?: number
     /** 일부만 남았을 때 채우지 않고, 전멸한 다음 턴에만 한 묶음을 다시 소환한다. */
     refillOnlyWhenEmpty?: boolean
+    /** 전투 전체에서 호위 묶음을 부를 수 있는 횟수. 비우면 제한 없이 다시 부른다. */
+    maxWaves?: number
+    /** 이 체력 페이지(1부터, 위에서부터 센 막)에 들어선 뒤에야 소환한다. 'last'는 마지막 페이지. 없으면 전투 시작부터. */
+    summonFromBar?: number | 'last'
     /** 호위가 한 마리라도 살아 있으면 소환자의 공격이 플레이어 방어를 관통한다. */
     pierceWhileEscorted?: boolean
     /** 호위 하나를 흩뜨릴 때 소환자 최대 체력에서 직접 깎는 비율. */

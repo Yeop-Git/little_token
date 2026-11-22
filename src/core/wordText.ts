@@ -3,19 +3,41 @@
  * 화면마다 따로 조립하면 같은 카드가 화면마다 다르게 읽힌다(도박 표기가 그랬다).
  */
 
+import { formatNumber, formatMult } from './numberFormat'
 import { TARGET_FALLOFF } from './combatRules'
-import { PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
+import { CRIT_CAP, PREEMPT_TAG, STAT_NAME, wordFlat } from './compiler'
 import type { StatBlock, TargetCount, Variance, Word } from './types'
 import { currentLocale } from '@/localization'
 import { wordKeywords } from './wordKeywords'
+import { getCardLuck, luckChance } from './luck'
 
 const L = {
-  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', all:'전체', noMult:'배율을 받지 않는다', pool:'배율 풀', safe:'안전한 한 수', immediate:'즉발', magicShield:'매직실드', guardAttack:'현재 방어도 피해', overhealAttack:'초과 회복 피해', lifeSteal:'흡혈' },
-  en: { chance:'chance for multiplier', rest:'otherwise', mult:'Multiplier', crit:'Critical', power:'Power', guard:'Guard', heal:'Heal', hp:'Max HP', allHit:'Hits all enemies', next:'Activates next turn', self:'40% damage returns to self', preempt:'Acts before first-strike enemies', adapt:'Uses current part weakness', attack:' targets', unit:' targets', pierce:'Pierces guard', hits:' hits', casts:' verb casts', each:'each', counter:'Counter', inkDiscount:'Sentence cost', all:'All', noMult:'Unaffected by multipliers', pool:'Multiplier pool', safe:'safe move', immediate:'Immediate' },
-  ja: { chance:'の確率で倍率', rest:'それ以外', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'回復', hp:'最大体力', allHit:'敵全体に命中', next:'次のターンに発動', self:'ダメージ40%が自分に戻る', preempt:'先攻の敵より先に行動', adapt:'現在の部位弱点を適用', attack:'体を攻撃', unit:'体', pierce:'防御貫通', hits:'連打', casts:'回動詞発動', each:'各', counter:'カウンター', inkDiscount:'文のコスト', all:'全体', noMult:'倍率を受けない', pool:'倍率プール', safe:'安全な一手', immediate:'即時' },
-  ru: { chance:'шанс на множитель', rest:'иначе', mult:'Множитель', crit:'Критический успех', power:'Сила', guard:'Защита', heal:'Лечение', hp:'Макс. здоровье', allHit:'Попадает по всем врагам', next:'Сработает в следующий ход', self:'40% урона возвращается герою', preempt:'Действует раньше быстрых врагов', adapt:'Использует слабость текущей части', attack:' цели', unit:' цели', pierce:'Пробивает защиту', hits:' ударов', casts:' срабатывания глагола', each:'каждый', counter:'Контратака', inkDiscount:'Стоимость фразы', all:'Все', noMult:'Не получает множитель', pool:'Пул множителя', safe:'надёжный ход', immediate:'Сразу' },
-  'zh-Hans': { chance:'概率获得倍率', rest:'其余', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'恢复', hp:'最大体力', allHit:'命中全部敌人', next:'下回合发动', self:'40%伤害反弹给自己', preempt:'先于先攻敌人行动', adapt:'套用当前部位弱点', attack:'个目标', unit:'个目标', pierce:'贯穿防御', hits:'连击', casts:'次动词发动', each:'每次', counter:'反击', inkDiscount:'句子费用', all:'全部', noMult:'不受倍率影响', pool:'倍率池', safe:'稳妥一手', immediate:'立即发动' },
-  'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', adapt:'套用目前部位弱點', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', casts:'次動詞發動', each:'每次', counter:'反擊', inkDiscount:'句子費用', all:'全部', noMult:'不受倍率影響', pool:'倍率池', safe:'穩妥一手', immediate:'立即發動' },
+  ko: { chance:'확률로 배율', rest:'나머지', mult:'배율', crit:'대성공', power:'위력', guard:'방어', heal:'회복', hp:'최대 체력', allHit:'적 전체 적중', next:'다음 턴 발동', self:'피해 40% 나에게 되돌아옴', preempt:'선공 상대보다 먼저 행동', adapt:'현재 다리 약점 적용', attack:'명 공격', unit:'명', pierce:'방어 관통', hits:'연타', casts:'회 동사 발동', each:'각', counter:'카운터', inkDiscount:'문장 비용', all:'전체', noMult:'배율을 받지 않는다', immediate:'즉발', magicShield:'매직실드', guardAttack:'현재 방어도 피해', overhealAttack:'초과 회복 피해', lifeSteal:'흡혈' },
+  en: { chance:'chance for multiplier', rest:'otherwise', mult:'Multiplier', crit:'Critical', power:'Power', guard:'Guard', heal:'Heal', hp:'Max HP', allHit:'Hits all enemies', next:'Activates next turn', self:'40% damage returns to self', preempt:'Acts before first-strike enemies', adapt:'Uses current part weakness', attack:' targets', unit:' targets', pierce:'Pierces guard', hits:' hits', casts:' verb casts', each:'each', counter:'Counter', inkDiscount:'Sentence cost', all:'All', noMult:'Unaffected by multipliers', immediate:'Immediate' },
+  ja: { chance:'の確率で倍率', rest:'それ以外', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'回復', hp:'最大体力', allHit:'敵全体に命中', next:'次のターンに発動', self:'ダメージ40%が自分に戻る', preempt:'先攻の敵より先に行動', adapt:'現在の部位弱点を適用', attack:'体を攻撃', unit:'体', pierce:'防御貫通', hits:'連打', casts:'回動詞発動', each:'各', counter:'カウンター', inkDiscount:'文のコスト', all:'全体', noMult:'倍率を受けない', immediate:'即時' },
+  ru: { chance:'шанс на множитель', rest:'иначе', mult:'Множитель', crit:'Критический успех', power:'Сила', guard:'Защита', heal:'Лечение', hp:'Макс. здоровье', allHit:'Попадает по всем врагам', next:'Сработает в следующий ход', self:'40% урона возвращается герою', preempt:'Действует раньше быстрых врагов', adapt:'Использует слабость текущей части', attack:' цели', unit:' цели', pierce:'Пробивает защиту', hits:' ударов', casts:' срабатывания глагола', each:'каждый', counter:'Контратака', inkDiscount:'Стоимость фразы', all:'Все', noMult:'Не получает множитель', immediate:'Сразу' },
+  'zh-Hans': { chance:'概率获得倍率', rest:'其余', mult:'倍率', crit:'大成功', power:'威力', guard:'防御', heal:'恢复', hp:'最大体力', allHit:'命中全部敌人', next:'下回合发动', self:'40%伤害反弹给自己', preempt:'先于先攻敌人行动', adapt:'套用当前部位弱点', attack:'个目标', unit:'个目标', pierce:'贯穿防御', hits:'连击', casts:'次动词发动', each:'每次', counter:'反击', inkDiscount:'句子费用', all:'全部', noMult:'不受倍率影响', immediate:'立即发动' },
+  'zh-Hant': { chance:'機率獲得倍率', rest:'其餘', mult:'倍率', crit:'大成功', power:'威力', guard:'防禦', heal:'恢復', hp:'最大體力', allHit:'命中全部敵人', next:'下回合發動', self:'40%傷害反彈給自己', preempt:'先於先攻敵人行動', adapt:'套用目前部位弱點', attack:'個目標', unit:'個目標', pierce:'貫穿防禦', hits:'連擊', casts:'次動詞發動', each:'每次', counter:'反擊', inkDiscount:'句子費用', all:'全部', noMult:'不受倍率影響', immediate:'立即發動' },
+}[currentLocale]
+
+/** 대상 수는 언어마다 어순이 달라 단어 조각을 이어 붙이지 않고 문장째 만든다. */
+function targetLabel(count: TargetCount): string {
+  if (currentLocale === 'ko') return count === 'all' ? '대상 전체' : `대상 ${count}명`
+  if (currentLocale === 'en') return count === 'all' ? 'All targets' : `${count} targets`
+  if (currentLocale === 'ja') return count === 'all' ? '対象：敵全体' : `対象：${count}体`
+  if (currentLocale === 'ru') return count === 'all' ? 'Все цели' : `Целей: ${count}`
+  return count === 'all'
+    ? currentLocale === 'zh-Hans' ? '目标：全部' : '目標：全部'
+    : currentLocale === 'zh-Hans' ? `目标：${count}个` : `目標：${count}個`
+}
+
+const INVALID_SUBJECT_NOTE = {
+  ko: '주어로 쓸 수 없다 — 일기의 주어는 나·우리',
+  en: 'Cannot be used as the subject — this diary only uses I or we as its subject',
+  ja: '主語には使えない — この日記の主語は「ぼく・ぼくたち」',
+  ru: 'Нельзя поставить в подлежащее — этот дневник пишется от лица «я» или «мы»',
+  'zh-Hans': '不能用作主语——这本日记的主语只能是“我”或“我们”',
+  'zh-Hant': '不能用作主語——這本日記的主語只能是「我」或「我們」',
 }[currentLocale]
 
 export const DRAW_COUNT_UNIT = {
@@ -53,17 +75,41 @@ export const OVERDRAW_HIT_UNIT = {
  * 양쪽을 나란히 적을 필요가 없다. `×2.50 / ×1.00`은 "절반은 손해"처럼 읽혀서 폐지했다.
  * 저점이 1이 아닌 데이터가 들어오면 그때만 나머지 쪽을 덧붙인다.
  */
-export function gambleText(v: Variance): string {
-  const p = Math.round(v.p * 100)
+export function gambleText(v: Variance, luck = getCardLuck()): string {
+  // 카드에는 운이 반영된 최종 확률을 적는다(기본 확률·운 몫은 툴팁이 밝힌다).
+  const p = Math.round(luckChance(v.p, luck).final * 100)
   const hi = `${p}% ${L.chance} ×${v.hi.toFixed(2)}`
   return v.lo === 1 ? hi : `${hi} · ${L.rest} ×${v.lo.toFixed(2)}`
+}
+
+const GAMBLE_FAIL_LABEL = {
+  ko: '실패 시 배율', en: 'On a miss, multiplier', ja: '失敗時の倍率', ru: 'При неудаче множитель',
+  'zh-Hans': '失败时倍率', 'zh-Hant': '失敗時倍率',
+}[currentLocale]
+
+const CRIT_MISS_TEXT = {
+  ko: '대성공 아니면 효과 없음', en: 'No critical: no extra effect', ja: '大成功しなければ追加効果なし',
+  ru: 'Без крит. успеха: без доп. эффекта', 'zh-Hans': '未大成功时无额外效果', 'zh-Hant': '未大成功時無額外效果',
+}[currentLocale]
+
+/**
+ * 도박 카드의 실패 쪽 결과 — "실패 시 배율 ×1.00". 카드 앞면은 짧게 성공 쪽만 적고,
+ * 상세 팝업에서는 붉은 줄로 실패하면 어떻게 되는지 함께 밝힌다(11/20 피드백).
+ */
+export function wordDetailNoteLine(w: Word): ValueLine | null {
+  // 무럭무럭처럼 배율을 받지 않는 규칙도 앞면이 아니라 상세 설명에서 밝힌다(11/20 피드백).
+  if (w.growHp) return { text: L.noMult, cls: 'rule' }
+  if (w.variance) return { text: `${GAMBLE_FAIL_LABEL} ×${w.variance.lo.toFixed(2)}`, cls: 'gamble-fail' }
+  // 대성공 카드도 터지지 않았을 때를 붉은 줄로 밝힌다 — 배율 ×1.5가 붙지 않을 뿐 손해는 없다.
+  if (w.crit && w.slot !== 'punct') return { text: CRIT_MISS_TEXT, cls: 'gamble-fail' }
+  return null
 }
 
 /** 가산 배율 표기 — "배율 ×1.20". */
 export const multText = (bonus: number): string => `${L.mult} ×${(1 + bonus).toFixed(2)}`
 
 /** 대성공 표기 — "대성공 20%". */
-export const critText = (crit: number): string => `${L.crit} ${Math.round(crit * 100)}%`
+export const critText = (crit: number, luck = getCardLuck()): string => `${L.crit} ${Math.round(luckChance(crit, luck, CRIT_CAP).final * 100)}%`
 
 /**
  * 카드가 화면에 내걸어야 하는 수치 조각 — CSV `note`가 빠뜨리지 않았는지 검사하는
@@ -92,8 +138,8 @@ export function wordValueLines(w: Word, stats?: StatBlock, includeKeywords = tru
   const lane = w.kind === 'heal' ? 'heal' : w.kind === 'guard' ? 'guard' : 'dmg'
   // 동사·목적어 — 공격도 방어처럼 "공격 ×1"로 적는다("적을 공격"은 수치가 아니다).
   if (w.stat && w.statMult != null && w.statMult > 0) {
-    const applied = stats ? ` = ${wordFlat(w, stats)}` : ''
-    out.push({ text: `${STAT_NAME[w.stat]} ×${w.statMult}${applied}`, cls: lane })
+    const applied = stats ? ` = ${formatNumber(wordFlat(w, stats))}` : ''
+    out.push({ text: `${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}${applied}`, cls: lane })
   } else if (w.power) {
     out.push({ text: `${L.power} ${w.power}`, cls: lane })
   }
@@ -106,7 +152,7 @@ export function wordValueLines(w: Word, stats?: StatBlock, includeKeywords = tru
   if (w.targetMode === 'both') out.push({ text: L.self, cls: 'self' })
   if (w.tags.includes('adapt')) out.push({ text: L.adapt, cls: 'buff' })
   if (w.targetCount && w.targetCount !== 1) {
-    out.push({ text: `대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`, cls: 'dmg' })
+    out.push({ text: targetLabel(w.targetCount), cls: 'dmg' })
   }
   for (const keyword of includeKeywords ? wordKeywords(w) : []) {
     const cls = ['counter', 'magicShield', 'protect'].includes(keyword.id)
@@ -149,19 +195,20 @@ export function wordNoteText(w: Word): string {
 
 function noteParts(w: Word): string[] {
   // 성장 카드와 문장부호는 수치 대신 규칙을 적는다 — 같은 값에서 같은 문구를 다시 만든다.
-  if (w.growHp) return [`${L.hp} +${w.growHp}`, L.noMult]
+  if (w.growHp) return [`${L.hp} +${w.growHp}`]
   if (w.slot === 'punct') {
     const punct: string[] = []
-    if (w.tags.includes(PREEMPT_TAG)) punct.push(currentLocale === 'ko' ? `${L.preempt}한다` : L.preempt)
-    if (w.bonus) punct.push(`${L.pool} +${w.bonus.toFixed(2)} (${L.safe})`)
-    if (w.crit) punct.push(currentLocale === 'ko' ? `대성공 확률 +${Math.round(w.crit * 100)}%` : `${L.crit} +${Math.round(w.crit * 100)}%`)
+    // 다른 카드와 같은 표기: 선공은 키워드 이름, 배율은 "배율 ×1.10", 대성공은 "대성공 30%"(11/20 표기 통일).
+    if (w.tags.includes(PREEMPT_TAG)) punct.push(...wordKeywords(w).filter((keyword) => keyword.id === 'preempt').map((keyword) => keyword.label))
+    if (w.bonus) punct.push(multText(w.bonus))
+    if (w.crit) punct.push(critText(w.crit))
     return punct
   }
   // 일기의 주어는 나·우리뿐이라 다른 인칭은 수치가 아니라 차단 이유를 적는다.
-  if (w.person && w.person !== 'first') return []
+  if (w.person && w.person !== 'first') return [INVALID_SUBJECT_NOTE]
 
   const out: string[] = []
-  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${w.statMult}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}`)
   else if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.variance) out.push(gambleText(w.variance))
   // 배율 풀에 보태는 칸(주어·어미)은 0이어도 "배율 ×1.00"을 적는다.
@@ -169,7 +216,7 @@ function noteParts(w: Word): string[] {
   else if (w.bonus) out.push(multText(w.bonus))
   if (w.effects?.guard) out.push(`${L.guard} +${w.effects.guard}`)
   if (w.effects?.heal) out.push(`${L.heal} +${w.effects.heal}`)
-  if (w.targetCount && w.targetCount !== 1) out.push(`대상 ${w.targetCount === 'all' ? L.all : `${w.targetCount}${L.unit}`}`)
+  if (w.targetCount && w.targetCount !== 1) out.push(targetLabel(w.targetCount))
   // 연타는 그 자체로 단일 대상이라 대상 수를 겹쳐 적지 않는다.
   out.push(...wordKeywords(w).map((keyword) => keyword.label))
   if (w.tags.includes('adapt')) out.push(L.adapt)
@@ -181,7 +228,7 @@ function noteParts(w: Word): string[] {
 
 export function numericNoteParts(w: Word): string[] {
   const out: string[] = []
-  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`×${w.statMult}`)
+  if (w.stat && w.statMult != null && w.statMult > 0) out.push(`×${formatMult(w.statMult)}`)
   if (w.power) out.push(`${L.power} ${w.power}`)
   if (w.bonus) out.push(multText(w.bonus))
   if (w.variance) out.push(gambleText(w.variance))

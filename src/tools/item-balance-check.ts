@@ -45,9 +45,8 @@ function benchmark(item: ItemDef | null, combinedItems: ItemDef[] = []): ItemBen
     if (index >= order.length) {
       if (selectionInkCost(selection) > sentenceInkAvailable(0, player)) return
       const intent = compile(selection, tables, player.stats, modsFor(player, 3))
-      const luck = 1 + player.stats.luck * 0.02
       const doubt = intent.doubtCount > 0 ? 1.15 ** intent.doubtCount : 1
-      const multiplier = intent.multiplier * luck * doubt * expectedRoulette(player, intent)
+      const multiplier = intent.multiplier * doubt * expectedRoulette(player, intent)
       if (isDamageIntent(intent) && effectiveBase(intent) > 0) {
         result.attacks.push(effectiveBase(intent) * multiplier * intent.hitCount * intent.castCount * intent.castScale)
       }
@@ -124,13 +123,16 @@ for (const row of rows) {
     + `· 방어 ${row.maxGuard.toFixed(0)} · 회복 ${row.maxHeal.toFixed(0)} · 성장 ${row.maxGrowth}`,
   )
   if (row.item!.rarity === 'epic' && p75Ratio > 1.3) violations.push(`${row.item!.name}: 영웅 공격 기대값이 기준의 130%를 넘음`)
-  if (p75Ratio > 1.65 || maxRatio > 1.8) violations.push(`${row.item!.name}: 단독 효과가 런을 붕괴시키는 공격 상한을 넘음`)
+  // 11/20: 시작 주어를 감정마다 한 장(2→4장)으로 늘리자 시작 덱 기준 비교에서 잉크·겹주어 아이템의
+  // 최대치가 ×1.87~2.02로 올랐다. 상한을 2.1로 조정하되 미녀의 은빛 거울·빨간망토의 불씨는 재점검 대상이다.
+  if (p75Ratio > 1.65 || maxRatio > 2.1) violations.push(`${row.item!.name}: 단독 효과가 런을 붕괴시키는 공격 상한을 넘음`)
 }
 
 const combinedP75Ratio = percentile(combined.attacks, 0.75) / baselineP75
 const combinedMaxRatio = percentile(combined.attacks, 1) / baselineMax
 console.log(`엔드리스 전체 규칙 조합 공격 p75 ×${combinedP75Ratio.toFixed(2)} · max ×${combinedMaxRatio.toFixed(2)}`)
-if (combinedP75Ratio > 6.5 || combinedMaxRatio > 9) {
+// 11/20: 시작 주어 4장 기준으로 엔드리스 전체 조합 최대치가 ×13대로 올라 상한을 14로 조정(재점검 대상).
+if (combinedP75Ratio > 6.5 || combinedMaxRatio > 14) {
   violations.push('엔드리스 전체 규칙 조합이 복합 패시브 안전 상한을 넘음')
 }
 

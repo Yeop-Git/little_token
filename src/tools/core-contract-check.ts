@@ -20,10 +20,10 @@ import { floorsForEdition, isEditionFinalFloor, strictResourceError } from '@/co
 import { clearRewardValue, gradeFloor, gradeForElapsedTurns, stageInspirationBonus, startGrade } from '@core/grade'
 import { EARLY_BUILD_MODIFIER_IDS, EARLY_BUILD_REWARD_DAY, EARLY_STAT_VERB_IDS, genRewards } from '@data/rewards'
 
-const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(3, elapsed))
+const speedGrades = Array.from({ length: 7 }, (_, elapsed) => gradeForElapsedTurns(0, elapsed))
 assert.deepEqual(speedGrades, [5, 5, 5, 4, 4, 4, 3], 'reward grade falls once per three completed sentences until the luck floor')
-assert.equal(gradeForElapsedTurns(3, 0), startGrade(3), 'a first-turn clear keeps the full starting grade')
-assert.equal(speedGrades[speedGrades.length - 1], gradeFloor(3), 'a long battle stops at the luck floor')
+assert.equal(gradeForElapsedTurns(0, 0), startGrade(0), 'a first-turn clear keeps the full starting grade')
+assert.equal(speedGrades[speedGrades.length - 1], gradeFloor(0), 'a long battle stops at the luck floor')
 assert.equal(clearRewardValue(4, 2, 1), 4, 'early speed grade converts at half scale and keeps unused draws at full value')
 assert.equal(clearRewardValue(4, 0, 5), 3, 'the guaranteed Rare boss shop supplies its one-point price difference after draws are spent')
 assert.equal(clearRewardValue(4, 2, 5), 4, 'saved draws and stage progression do not pay the same allowance twice')
@@ -103,12 +103,13 @@ const lateLine = {
   adv: ALL_REWARD_WORDS.find((word) => word.id === 'michin')!,
   verb: ALL_REWARD_WORDS.find((word) => word.id === 'focusStrike')!,
 }
-const lateStats = { hp: 120, atk: 70, guard: 30, heal: 30, luck: 20 }
+// 운 기본 배율(×1.38)이 빠진 만큼(2026-11-20) 고성장 공격 스탯을 70 → 90으로 올려 같은 후반 화력을 가정한다.
+const lateStats = { hp: 120, atk: 90, guard: 30, heal: 30, luck: 20 }
 const lateIntent = compile(lateLine, makeEarlyTables(), lateStats)
 const lateMult = resolveMultiplier(lateIntent, { luck: lateStats.luck, statBias: lateStats.atk }, 0).mult
 assert(selectionInkCost(lateLine) <= sentenceInkAvailable(0, inkPlayer), 'late combo fits with ink items')
 assert(lateIntent.combos.length > 0 && Math.floor(effectiveBase(lateIntent) * lateMult * lateIntent.castScale) >= 1000,
-  'a high-growth critical combo can still exceed 1000 damage in one hit')
+  `a high-growth critical combo can still exceed 1000 damage in one hit (got ${Math.floor(effectiveBase(lateIntent) * lateMult * lateIntent.castScale)})`)
 
 // 모든 보상 단어가 시작 덱과 기본 잉크만으로 실제 문장 하나에는 들어간다.
 for (const word of ALL_REWARD_WORDS) {
@@ -130,6 +131,7 @@ assert.equal(inkOverdraw(9, 6), 3, 'overdraw reports exact health damage even be
 assert.equal(inkExceedsLimit(6, 5), true, 'sentences cannot exceed five ink')
 assert(SPECIAL_REWARD_WORDS.every((word) => word.inkCost != null), 'reward verbs expose Ink cost as part of their identity')
 const specialCost = (id: string) => wordInkCost(SPECIAL_REWARD_WORDS.find((word) => word.id === id)!)
+// 11/20: 같은 슬픔 3잉크 방어의 「웅크렸다」를 완전히 덮지 않도록 방패치기 100%로 올리고 4잉크로 매긴다.
 assert.equal(specialCost('magicVeil'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('storedResolve'), 4, 'guard-to-damage echo pays for its conversion coefficient')
 assert.equal(specialCost('overflowingHeart'), 4, 'overheal-to-damage pays for its conversion coefficient')

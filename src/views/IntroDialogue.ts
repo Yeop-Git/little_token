@@ -10,7 +10,6 @@ import { TOKEN_FACES, TUTORIAL_CARD_ART } from '@/assets'
 import type { Emotion, Word } from '@core/types'
 import { wordCardInnerHtml, wordMood } from '@/ui/WordCardFace'
 import { currentLocale, t, type LocaleCode } from '@/localization'
-import { SENTENCE_BASE_INK } from '@core/ink'
 
 export interface IntroDialogueHandlers {
   /** 마지막 대사 후(또는 SKIP) 딤이 걷히고 대화창이 사라진 뒤 호출된다. */
@@ -54,7 +53,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '좋아! 주어, 수식어, 동사를 차례로 고르면 한 문장이 완성돼.',
     '앞뒤 단어가 잘 맞으면 좋은 「맥락」이 생기고, 같은 색 감정이 모이면 「공명」해서 더 강해져!',
     '마지막 동사는 때릴지, 막을지, 회복할지를 정해.',
-    `문장마다 잉크 ${SENTENCE_BASE_INK}으로 시작해. 단어를 고르면 잉크를 쓰니까 잉크병을 살펴봐!`,
+    '문장을 쓸 때마다 잉크병이 가득 차. 단어를 고르면 그만큼 줄어드니까, 잉크병을 꼭 살펴봐!',
     '피해가 남으면 앞의 벌레를 넘어 다음 녀석까지 이어져!',
     '그럼 눈앞에서 이야기를 갉아먹는 녀석들부터 쫓아내자!',
   ],
@@ -69,7 +68,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'Good! Choose a subject, modifier, and verb in order to complete one sentence.',
     'When neighboring words fit, they create Context; words of the same emotion color Resonate and become even stronger!',
     'The final verb decides whether you attack, guard, or heal.',
-    `Each sentence starts with ${SENTENCE_BASE_INK} Ink. Words spend Ink, so keep an eye on the bottle!`,
+    'Every sentence starts with a full bottle. Each word drains some, so keep an eye on it!',
     'Any damage left over carries past the front bug into the next one!',
     'Now let us chase away the bugs gnawing at the story in front of us!',
   ],
@@ -84,7 +83,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'そう！主語、修飾語、動詞の順に選べば、一つの文が完成するよ。',
     '前後の言葉が合えば「文脈」になり、同じ色の感情が集まれば「共鳴」してもっと強くなる！',
     '最後の動詞が、攻撃するか、防ぐか、回復するかを決めるんだ。',
-    `文ごとにインク${SENTENCE_BASE_INK}で始まるよ。単語を選ぶとインクを使うから、インク瓶を見てね！`,
+    '文を書くたび、インク瓶は満タンになるよ。単語を選ぶとその分減るから、インク瓶を見てね！',
     '余ったダメージは前の虫を越えて、次の虫まで届くよ！',
     'さあ、目の前で物語をかじる虫たちを追い払おう！',
   ],
@@ -99,7 +98,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     'Отлично! Выбирай по порядку подлежащее, определение и глагол, чтобы закончить фразу.',
     'Соседние слова создают Контекст, а эмоции одного цвета входят в Резонанс и усиливают фразу!',
     'Последний глагол решает, атаковать, защищаться или лечиться.',
-    `Каждая фраза начинается с ${SENTENCE_BASE_INK} чернил. Слова расходуют их, так что следи за чернильницей!`,
+    'Каждая фраза начинается с полной чернильницы. Слова её расходуют, так что следи за ней!',
     'Лишний урон пройдёт сквозь первого жука и попадёт в следующего!',
     'А теперь прогоним жуков, которые пожирают историю прямо перед нами!',
   ],
@@ -114,7 +113,7 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '很好！依次选择主语、修饰语和动词，就能完成一句话。',
     '前后词语契合会形成“语境”，同色情感聚集则会“共鸣”，让句子更强！',
     '最后的动词决定攻击、防御还是治疗。',
-    `每句话从${SENTENCE_BASE_INK}点墨水开始。选择词语会消耗墨水，留意墨水瓶哦！`,
+    '每写一句，墨水瓶都会装满。选词会用掉墨水，留意墨水瓶哦！',
     '多余的伤害会越过前面的虫子，继续打到下一只！',
     '那么，先赶走眼前这些啃食故事的虫子吧！',
   ],
@@ -129,11 +128,14 @@ const TOKEN_LINES: Record<LocaleCode, TokenTutorialLines> = {
     '很好！依次選擇主語、修飾語和動詞，就能完成一句話。',
     '前後詞語契合會形成「語境」，同色情感聚集則會「共鳴」，讓句子更強！',
     '最後的動詞決定攻擊、防禦還是治療。',
-    `每句話從${SENTENCE_BASE_INK}點墨水開始。選擇詞語會消耗墨水，留意墨水瓶喔！`,
+    '每寫一句，墨水瓶都會裝滿。選詞會用掉墨水，留意墨水瓶喔！',
     '多餘的傷害會越過前面的蟲子，繼續打到下一隻！',
     '那麼，先趕走眼前這些啃食故事的蟲子吧！',
   ],
 }
+
+/** 한자·가나처럼 띄어쓰기 없이 글자마다 줄을 바꿔도 되는 문자. */
+const CJK_CHAR = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/
 
 /** 인덱스를 전역에서 소모하지 않고 매 튜토리얼마다 같은 앞뒤 관계로 대사를 만든다. */
 function tutorialScript(locale: LocaleCode): ScriptLine[] {
@@ -194,6 +196,8 @@ export class IntroDialogue {
   private readonly choiceEl: HTMLElement
 
   private skipTyping: (() => void) | null = null
+  /** 타자 중인 단어 묶음 — 띄어쓰기 언어에서 단어 단위 줄바꿈을 위해. */
+  private wordEl: HTMLSpanElement | null = null
   private advanceNow: (() => void) | null = null
   private advanceForce: (() => void) | null = null
   private currentPortrait: Portrait | null = null
@@ -320,6 +324,7 @@ export class IntroDialogue {
 
   /** 글자별 팝인 타자 — 클릭 시 남은 글자 즉시 완성. */
   private typeText(text: string): Promise<void> {
+    this.wordEl = null
     let revealed = 0
     let fastForward = false
     return new Promise<void>((resolve) => {
@@ -330,11 +335,24 @@ export class IntroDialogue {
         const target = fastForward ? text.length : revealed + 1
         while (revealed < target) {
           // 드러나는 순간 글자마다 span을 붙여 "다라라락 띠용띠용" 바운스를 낸다.
+          const ch = text[revealed]
           const span = document.createElement('span')
           span.className = 'intro-dlg-char'
           // inline-block은 낱개 공백을 자기 포맷 문맥의 여백으로 지워버린다 — nbsp로 보존.
-          span.textContent = text[revealed] === ' ' ? ' ' : text[revealed]
-          this.textEl.appendChild(span)
+          span.textContent = ch === ' ' ? '\u00a0' : ch
+          // 글자마다 inline-block이면 줄이 단어 한가운데서 끊긴다("р / ядом").
+          // 띄어쓰기가 있는 언어는 단어 묶음 안에 글자를 넣어 단어 단위로만 줄바꿈한다.
+          if (ch === ' ' || CJK_CHAR.test(ch)) {
+            this.wordEl = null
+            this.textEl.appendChild(span)
+          } else {
+            if (!this.wordEl || !this.wordEl.isConnected) {
+              this.wordEl = document.createElement('span')
+              this.wordEl.className = 'intro-dlg-word'
+              this.textEl.appendChild(this.wordEl)
+            }
+            this.wordEl.appendChild(span)
+          }
           revealed++
         }
         if (revealed >= text.length) {
@@ -420,6 +438,8 @@ export class IntroDialogue {
         hideMeta: true,
       })
       chip.disabled = true
+      // 차례가 된 카드 위 말풍선 문구(CSS가 attr()로 읽는다).
+      chip.dataset.hintLabel = t('tutorialTapHere', '여기 클릭!')
       chip.style.setProperty('--chip-delay', `${i * 90}ms`)
       // 이 런에서 처음 마주하는 선택 — 칩 위에 큰 화살표가 점멸하며 내려찍는다.
       if (i === 0 && !this.hintedFirstChoice) {

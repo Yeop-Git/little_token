@@ -180,7 +180,8 @@ export function preparePendingReward(run: RunState, grade: number, seed: number,
     day: run.day,
     grade: normalizedGrade,
     earned: normalizedEarned,
-    phase: 'subject',
+    // 클리어 보상은 아이템 → 주어·수식어 → 동사 순서로 넘긴다(11/20 피드백).
+    phase: 'item',
     picks: [],
     seed: Number.isFinite(seed) ? Math.floor(seed) : 0,
     refreshes: { subject: 0, item: 0, verb: 0 },
@@ -214,15 +215,46 @@ function cloneWord(w: Word): Word {
 const REINFORCE_STEP = {
   power: 2, statMult: 0.15, bonus: 0.15, guard: 2, heal: 2, crit: 0.05,
   castScale: 0.05,
-  varianceHi: 0.15, growHp: 1,
+  growHp: 1,
+}
+
+/**
+ * 도박 카드 고점의 강화 폭 — 기대 배율이 일반 주어(배율 +0.15)와 같은 만큼 오르도록
+ * 성공 확률로 나눈다(0.05 단위). 고점을 일률 +0.15로 올리면 30% 카드(다친 나는)는
+ * 기대치가 +0.045밖에 안 올라 강화가 거의 무의미했다(11/21 강화 검수).
+ */
+export function gambleHiStep(p: number): number {
+  return Math.round(REINFORCE_STEP.bonus / Math.max(0.05, p) / 0.05) * 0.05
+}
+
+/** 규칙 카드가 강화마다 얻는 배율 풀 — 주어 강화(+0.15)보다 한 칸 낮게 두어 규칙 자체의 몫을 남긴다. */
+export const KEYWORD_REINFORCE_BONUS = 0.1
+
+/** 오를 수치 없이 규칙(키워드)만 가진 수식어. 강화로 붙은 배율 풀은 이 카드의 성장분이라 판정에서 뺀다. */
+function keywordOnly(w: Word): boolean {
+  return w.slot === 'adv' && w.power == null && w.statMult == null && !w.variance && !w.growHp
+    && !w.effects?.guard && !w.effects?.heal && w.effects?.castScale == null && w.crit == null
+}
+
+/** 강화해도 아무 수치가 오르지 않는 카드 — 강화 보상으로 내지 않는다(안전망). */
+export function reinforceGrows(w: Word): boolean {
+  const after = cloneWord(w)
+  reinforceWord(after)
+  return JSON.stringify({ ...after, level: 0 }) !== JSON.stringify({ ...cloneWord(w), level: 0 })
 }
 export function reinforceWord(w: Word): void {
   w.level = (w.level ?? 1) + 1
   if (w.power != null) w.power += REINFORCE_STEP.power
   if (w.statMult != null) w.statMult = Math.round((w.statMult + REINFORCE_STEP.statMult) * 100) / 100
-  if (w.bonus != null) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
+  // 도박 카드의 핵심 수치는 고점이다. 배율 풀까지 올리면 실패해도 ×1.15·×1.30이 붙어
+  // 상세 팝업의 "실패 시 배율 ×1.00"과 실제 결과가 어긋났다(11/20 피드백).
+  if (keywordOnly(w)) {
+    // 관통·선공·카운터처럼 규칙만 가진 카드는 규칙이 그대로라 강화가 아무것도 바꾸지 않았다.
+    // 강화마다 배율 줄을 하나 붙여(또는 키워) 단계가 오른 만큼 실제로 세지게 한다(11/21 요청).
+    w.bonus = Math.round(((w.bonus ?? 0) + KEYWORD_REINFORCE_BONUS) * 100) / 100
+  } else if (w.bonus != null && !w.variance) w.bonus = Math.round((w.bonus + REINFORCE_STEP.bonus) * 100) / 100
   if (w.variance) {
-    w.variance = { ...w.variance, hi: Math.round((w.variance.hi + REINFORCE_STEP.varianceHi) * 100) / 100 }
+    w.variance = { ...w.variance, hi: Math.round((w.variance.hi + gambleHiStep(w.variance.p)) * 100) / 100 }
   }
   if (w.growHp) w.growHp += REINFORCE_STEP.growHp
   if (w.effects?.guard) w.effects.guard += REINFORCE_STEP.guard

@@ -1,3 +1,5 @@
+import { formatNumber } from '@/core/numberFormat'
+import { tipBulletsHtml } from '@/ui/TooltipLayer'
 /**
  * 로비(타이틀)에서만 여는 전투 설명서. 전투 화면을 가리지 않는 독립 씬이다.
  *
@@ -14,7 +16,6 @@ import {
   CRIT_STAT_K,
   compile,
   effectiveBase,
-  LUCK_MULT,
   resolveMultiplier,
   rouletteOdds,
   ROULETTE,
@@ -30,7 +31,7 @@ import {
   WEAKNESS_MULT,
 } from '@core/combatRules'
 import { josa } from '@core/josa'
-import { selectionInkCost, SENTENCE_MAX_INK } from '@core/ink'
+
 import { STARTING_COMBAT_STATS, STAT_META } from '@core/player'
 import {
   EMOTION_LABEL,
@@ -100,9 +101,9 @@ export class CombatGuideView {
   private chapters: Chapter[] = (currentLocale === 'ko' ? [
     { key: 'flow', title: '전투의 흐름', hint: '한 턴에 벌어지는 일', body: () => this.pageFlow() },
     { key: 'card', title: '카드 읽는 법', hint: '카드에 적힌 것이 전부', body: () => this.pageCard() },
-    { key: 'damage', title: '피해가 정해지는 순서', hint: '깡수치 × 배율', body: () => this.pageDamage() },
+    { key: 'damage', title: '피해가 정해지는 순서', hint: '점수 × 배율', body: () => this.pageDamage() },
     { key: 'context', title: '감정과 맥락', hint: '공명 · 관용구 · 약점', body: () => this.pageContext() },
-    { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어막', body: () => this.pageCombat() },
+    { key: 'combat', title: '공격과 방어', hint: '범위 · 관통 · 방어도', body: () => this.pageCombat() },
     { key: 'journey', title: '여정과 보상', hint: '15층 · 보스 · 전리품', body: () => this.pageJourney() },
   ] : localizedGuidePages(currentLocale).map((entry) => ({ ...entry, body: () => entry.body })))
     .filter((chapter) => !IS_DEMO || chapter.key !== 'journey')
@@ -150,7 +151,7 @@ export class CombatGuideView {
             <p class="guide-eyebrow">그림일기 · 전투 설명서</p>
             <h1 id="guide-title">오늘의 전투는 이렇게 쓴다</h1>
             <p class="guide-lede">단어 카드를 이어 문장 하나를 완성하면, 그 문장이 그대로 이번 턴의 행동이 된다.
-              여기 적힌 수치는 모두 지금 돌아가는 전투 규칙에서 그대로 읽어 온 값이다.</p>
+              여기 적힌 점수는 모두 지금 돌아가는 전투 규칙에서 그대로 읽어 온 값이다.</p>
             <button type="button" class="guide-back">로비로 돌아가기<kbd>Esc</kbd></button>
           </header>
           <div class="guide-body">
@@ -195,8 +196,6 @@ export class CombatGuideView {
     }).join('<span class="g-plus" aria-hidden="true">+</span>')
 
     const sentence = slots.map((slot) => slotWord(slot.key, EXAMPLE_IDS[slot.key])?.text ?? '____').join(' ')
-    const exampleSelection = Object.fromEntries(slots.map((slot) => [slot.key, slotWord(slot.key, EXAMPLE_IDS[slot.key]) ?? undefined]))
-    const exampleInk = selectionInkCost(exampleSelection)
 
     const phases: [string, string, string][] = [
       ['1', '단어 고르기', `${slots.map((s) => s.label).join(' → ')} 순서로 카드를 한 장씩 확정한다`],
@@ -216,7 +215,7 @@ export class CombatGuideView {
 
       <div class="g-cardrow">${cards}</div>
       <p class="g-sentence">“${sentence}”<span>세 장이 이어져 한 문장이 된다</span></p>
-      <p class="g-note"><b>잉크 ${exampleInk}/${SENTENCE_MAX_INK}</b> · ${t('guideInkRule', '문장마다 잉크 {max}로 시작하며, 단어를 고르면 잉크를 사용한다.').replace('{max}', String(SENTENCE_MAX_INK))}</p>
+      <p class="g-note"><b>${t('hudInkLabel', '잉크')}</b> · ${t('guideInkRule', '문장을 쓸 때마다 잉크는 가득 찬 채로 시작한다. 단어를 고르면, 적힌 만큼 잉크가 줄어든다.')}</p>
 
       <h3 class="g-h3">일반전 한 턴의 순서</h3>
       <ol class="g-flow">
@@ -229,7 +228,7 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">손패와 뽑기</h3>
           <ul class="g-bullets">
-            <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 선택지가 넓은 동사 칸만 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
+            <li>칸을 열면 카드가 <b>${CARD_HAND_CONFIG.initialHand}장</b> 깔린다. 감정마다 시작 주어가 한 장씩 있는 주어 칸은 <b>${CARD_HAND_CONFIG.subjInitialHand}장</b>, 선택지가 넓은 동사 칸은 <b>${CARD_HAND_CONFIG.verbInitialHand}장</b>이다.</li>
             <li>한 스테이지에서 추가로 뽑을 수 있는 횟수는 <b>${CARD_HAND_CONFIG.drawsPerStage}회</b>, 손패는 최대 <b>${CARD_HAND_CONFIG.maxHand}장</b>까지 늘어난다.</li>
             <li>미사용 무료 뽑기 수와 보스 진행 보너스(<b>5·10·15층 +1·+2·+3</b>) 중 큰 값이 획득 영감에 더해진다. 보상 희귀도에는 영향을 주지 않는다.</li>
             <li>카드를 클릭하면 그 칸이 곧바로 확정된다. 아래 단계 버튼을 누르면 그 칸으로 돌아가 뒤 선택을 다시 고를 수 있다.</li>
@@ -238,7 +237,7 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">시작 스탯</h3>
           <ul class="g-stats">${stats}</ul>
-          <p class="g-note g-tight">동사의 깡수치는 카드에 박힌 고정 위력이 아니라 <b>스탯 × 계수</b>에서 나온다.
+          <p class="g-note g-tight">동사의 점수는 카드에 박힌 고정 위력이 아니라 <b>스탯 × 계수</b>에서 나온다.
             그래서 같은 카드도 스탯이 오르면 함께 세진다.</p>
         </section>
       </div>`
@@ -257,17 +256,17 @@ export class CombatGuideView {
       ['오른쪽 위 · 비용', '문장을 쓸 때 소비하는 잉크. 감정과 겹치지 않게 반대편에 표시한다.'],
       ['테두리와 상세 · 등급', `${Object.values(RARITY_LABEL).join(' · ')}. 카드에 마우스를 올리면 등급과 반복강화 <b>Lv.</b>를 함께 볼 수 있다.`],
       ['가운데 · 이름', '문장에 실제로 적히는 말. 조사는 칸에 맞춰 자동으로 붙는다.'],
-      ['아래 · 한 줄 효과', '이 카드가 문장에 보태는 값 전부. 숨은 수치는 없다.'],
+      ['아래 · 한 줄 효과', '이 카드가 문장에 보태는 값 전부. 숨은 점수는 없다.'],
     ]
 
     const notes: [string, string][] = [
       ['배율 ×1.20', '주어가 문장에 보태는 배율. 주어의 안정성·고점에 따라 비용이 달라진다.'],
-      ['공격 ×1', '동사가 스탯에서 뽑아내는 깡수치. 공격 스탯이 5면 5가 된다.'],
+      ['공격 ×1', '동사가 스탯에서 뽑아내는 점수. 공격 스탯이 5면 5가 된다.'],
       ['75% 확률로 배율 ×1.80', '도박 카드. 확률로 높은 배율과 낮은 배율 중 하나가 정해진다.'],
       ['연타 2', '동사의 본행동이 같은 적에게 두 번 이어진다. 이런 직접 행동 키워드는 동사에만 붙는다.'],
       ['다시 뽑기 +1회', '덱에서 카드를 한 번 더 뽑을 수 있다.'],
       ['공격 1랭크↑', `공격·방어 태세는 1랭크마다 25% 변하고 최대 ±${STAT_RANK_LIMIT}랭크까지 쌓인다.`],
-      ['대상 2명', '대상 수치가 2인 동사는 앞의 두 적에게 이어진다. 뒷줄일수록 피해가 줄어든다.'],
+      ['대상 2명', '대상 점수가 2인 동사는 앞의 두 적에게 이어진다. 뒷줄일수록 피해가 줄어든다.'],
     ]
 
     return `
@@ -312,35 +311,32 @@ export class CombatGuideView {
     const damageOf = (m: number) => Math.round(base * m)
 
     const flats = intent.breakdown.flats.map((part) => `
-      <li><b>${part.label}</b><i>+${part.value}</i><span>${part.hint ?? '카드 고정 위력'}</span></li>`).join('')
+      <li><b>${part.label}</b><i>+${formatNumber(part.value)}</i><span>${part.hint ?? '카드 고정 위력'}</span></li>`).join('')
 
     const mults = intent.breakdown.mults.map((part) => `
       <li><b>${part.label}</b><i>${mult(part.value)}</i><span>${part.hint ?? ''}</span></li>`).join('')
 
-    const luckMult = 1 + STATS.luck * LUCK_MULT
-
     return `
-      <p class="g-lead">피해는 <b>깡수치</b>를 만들고 거기에 <b>배율</b>을 곱해 정해진다.
+      <p class="g-lead">피해는 <b>점수</b>를 만들고 거기에 <b>배율</b>을 곱해 정해진다.
         아래 계산은 시작 덱과 시작 스탯으로 실제 컴파일러를 돌린 결과다.</p>
 
       <p class="g-sentence g-sentence-sm">“${intent.sentence}”</p>
 
       <div class="g-calc">
         <section class="g-calc-col">
-          <h3 class="g-h3">① 깡수치</h3>
+          <h3 class="g-h3">① 점수</h3>
           <ul class="g-parts">${flats}</ul>
           <p class="g-calc-sum">합계 <b>${base}</b></p>
-          <p class="g-note g-tight">동사가 정한다. 공격이면 피해, 방어·회복이면 그쪽 수치로 들어간다.</p>
+          <p class="g-note g-tight">동사가 정한다. 공격이면 피해, 방어·회복이면 그쪽 점수로 들어간다.</p>
         </section>
         <span class="g-calc-op" aria-hidden="true">×</span>
         <section class="g-calc-col">
           <h3 class="g-h3">② 배율</h3>
           <ul class="g-parts">
             ${mults}
-            <li class="is-extra"><b>운</b><i>${mult(luckMult)}</i><span>운 ${STATS.luck} × ${pct(LUCK_MULT)}</span></li>
           </ul>
           <p class="g-calc-sum">합계 <b>${mult(normal.mult)}</b></p>
-          <p class="g-note g-tight">배율 풀은 <b>더해서</b> 한 번, 관용구·공명·운은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
+          <p class="g-note g-tight">카드 배율은 <b>더해서</b> 한 번, 관용구·공명은 <b>곱해서</b> 붙는다. 상한은 없다.</p>
         </section>
         <span class="g-calc-op" aria-hidden="true">=</span>
         <section class="g-calc-col g-calc-out">
@@ -418,7 +414,7 @@ export class CombatGuideView {
 
   private pageCombat(): string {
     const falloff = TARGET_FALLOFF.map((v) => pct(v)).join(' · ')
-    const preempt = rewardWord('sinnage')
+    const preempt = rewardWord('naepda')
     const flurry = rewardWord('michin')
     const pierce = rewardWord('himkkeot')
     const counter = rewardWord('dandanhi')
@@ -441,7 +437,7 @@ export class CombatGuideView {
             <li><b>2명·3명</b> — 앞줄부터 <b>${falloff}</b>로 피해가 줄어든다.</li>
             <li><b>전체</b> — 살아 있는 모든 적을 같은 위력으로 때린다.</li>
             <li><b>2연타·3연타</b> — 최전방 하나만 여러 번 때린다. 쓰러지면 남은 타격은 다음 적으로 넘어가지 않는다.</li>
-            <li><b>관통</b> — 적의 방어막과 매직실드를 지나쳐 체력에 직접 꽂히고, 둘을 깎지도 않는다.</li>
+            <li><b>관통</b> — 적의 방어도와 매직실드를 지나쳐 체력에 직접 꽂히고, 둘을 깎지도 않는다.</li>
             <li><b>다음 턴 발동</b> — 타격 수·범위·관통·감정까지 그대로 보존해 다음 턴에 실행한다.</li>
             <li>단일 공격이 적을 넘겨 죽이면 <b>초과 피해가 뒷줄로 관통</b>한다.</li>
           </ul>
@@ -449,10 +445,10 @@ export class CombatGuideView {
         <section class="g-panel">
           <h3 class="g-h3">적이 두르는 것</h3>
           <ul class="g-bullets">
-            <li><b>방어막</b> — 피해를 먼저 받아 낸다. ${roach ? `${josa(roach.name, '은', '는')} 방어 ${roach.guard}짜리 껍질을 두르고 나온다.` : ''}</li>
+            <li><b>방어도</b> — 피해를 먼저 받아 낸다. ${roach ? `${josa(roach.name, '은', '는')} 방어 ${roach.guard}짜리 껍질을 두르고 나온다.` : ''}</li>
             <li><b>매직실드</b> — 한 타격을 통째로 막고 1겹이 사라진다. <b>관통</b>은 이를 우회하고, 일반 공격은 <b>연타</b>로 벗길 수 있다.
               ${pillbug ? `${josa(pillbug.name, '이', '가')} 1겹을 들고 나온다.` : ''}</li>
-            <li><b>관통하는 적</b> — ${mosquito ? `${mosquito.name}처럼` : '일부 적은'} 내 방어막을 소모시키지 않고 체력에 직접 꽂는다.</li>
+            <li><b>관통하는 적</b> — ${mosquito ? `${mosquito.name}처럼` : '일부 적은'} 내 방어도를 소모시키지 않고 체력에 직접 꽂는다.</li>
             <li>보스는 저마다 방어를 무력화하는 수단을 하나씩 갖는다. 대신 반드시 미리 읽히게 예고하고,
               왼쪽 토큰이 붉은 쪽지로 경고한다.</li>
           </ul>
@@ -461,11 +457,12 @@ export class CombatGuideView {
 
       <div class="g-split">
         <section class="g-panel">
-          <h3 class="g-h3">내 방어막</h3>
+          <h3 class="g-h3">내 방어도</h3>
           <ul class="g-bullets">
             <li>피해를 <b>흡수한 만큼만</b> 줄어들고 남은 양은 그대로 유지된다.</li>
-            <li>새 방어는 기존 방어에 <b>합산</b>되며, 이월분을 포함해 <b>최대 체력의 50%</b>까지 비축할 수 있다.</li>
-            <li>체력과 방어막은 <b>다음 스테이지에도 그대로 이어진다.</b> 스테이지가 바뀐다고 회복되지 않는다.</li>
+            <li>새 방어는 기존 방어에 <b>합산</b>되며, 이월분을 포함해 <b>최대 체력의 50% + 방어 스탯×2</b>까지 비축할 수 있다.</li>
+            <li>한도에 걸려 담기지 못한 방어도도 <b>그 턴 방패치기 피해</b>에는 그대로 들어간다.</li>
+            <li>체력과 방어도는 <b>다음 스테이지에도 그대로 이어진다.</b> 스테이지가 바뀐다고 회복되지 않는다.</li>
           </ul>
         </section>
         <section class="g-panel">
@@ -473,7 +470,7 @@ export class CombatGuideView {
           <p>카운터 수식어는 공격 행동 중에는 받은 피해의 <b>50%</b>를, 방어 또는 회복 행동 중에는
             받은 피해의 <b>100%</b>를 즉시 최전방 적에게 되돌린다.</p>
           <p class="g-example">받은 피해 <b>4</b> → 공격 행동 <b>2</b> 반격 · 방어/회복 행동 <b>4</b> 반격</p>
-          <p class="g-note g-tight">실드 유무는 카운터 비율에 영향을 주지 않으며, 해당 문장을 쓴 턴에만 유효하다.</p>
+          <p class="g-note g-tight">방어도 유무는 카운터 비율에 영향을 주지 않으며, 해당 문장을 쓴 턴에만 유효하다.</p>
         </section>
       </div>`
   }
@@ -503,7 +500,7 @@ export class CombatGuideView {
 
       <h3 class="g-h3">길에서 만나는 벌레</h3>
       <ul class="g-foes">
-        ${normals.map((def) => `<li><b>${def.name}</b><i>체력 ${def.hp} · 공격 ${def.atk}</i><span>${def.note ?? ''}</span></li>`).join('')}
+        ${normals.map((def) => `<li><b>${def.name}</b><i>체력 ${def.hp} · 공격 ${def.atk}</i><span>${tipBulletsHtml(def.note ?? '')}</span></li>`).join('')}
       </ul>
 
       <div class="g-split">
@@ -536,7 +533,8 @@ export class CombatGuideView {
       </ul>
       <p class="g-note">세 마디는 저마다 <b>1점</b>을 보장하고, 등급 보너스가 그 위에 무작위 칸으로
         얹힌다 — 어느 마디가 크게 터질지는 골라 보기 전까지 모른다.
-        영웅·전설 아이템은 여기에 <b>문장 규칙 자체를 바꾸는 고유효과</b>까지 더한다 —
-        칸을 하나 더 열거나, 동사를 둘로 가르거나, 문장 끝에 물음표를 붙이는 식이다.</p>`
+        모든 아이템에는 <b>특성</b>이 하나씩 붙는다. 일반·희귀 아이템은 잉크·뽑기·감정 점수·배율 같은
+        덱의 방향을 정하는 특성이 진열마다 무작위로 붙고, 영웅·전설 아이템은 <b>문장 규칙 자체를 바꾸는 특성</b>을
+        지닌다 — 칸을 하나 더 열거나, 동사를 둘로 가르거나, 문장 끝에 물음표를 붙이는 식이다.</p>`
   }
 }

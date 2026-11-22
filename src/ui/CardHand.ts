@@ -1,7 +1,8 @@
 import { SPRITES } from '@/assets'
 import { emotionOrNeutral, RARITY_LABEL, type Word } from '@core/types'
 import { emotionIconBadge } from '@/ui/EmotionBadge'
-import { wordCardFrontHtml, wordCardPrimaryNote, wordMood } from '@/ui/WordCardFace'
+import { cardNoteTagsHtml, emphasizeCardNumbers, wordCardFrontHtml, wordCardPrimaryNote, wordMood } from '@/ui/WordCardFace'
+import { wordLuckChances } from '@/ui/luckChance'
 import { wordNoteText } from '@core/wordText'
 import { wordInkCost } from '@core/ink'
 import { spawnCardCommitBurst } from '@/ui/CardCommitBurst'
@@ -13,8 +14,9 @@ import { ensureCardInInitialDraw } from '@core/hand'
 const COMMIT_FLIGHT_MS = 480
 const COMMIT_POP_MS = 180
 export const CARD_HAND_CONFIG = {
-  /** Subjects/modifiers open three choices; the eight-card verb deck opens four. */
+  /** Modifiers open three choices; subjects (one starter per emotion) and the verb deck open four. */
   initialHand: 3,
+  subjInitialHand: 4,
   verbInitialHand: 4,
   maxHand: 6,
   /** 한 스테이지에서 추가로 뽑을 수 있는 횟수. 전투를 시작할 때 이 값으로 초기화된다. */
@@ -233,6 +235,8 @@ export class CardHand {
     this.sealedWordIds.add(picked.word.id)
     if (this.selectedId === picked.instanceId) this.selectedId = null
     this.render()
+    // 거미줄이 날아와 닿기 전까지는 봉인 그물을 숨겨 둔다. 닿는 순간(playSealImpact) 붙는다.
+    this.opts.handRoot.querySelector(`[data-instance-id="${picked.instanceId}"]`)?.classList.add('web-pending')
     return { instanceId: picked.instanceId, word: picked.word }
   }
 
@@ -241,6 +245,7 @@ export class CardHand {
     window.setTimeout(() => {
       const button = this.opts.handRoot.querySelector<HTMLButtonElement>(`[data-instance-id="${instanceId}"]`)
       if (!button) return
+      button.classList.remove('web-pending')
       button.classList.add('web-catching')
       window.setTimeout(() => button.isConnected && button.classList.remove('web-catching'), 900)
     }, delay)
@@ -291,7 +296,9 @@ export class CardHand {
     if (!state) {
       const handTarget = slotKey === 'verb' || slotKey === 'verb2'
         ? CARD_HAND_CONFIG.verbInitialHand
-        : CARD_HAND_CONFIG.initialHand
+        : slotKey === 'subj' || slotKey === 'subj2'
+          ? CARD_HAND_CONFIG.subjInitialHand
+          : CARD_HAND_CONFIG.initialHand
       const initialCount = Math.min(handTarget, words.length)
       const shuffled = ensureCardInInitialDraw(
         this.shuffle(words),
@@ -582,7 +589,7 @@ export class CardHand {
       // 풀에 들어가면, 다음에 빌려 쓸 때 그 애니메이션이 이어져 뒷면이 보이거나
       // 엉뚱한 자리에서 시작한다. CSS 애니메이션은 다시 붙을 때 처음부터 돈다.
       button.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
-      button.classList.remove('pressing', 'selected', 'touch-previewing', 'drawing', 'sealed', 'blocked', 'web-catching')
+      button.classList.remove('pressing', 'selected', 'touch-previewing', 'drawing', 'sealed', 'blocked', 'web-catching', 'web-pending')
       button.remove()
       const key = button.dataset.poolKey
       if (!key) return
@@ -622,7 +629,7 @@ export class CardHand {
       const note = button.querySelector<HTMLElement>('.card-note-text')
       // 키워드는 아래 전용 칩이 맡는다. 카드 재사용 갱신에서도 전체 note를 다시 넣으면
       // 같은 키워드가 요약 줄과 칩에 한 번씩 중복된다.
-      if (note) note.textContent = unavailable ?? wordCardPrimaryNote(card.word)
+      if (note) note.innerHTML = unavailable ? emphasizeCardNumbers(unavailable) : cardNoteTagsHtml(wordCardPrimaryNote(card.word), wordLuckChances(card.word))
       const emotionBadge = button.querySelector<HTMLElement>('.card-emotion')
       if (emotionBadge) {
         emotionBadge.outerHTML = emotionIconBadge(emotionKey, 'card-emotion')
@@ -806,7 +813,7 @@ export class CardHand {
     const spent = this.drawsLeft <= 0
     const disabled = !this.inputEnabled || this.processing || full || spent || pileLeft === 0
     const note = spent ? '이번 전투 소진' : full ? '손패 가득' : pileLeft === 0 ? '남은 카드 없음' : `${this.drawsLeft}회 남음`
-    const saveHint = this.drawsLeft > 0 ? ` · 아끼면 영감 +${this.drawsLeft}` : ''
+    const saveHint = this.savedDraws > 0 ? ` · 아끼면 영감 +${this.savedDraws}` : ''
     this.opts.deckButton.disabled = disabled
     this.opts.deckButton.title = `남은 뽑기 ${this.drawsLeft}회${saveHint}`
     this.opts.deckButton.setAttribute('aria-label', (disabled ? `카드 뽑기 불가: ${note}` : `카드 뽑기, ${note}`) + saveHint)

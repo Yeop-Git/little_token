@@ -15,7 +15,7 @@ import { compile, effectiveBase, isDamageIntent, resolveMultiplier, statBiasOf }
 import { rankedStat } from '@core/combatRules'
 import { inkExceedsLimit, selectionInkCost, sentenceInkAvailable } from '@core/ink'
 import { conflictReason } from '@core/validator'
-import type { Intent, Selection, Word } from '@core/types'
+import type { Emotion, Intent, Selection, Word } from '@core/types'
 import { startingPlayer, applyItemReward } from '@core/run'
 import { ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@core/passives'
 import { registerWord } from '@core/run'
@@ -36,6 +36,8 @@ import {
   activeEnemyPart,
   summonCount,
   type BattleState,
+  weaknessEmotions,
+  intentWeaknessMult,
 } from '../sim/reference'
 
 const rngSeeded = (seed: number) => () => {
@@ -170,7 +172,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
   const t = makeEarlyTables(player.deck, player)
   const ceiling = candidates(player, null, new Set(), null, 0)
   const state: BattleState = {
-    playerHp: player.stats.hp, playerMax: player.stats.hp, guard: 0, counter: false, counterFull: false,
+    playerHp: player.stats.hp, playerMax: player.stats.hp, playerGuardStat: player.stats.guard, guard: 0, counter: false, counterFull: false,
     turn: 1, enemies: [boss], pending: null,
   }
   engageInitialFront(state)
@@ -195,7 +197,9 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
     const incoming = !telegraphed && !!nextEnemyAttackStep(boss)?.shatterGuard
     const sealSlotKey = web ? spiderSealSlotForTurn(t.template.slots.map((slot) => slot.key), turn) : null
     const hand = candidates(player, rng, sealedWordIds, sealSlotKey, boss.def.webPattern?.maxSealedCards ?? 0, state)
-    const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => b.dmg - a.dmg)[0]
+    // 숙련 정책은 체력바 옆 약점 배지를 보고 공격 속성까지 맞춘 피해로 비교한다.
+    const readDmg = (c: Candidate) => policy === 'smart' ? c.dmg * intentWeaknessMult(boss, c.intent) : c.dmg
+    const bestAttack = hand.filter((c) => c.dmg > 0).sort((a, b) => readDmg(b) - readDmg(a))[0]
     const bestGuard = hand
       .filter((c) => c.guard > 0 || c.intent.magicShield > 0)
       .sort((a, b) => (b.guard + b.intent.magicShield * state.playerMax * .6) - (a.guard + a.intent.magicShield * state.playerMax * .6))[0]
@@ -220,7 +224,7 @@ function simulate(day: number, policy: Policy, seed: number, build: BossBuild = 
       const weakness = activeEnemyPart(boss)?.def.weakness
       const matchesWeakness = (candidate: Candidate) => !weakness
         || (weakness.kind === 'emotion'
-          ? candidate.intent.emotions.includes(weakness.value as typeof candidate.intent.emotions[number])
+          ? weaknessEmotions(candidate.intent).includes(weakness.value as Emotion)
           : candidate.intent.tags.includes(weakness.value))
       const weakAnswer = boss.def.webPattern
         ? hand.filter(matchesWeakness).sort((a, b) => (b.dmg > 0 ? 1 : 0) - (a.dmg > 0 ? 1 : 0) || b.dmg - a.dmg || b.heal + b.guard - a.heal - a.guard)[0]
@@ -368,8 +372,10 @@ for (const day of [5, 10, 15]) {
     for (const [policy, runs] of byPolicy) {
       const waves = total(runs, (run) => run.summonWaves)
       const groggies = total(runs, (run) => run.queenGroggies)
-      if (waves < runs.length * 1.5) failures.push(`10층 ${policy}: 6~7턴 전투에서 일벌 웨이브가 충분히 반복되지 않습니다 (${waves}/${runs.length}).`)
-      if (groggies < runs.length * 1.5) failures.push(`10층 ${policy}: 호위 전멸 보상이 충분히 열리지 않습니다 (${groggies}/${runs.length}).`)
+      // 11/20 피드백: 여왕벌전 일벌은 재소환하지 않는다. 전투마다 한 웨이브를
+      // 세우고, 그 웨이브를 정리해 그로기를 한 번 여는지만 본다.
+      if (waves < runs.length) failures.push(`10층 ${policy}: 일벌 웨이브가 세워지지 않은 전투가 있습니다 (${waves}/${runs.length}).`)
+      if (groggies < runs.length) failures.push(`10층 ${policy}: 호위 전멸 보상이 충분히 열리지 않습니다 (${groggies}/${runs.length}).`)
     }
     const greedyGroggyRate = total(greedy, (run) => run.queenGroggies) / Math.max(1, total(greedy, (run) => run.summonWaves))
     const smartGroggyRate = total(smart, (run) => run.queenGroggies) / Math.max(1, total(smart, (run) => run.summonWaves))

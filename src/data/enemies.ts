@@ -7,7 +7,7 @@
 
 import type { EnemyDef, Rarity } from '@core/types'
 
-export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중 : 본체 무적'
+export const QUEEN_ESCORT_IMMUNITY_LABEL = '호위 중: 본체 무적'
 
 export const ENEMIES: Record<string, EnemyDef> = {
   mantis: {
@@ -35,7 +35,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
         groggyRequiresGuardShatter: true,
       },
     ],
-    note: '낫 휘두르기를 한두 번 쓴 뒤, 견제 공격과 함께 큰낫 내려베기를 예고한다. 표시된 필요 방어를 채우면 방어를 전부 소모하는 대신 체력 피해 없이 사마귀가 그로기되어 이번 문장 피해를 ×2.5로 받고 예정된 다음 공격을 한 번 거른다. 부족한 방어는 피해를 흡수한 만큼만 소모되며, 남은 피해의 절반을 사마귀가 흡혈한다.',
+    note: '휘두르기 1~2번 뒤 내려베기 예고\n필요 방어를 채우면 피해 없음, 모자라면 남은 피해 절반을 흡혈\n막아 내면 그로기: 피해 ×2.5, 다음 공격 거름',
   },
   queenBee: {
     id: 'queenBee', name: '여왕벌', boss: true,
@@ -48,19 +48,23 @@ export const ENEMIES: Record<string, EnemyDef> = {
       // 10층 덱의 평범한 문장은 한두 마리를 순서대로 정리하고, 덱 상한(약 160)은
       // 네 마리 총 120 체력을 한 번에 관통할 수 있는 기준이다.
       hp: 30,
-      // 전투 시작과 호위 전멸 다음 턴에만 네 마리를 한꺼번에 세운다. 중간 보충을
-      // 막아 매 웨이브가 "네 마리를 모두 퇴치하면 그로기"라는 완결된 목표가 된다.
+      // 피드백(11/20): 여왕벌은 혼자 싸우다가 마지막 페이지에 들어선 다음 턴에
+      // 네 마리를 한꺼번에 단 한 번 세운다(예고 표기 없이 TIP 쪽지에만 적는다). 다 쓰러뜨린 일벌이 다시 살아나면 쌓아 온 진행이
+      // "새로고침"된 것처럼 느껴져, 재소환 없이 한 묶음으로 끝낸다.
       perTurn: 4,
       max: 4,
       maxPerSide: 2,
       refillOnlyWhenEmpty: true,
+      maxWaves: 1,
+      summonFromBar: 'last',
       pierceWhileEscorted: true,
       backlashMaxHpRatePerUnit: 0.05,
       focusedBacklash: { emotion: 'anger', multiplier: 2 },
       groggyEvery: 4,
       groggyDamageMult: 2.5,
     },
-    note: `전투 시작에 체력 30인 일벌 네 마리를 한꺼번에 호위로 세운다. ${QUEEN_ESCORT_IMMUNITY_LABEL}. 한 마리라도 남아 있으면 여왕벌의 공격도 방어를 관통한다. 문장 피해는 일벌 넷을 차례로 쓰러뜨린 뒤 남은 만큼 본체까지 이어진다. 범위·관통 공격은 여러 일벌을 빠르게 퇴치해 그로기를 노리고, 분노 단일 비관통 공격은 한 마리씩 노리는 대신 퇴치 반동 피해를 2배로 준다. 일반 퇴치 반동은 일벌 한 마리마다 여왕벌 최대 체력의 5%다. 네 마리를 모두 퇴치하면 여왕벌이 그 턴 받는 피해 ×2.5 그로기에 빠지고 다음 턴에는 아무 행동도 하지 않는다. 그 다음 턴 시작에 새 일벌 네 마리를 소환해 같은 주기를 반복한다.`,
+    // 11/21 피드백: 호버 상세가 넘쳐 스크롤이 생겼다. 호위 수는 위 칸이 보여 주므로 규칙만 남긴다.
+    note: `마지막 페이지에서 일벌 넷이 한 번 호위로 나옴\n${QUEEN_ESCORT_IMMUNITY_LABEL}, 공격은 방어 관통\n일벌 퇴치마다 본체 최대 체력 5% 반동\n관통 없는 분노 단일 공격은 반동 2배\n넷을 모두 퇴치하면 그로기: 피해 ×2.5, 행동 없음`,
   },
   elderSpider: {
     id: 'elderSpider', name: '장로거미', boss: true,
@@ -86,7 +90,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { id: 'body', name: '본체', kind: 'body' },
     ],
     webPattern: { sealPerTurn: 1, maxSealedCards: 3 },
-    note: '네 다리는 기쁨·분노·슬픔·즐거움 약점을 차례로 드러내며, 마지막 본체에는 약점이 없다. 거미줄 조이기는 방어막을 넘어 몸에 직접 감기지만 다음 앞다리 휘두르기는 방어로 막을 수 있다. 거미줄 피해는 한 번에 최대 체력의 1/5을 넘지 않는다. 매 문장마다 무작위 카드 하나를 거미줄로 봉인하며 봉인은 최대 3장까지 누적된다. 현재 다리의 약점 공격은 피해 ×2와 함께 봉인 하나를 풀지만 기본적으로 현재 다리에서 멈춘다. 현재 약점을 맞힌 관용구 문장만 남은 피해로 뒤의 다리와 본체까지 관통한다. 공격이 아니어도 현재 약점 속성을 담은 방어·회복 문장은 봉인 하나를 푼다. 약점을 빗나간 공격은 아무리 세도 지금 다리에서 멈춘다. 다리가 떨어지면 모든 카드의 거미줄이 즉시 사라진다.',
+    // 11/21 피드백: 호버 상세가 넘쳐 스크롤이 생겼다. 현재 부위·약점은 위 칸이 보여 주므로
+    // 여기엔 판단에 필요한 규칙만 짧게 남긴다(다리 약점 순서 줄은 빼고, 방어·회복 해제는 '약점 문장'에 함께 담는다).
+    note: '문장마다 카드 1장 봉인, 다리가 떨어지면 모두 해제\n약점 문장: 피해 ×2, 봉인 1장 해제\n약점 관용구만 다음 다리까지 관통\n거미줄 조이기: 방어 무시, 최대 체력 1/5',
   },
   termite: {
     id: 'termite', name: '흰개미', hp: 6, atk: 2, every: 1, initiative: 'second',
@@ -127,7 +133,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   mosquito: {
     id: 'mosquito', name: '모기', hp: 8, atk: 3, every: 1, initiative: 'second',
     sprite: 'enemy_mosquito', pierceGuard: true, weakEmotion: 'pleasure',
-    note: '긴 침으로 방어막을 소모시키지 않고 체력에 직접 피해를 준다.',
+    note: '긴 침으로 방어도를 소모시키지 않고 체력에 직접 피해를 준다.',
   },
 }
 

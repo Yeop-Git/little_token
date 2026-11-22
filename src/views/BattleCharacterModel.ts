@@ -388,6 +388,8 @@ class BattleCharacterModel {
   private frozen = false
   /** 정지 프레임으로 붙들고 있는 중인가(`poseAt`). 붙든 동안은 시간이 흐르지 않는다. */
   private posed = false
+  /** `playAndHold`가 멈춰 설 클립 시각(초). 닿으면 null로 비우고 posed가 된다. */
+  private holdAt: number | null = null
   private readonly effects = new THREE.Group()
   private healAura: THREE.Group | null = null
   private healMaterials: THREE.ShaderMaterial[] = []
@@ -418,6 +420,9 @@ class BattleCharacterModel {
   private spiderPartDissolves: SpiderPartDissolve[] = []
   private eliteElapsed = 0
   private readonly eliteTimeUniforms: Array<{ value: number }> = []
+  /** 매직실드가 씌워져 있는 동안 금빛 반짝이 막이 0→1로 차오른다. 셸의 data-magic-shield가 켠다. */
+  private magicShieldLevel = 0
+  private readonly magicShieldUniforms: Array<{ value: number }> = []
 
   constructor(private readonly shell: HTMLElement, private readonly visual: CharacterVisualDef) {
     this.renderer = acquireRenderer()
@@ -594,6 +599,9 @@ class BattleCharacterModel {
       const eliteTime = { value: this.eliteElapsed }
       shader.uniforms.uEliteTime = eliteTime
       this.eliteTimeUniforms.push(eliteTime)
+      const magicShield = { value: this.magicShieldLevel }
+      shader.uniforms.uMagicShield = magicShield
+      this.magicShieldUniforms.push(magicShield)
 
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
@@ -626,6 +634,7 @@ uniform float uPartDissolve;
 uniform float uEliteTier;
 uniform float uEliteTime;
 uniform float uElitePhase;
+uniform float uMagicShield;
 varying float vBattleHeight;
 varying float vBattleSide;
 varying vec3 vEliteNormalView;
@@ -774,13 +783,38 @@ if (uEliteTier > 0.5) {
     outgoingLight += vec3(1.0) * starGlint * 0.52;
   }
 }
+// Magic Shield -> a gold leaf coat with a sweeping sheen and twinkling four-point
+// sparks. It sits on top of rarity so a shielded elite still reads as shielded.
+if (uMagicShield > 0.01) {
+  vec3 shieldNormal = normalize(vEliteNormalView);
+  float shieldFacing = clamp(dot(shieldNormal, normalize(vEliteViewDir)), 0.0, 1.0);
+  float shieldRim = pow(1.0 - shieldFacing, 2.0);
+  float shieldBand = pow(max(0.0, sin(vEliteWorldPosition.y * 5.5 - vEliteWorldPosition.x * 2.0 - uEliteTime * 2.4)), 14.0);
+  vec2 shieldGrid = vEliteWorldPosition.xy * 11.0 + shieldNormal.xy * 1.3;
+  vec2 shieldLocal = abs(fract(shieldGrid) - 0.5);
+  float shieldSeed = fract(sin(dot(floor(shieldGrid), vec2(27.31, 71.17))) * 35791.113);
+  float shieldCross = (1.0 - smoothstep(0.02, 0.07, min(shieldLocal.x, shieldLocal.y)))
+    * (1.0 - smoothstep(0.10, 0.42, max(shieldLocal.x, shieldLocal.y)));
+  float shieldCore = 1.0 - smoothstep(0.03, 0.14, length(shieldLocal));
+  float shieldTwinkle = pow(0.5 + 0.5 * sin(uEliteTime * (2.6 + shieldSeed * 1.8) + shieldSeed * 40.0), 7.0);
+  float shieldSpark = step(0.62, shieldSeed) * max(shieldCross, shieldCore) * shieldTwinkle;
+  // 짙은 황금빛(선형 색공간 값이라 sRGB보다 G·B를 낮게 잡는다): 밝은 금을 더해 바래게 하지 않고, 원래 색을 금빛으로 곱해 깊이를 남긴다.
+  vec3 shieldGold = vec3(1.0, 0.34, 0.0);
+  // 날씨 색조(숲의 초록 등)에 끌려가지 않게 밝기만 남기고 색은 금빛으로 고정한다.
+  float shieldLuma = dot(outgoingLight, vec3(0.299, 0.587, 0.114));
+  vec3 shieldGoldTint = shieldLuma * vec3(1.55, 0.62, 0.06) + shieldGold * 0.06;
+  outgoingLight = mix(outgoingLight, shieldGoldTint, 0.80 * uMagicShield);
+  outgoingLight += shieldGold * shieldRim * 0.75 * uMagicShield;
+  outgoingLight += vec3(1.0, 0.55, 0.08) * shieldBand * (0.20 + shieldFacing * 0.16) * uMagicShield;
+  outgoingLight += vec3(1.0, 0.88, 0.50) * shieldSpark * 1.10 * uMagicShield;
+}
 float partDissolveNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
 if (partDissolveNoise < uPartDissolve) discard;
           float partDissolveActive = smoothstep(0.0, 0.025, uPartDissolve);
           float partDissolveEdge = partDissolveActive * (1.0 - smoothstep(0.0, 0.09, partDissolveNoise - uPartDissolve));
 outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolve);`)
     }
-    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v4-${weather}`
+    material.customProgramCacheKey = () => `battle-atmosphere-rarity-v10-${weather}`
   }
 
   private fitModel(model: THREE.Object3D): THREE.Box3 | null {
@@ -1159,7 +1193,9 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
       root,
       materials,
       elapsed: 0,
-      duration: .92,
+      // 피드백(11/20): 0.9초 디졸브는 다른 타격 연출에 묻혀 다리가 사라지는 게
+      // 안 보였다. 먼저 꺾여 떨어지는 게 보이고, 그다음 천천히 녹아 사라진다.
+      duration: 1.7,
       fallDirection: SPIDER_PART_ORDER.indexOf(partId as typeof SPIDER_PART_ORDER[number]) % 2 ? 1 : -1,
     })
   }
@@ -1168,14 +1204,16 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.spiderPartDissolves = this.spiderPartDissolves.filter((entry) => {
       entry.elapsed += delta
       const progress = THREE.MathUtils.clamp(entry.elapsed / entry.duration, 0, 1)
-      const eased = progress * progress * (3 - 2 * progress)
-      entry.materials.forEach((material) => { material.userData.partDissolveUniform.value = eased })
+      // 처음 25%는 형태를 유지한 채 꺾여 떨어지기만 하고, 그 뒤에 녹는다.
+      const dissolve = THREE.MathUtils.clamp((progress - .25) / .75, 0, 1)
+      entry.materials.forEach((material) => { material.userData.partDissolveUniform.value = dissolve * dissolve * (3 - 2 * dissolve) })
       const original = this.spiderPartOriginals.get(entry.id)
       if (original) {
+        const fall = 1 - (1 - progress) ** 3
         entry.root.position.copy(original.position)
-        entry.root.position.y -= eased * .18
+        entry.root.position.y -= fall * .5
         entry.root.rotation.copy(original.rotation)
-        entry.root.rotation.z += entry.fallDirection * eased * .16
+        entry.root.rotation.z += entry.fallDirection * fall * .5
       }
       if (progress < 1) return true
       entry.root.visible = false
@@ -1257,7 +1295,22 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
    *   강타 연출은 같은 attack 클립을 느리게 늘려 예비 동작을 읽히게 한다.
    */
   play(animation: BattleAnimation, stretchMs?: number): number {
+    // 예고 자세로 붙들어 둔 바로 그 클립을 다시 틀면, 처음(0)으로 되감지 않고 붙든 마디에서
+    // 이어 간다. 예전에는 reset()으로 첫 프레임에 뚝 떨어졌다가 다시 휘둘러 끊겨 보였다.
+    const held = this.posed ? this.current : null
+    this.holdAt = null
     this.releasePose()
+    if (held && held === this.actions[animation] && animation !== 'idle' && animation !== 'idle2' && animation !== 'walk') {
+      const clip = held.getClip()
+      const fullMs = stretchMs ?? this.visual.animations?.durationsMs?.[animation as OneShotAnimation] ?? clip.duration * 1000
+      const remaining = Math.max(0.05, 1 - held.time / clip.duration)
+      held.paused = false
+      held.setEffectiveTimeScale(clip.duration / (fullMs / 1000))
+      this.requestedAnimation = animation
+      this.shell.dataset.modelAnimation = animation
+      this.shell.dataset.modelLastAction = animation
+      return fullMs * remaining
+    }
     this.requestedAnimation = animation
     this.cameraZoomTarget = this.visual.id === 'player' && animation === 'defeat' ? 0.78 : 1
     this.shell.dataset.modelAnimation = animation
@@ -1305,6 +1358,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
 
   /** 풀에서 재사용할 때 이전 one-shot 자세를 한 프레임도 노출하지 않고 idle로 되돌린다. */
   resetToIdle() {
+    this.holdAt = null
     this.releasePose()
     this.requestedAnimation = 'idle'
     this.cameraZoom = 1
@@ -1423,11 +1477,20 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.lastRenderedAt = now
     const motionDelta = this.frozen || this.posed ? 0 : frameDelta
     this.mixer?.update(motionDelta)
+    this.applyHold()
     this.updateModelYawReturn(frameDelta)
     this.updateEffect(frameDelta)
     this.updateSpiderPartDissolves(frameDelta)
     this.eliteElapsed += frameDelta
     this.eliteTimeUniforms.forEach((uniform) => { uniform.value = this.eliteElapsed })
+    const shieldTarget = this.shell.dataset.magicShield === 'on' ? 1 : 0
+    if (this.magicShieldLevel !== shieldTarget) {
+      const step = Math.min(1, frameDelta * 4)
+      this.magicShieldLevel = Math.abs(shieldTarget - this.magicShieldLevel) < 0.01
+        ? shieldTarget
+        : this.magicShieldLevel + (shieldTarget - this.magicShieldLevel) * step
+      this.magicShieldUniforms.forEach((uniform) => { uniform.value = this.magicShieldLevel })
+    }
     const zoomBlend = 1 - Math.exp(-frameDelta * 8)
     const nextZoom = THREE.MathUtils.lerp(this.cameraZoom, this.cameraZoomTarget, zoomBlend)
     if (Math.abs(nextZoom - this.cameraZoom) > 0.0001) {
@@ -1498,6 +1561,7 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.shell.dataset.modelAnimation = animation
     this.shell.dataset.modelLastAction = animation
     this.shell.dataset.modelPose = `${animation}@${at.toFixed(2)}`
+    this.holdAt = null
     this.stopEffect()
     // 이전 동작을 완전히 걷어낸다. 크로스페이드가 남아 있으면 자세가 섞여 흐려진다.
     this.mixer?.stopAllAction()
@@ -1515,6 +1579,30 @@ outgoingLight += vec3(0.72, 0.42, 0.88) * partDissolveEdge * (1.0 - uPartDissolv
     this.current = action
     this.posed = true
     return true
+  }
+
+  /**
+   * 클립을 처음부터 **평소 속도로** 틀다가 `at` 마디에 닿으면 그 자리에 멈춰 붙든다.
+   * `poseAt`은 지금 자세에서 그 마디로 순간이동하므로, 공격을 다 휘두른 뒤 예고 자세로
+   * 뚝 끊겨 돌아가 보였다(사마귀 강공격 예고, 11/20 피드백). 이쪽은 이어진 한 동작이다.
+   */
+  playAndHold(animation: BattleAnimation, at: number): boolean {
+    const action = this.actions[animation]
+    if (!action) return false
+    this.play(animation)
+    this.holdAt = action.getClip().duration * Math.max(0, Math.min(1, at))
+    return true
+  }
+
+  private applyHold() {
+    if (this.holdAt == null || !this.current) return
+    if (this.current.time < this.holdAt) return
+    this.current.time = this.holdAt
+    this.current.paused = true
+    this.mixer?.update(0)
+    this.holdAt = null
+    this.posed = true
+    this.shell.dataset.modelPose = `${this.requestedAnimation}@hold`
   }
 
   /** 붙들고 있던 자세를 놓는다. 다음 동작이 이어받을 수 있게 표시만 지운다. */
@@ -1623,6 +1711,13 @@ export function playCharacterAnimation(
  * 클립의 한 마디를 정지 프레임으로 붙든다 — 강공격 예고처럼 "딱 멈춰 선 위협적인
  * 자세"를 만들 때 쓴다. 재생+타이머 정지와 달리 재렌더에 풀리지 않는다.
  */
+export function playCharacterAndHold(actor: HTMLElement | null, animation: BattleAnimation, at: number): boolean {
+  if (!actor) return false
+  const shell = modelShellFor(actor)
+  if (!shell) return false
+  return mountedModels.get(shell)?.playAndHold(animation, at) ?? false
+}
+
 export function poseCharacterAt(actor: HTMLElement | null, animation: BattleAnimation, at: number): boolean {
   if (!actor) return false
   const shell = modelShellFor(actor)

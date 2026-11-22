@@ -71,7 +71,7 @@ const MANTIS_TACTIC: Word = {
   statMult: 4,
   kind: 'guard',
   targetCount: 1,
-  inkCost: 4,
+  inkCost: 3,
   art: '3021',
   rarity: 'rare',
   note: '방어 ×4',

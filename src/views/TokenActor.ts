@@ -15,6 +15,7 @@
 
 import { CHARACTER_VISUALS } from '@data/characters'
 import type { TokenLine } from '@/localization/bossToken'
+import { speechLifeMs, tokenSpeechHtml, tokenSpeechPlain } from '@/ui/TokenSpeech'
 import { sharedTokenMind, stoodByThroughDanger, TokenMind, type BondEvent, type MoodEvent } from '@core/tokenMind'
 import { POLICY_ACTIONS, TokenPolicy, type PolicyAction, type TokenContext } from '@core/tokenPolicy'
 import {
@@ -222,6 +223,7 @@ export class TokenActor {
   private frame = 0
   private lastFrameAt = 0
   private speechHideTimer = 0
+  private talkTimer = 0
   private holdingSpeech = false
   private disposed = false
   private readonly reducedMotion: boolean
@@ -411,12 +413,20 @@ export class TokenActor {
     if (this.disposed) return
     window.clearTimeout(this.speechHideTimer)
     const mark = line.tone === 'warn' ? '!' : line.tone === 'relief' ? '✓' : ''
+    const life = speechLifeMs(line.text, line.tone)
     this.bubble.innerHTML =
       `${mark ? `<b class="token-speech-mark" aria-hidden="true">${mark}</b>` : ''}` +
-      `<span class="token-speech-text">${line.text}</span>`
+      `<span class="token-speech-text" aria-label="${tokenSpeechPlain(line.text).replace(/"/g, '&quot;')}">${tokenSpeechHtml(line.text)}</span>`
     this.bubble.dataset.tone = line.tone
+    this.bubble.style.setProperty('--speech-life', `${life}ms`)
     this.el.dataset.tone = line.tone
     this.bubble.classList.add('is-speaking')
+    // 말을 꺼내는 순간 몸이 먼저 반응한다 — 평소엔 고개를 한 번 끄덕, 경고엔 움찔, 안도엔 폴짝.
+    // 강제 reflow 없이 다시 재생하려고 한 프레임 비웠다가 붙인다.
+    this.el.classList.remove('is-talking')
+    requestAnimationFrame(() => { if (!this.disposed) this.el.classList.add('is-talking') })
+    window.clearTimeout(this.talkTimer)
+    this.talkTimer = window.setTimeout(() => this.el.classList.remove('is-talking'), 900)
     // 연속 대사도 같은 CSS 연출을 첫 프레임부터 다시 재생하되, 레이아웃 강제 확정은 하지 않는다.
     // CSSAnimation 자체를 되감으면 모양·시간은 그대로이고 전투 DOM 전체 reflow만 사라진다.
     this.bubble.getAnimations().forEach((animation) => {
@@ -432,7 +442,7 @@ export class TokenActor {
       // 끝까지 떠 있었던 말만 "들려준 것"으로 친다. 다음 대사가 덮은 말은 세지 않는다.
       this.mind.bindCloser('adviceHeard')
       this.clearSpeech()
-    }, line.tone === 'relief' ? 4200 : 3600)
+    }, life)
   }
 
   /** 말풍선을 걷고 자유 비행으로 돌려보낸다. */
@@ -464,6 +474,7 @@ export class TokenActor {
     window.visualViewport?.removeEventListener('resize', this.onViewportChange)
     window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
     window.clearTimeout(this.speechHideTimer)
+    window.clearTimeout(this.talkTimer)
     if (this.anchorRefreshFrame) cancelAnimationFrame(this.anchorRefreshFrame)
     this.anchorRefreshFrame = 0
     if (this.frame) cancelAnimationFrame(this.frame)

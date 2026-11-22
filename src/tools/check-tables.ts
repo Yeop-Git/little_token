@@ -28,6 +28,7 @@ import {
 import { numericNoteParts, wordNoteText } from '@core/wordText'
 import { wordKeywords } from '@core/wordKeywords'
 import { recommendedWordInkCost } from '@core/ink'
+import { cardIndex } from './ink-cost-index'
 import { defaultPlayer, type OwnedItem } from '@core/player'
 import type { PassiveId } from '@core/passives'
 import { RARITY_LABEL, type Tables, type Word } from '@core/types'
@@ -43,6 +44,10 @@ import {
 } from '@data/earlyWords'
 import { SPECIAL_REWARD_WORDS } from '@data/specialWords'
 import { TABLES } from '@data/tables'
+import { setCardLuck } from '@core/luck'
+
+// CSV note는 운 보정 전 기본 확률을 적는다 — 기본 확률로 대조한다(카드 화면은 운 반영 확률을 보여 준다).
+setCardLuck(0)
 
 // 이 태그가 하나라도 충돌 쌍에 등장하면, 앞 선택에 따라 차단될 여지가 있다.
 function tagInAnyConflict(tag: string, t: Tables): boolean {
@@ -162,6 +167,8 @@ function allWords(): { w: Word; pool: string }[] {
   })
 }
 
+const INK_INDEX = new Map(cardIndex().map((row) => [row.word.id, row.proposed]))
+
 function checkBudget(): string[] {
   const out: string[] = []
   const early = Object.entries(EARLY_WORDS).flatMap(([slot, list]) => list.map((w) => ({ slot, w, pool: '초기' })))
@@ -171,11 +178,13 @@ function checkBudget(): string[] {
 
   for (const { slot, w, pool } of [...early, ...reward, ...special]) {
     const rarity = w.rarity ?? 'common'
-    if (w.inkCost != null) {
-      const recommendedCost = recommendedWordInkCost(w)
-      if (w.inkCost !== recommendedCost) {
-        out.push(`${pool}/${w.text}: ink cost ${w.inkCost}, formula requires ${recommendedCost}`)
-        console.log(`  위반  ${pool} · ${w.text} — 잉크 ${w.inkCost}, 기능 공식은 ${recommendedCost}`)
+    {
+      // 잉크 비용은 조합 전수 기여도 지표(ink-cost-index)가 정한 값과 같아야 한다.
+      const indexed = INK_INDEX.get(w.id)
+      const cost = w.inkCost ?? recommendedWordInkCost(w)
+      if (indexed != null && cost !== indexed) {
+        out.push(`${pool}/${w.text}: ink cost ${cost}, combination index requires ${indexed}`)
+        console.log(`  위반  ${pool} · ${w.text} — 잉크 ${cost}, 조합 지표는 ${indexed}`)
       }
     }
     if (slot === 'adv') {
@@ -218,9 +227,9 @@ function checkBudget(): string[] {
         out.push(`${pool}/${w.text}: modifier has more than two functions`)
         console.log(`  VIOLATION  ${pool} · ${w.text} — modifiers may have at most two functions`)
       }
-      if ((w.effects?.magicShield ?? 0) > 0 && (w.inkCost ?? 0) < 3) {
-        out.push(`${pool}/${w.text}: magic shield modifier costs less than 4 ink`)
-        console.log(`  VIOLATION  ${pool} · ${w.text} — magic shield modifiers cost at least 3 ink`)
+      if ((w.effects?.magicShield ?? 0) > 0 && (w.inkCost ?? 0) < 2) {
+        out.push(`${pool}/${w.text}: magic shield modifier costs less than the modifier cap (2)`)
+        console.log(`  VIOLATION  ${pool} · ${w.text} — magic shield modifiers cost the modifier cap (2)`)
       }
       if ((w.effects?.inkDiscount ?? 0) > 0 && (w.inkCost ?? 0) >= (w.effects?.inkDiscount ?? 0)) {
         out.push(`${pool}/${w.text}: ink discount does not exceed its own cost`)

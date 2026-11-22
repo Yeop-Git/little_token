@@ -13,6 +13,7 @@ import {
 } from './run'
 import { ALL_REWARD_WORDS, EARLY_WORDS } from '@data/earlyWords'
 import { ALL_ITEMS } from '@data/items'
+import { isItemTraitId } from '@core/itemTraits'
 import type { Word } from './types'
 import { STARTING_COMBAT_STATS, type OwnedItem, type PlayerStats } from './player'
 import { IS_DEMO } from '@/config/edition'
@@ -150,6 +151,7 @@ function migrateItems(run: RunState): boolean {
       line: typeof saved.line === 'string' ? saved.line : def.flavor,
       stats: normalizedItemStats(saved.stats),
       ...(def.passive ? { passive: def.passive } : {}),
+      ...(!def.passive && isItemTraitId(saved.trait) ? { trait: saved.trait } : {}),
     })
   }
   run.player.items = normalized
@@ -367,7 +369,7 @@ export function deserializeRun(raw: string): RunState | null {
       migrated = true
     } else {
       const hp = Math.max(0, Math.min(parsed.player.stats.hp, parsed.combat.hp))
-      const guard = Math.max(0, Math.min(playerGuardLimit(parsed.player.stats.hp), parsed.combat.guard))
+      const guard = Math.max(0, Math.min(playerGuardLimit(parsed.player.stats.hp, parsed.player.stats.guard), parsed.combat.guard))
       if (hp !== parsed.combat.hp || guard !== parsed.combat.guard) {
         parsed.combat = { hp, guard }
         migrated = true
@@ -497,4 +499,28 @@ export function clearAllRecords(): void {
   clearRun()
   clearTutorialHistory()
   clearPrefixedStorage()
+}
+
+/**
+ * 설정의 '모든 기록 삭제'가 쓰는 완전 초기화. 진행도에 더해 그래픽·사운드·언어
+ * 설정(`little-token-` 키)까지 지운다. 메모리에 들고 있는 토큰의 마음·취향 등이
+ * 다시 저장하지 못하도록 호출한 쪽은 곧바로 페이지를 새로 불러와야 한다.
+ */
+export function clearEverything(): void {
+  clearAllRecords()
+  const stores = new Set<Storage | null>([progressStorage()])
+  try { stores.add(typeof localStorage === 'undefined' ? null : localStorage) } catch { /* 저장소 없음 */ }
+  for (const store of stores) {
+    if (!store) continue
+    try {
+      const doomed: string[] = []
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i)
+        if (key?.startsWith('little-token')) doomed.push(key)
+      }
+      doomed.forEach((key) => store.removeItem(key))
+    } catch {
+      // 저장소를 못 쓰는 환경에서는 지울 설정도 없다.
+    }
+  }
 }

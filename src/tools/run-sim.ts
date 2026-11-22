@@ -18,7 +18,7 @@ import { beanstalkGrowthFor, ECHO_REPEAT_SCALE, hasPassive, modsFor } from '@cor
 import { clearRewardValue, gradeForElapsedTurns, startGrade } from '@core/grade'
 import { FREE_DRAWS_PER_STAGE } from '@core/draw'
 import { playerGuardLimit, rankedStat, STAT_RANK_LIMIT } from '@core/combatRules'
-import type { Intent, Rarity, Selection, Word } from '@core/types'
+import type { Emotion, Intent, Rarity, Selection, Word } from '@core/types'
 import type { PlayerState, PlayerStats } from '@core/player'
 import { applyItemReward, registerWord, startingPlayer } from '@core/run'
 import {
@@ -53,6 +53,7 @@ import {
   applyOverkillTransfer,
   applyPendingAttack,
   applyPreparation,
+  stateGuardLimit,
   enemyTurn,
   engageFront,
   engageInitialFront,
@@ -65,6 +66,8 @@ import {
   summonCount,
   activeEnemyPart,
   type BattleState,
+  weaknessEmotions,
+  intentWeaknessMult,
 } from '../sim/reference'
 
 const rngSeeded = (seed: number) => () => {
@@ -118,6 +121,8 @@ interface ActionStats {
   healEngineDamage: number
   telegraphs: number
   groggies: number
+  /** 그로기 기믹 공격이 실제로 들어온 횟수. 그 전에 보스를 잡으면 0이다. */
+  groggyChances: number
   groggyBonusDamage: number
 }
 
@@ -135,6 +140,7 @@ const emptyActions = (): ActionStats => ({
   healEngineDamage: 0,
   telegraphs: 0,
   groggies: 0,
+  groggyChances: 0,
   groggyBonusDamage: 0,
 })
 const addActions = (into: ActionStats, from: ActionStats): void => {
@@ -494,8 +500,10 @@ function railValue(c: Candidate, state: BattleState): number {
 
 function candidateDamage(c: Candidate, state: BattleState): number {
   const missingHp = Math.max(0, state.playerMax - state.playerHp)
-  const projectedGuard = Math.min(playerGuardLimit(state.playerMax), state.guard + c.guard)
-  return c.dmg
+  const projectedGuard = state.guard + c.guard
+  // 플레이어는 체력바 옆 약점 배지를 보고 공격 속성을 맞춘다.
+  const weakMult = intentWeaknessMult(state.enemies[frontIdx(state)], c.intent)
+  return Math.floor(c.dmg * weakMult)
     + Math.floor(projectedGuard * c.intent.guardAttackMultiplier)
     + Math.floor(Math.max(0, c.heal - missingHp) * c.intent.overhealDamageMultiplier)
 }
@@ -554,7 +562,8 @@ function fightStage(
   const state: BattleState = {
     playerHp: Math.max(0, Math.min(maxHp, carried.hp)),
     playerMax: maxHp,
-    guard: Math.max(0, Math.min(playerGuardLimit(maxHp), carried.guard)),
+    playerGuardStat: player.stats.guard,
+    guard: Math.max(0, Math.min(playerGuardLimit(maxHp, player.stats.guard), carried.guard)),
     counter: false,
     counterFull: false,
     turn: 1,
@@ -690,7 +699,7 @@ function fightStage(
       const focused = [...hand].sort((a, b) => candidateValue(b, state, focus) - candidateValue(a, state, focus))[0]
       if (focus === 'attack') pick = bestAttack ?? focused
       else if (focus === 'guard' && state.turn <= boss.groggyUntilTurn) pick = bestAttack ?? focused
-      else if (focus === 'guard' && !guardIgnored && state.guard < playerGuardLimit(state.playerMax) * 0.65 && bestGuard) pick = bestGuard
+      else if (focus === 'guard' && !guardIgnored && state.guard < stateGuardLimit(state) * 0.65 && bestGuard) pick = bestGuard
       else if (focus === 'guard' && bestGuardEngine) pick = bestGuardEngine
       else if (focus === 'guard') {
         const guardOffense = hand
@@ -740,7 +749,7 @@ function fightStage(
       const weakness = activeEnemyPart(boss)?.def.weakness
       const matchesWeak = (c: Candidate) => !weakness
         || (weakness.kind === 'emotion'
-          ? c.intent.emotions.includes(weakness.value as typeof c.intent.emotions[number])
+          ? weaknessEmotions(c.intent).includes(weakness.value as Emotion)
           : c.intent.tags.includes(weakness.value))
       const weakAnswer = boss.def.webPattern
         ? hand.filter(matchesWeak).sort((a, b) =>
@@ -833,7 +842,7 @@ function fightStage(
         const front = frontIdx(state)
         if (front < 0) break
         const transfer = applyOverkillTransfer(state, front, overflow, {
-          emotions: intent.emotions,
+          emotions: weaknessEmotions(intent),
           tags: intent.tags,
           comboMatched: intent.combos.length > 0,
         })
@@ -864,6 +873,9 @@ function fightStage(
         for (const st of enemyTurn(state, rng, 'first')) {
           if (st.telegraphText) actions.telegraphs++
           if (st.groggyEntered) actions.groggies++
+      if (st.groggyChance) actions.groggyChances++
+        if (st.groggyChance) actions.groggyChances++
+          if (st.groggyChance) actions.groggyChances++
           log?.push(`    T${turn} 선공 ${st.text}`)
         }
       }
@@ -871,6 +883,8 @@ function fightStage(
       for (const st of enemyTurn(state, rng, 'first')) {
         if (st.telegraphText) actions.telegraphs++
         if (st.groggyEntered) actions.groggies++
+      if (st.groggyChance) actions.groggyChances++
+        if (st.groggyChance) actions.groggyChances++
         log?.push(`    T${turn} 선공 ${st.text}`)
       }
       if (state.playerHp <= 0) break
@@ -882,6 +896,7 @@ function fightStage(
     for (const st of enemyTurn(state, rng, 'second')) {
       if (st.telegraphText) actions.telegraphs++
       if (st.groggyEntered) actions.groggies++
+      if (st.groggyChance) actions.groggyChances++
       log?.push(`    T${turn} 후공 ${st.text}`)
     }
     if (state.pending) {
@@ -918,7 +933,7 @@ interface RunResult {
   stoppedOn: number | null
   stopReason: StageResult['stopReason']
   killedBy: string | null
-  hpTrace: { floor: number; hpBefore: number; hpAfter: number; max: number; turns: number; groggies: number; groggyBonusDamage: number }[]
+  hpTrace: { floor: number; hpBefore: number; hpAfter: number; max: number; turns: number; groggies: number; groggyChances: number; groggyBonusDamage: number }[]
   finalStats: PlayerStats
   log: string[]
   actions: ActionStats
@@ -950,6 +965,7 @@ function playRun(seed: number, reward: RewardSkill, combat: CombatSkill, focus: 
         max: result.maxHp,
         turns: result.turns,
         groggies: result.actions.groggies,
+        groggyChances: result.actions.groggyChances,
         groggyBonusDamage: result.actions.groggyBonusDamage,
       })
       if (verbose) {
@@ -1004,6 +1020,7 @@ interface ProfileMetrics {
   avgTurns: number
   avgFinalInspiration: number
   floor5Solved: number
+  floor5Faced: number
   floor5Bonus: number
   midDeaths: number
   lateDeaths: number
@@ -1067,11 +1084,13 @@ for (const profile of SKILL_PROFILES) {
   console.log(`  진입 시 평균 체력비: ${hpLine.join(' ')}`)
 
   const floor5Traces = runs.flatMap((run) => run.hpTrace.filter((trace) => trace.floor === 5))
-  const floor5Solved = floor5Traces.filter((trace) => trace.groggies > 0)
+  // 기믹 공격이 오기 전에 보스를 잡은 판은 파훼 실패가 아니다. 기믹을 실제로 마주친 판만 센다.
+  const floor5Faced = floor5Traces.filter((trace) => trace.groggyChances > 0)
+  const floor5Solved = floor5Faced.filter((trace) => trace.groggies > 0)
   const floor5Bonus = floor5Solved.reduce((sum, trace) => sum + trace.groggyBonusDamage, 0)
     / Math.max(1, floor5Solved.length)
   console.log(
-    `  5층 기믹 파훼 ${pct(floor5Solved.length, Math.max(1, floor5Traces.length))}`
+    `  5층 기믹 파훼 ${pct(floor5Solved.length, Math.max(1, floor5Faced.length))}`
     + ` · 파훼 런 평균 그로기 추가 피해 ${floor5Bonus.toFixed(1)}`,
   )
 
@@ -1093,6 +1112,7 @@ for (const profile of SKILL_PROFILES) {
     avgTurns,
     avgFinalInspiration,
     floor5Solved: floor5Solved.length,
+    floor5Faced: floor5Faced.length,
     floor5Bonus,
     midDeaths: runs.filter((run) => run.stopReason === 'death' && run.stoppedOn !== null && run.stoppedOn >= 6 && run.stoppedOn <= 10).length,
     lateDeaths: runs.filter((run) => run.stopReason === 'death' && run.stoppedOn !== null && run.stoppedOn >= 11).length,
@@ -1154,6 +1174,7 @@ for (const focus of BUILD_FOCUSES) {
     healEngineDamage: totals.healEngineDamage / sentences,
     telegraphs: totals.telegraphs / sentences,
     groggies: totals.groggies / sentences,
+    groggyChances: totals.groggyChances / sentences,
     groggyBonusDamage: totals.groggyBonusDamage / sentences,
   }
   const metric: BuildMetrics = {
@@ -1254,7 +1275,7 @@ if (check) {
     violations.push('15층 클리어 잔여 영감이 평균 10을 넘어 스테이지 보상이 지갑에 쌓이기만 한다')
   }
   if (beginner.avgTurns < 1.4) violations.push('초보 평균 전투 길이가 1.4턴 미만이라 문장 선택이 의미를 잃는다')
-  if (beginner.floor5Solved / RUNS < 0.8) violations.push('초보가 5층 그로기 기믹을 80% 이상 파훼하지 못한다')
+  if (beginner.floor5Solved / Math.max(1, beginner.floor5Faced) < 0.8) violations.push('초보가 5층 그로기 기믹을 80% 이상 파훼하지 못한다')
   if (beginner.floor5Bonus <= 0) violations.push('5층 그로기 파훼가 실제 추가 피해 보상을 만들지 않는다')
   if (beginner.lateDeaths <= beginner.midDeaths) violations.push('6~10층보다 11~15층의 누적 사망이 늘지 않아 후반 상승 곡선이 보이지 않는다')
   const builds = Object.fromEntries(buildMetrics.map((metric) => [metric.focus, metric])) as Record<Exclude<BuildFocus, 'balanced'>, BuildMetrics>

@@ -8,10 +8,11 @@
 
 import type { Emotion, Rarity, Word } from '@core/types'
 import type { PlayerState } from '@core/player'
-import type { RewardPhase } from '@core/run'
+import { reinforceGrows, type RewardPhase } from '@core/run'
 import { GRADE_MAX, startGrade } from '@core/grade'
 import { canAddItemWithoutLock } from '@core/deckSafety'
 import { floorInCycle, STORY_FLOORS } from './stages'
+import { LUCK_BASE, luckRarityShift } from '@core/luck'
 import { ALL_REWARD_WORDS } from './earlyWords'
 import { ITEMS, PASSIVE_ITEMS, type ItemDef } from './items'
 import { tacticalCardIdsForRewardDay } from './tacticalCards'
@@ -92,41 +93,77 @@ export const EARLY_STAT_VERB_IDS = ['storedResolve', 'doubleTap', 'pierceStrike'
 /** 보스 클리어마다 한 장은 해당 장의 대표 등급으로 못 박아 상승감을 만든다. */
 export function bossRewardRarity(day: number): Rarity | null {
   const floor = floorInCycle(day)
-  return floor === 5 ? 'rare' : floor === 10 ? 'epic' : floor === 15 ? 'legendary' : null
+  return floor === 5 ? 'epic' : floor === 10 || floor === 15 ? 'legendary' : null
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
 /**
  * 15층 희귀도 곡선.
- * 1~4층은 일반, 5~9층은 희귀, 10~15층은 영웅이 항상 가장 큰 가중치다.
- * 전투 등급은 각 구간의 중심을 뒤집지 않는 범위에서 다음 등급 확률만 조금 보탠다.
+ * 1~4층은 일반, 5~9층은 희귀, 10~15층은 영웅이 가장 큰 가중치라는 중심은 유지한다.
+ * 상위 등급 잠금은 완화했다: 1층만 영웅·전설을 막고, 2층부터 영웅, 3층부터 전설이 낮은 확률로 섞인다.
  */
-export function rewardRarityWeights(grade: number, day: number): Record<Rarity, number> {
+export function rewardRarityWeights(grade: number, day: number, luck = LUCK_BASE): Record<Rarity, number> {
+  return applyLuckShift(baseRarityWeights(grade, day), luck)
+}
+
+/**
+ * 운 보정 — 기본 운(3)을 넘는 만큼 영웅·전설 가중치를 더하고 일반→희귀 순으로 덜어낸다.
+ * 아직 잠긴 등급(가중치 0)은 열지 않아 1층 잠금은 그대로다.
+ */
+function applyLuckShift(weights: Record<Rarity, number>, luck: number): Record<Rarity, number> {
+  const shift = luckRarityShift(luck)
+  const epic = weights.epic > 0 ? shift.epic : 0
+  const legendary = weights.legendary > 0 ? shift.legendary : 0
+  let take = epic + legendary
+  const fromCommon = Math.min(Math.max(0, weights.common - 2), take)
+  take -= fromCommon
+  const fromRare = Math.min(Math.max(0, weights.rare - 2), take)
+  take -= fromRare
+  const scale = take > 0 ? (epic + legendary - take) / (epic + legendary) : 1
+  return {
+    common: weights.common - fromCommon,
+    rare: weights.rare - fromRare,
+    epic: weights.epic + epic * scale,
+    legendary: weights.legendary + legendary * scale,
+  }
+}
+
+function baseRarityWeights(grade: number, day: number): Record<Rarity, number> {
   const floor = floorInCycle(day)
   const quality = clamp((grade - 5) / 5, -1, 1)
 
-  if (floor <= 4) {
-    const progress = (floor - 1) / 3
-    const rare = 20 + progress * 25 + quality * 3
+  if (floor <= 1) {
+    const rare = 22 + quality * 3
     return { common: 100 - rare, rare, epic: 0, legendary: 0 }
+  }
+  if (floor <= 4) {
+    const progress = (floor - 2) / 2
+    const rare = 26 + progress * 12 + quality * 3
+    const epic = 5 + progress * 7 + quality * 2
+    const legendary = floor >= 3 ? 1 + progress * 2 + quality : 0
+    return { common: 100 - rare - epic - legendary, rare, epic, legendary }
   }
   if (floor <= 9) {
     const progress = (floor - 5) / 4
-    const common = 20 - progress * 10
-    const epic = 5 + progress * 30 + quality * 5
-    return { common, rare: 100 - common - epic, epic, legendary: 0 }
+    const common = 18 - progress * 8
+    const epic = 14 + progress * 20 + quality * 4
+    const legendary = 4 + progress * 6 + quality * 2
+    return { common, rare: 100 - common - epic - legendary, epic, legendary }
   }
 
   const progress = (floor - 10) / 5
-  const common = 5 - progress * 2
-  const rare = 25 - progress * 15
-  const legendary = 2 + progress * 18 + quality * 3
+  const common = 4 - progress * 2
+  const rare = 22 - progress * 12
+  const legendary = 12 + progress * 23 + quality * 4
   return { common, rare, epic: 100 - common - rare - legendary, legendary }
 }
 
-function rollRewardRarity(grade: number, day: number, rng: () => number = Math.random): Rarity {
-  const weights = rewardRarityWeights(grade, day)
+/** genRewards 한 번이 도는 동안 쓰는 플레이어 운(동기 호출 안에서만 바뀐다). */
+let offerLuck = LUCK_BASE
+
+function rollRewardRarity(grade: number, day: number, rng: () => number = Math.random, luck = LUCK_BASE): Rarity {
+  const weights = rewardRarityWeights(grade, day, luck)
   let roll = rng() * Object.values(weights).reduce((sum, weight) => sum + weight, 0)
   for (const rarity of RARITY_ORDER) {
     roll -= weights[rarity]
@@ -154,7 +191,7 @@ function pickOne(
   for (const [rarity, pool] of pools) pools.set(rarity, shuffle(pool, rng))
   const pool = forceRarity
     ? pools.get(forceRarity) ?? null
-    : nearestPool(pools, rollRewardRarity(grade, day, rng))
+    : nearestPool(pools, rollRewardRarity(grade, day, rng, offerLuck))
   if (!pool) return null
   const option = pool[0]
   used.add(option.word?.id ?? option.item?.id ?? option.name)
@@ -175,8 +212,10 @@ function wordOptions(player: PlayerState, slots: string[]): RewardOption[] {
       art: 'word',
       word,
     }))
+  // 강화해도 오르는 수치가 없는 카드(관통·선공처럼 키워드만 가진 수식어)는 강화 보상으로 내지 않는다.
+  // 단계만 오르는 강화는 보상 한 칸을 버리는 함정이다(11/21 강화 검수).
   const reinforce = deckWords
-    .filter((word) => allowed.has(word.slot))
+    .filter((word) => allowed.has(word.slot) && reinforceGrows(word))
     .map((word): RewardOption => ({
       kind: 'word',
       reinforce: true,
@@ -209,7 +248,7 @@ const toItemOption = (item: ItemDef): RewardOption => ({
   kind: 'item',
   rarity: item.rarity,
   name: item.name,
-  desc: item.passive ? '고유효과 · 제련 문장으로 스탯 선택' : '제련 문장으로 스탯 선택',
+  desc: item.passive ? '특성 · 제련 문장으로 스탯 선택' : '제련 문장으로 스탯 선택',
   art: 'gift',
   item,
 })
@@ -257,7 +296,7 @@ function generateWordRewards(player: PlayerState, grade: number, day: number, ph
     if (option) picks.push(option)
   }
 
-  // 5·10·15층 보상에는 각각 희귀·영웅·전설 스킬을 한 장 이상 고정한다.
+  // 5층 보상에는 영웅, 10·15층 보상에는 전설 스킬을 한 장 이상 고정한다.
   const bossRarity = bossRewardRarity(day)
   if (bossRarity) {
     const option = pickOne(all, grade, day, used, rng, bossRarity)
@@ -335,9 +374,16 @@ export function genRewards(
   const candidates = phase === 'item'
     ? itemOptions(player)
     : wordOptions(player, phase === 'subject' ? ['subj', 'adv'] : ['verb'])
-  const picks = phase === 'item'
-    ? generateItemRewards(player, effectiveGrade, day, rng)
-    : generateWordRewards(player, effectiveGrade, day, phase, rng)
+  const previousLuck = offerLuck
+  offerLuck = player.stats?.luck ?? LUCK_BASE
+  let picks: RewardOption[]
+  try {
+    picks = phase === 'item'
+      ? generateItemRewards(player, effectiveGrade, day, rng)
+      : generateWordRewards(player, effectiveGrade, day, phase, rng)
+  } finally {
+    offerLuck = previousLuck
+  }
   // 보스를 이긴 보상은 각 단계의 세 선택지를 모두 고를 수 있어야 한다.
   // 지갑이 부족하면 현재 잔액까지만 받으며 할인 가격을 카드와 결제에 같이 쓴다.
   if (bossRewardRarity(day) && Number.isFinite(availableInspiration)) {

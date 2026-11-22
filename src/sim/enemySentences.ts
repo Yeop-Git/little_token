@@ -9,6 +9,7 @@ import {
   nextEnemyAttackStep,
   spiderWebTension,
   summonCount,
+  summonWavesLeft,
   type BattleState,
   type EnemyInst,
 } from './reference'
@@ -128,7 +129,11 @@ function queenSentence(state: BattleState, enemy: EnemyInst, eventText?: string)
       label: tx('correctedEnding'),
       tone: 'relief',
       tokens: tokens(['subject', tx('queenSubject')], ['modifier', tx('queenStagger')], ['verb', tx('queenRest')]),
-      meta: [tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }), tx('nextActionSkip'), tx('respawnWorkers')],
+      meta: [
+        tx('damageTakenMult', { value: enemy.groggyDamageMult.toFixed(1) }),
+        tx('nextActionSkip'),
+        ...(summonWavesLeft(enemy) > 0 ? [tx('respawnWorkers')] : []),
+      ],
       eventText,
     }
   }
@@ -144,7 +149,11 @@ function queenSentence(state: BattleState, enemy: EnemyInst, eventText?: string)
       ['modifier', tx(escorts > 0 ? 'throughShield' : 'fromFront')],
       ['verb', tx('queenSting')],
     ),
-    meta: [timingText(state, enemy), damageMeta(state, enemy), ...(escorts > 0 ? [tx('guardPierce')] : [])],
+    meta: [
+      timingText(state, enemy),
+      damageMeta(state, enemy),
+      ...(escorts > 0 ? [tx('guardPierce')] : []),
+    ],
     context: escorts > 0
       ? {
           label: tx('continuedSentence'),
@@ -177,7 +186,6 @@ function spiderManuscript(enemy: EnemyInst): EnemySentenceClause[] {
 
 function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string): EnemySentenceView {
   const active = activeEnemyPart(enemy)
-  const weakness = active?.def.weakness
   const webMax = enemy.def.webPattern?.maxSealedCards ?? 0
   const web = spiderWebTension(enemy)
   const step = nextEnemyAttackStep(enemy)
@@ -196,7 +204,7 @@ function spiderSentence(state: BattleState, enemy: EnemyInst, eventText?: string
       damageMeta(state, enemy),
       ...(pierces ? [tx('guardPierce')] : []),
       tx('sealCount', { current: web, max: webMax }),
-      ...(weakness ? [tx('currentWeakness', { weakness: weakness.label }), tx('weaknessAction'), tx('weaknessComboPierce')] : [tx('bodyNoWeakness')]),
+      // 현재 약점과 약점 행동은 체력바 옆 약점 아이콘(툴팁)이 맡는다. 문장판에는 공격 정보만 둔다.
     ],
     manuscript: spiderManuscript(enemy),
     eventText,

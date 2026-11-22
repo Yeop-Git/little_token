@@ -4,6 +4,7 @@
  * 런: 하루 전투 클리어 → 보상(문장=스킬업 / 아이템=스펙업) → 다음날(더 강한 스테이지).
  */
 
+import { setCardLuck } from '@core/luck'
 import './style.css'
 import type { BattleView as BattleViewType } from '@views/BattleView'
 import { DeckDiscardView } from '@views/DeckDiscardView'
@@ -14,13 +15,15 @@ import type { DefeatCause } from '@core/run'
 import { EndingView } from '@views/EndingView'
 import { FontManager } from '@/ui/FontManager'
 import { ALL_ITEMS, ITEMS, type ItemDef } from '@data/items'
-import { makeEarlyTables } from '@data/earlyWords'
+import { isItemTraitId, rollItemTrait, type ItemTraitId } from '@core/itemTraits'
+import { inkAlreadySaturated, wordInkCost } from '@core/ink'
+import { EARLY_TEMPLATE, makeEarlyTables } from '@data/earlyWords'
 import { STORY_FLOORS, floorInCycle, stageFor } from '@data/stages'
 import { genRewards, rewardRefreshCost, rewardOfferRng, rewardPrice, type RewardOption } from '@data/rewards'
 import { applyItemReward, checkpointStoryEnding, completeStoryEnding, newRun, preparePendingReward, registerWord, spendInspiration, type RewardPhase, type RewardPickRef } from '@core/run'
 import { startGrade } from '@core/grade'
-import { canAddItemWithoutLock, recoverBattleTables } from '@core/deckSafety'
-import { clearAllRecords, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
+import { recoverBattleTables } from '@core/deckSafety'
+import { clearEverything, clearRun, loadRun, markTutorialSeen, saveRun } from '@core/save'
 import { sharedTokenMind } from '@core/tokenMind'
 import packageInfo from '../package.json'
 import { GraphicsSettings } from '@/ui/GameSettings'
@@ -34,7 +37,7 @@ import { GameAudio } from '@/audio/GameAudio'
 import { installFoilShaders } from '@/ui/FoilShader'
 import { CustomCursor } from '@/ui/CustomCursor'
 import { ClickScribble } from '@/ui/ClickScribble'
-import { applyLocaleToDocument, currentLocale } from '@/localization'
+import { applyLocaleToDocument, currentLocale, t } from '@/localization'
 import { applyContentLocalization } from '@/localization/content'
 import { applyDetailedContentLocalization } from '@/localization/contentDetails'
 import { installDomLocalization } from '@/localization/dom'
@@ -54,6 +57,12 @@ const TITLE_UI_HOLD_MS = 850
 const AMBIENT_THAW_MS = 260
 const STAGE_TRANSITION_COVER_MS = 320
 const STAGE_TRANSITION_REVEAL_MS = 520
+/**
+ * 전투 진입이 리소스 예열을 기다리는 최대 시간. 예열은 로딩 프레임을 감추려는
+ * 것일 뿐이라, 오디오 스트림의 canplaythrough처럼 끝내 오지 않는 신호 하나 때문에
+ * 덮개가 걷히지 않은 채 화면이 멈추면 안 된다. 넘기면 남은 준비는 뒤에서 계속된다.
+ */
+const BATTLE_PRELOAD_WAIT_MS = 6000
 /** 백틱 키 또는 좌상단 모서리 5회 클릭으로 여는 숨은 검수 기능. */
 const DEV_CHEAT_ENABLED = import.meta.env.DEV
 const viewport = document.getElementById('viewport') as HTMLElement
@@ -105,7 +114,9 @@ const debugCombatModes = {
 // 디버그 아이템 지급 — 감탄사 화면을 건너뛰고 기본 스탯만 얹는다.
 // 전설(규칙) 아이템은 기본 스탯이 0이라 패시브만 붙는다.
 function grantItem(def: ItemDef) {
+  const trait = def.passive ? undefined : rollItemTrait(def.id, def.rarity, Math.floor(Math.random() * 2 ** 31), deadItemTraits())
   applyItemReward(run.player, {
+    ...(trait ? { trait } : {}),
     id: def.id,
     name: def.name,
     rarity: def.rarity,
@@ -311,7 +322,7 @@ function mountDevCheat(active: SceneName) {
   const corner = document.createElement('button')
   corner.className = 'dev-cheat-corner'
   corner.type = 'button'
-  corner.setAttribute('aria-label', '개발 치트 열기')
+  corner.setAttribute('aria-label', t('devCheatOpen', '개발자 도구 열기'))
   corner.addEventListener('click', () => {
     cornerClicks++
     if (cornerClicks < 5) return
@@ -450,11 +461,31 @@ function startNewRunBattle() {
   void goBattle(true, markTutorialSeen)
 }
 
-function resetAllRecordsAndStart() {
-  clearAllRecords()
-  run = newRun()
-  saveRun(run)
-  void goBattle(true, markTutorialSeen)
+/** 새로고침 직후 오프닝 시네마틱을 한 번 건너뛰게 하는 표식(진행도가 아니라 세션 저장소). */
+const SKIP_INTRO_ONCE_KEY = 'lt-skip-intro-once'
+
+/**
+ * 설정의 '모든 기록 삭제'. 진행도·설정을 전부 지우고 페이지를 새로 불러와 타이틀로
+ * 돌아간다. 토큰의 마음·취향 같은 메모리 싱글턴이 지운 직후 옛 값을 다시 저장하던
+ * 문제를 새로고침으로 끊는다. 튜토리얼은 타이틀에서 시작을 누르면 다시 나온다.
+ */
+function resetAllRecordsToTitle() {
+  battleRequest++
+  // 뷰가 정리되며 저장하는 값까지 함께 지우도록 먼저 내린 뒤 지운다.
+  reset()
+  clearEverything()
+  try { sessionStorage.setItem(SKIP_INTRO_ONCE_KEY, '1') } catch { /* 없으면 오프닝이 한 번 더 나올 뿐 */ }
+  window.location.reload()
+}
+
+function consumeSkipIntroOnce(): boolean {
+  try {
+    const skip = sessionStorage.getItem(SKIP_INTRO_ONCE_KEY) === '1'
+    sessionStorage.removeItem(SKIP_INTRO_ONCE_KEY)
+    return skip
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -473,7 +504,7 @@ function goTitle(withIntro: unknown = false) {
   const title = new TitleView(stage, {
     hasSave: !!loadRun(),
     holdUi: playIntro,
-    onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsAndStart }),
+    onSettings: () => openSettingsModal(stage, { onResetAll: resetAllRecordsToTitle }),
     onGuide: goCombatGuide,
     onStart: (fresh) => {
       if (fresh) clearRun()
@@ -486,7 +517,8 @@ function goTitle(withIntro: unknown = false) {
       else if (run.pendingEndingGrade != null) goEnding(run.pendingEndingGrade, run.pendingEndingEarned ?? run.pendingEndingGrade)
       else if (run.reward?.day === run.day) {
         if (run.reward.phase === 'complete') finishReward()
-        else if (run.reward.phase === 'shop') goInspirationShop(run.reward.grade)
+        // 예전 저장의 보스 영감 상점 단계는 상점을 없앤 뒤 보상 완료로 넘긴다.
+        else if (run.reward.phase === 'shop') finishReward()
         else goReward(run.reward.grade, run.reward.phase)
       }
       else void goBattle()
@@ -573,7 +605,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
   const background = backgroundFor(run.day, st.isBoss, st.encounter[0])
   const [{ BattleView }] = await Promise.all([
     import('@views/BattleView'),
-    preloadUpcomingBattle(),
+    Promise.race([preloadUpcomingBattle(), waitForMs(BATTLE_PRELOAD_WAIT_MS)]),
   ])
   if (request !== battleRequest) return
   reset()
@@ -605,7 +637,7 @@ async function goBattle(intro = false, onIntroComplete?: () => void) {
       saveRun(run)
       goTitle()
     }, // 인트로 없이 — 시네마틱은 첫 부팅에서만 튼다
-    onResetAll: resetAllRecordsAndStart,
+    onResetAll: resetAllRecordsToTitle,
 
     intro,
     onIntroComplete,
@@ -696,9 +728,9 @@ function beginReward(grade: number, earned: number = grade) {
   openPreparedReward(grade)
 }
 
-/** 새 보상은 일반전과 보스전 모두 세 단계로 선택한다. */
+/** 새 보상은 일반전과 보스전 모두 세 단계(아이템 → 주어·수식어 → 동사)로 선택한다. */
 function openPreparedReward(grade: number) {
-  goReward(grade, 'subject')
+  goReward(grade, 'item')
 }
 
 function rewardPickRef(opt: RewardOption): RewardPickRef {
@@ -709,111 +741,40 @@ function rewardPickRef(opt: RewardOption): RewardPickRef {
   }
 }
 
-function shopOptionFromRef(ref: RewardPickRef | null): RewardOption | null {
-  if (!ref) return null
-  if (ref.kind === 'item') {
-    const item = ALL_ITEMS[ref.id]
-    if (!item || run.player.items.some((owned) => owned.id === item.id) || !canAddItemWithoutLock(run.player, item)) return null
-    return {
-      kind: 'item', rarity: item.rarity, name: item.name, desc: item.flavor,
-      art: 'gift', item,
+/**
+ * 일반·희귀 아이템 진열에 무작위 특성을 붙인다. 클리어 씨앗과 진열 새로고침 횟수로 굴리므로
+ * 영감을 내고 새로고침하면 특성도 다시 굴러가고, 같은 진열을 다시 열면(이어하기) 그대로다.
+ */
+function itemTraitSeed(refreshes: number): number {
+  return ((run.reward?.seed ?? 0) ^ Math.imul(Math.max(0, refreshes) + 1, 0x9e3779b1)) >>> 0
+}
+
+/** 지금 보유 상태에서 효과가 없는 특성 — 진열에 올리지 않는다(잉크가 이미 가장 비싼 문장을 감당하면 넉넉한 잉크). */
+function deadItemTraits(): ItemTraitId[] {
+  return inkAlreadySaturated(EARLY_TEMPLATE, slotInkCap, run.player) ? ['inkMax'] : []
+}
+
+/** 칸마다 카드 한 장의 최대 잉크 — 겹주어·겹동사 칸은 원래 칸 카드를 쓴다. 문장부호는 0. */
+let slotInkCaps: Record<string, number> | null = null
+function slotInkCap(slotKey: string): number {
+  if (!slotInkCaps) {
+    slotInkCaps = {}
+    for (const word of [...ALL_REWARD_WORDS, ...Object.values(EARLY_WORDS).flat()]) {
+      slotInkCaps[word.slot] = Math.max(slotInkCaps[word.slot] ?? 0, wordInkCost(word))
     }
   }
-  const owned = Object.values(run.player.deck).flat().find((word) => word.id === ref.id)
-  const word = ref.reinforce ? owned : ALL_REWARD_WORDS.find((candidate) => candidate.id === ref.id)
-  if (!word) return null
-  return {
-    kind: 'word', reinforce: ref.reinforce, rarity: word.rarity ?? 'common',
-    name: word.text, desc: word.note, art: 'word', word,
-  }
+  const base = slotKey === 'subj2' ? 'subj' : slotKey === 'verb2' ? 'verb' : slotKey
+  return slotInkCaps[base] ?? 0
 }
 
-function makeShopStock(grade: number, refreshes: number): RewardPickRef[] {
-  const seed = run.reward?.seed ?? 0
-  return (['subject', 'verb', 'item'] as RewardPhase[]).flatMap((phase) =>
-    genRewards(
-      run.player,
-      grade,
-      run.day,
-      phase,
-      rewardOfferRng(seed, phase, refreshes),
-      Number.POSITIVE_INFINITY,
-    ).map(rewardPickRef),
-  )
+function withItemTrait(item: ItemDef, seed = itemTraitSeed(run.reward?.shopRefreshes ?? 0)): ItemDef {
+  if (item.trait || item.passive) return item
+  const trait = rollItemTrait(item.id, item.rarity, seed, deadItemTraits())
+  return trait ? { ...item, trait } : item
 }
 
-async function goInspirationShop(
-  grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
-  playEntrance = true,
-) {
-  const request = ++battleRequest
-  reset()
-  stage.setAttribute('data-theme', 'day')
-  const pending = run.reward
-  if (!pending) {
-    finishReward()
-    return
-  }
-  pending.phase = 'shop'
-  pending.shopRefreshes ??= 0
-  pending.shopPurchases ??= 0
-  if (!pending.shopStock?.length) pending.shopStock = makeShopStock(grade, pending.shopRefreshes)
-  const options = Array.from({ length: 9 }, (_, index) => shopOptionFromRef(pending.shopStock![index] ?? null))
-  saveRun(run)
-  const { RewardView } = await import('@views/RewardView')
-  if (request !== battleRequest) return
-  current = new RewardView(stage, {
-    day: run.day,
-    deck: run.player.deck,
-    inspiration: run.inspiration,
-    earned: pending.earned,
-    phase: 'subject',
-    refreshes: pending.shopRefreshes,
-    purchases: pending.shopPurchases,
-    mode: 'shop',
-    playEntrance,
-    options,
-    onPick: (opt) => {
-      const cost = rewardPrice(opt)
-      if (run.inspiration < cost) {
-        goInspirationShop(grade, false)
-        return
-      }
-      const slotIndex = options.indexOf(opt)
-      const finishPurchase = () => {
-        spendInspiration(run, cost)
-        if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
-        if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
-        saveRun(run)
-        goInspirationShop(grade, false)
-      }
-      if (opt.kind === 'word' && opt.word) {
-        const result = registerWord(run.player, opt.word)
-        if (result.kind === 'needs-discard') {
-          goDiscard(opt.word, result.candidates, finishPurchase, () => goInspirationShop(grade, false))
-        }
-        else finishPurchase()
-      } else if (opt.item) {
-        goItem(opt.item, grade, undefined, rewardPickRef(opt), cost, () => {
-          if (slotIndex >= 0 && run.reward?.shopStock) run.reward.shopStock[slotIndex] = null
-          if (run.reward) run.reward.shopPurchases = (run.reward.shopPurchases ?? 0) + 1
-          saveRun(run)
-          goInspirationShop(grade, false)
-        })
-      }
-    },
-    onRefresh: () => {
-      const cost = rewardRefreshCost(pending.shopRefreshes ?? 0)
-      if (!spendInspiration(run, cost)) return false
-      pending.shopRefreshes = (pending.shopRefreshes ?? 0) + 1
-      pending.shopStock = makeShopStock(grade, pending.shopRefreshes)
-      saveRun(run)
-      goInspirationShop(grade)
-      return true
-    },
-    onSkip: () => finishReward(),
-  })
-  mountMeta('reward')
+function withOptionTrait(option: RewardOption, refreshes: number): RewardOption {
+  return option.kind === 'item' && option.item ? { ...option, item: withItemTrait(option.item, itemTraitSeed(refreshes)) } : option
 }
 
 function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) {
@@ -825,16 +786,17 @@ function advanceReward(grade: number, phase: RewardPhase, pick?: RewardPickRef) 
   const earned = run.reward?.earned ?? Math.max(0, Math.round(grade))
   const refreshes = run.reward?.refreshes ?? { subject: 0, item: 0, verb: 0 }
   if (pick) picks.push(pick)
+  // 1페이지 아이템 → 2페이지 주어·수식어 → 3페이지 동사.
+  if (phase === 'item') {
+    run.reward = { day: run.day, grade, earned, phase: 'subject', picks, seed, refreshes }
+    saveRun(run)
+    goReward(grade, 'subject')
+    return
+  }
   if (phase === 'subject') {
     run.reward = { day: run.day, grade, earned, phase: 'verb', picks, seed, refreshes }
     saveRun(run)
     goReward(grade, 'verb')
-    return
-  }
-  if (phase === 'verb') {
-    run.reward = { day: run.day, grade, earned, phase: 'item', picks, seed, refreshes }
-    saveRun(run)
-    goReward(grade, 'item')
     return
   }
   finishReward()
@@ -874,11 +836,12 @@ function goDiscard(incoming: Word, candidates: Word[], onDone: () => void, onDis
 // 전투 등급에 현재 15층 사이클의 진행도를 더해 실제 희귀도 가중치를 정한다.
 async function goReward(
   grade = run.reward?.grade ?? startGrade(run.player.stats.luck),
-  phase: RewardPhase = run.reward?.phase === 'item' || run.reward?.phase === 'verb' ? run.reward.phase : 'subject',
+  phase: RewardPhase = run.reward?.phase === 'subject' || run.reward?.phase === 'verb' ? run.reward.phase : 'item',
 ) {
   const request = ++battleRequest
-  reset()
-  stage.setAttribute('data-theme', 'day')
+  // 보상 화면이 이미 떠 있던 채로 다시 그리는 경우(새로고침·다음 장) — 레이어는 그대로, 카드만 뒤집힌다.
+  const layerShown = !!stage.querySelector('.reward-card')
+  const dockShown = !!stage.querySelector('.reward-dock')
   const seed = run.reward?.seed ?? 0
   const refreshes = run.reward?.refreshes?.[phase] ?? 0
   const options = genRewards(
@@ -888,15 +851,21 @@ async function goReward(
     phase,
     rewardOfferRng(seed, phase, refreshes),
     run.inspiration,
-  )
+  ).map((option) => withOptionTrait(option, refreshes))
   // 후보 자체가 없거나 잔액이 0이라 살 수 있는 후보가 존재하지 않을 때만 넘긴다.
   // 그 외에는 생성기가 세 장 중 적어도 한 장을 현재 잔액 안으로 맞춘다.
   if (options.length === 0 || options.every((option) => rewardPrice(option) > run.inspiration)) {
+    reset()
     advanceReward(grade, phase)
     return
   }
   const { RewardView } = await import('@views/RewardView')
   if (request !== battleRequest) return
+  // 비우기는 모듈을 받은 뒤에 한다 — 새로고침 때 빈 화면이 한 프레임이라도 비치지 않게.
+  reset()
+  stage.setAttribute('data-theme', 'day')
+  // 카드 문구의 확률은 운 반영 값으로 적는다 — 보상·상점에서도 전투와 같은 운을 쓴다.
+  setCardLuck(run.player.stats.luck)
   current = new RewardView(stage, {
     day: run.day,
     deck: run.player.deck,
@@ -905,6 +874,8 @@ async function goReward(
     phase,
     refreshes,
     options,
+    layerShown,
+    dockShown,
     onPick: (opt) => {
       const cost = rewardPrice(opt)
       if (run.inspiration < cost) {
@@ -952,7 +923,6 @@ function goItem(
   rewardPhase?: RewardPhase,
   pick?: RewardPickRef,
   inspirationCost = 0,
-  onComplete?: () => void,
 ) {
   battleRequest++
   reset()
@@ -963,14 +933,9 @@ function goItem(
     onDone: (result) => {
       if (inspirationCost > 0 && !spendInspiration(run, inspirationCost)) {
         if (rewardPhase) advanceReward(grade, rewardPhase)
-        else if (onComplete) goInspirationShop(grade, false)
         return
       }
       applyItemReward(run.player, result)
-      if (onComplete) {
-        onComplete()
-        return
-      }
       if (rewardPhase && pick) {
         advanceReward(grade, rewardPhase, pick)
       } else {
@@ -1035,7 +1000,7 @@ function prepareDemoResultFixture() {
   run.record.sentences = 18
   run.record.bestMult = 4.2
   run.record.bestCombo = 3
-  run.record.bestHit = { dmg: 86, sentence: '나는 미친듯이 때렸다' }
+  run.record.bestHit = { dmg: 86, sentence: '나는 미친 듯이 때렸다' }
   registerWord(run.player, ALL_REWARD_WORDS[0])
   registerWord(run.player, ALL_REWARD_WORDS[1])
   registerWord(run.player, run.player.deck.subj[0])
@@ -1059,6 +1024,9 @@ if (import.meta.env.DEV && STRICT_RESOURCE_LOADING && params.get('qaMissingResou
 const start = (params.get('scene') as SceneName) || 'title'
 const dayParam = Number(params.get('day'))
 if (Number.isFinite(dayParam) && dayParam >= 1) run.day = Math.floor(dayParam)
+// 검수용: ?luck=8 로 운 수치별 확률 표기(카드·운 툴팁)를 바로 확인한다.
+const luckParam = Number(params.get('luck'))
+if (params.has('luck') && Number.isFinite(luckParam) && luckParam >= 0) run.player.stats.luck = luckParam
 // 1MB에 가까운 장식 폰트가 내려오는 동안 화면 전체를 비워 두지 않는다.
 // 폴백으로 즉시 첫 씬을 그리고, 로드가 끝나면 FontManager가 같은 CSS 변수만 교체한다.
 void FontManager.load()
@@ -1067,7 +1035,12 @@ if (start === 'reward') {
   if (!run.reward) prepareReward(grade, Math.max(1, Math.round(grade)))
   openPreparedReward(grade)
 }
-else if (start === 'item') goItem(ITEMS.candle)
+else if (start === 'item') {
+  // 검수용: ?item=아이템id&trait=특성id 로 특성 표시를 바로 확인한다.
+  const devItem = (ALL_ITEMS as Record<string, ItemDef>)[params.get('item') ?? ''] ?? ITEMS.candle
+  const devTrait = params.get('trait')
+  goItem(devTrait && isItemTraitId(devTrait) && !devItem.passive ? { ...devItem, trait: devTrait } : withItemTrait(devItem, Math.floor(Math.random() * 2 ** 31)))
+}
 else if (start === 'ending') goEnding()
 else if (start === 'defeat' && params.get('demo') === '1') {
   prepareDemoResultFixture()
@@ -1078,4 +1051,4 @@ else if (start === 'intro') goBattle(true)
 else if (start === 'battle') goBattle()
 else if (start === 'guide') goCombatGuide()
 // 부팅으로 들어온 타이틀에서만 오프닝 시네마틱을 튼다(?scene=title이면 검수용이라 건너뛴다).
-else goTitle(!params.get('scene'))
+else goTitle(!params.get('scene') && !consumeSkipIntroOnce())

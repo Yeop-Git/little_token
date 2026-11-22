@@ -32,19 +32,55 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "mind"
       ],
       "emotion": "sorrow",
-      "inkCost": 2,
+      "inkCost": 1,
       "person": "first",
       "bonus": 0,
       "targetMode": "enemy",
       "rarity": "rare",
       "art": "1002",
-      "note": "75% 확률로 배율 ×1.80",
+      "note": "75% 확률로 배율 ×1.65",
       "lore": "지난 일은 이미 정해져 있다. 그래서 자주 손에 잡힌다.",
       "variance": {
         "p": 0.75,
-        "hi": 1.8,
+        "hi": 1.65,
         "lo": 1
       }
+    },
+    {
+      "id": "hwanan",
+      "text": "화가 난 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "anger"
+      ],
+      "emotion": "anger",
+      "inkCost": 0,
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "art": "1012",
+      "note": "배율 ×1.20",
+      "lore": "구겨진 페이지를 펴며 씩씩거린다."
+    },
+    {
+      "id": "deultteun",
+      "text": "들뜬 나는",
+      "slot": "subj",
+      "tags": [
+        "self",
+        "play"
+      ],
+      "emotion": "pleasure",
+      "inkCost": 1,
+      "person": "first",
+      "bonus": 0.2,
+      "targetMode": "enemy",
+      "rarity": "common",
+      "art": "1018",
+      "note": "배율 ×1.20",
+      "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
     }
   ],
   "adv": [
@@ -73,7 +109,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "warm"
       ],
       "emotion": "joy",
-      "inkCost": 1,
+      "inkCost": 2,
       "rarity": "common",
       "art": "2002",
       "note": "카운터",
@@ -113,7 +149,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "kind": "attack",
       "rarity": "common",
       "art": "3001",
-      "note": "공격 ×1",
+      "note": "공격 ×1.0",
       "lore": "정직한 한 방."
     },
     {
@@ -124,13 +160,13 @@ export const EARLY_WORDS: Record<string, Word[]> = {
         "grd"
       ],
       "emotion": "anger",
-      "inkCost": 2,
+      "inkCost": 1,
       "stat": "guard",
       "statMult": 1,
       "kind": "guard",
       "rarity": "common",
       "art": "3002",
-      "note": "방어 ×1",
+      "note": "방어 ×1.0",
       "lore": "한 발 버틴다."
     },
     {
@@ -147,7 +183,7 @@ export const EARLY_WORDS: Record<string, Word[]> = {
       "kind": "heal",
       "rarity": "common",
       "art": "3003",
-      "note": "회복 ×1",
+      "note": "회복 ×1.0",
       "lore": "상처를 매만진다."
     },
     {
@@ -181,17 +217,17 @@ export const REWARD_WORDS: Word[] = [
       "echo"
     ],
     "emotion": "pleasure",
-    "inkCost": 2,
+    "inkCost": 1,
     "person": "first",
     "bonus": 0,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1003",
-    "note": "60% 확률로 배율 ×2.00",
+    "note": "60% 확률로 배율 ×1.85",
     "lore": "누가 먼저였는지는 중요하지 않다.",
     "variance": {
       "p": 0.6,
-      "hi": 2,
+      "hi": 1.85,
       "lo": 1
     }
   },
@@ -274,11 +310,11 @@ export const REWARD_WORDS: Word[] = [
     "targetMode": "enemy",
     "rarity": "epic",
     "art": "1007",
-    "note": "55% 확률로 배율 ×3.00",
-    "lore": "아픈 자리가 오히려 뜨겁다.",
+    "note": "30% 확률로 배율 ×4.70",
+    "lore": "아픈 자리가 오히려 뜨겁다. 좀처럼 터지지 않지만, 터지면 가장 크게 터진다.",
     "variance": {
-      "p": 0.55,
-      "hi": 3,
+      "p": 0.3,
+      "hi": 4.7,
       "lo": 1
     }
   },
@@ -314,7 +350,7 @@ export const REWARD_WORDS: Word[] = [
       "bright"
     ],
     "emotion": "joy",
-    "inkCost": 0,
+    "inkCost": 1,
     "person": "first",
     "bonus": 0.2,
     "targetMode": "enemy",
@@ -333,13 +369,13 @@ export const REWARD_WORDS: Word[] = [
       "warm"
     ],
     "emotion": "joy",
-    "inkCost": 2,
+    "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1010",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "서로의 공책을 꼭 잡아 준다."
   },
   {
@@ -353,33 +389,15 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "joy",
     "inkCost": 2,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1011",
-    "note": "배율 ×1.60 · 매직실드 1",
+    "note": "배율 ×1.50 · 매직실드 1",
     "lore": "안도의 숨이 다음 공격을 지우는 빛의 막이 된다.",
     "effects": {
       "magicShield": 1
     }
-  },
-  {
-    "id": "hwanan",
-    "text": "화가 난 나는",
-    "slot": "subj",
-    "tags": [
-      "self",
-      "anger"
-    ],
-    "emotion": "anger",
-    "inkCost": 0,
-    "person": "first",
-    "bonus": 0.2,
-    "targetMode": "enemy",
-    "rarity": "common",
-    "art": "1012",
-    "note": "배율 ×1.20",
-    "lore": "구겨진 페이지를 펴며 씩씩거린다."
   },
   {
     "id": "matseo",
@@ -390,13 +408,13 @@ export const REWARD_WORDS: Word[] = [
       "both"
     ],
     "emotion": "anger",
-    "inkCost": 2,
+    "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1013",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "같은 줄에서 벌레를 마주 본다."
   },
   {
@@ -410,11 +428,11 @@ export const REWARD_WORDS: Word[] = [
     "emotion": "anger",
     "inkCost": 2,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "legendary",
     "art": "1014",
-    "note": "배율 ×1.60 · 매직실드 1 · 방어 +2랭크",
+    "note": "배율 ×1.50 · 매직실드 1 · 방어 +2랭크",
     "lore": "마지막 한 줄까지 버틴 집념이 빛의 막과 단단한 방어 태세가 된다.",
     "effects": {
       "magicShield": 1,
@@ -466,32 +484,14 @@ export const REWARD_WORDS: Word[] = [
       "mind"
     ],
     "emotion": "sorrow",
-    "inkCost": 2,
+    "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1017",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "어제의 줄을 다시 읽어 본다."
-  },
-  {
-    "id": "deultteun",
-    "text": "들뜬 나는",
-    "slot": "subj",
-    "tags": [
-      "self",
-      "play"
-    ],
-    "emotion": "pleasure",
-    "inkCost": 0,
-    "person": "first",
-    "bonus": 0.2,
-    "targetMode": "enemy",
-    "rarity": "common",
-    "art": "1018",
-    "note": "배율 ×1.20",
-    "lore": "좋은 일이 생길 것처럼 발끝이 바쁘다."
   },
   {
     "id": "sinnan",
@@ -503,7 +503,7 @@ export const REWARD_WORDS: Word[] = [
       "play"
     ],
     "emotion": "pleasure",
-    "inkCost": 0,
+    "inkCost": 1,
     "person": "first",
     "bonus": 0.2,
     "targetMode": "enemy",
@@ -514,20 +514,20 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "jangnan",
-    "text": "장난스런 나는",
+    "text": "장난스러운 나는",
     "slot": "subj",
     "tags": [
       "self",
       "play"
     ],
     "emotion": "pleasure",
-    "inkCost": 2,
+    "inkCost": 1,
     "person": "first",
-    "bonus": 0.6,
+    "bonus": 0.5,
     "targetMode": "enemy",
     "rarity": "rare",
     "art": "1020",
-    "note": "배율 ×1.60",
+    "note": "배율 ×1.50",
     "lore": "여백에 작은 낙서를 남긴다."
   },
   {
@@ -553,7 +553,7 @@ export const REWARD_WORDS: Word[] = [
       "solid"
     ],
     "emotion": "sorrow",
-    "inkCost": 3,
+    "inkCost": 2,
     "rarity": "rare",
     "art": "2005",
     "note": "매직실드 1 · 방어 +1랭크",
@@ -582,21 +582,21 @@ export const REWARD_WORDS: Word[] = [
   },
   {
     "id": "jikyeot",
-    "text": "지켰다",
+    "text": "막아섰다",
     "slot": "verb",
     "tags": [
       "grd",
       "hold"
     ],
     "emotion": "joy",
-    "inkCost": 3,
+    "inkCost": 2,
     "stat": "guard",
     "statMult": 1,
     "kind": "guard",
     "rarity": "common",
     "art": "3005",
-    "note": "방어 ×1 · 방패치기 50%",
-    "lore": "한 뼘도 안 내준다.",
+    "note": "방어 ×1.0 · 방패치기 50%",
+    "lore": "빛의 방울을 두르고 벌레 앞을 막아선다. 부딪힌 힘의 절반을 되튕긴다.",
     "effects": {
       "guardAttackMultiplier": 0.5
     }
@@ -624,15 +624,18 @@ export const REWARD_WORDS: Word[] = [
     "text": "재빨리",
     "slot": "adv",
     "tags": [
-      "swift",
-      "preempt"
+      "swift"
     ],
     "emotion": "pleasure",
     "inkCost": 1,
     "rarity": "common",
     "art": "2007",
-    "note": "선공",
-    "lore": "상대의 공격이 닿기 전에 먼저 움직인다."
+    "note": "연타 2회·62%",
+    "lore": "재빠른 발놀림으로 같은 행동을 한 번 더 가볍게 이어 간다.",
+    "effects": {
+      "castCount": 2,
+      "castScale": 0.62
+    }
   },
   {
     "id": "motdohage",
@@ -667,7 +670,7 @@ export const REWARD_WORDS: Word[] = [
     "kind": "heal",
     "rarity": "common",
     "art": "3008",
-    "note": "회복 ×1",
+    "note": "회복 ×1.0",
     "lore": "삐뚤어진 줄도 신나게 다시 고친다."
   },
   {
@@ -685,18 +688,18 @@ export const REWARD_WORDS: Word[] = [
     "kind": "attack",
     "rarity": "common",
     "art": "3007",
-    "note": "공격 ×1",
+    "note": "공격 ×1.0",
     "lore": "젖은 잉크를 한 획에 멀리 흘려보낸다."
   },
   {
     "id": "michin",
-    "text": "미친듯이",
+    "text": "미친 듯이",
     "slot": "adv",
     "tags": [
       "mad"
     ],
     "emotion": "anger",
-    "inkCost": 3,
+    "inkCost": 2,
     "rarity": "epic",
     "art": "2009",
     "note": "연타 2회·67% · 공격 +1랭크",
@@ -746,17 +749,17 @@ export const REWARD_WORDS: Word[] = [
     "text": "포근하게",
     "slot": "adv",
     "tags": [
-      "warm"
+      "warm",
+      "preempt"
     ],
     "emotion": "joy",
-    "inkCost": 3,
+    "inkCost": 2,
     "rarity": "rare",
     "art": "2012",
-    "note": "매직실드 1 · 방어 +1랭크",
-    "lore": "포근한 온기로 다음 공격을 막고 방어 태세를 단단하게 만든다.",
+    "note": "선공 · 매직실드 1",
+    "lore": "포근한 이불을 먼저 끌어올려, 상대가 덤비기 전에 다음 공격을 막을 온기를 두른다.",
     "effects": {
-      "magicShield": 1,
-      "guardRank": 1
+      "magicShield": 1
     }
   },
   {
@@ -767,7 +770,7 @@ export const REWARD_WORDS: Word[] = [
       "greet"
     ],
     "emotion": "joy",
-    "inkCost": 3,
+    "inkCost": 2,
     "crit": 0.3,
     "targetCount": 3,
     "rarity": "legendary",
@@ -783,7 +786,7 @@ export const REWARD_WORDS: Word[] = [
       "smile"
     ],
     "emotion": "joy",
-    "inkCost": 2,
+    "inkCost": 1,
     "crit": 0.3,
     "rarity": "common",
     "art": "2014",
@@ -798,7 +801,7 @@ export const REWARD_WORDS: Word[] = [
       "rage"
     ],
     "emotion": "anger",
-    "inkCost": 3,
+    "inkCost": 1,
     "rarity": "rare",
     "art": "2015",
     "note": "연타 2회·50% · 공격 +1랭크",
@@ -818,13 +821,11 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "sorrow",
     "inkCost": 1,
+    "crit": 0.3,
     "rarity": "common",
     "art": "2016",
-    "note": "카운터",
-    "lore": "이 턴에 받은 충격을 행동 종류에 따라 되돌린다.",
-    "effects": {
-      "counter": true
-    }
+    "note": "대성공 30%",
+    "lore": "홀로 앉아 숨을 고르다가 아무도 모르는 틈에 정확한 한 줄을 긋는다."
   },
   {
     "id": "aesseo",
@@ -852,11 +853,14 @@ export const REWARD_WORDS: Word[] = [
     ],
     "emotion": "pleasure",
     "inkCost": 2,
-    "crit": 0.3,
+    "crit": 0.25,
     "rarity": "rare",
     "art": "2018",
-    "note": "대성공 30%",
-    "lore": "신나는 기세로 결정적인 한 수를 끌어낼 가능성을 높인다."
+    "note": "대성공 25% · 공격 +1랭크",
+    "lore": "신나게 계단을 뛰어오르며 결정적인 한 수를 노리고, 오른 기세만큼 공격 태세도 끌어올린다.",
+    "effects": {
+      "attackRank": 1
+    }
   },
   {
     "id": "deulsseogimyeo",
@@ -885,13 +889,75 @@ export const REWARD_WORDS: Word[] = [
       "preempt"
     ],
     "emotion": "pleasure",
-    "inkCost": 0,
+    "inkCost": 1,
     "rarity": "epic",
     "art": "2020",
     "note": "선공 · 리필 2",
     "lore": "가벼운 박자로 잉크를 아끼며 상대보다 먼저 움직인다.",
     "effects": {
       "inkDiscount": 2
+    }
+  },
+  {
+    "id": "nunmulDakeun",
+    "text": "눈물 닦은 나는",
+    "slot": "subj",
+    "tags": [
+      "self",
+      "tear"
+    ],
+    "emotion": "sorrow",
+    "inkCost": 2,
+    "person": "first",
+    "bonus": 0,
+    "targetMode": "enemy",
+    "rarity": "legendary",
+    "art": "1015",
+    "note": "60% 확률로 배율 ×2.60 · 나머지 ×1.50",
+    "lore": "울고 난 뒤의 손끝은 단단하다. 터지지 않아도 이미 한 뼘 자랐다.",
+    "variance": {
+      "p": 0.6,
+      "hi": 2.6,
+      "lo": 1.5
+    }
+  },
+  {
+    "id": "onhim",
+    "text": "온 힘을 다해",
+    "slot": "adv",
+    "tags": [
+      "force",
+      "rage"
+    ],
+    "emotion": "anger",
+    "inkCost": 2,
+    "rarity": "legendary",
+    "art": "2004",
+    "note": "관통 · 연타 2회·60%",
+    "lore": "남은 힘을 전부 실어 방어 너머까지 두 번 내리친다.",
+    "effects": {
+      "pierceGuard": true,
+      "castCount": 2,
+      "castScale": 0.6
+    }
+  },
+  {
+    "id": "kkwakmulgo",
+    "text": "이를 꽉 물고",
+    "slot": "adv",
+    "tags": [
+      "solid",
+      "counter"
+    ],
+    "emotion": "sorrow",
+    "inkCost": 2,
+    "rarity": "legendary",
+    "art": "2016",
+    "note": "카운터 · 매직실드 1",
+    "lore": "이를 악물고 버틴 자리에서 막아 낸 만큼 되돌려 준다. 다음 공격 한 번은 아예 닿지 못한다.",
+    "effects": {
+      "counter": true,
+      "magicShield": 1
     }
   }
 ]
@@ -996,7 +1062,7 @@ export const WORDS: Record<string, Word[]> = {
     },
     {
       "id": "mad",
-      "text": "미친듯이",
+      "text": "미친 듯이",
       "slot": "adv",
       "tags": [
         "mad"
@@ -1126,7 +1192,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "attack",
       "rarity": "common",
-      "note": "공격 ×1",
+      "note": "공격 ×1.0",
       "lore": "그냥, 앞으로."
     },
     {
@@ -1141,7 +1207,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "guard",
       "rarity": "common",
-      "note": "방어 ×1",
+      "note": "방어 ×1.0",
       "lore": "한 발 물러서는 것도 문장이다."
     },
     {
@@ -1171,7 +1237,7 @@ export const WORDS: Record<string, Word[]> = {
       "statMult": 1,
       "kind": "heal",
       "rarity": "common",
-      "note": "회복 ×1",
+      "note": "회복 ×1.0",
       "lore": "잊는 편이 나을 때가 있다."
     },
     {
@@ -1188,7 +1254,7 @@ export const WORDS: Record<string, Word[]> = {
       "kind": "attack",
       "aoe": "all",
       "rarity": "rare",
-      "note": "공격 ×1 · 전체",
+      "note": "공격 ×1.0 · 전체",
       "lore": "빗자루처럼, 페이지 끝에서 끝까지."
     }
   ],
@@ -1262,7 +1328,7 @@ export const PUNCT_WORDS: Word[] = [
     "emotion": "neutral",
     "rarity": "legendary",
     "art": "7001",
-    "note": "선공 상대보다 먼저 행동한다",
+    "note": "선공",
     "lore": "느낌표를 찍자 손이 먼저 나갔다."
   },
   {
@@ -1276,7 +1342,7 @@ export const PUNCT_WORDS: Word[] = [
     "bonus": 0.1,
     "rarity": "legendary",
     "art": "7002",
-    "note": "배율 풀 +0.10 (안전한 한 수)",
+    "note": "배율 ×1.10",
     "lore": "조용히 마침표를 찍는다. 그걸로 충분한 날도 있다."
   },
   {
@@ -1290,7 +1356,7 @@ export const PUNCT_WORDS: Word[] = [
     "crit": 0.3,
     "rarity": "legendary",
     "art": "7003",
-    "note": "대성공 확률 +30%",
+    "note": "대성공 30%",
     "lore": "정말 이걸로 끝일까? 되묻는 순간 문장이 커진다."
   }
 ]
@@ -1308,7 +1374,7 @@ export const GROW_WORDS: Word[] = [
     "growHp": 2,
     "rarity": "legendary",
     "art": "9001",
-    "note": "최대 체력 +2 · 배율을 받지 않는다",
+    "note": "최대 체력 +2",
     "lore": "그냥 자란다. 아무것도 하지 않고, 자라기만 한다."
   }
 ]
@@ -1616,7 +1682,7 @@ export const EARLY_COMBOS: Combo[] = [
   },
   {
     "id": "ec31",
-    "name": "장난스런 파도",
+    "name": "장난스러운 파도",
     "need": [
       "play",
       "wide"

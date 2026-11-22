@@ -6,9 +6,12 @@
  * 슬롯을 4칸/6칸으로 바꿔도 컴파일러는 그대로 동작한다.
  */
 
+import { formatMult } from './numberFormat'
 import { emotionResonanceFor } from './combatRules'
 import { eul } from './josa'
 import { DOUBT_RANGE, DOUBT_SUFFIX } from './passives'
+import { wordInkCost } from './ink'
+import { luckChance } from './luck'
 import { EMOTION_LABEL, emotionOrNeutral, type Combo, type CompileMods, type Emotion, type Intent, type IntentPart, type Selection, type StatBlock, type StatName, type Tables, type TargetCount, type Word } from './types'
 import { currentLocale, type LocaleCode } from '@/localization'
 import { wordTextFor } from '@/localization/content'
@@ -34,16 +37,16 @@ export const STAT_NAME: Record<StatName, string> = currentLocale === 'en'
           : { atk: '공격', guard: '방어', heal: '회복', luck: '운' }
 
 const CORE_TEXT = currentLocale === 'en'
-  ? { pool:'Multiplier pool', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions' }
+  ? { sky:'Up to the Sky', fire:'Ember Ink', fireHint:'{n} Ink left', pool:'Card multiplier', shoe:'Heavy Shoe', perfect:'Perfect context', mismatch:'Mismatch', bbq:'Barbecue', kills:'Grows with defeated enemies', resonance:'resonance', sameEmotion:'matching emotions', trait:'Item trait' }
   : currentLocale === 'ja'
-    ? { pool:'倍率プール', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情' }
+    ? { sky:'空まで', fire:'燃えるインク', fireHint:'残りインク{n}', pool:'カード倍率', shoe:'重い靴', perfect:'完璧な文脈', mismatch:'不一致', bbq:'バーベキュー', kills:'倒した敵の数だけ強くなる', resonance:'共鳴', sameEmotion:'同じ感情', trait:'特性' }
     : currentLocale === 'ru'
-      ? { pool:'Пул множителя', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций' }
+      ? { sky:'До неба', fire:'Пылающие чернила', fireHint:'осталось чернил: {n}', pool:'Множитель карт', shoe:'Тяжёлая туфля', perfect:'Идеальный контекст', mismatch:'Несоответствие', bbq:'Барбекю', kills:'Усиливается за побеждённых врагов', resonance:'резонанс', sameEmotion:'одинаковых эмоций', trait:'черта' }
       : currentLocale === 'zh-Hans'
-        ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪' }
+        ? { sky:'直上云霄', fire:'燃烧的墨水', fireHint:'剩余墨水{n}', pool:'卡牌倍率', shoe:'沉重鞋子', perfect:'完美语境', mismatch:'不匹配', bbq:'烧烤', kills:'随消灭敌人数增强', resonance:'共鸣', sameEmotion:'相同情绪', trait:'特性' }
         : currentLocale === 'zh-Hant'
-          ? { pool:'倍率池', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒' }
-          : { pool:'배율 풀', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바베큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정' }
+          ? { sky:'直上雲霄', fire:'燃燒的墨水', fireHint:'剩餘墨水{n}', pool:'卡牌倍率', shoe:'沉重鞋子', perfect:'完美語境', mismatch:'不匹配', bbq:'燒烤', kills:'隨消滅敵人數增強', resonance:'共鳴', sameEmotion:'相同情緒', trait:'特性' }
+          : { sky:'하늘까지', fire:'타오르는 잉크', fireHint:'남은 잉크 {n}', pool:'카드 배율', shoe:'무거운 구두', perfect:'완벽한 맥락', mismatch:'어긋남', bbq:'바비큐', kills:'잡은 만큼 세진다', resonance:'공명', sameEmotion:'같은 감정', trait:'특성' }
 
 const sameEmotionHint = (count: number): string => currentLocale === 'ko'
   ? `${CORE_TEXT.sameEmotion} ${count}장`
@@ -124,7 +127,10 @@ export function sentenceTokens(sel: Selection, t: Tables, locale: LocaleCode = c
     const hasPreviousVerb = t.template.slots
       .slice(0, slotIndex)
       .some((previous) => previous.role === 'verb' && !!sel[previous.key])
-    return sentenceSlotText(locale, s.key, text, hasPreviousVerb)
+    const hasPreviousSubject = t.template.slots
+      .slice(0, slotIndex)
+      .some((previous) => previous.role === 'subject' && !!sel[previous.key])
+    return sentenceSlotText(locale, s.key, text, hasPreviousVerb, hasPreviousSubject)
   })
 }
 
@@ -139,7 +145,20 @@ export function joinTokens(tokens: string[], t: Tables, locale: LocaleCode = cur
 }
 
 export function sentenceText(sel: Selection, t: Tables, locale: LocaleCode = currentLocale): string {
-  return joinTokens(sentenceTokens(sel, t, locale), t, locale)
+  const tokens = sentenceTokens(sel, t, locale)
+  // 영어 3슬롯 문장은 부사를 동사 뒤에 두는 편이 모든 카드 조합에서 자연스럽다.
+  // 5슬롯 확장 문법(목적어·어미)은 별도 어순을 가지므로 여기서 재배열하지 않는다.
+  if (locale === 'en' && !t.template.slots.some((slot) => slot.role === 'object' || (slot.role === 'ending' && !slot.attach))) {
+    const priority = { subject: 0, verb: 1, modifier: 2, object: 3, ending: 4 } as const
+    const ordered = t.template.slots
+      .map((slot, index) => ({ slot, token: tokens[index], index }))
+      .sort((a, b) => priority[a.slot.role] - priority[b.slot.role] || a.index - b.index)
+    return ordered.reduce((out, entry) => {
+      if (!out) return entry.token
+      return entry.slot.attach ? out + entry.token : `${out} ${entry.token}`
+    }, '')
+  }
+  return joinTokens(tokens, t, locale)
 }
 
 /** 이 태그가 붙은 문장은 선공 상대보다 먼저 행동한다(문장부호 '!'). */
@@ -171,6 +190,7 @@ export function compile(
   let damageKind: Intent['kind'] | null = null
   let growHp = 0
   const bonusFrom: string[] = [] // 보너스 풀에 기여한 단어 이름(집계판 힌트용)
+  const poolParts: NonNullable<IntentPart['poolParts']> = []
   let targetMode: Intent['targetMode'] = 'enemy'
   let aoe: Intent['aoe'] = 'single'
   let targetCount: TargetCount = 1
@@ -188,16 +208,16 @@ export function compile(
     // 칸 역할에 붙는 아이템 효과(백설공주의 구두·빨간망토의 성냥·성냥팔이 망토)를
     // 그대로 받아 "자라면서 때리는" 카드가 된다.
     if (w.growHp) {
-      growHp += w.growHp
+      growHp += w.growHp * (mods.growMult ?? 1)
       continue
     }
     if (role === 'object' || role === 'verb') {
       // 동사의 깡수치는 스탯에서 나온다 — 공격이면 위력, 방어/회복이면 그쪽 수치로.
       const flat = wordFlat(w, stats, mods)
       if (flat > 0) {
-        const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${w.statMult}` : undefined
+        const hint = w.stat && w.statMult != null ? `${STAT_NAME[w.stat]} ×${formatMult(w.statMult)}` : undefined
         const lane = w.kind === 'guard' ? 'guard' : w.kind === 'heal' ? 'heal' : 'damage'
-        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane })
+        flats.push({ label: w.text, value: flat, source: w.stat ? 'stat' : 'word', hint, lane, key, ...(mods.verbLuck && wordFlat(w, stats) < flat ? { itemTags: ['luckCloak'] } : {}) })
         if (lane === 'guard') statGuard += flat
         else if (lane === 'heal') statHeal += flat
         else base += flat
@@ -208,7 +228,10 @@ export function compile(
       const extra = mods.bonusEach ?? 0
       const bonus = (w.bonus || 0) + extra
       bonusPool += bonus
-      if (bonus) bonusFrom.push(w.text)
+      if (bonus) {
+        bonusFrom.push(w.text)
+        poolParts.push({ label: w.text, bonus, key })
+      }
     }
     critP += w.crit || 0
     failP += w.fail || 0
@@ -236,22 +259,58 @@ export function compile(
 
   // 보너스 풀은 가산이다 — 단어마다 칩을 하나씩 세우면 화면이 곱셈으로 읽히고
   // (1+0.2)×(1+0.15) ≠ 1+0.35 만큼 집계판이 실제 피해와 어긋난다. 한 칩으로 합쳐 세운다.
+  // 아이템 특성(배율) — 배율 풀 칩 하나에 합쳐 세운다.
+  if (mods.traitPool) {
+    bonusPool += mods.traitPool
+    bonusFrom.push(CORE_TEXT.trait)
+    poolParts.push({ label: CORE_TEXT.trait, bonus: mods.traitPool, itemTags: ['trait:poolBonus'] })
+  }
   if (bonusPool) {
-    mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · ') })
+    mults.push({ label: CORE_TEXT.pool, value: 1 + bonusPool, source: 'word', hint: bonusFrom.join(' · '), poolParts })
   }
 
   // 백설공주의 구두 — 피해 동사가 하나라도 있으면 문장 끝에 고정 깡수치를 한 번 얹는다.
   // 동사마다가 아니라 문장당 한 번이라 겹동사와 곱해져 폭발하지 않는다.
   if (base > 0 && mods.verbFlat) {
     base += mods.verbFlat
-    flats.push({ label: CORE_TEXT.shoe, value: mods.verbFlat, source: 'word', lane: 'damage' })
+    flats.push({ label: CORE_TEXT.shoe, value: mods.verbFlat, source: 'word', lane: 'damage', itemTags: ['heavyShoe'] })
   }
 
   // 피해 깡수치가 실제로 쌓였으면 회복/방어 동사가 뒤에 와도 공격 문장이다.
   if (base > 0 && damageKind) kind = damageKind
 
-  const comboMult = combos.reduce((m, c) => m * c.mult, 1)
+  // 아이템 특성 — 감정 카드 수, 행동 종류에 따라 문장의 주 수치(피해/방어/회복)에 더한다.
+  // 수치가 실제로 생긴 칸에만 얹어 0에 곱해지는 가짜 점수를 만들지 않는다.
+  const mainLane: 'damage' | 'guard' | 'heal' | null = base > 0 ? 'damage' : statGuard > 0 ? 'guard' : statHeal > 0 ? 'heal' : null
+  const addTraitFlat = (label: string, value: number, itemTags: string[]) => {
+    if (!value || !mainLane) return
+    if (mainLane === 'damage') base += value
+    else if (mainLane === 'guard') statGuard += value
+    else statHeal += value
+    flats.push({ label, value, source: 'word', hint: CORE_TEXT.trait, lane: mainLane, itemTags })
+  }
+  for (const [emotion, per] of Object.entries(mods.traitEmotionFlat ?? {}) as [Emotion, number][]) {
+    const count = order.filter((key) => sel[key] && emotionOrNeutral(sel[key]!.emotion) === emotion).length
+    addTraitFlat(`${EMOTION_LABEL[emotion]} ${CORE_TEXT.trait}`, count * per, [`trait:${emotion}Score`])
+  }
+  if (mainLane) addTraitFlat(`${CORE_TEXT.trait}`, mods.traitKindFlat?.[mainLane] ?? 0, [`trait:${mainLane === 'damage' ? 'attack' : mainLane}Flat`])
+  // 잭의 하늘나물 — 자란 키가 버팀목이 된다. 방어·회복 문장에만 얹는다.
+  if (mainLane === 'guard' || mainLane === 'heal') {
+    const sky = mods.beanstalkFlat ?? 0
+    if (sky > 0) {
+      if (mainLane === 'guard') statGuard += sky
+      else statHeal += sky
+      flats.push({ label: CORE_TEXT.sky, value: sky, source: 'word', lane: mainLane, itemTags: ['beanstalk'] })
+    }
+  }
+
+  let comboMult = combos.reduce((m, c) => m * c.mult, 1)
   for (const c of combos) mults.push({ label: `「${c.name}」`, value: c.mult, source: 'combo', hint: CORE_TEXT.perfect })
+  // 아이템 특성(관용구) — 관용구가 하나라도 발동하면 문장 전체에 한 번 곱한다.
+  if (combos.length && mods.traitCombo) {
+    comboMult *= 1 + mods.traitCombo
+    mults.push({ label: CORE_TEXT.trait, value: 1 + mods.traitCombo, source: 'combo', hint: CORE_TEXT.perfect, itemTags: ['trait:comboBoost'] })
+  }
 
   // 부조화(맥락 어긋남) 패널티 — 안 맞는 태그 쌍이 있으면 위력을 깎는다("틀린 문장").
   const allTags = order.flatMap((k) => (sel[k] ? sel[k]!.tags : []))
@@ -267,7 +326,7 @@ export function compile(
 
   // 아기돼지 바베큐 — 이번 전투에서 잡은 수만큼 문장 전체가 세진다.
   const stageMult = mods.stageMult ?? 1
-  if (stageMult !== 1) mults.push({ label: CORE_TEXT.bbq, value: stageMult, source: 'combo', hint: CORE_TEXT.kills })
+  if (stageMult !== 1) mults.push({ label: CORE_TEXT.bbq, value: stageMult, source: 'combo', hint: CORE_TEXT.kills, itemTags: ['bbq'] })
 
   // 천장 없음 — 배율은 상한 없이 곱해진다(벌레 스웜을 오버킬로 관통하는 쾌감).
   // 등급제 폐지 — 희귀도 보너스 없음(다양성 + 반복강화로 대체 예정).
@@ -278,17 +337,36 @@ export function compile(
   const emotionCounts = new Map<Emotion, number>()
   emotions.forEach((emotion) => emotionCounts.set(emotion, (emotionCounts.get(emotion) ?? 0) + 1))
   const repeatedEmotion = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-  const emotionResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
+  const baseResonance = emotionResonanceFor(repeatedEmotion?.[1] ?? 0)
+  // 아이템 특성(공명) — 공명이 실제로 일어났을 때만 공명 배율을 키운다.
+  const emotionResonance = baseResonance !== 1 ? baseResonance + (mods.traitResonance ?? 0) : 1
+  const attackEmotion = sentenceAttackEmotion(sel, order)
   if (emotionResonance !== 1) {
     mults.push({
       label: `${EMOTION_LABEL[repeatedEmotion![0]]} ${CORE_TEXT.resonance}`,
       value: emotionResonance,
       source: 'emotion',
       hint: sameEmotionHint(repeatedEmotion![1]),
+      ...(mods.traitResonance ? { itemTags: ['trait:resonanceBoost'] } : {}),
     })
   }
 
-  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult * emotionResonance
+  // 빨간망토의 불씨 — 완성한 문장에서 쓰지 않고 남은 잉크가 불씨가 되어 문장 배율을 키운다.
+  // 다음 문장으로 넘어가지 않는 잉크 규칙은 그대로이고, 완성 전 미리보기에서는 붙이지 않는다.
+  let fireMult = 1
+  if (mods.inkFire && complete) {
+    const spent = order.reduce((sum, key) => {
+      const w = sel[key]
+      return w ? sum + wordInkCost(w) - Math.max(0, w.effects?.inkDiscount ?? 0) : sum
+    }, 0)
+    const left = Math.max(0, Math.min(mods.inkFire.max, Math.floor(mods.inkFire.available - Math.max(0, spent))))
+    if (left > 0) {
+      fireMult = 1 + left * mods.inkFire.rate
+      mults.push({ label: CORE_TEXT.fire, value: fireMult, source: 'combo', hint: CORE_TEXT.fireHint.replace('{n}', String(left)), itemTags: ['matchFire'] })
+    }
+  }
+
+  const multiplier = (1 + bonusPool) * comboMult * coherence * stageMult * emotionResonance * fireMult
 
   const sumEffect = (k: keyof NonNullable<Word['effects']>) =>
     order.reduce((n, key) => {
@@ -325,6 +403,7 @@ export function compile(
     attackRank: sumEffect('attackRank'),
     guardRank: sumEffect('guardRank'),
     emotions,
+    attackEmotion,
     emotionResonance,
     tags: allTags,
     combos: combos.map((c) => c.name),
@@ -342,7 +421,6 @@ export function compile(
 
 // 룰렛 계수와 확률 보정 상수. 값은 임시 — 플레이 테스트로 다듬는다.
 export const ROULETTE = { crit: 1.5, fail: 0.25 } as const
-export const LUCK_MULT = 0.02 // 운 1당 기본 배율 +2% (그리 드라마틱하지 않게)
 export const CRIT_STAT_K = 0.01 // 맥락 스탯 1당 대성공 +1%
 const FAIL_STAT_K = 0.01 // 맥락 스탯 1당 실패 −1%
 export const CRIT_CAP = 0.6 // 아무리 높아도 대성공은 60%에서 수렴(실패가 없어진 만큼 천장을 올렸다)
@@ -367,7 +445,7 @@ export interface ResolvedMult {
   critP: number
   failP: number
   /** 배율 분해 — 화면에서 "무엇이 몇 배를 줬는지" 그대로 늘어놓으려고 쪼개 둔다. */
-  parts: { variance: number; luck: number; roulette: number; doubt: number }
+  parts: { variance: number; roulette: number; doubt: number }
   /** 피노키오의 미아핑 — 맥락마다 굴린 "근데?" 배율. 없으면 빈 배열. */
   doubtRolls: number[]
 }
@@ -383,13 +461,15 @@ export function doubtMults(intent: Pick<Intent, 'doubtCount'>, rolls: number[]):
 }
 
 // 스탯 보정된 룰렛 확률. 기본 실패가 0이면 0을 유지(무실패 수식은 계속 안전).
-export function rouletteOdds(intent: Intent, statBias: number): { critP: number; failP: number } {
-  const critP = Math.min(CRIT_CAP, intent.critP + statBias * CRIT_STAT_K)
+// 운은 대성공 확률이 있는 문장에만 +%p로 더해진다(luck.ts LUCK_CHANCE_PER, 상한 CRIT_CAP).
+export function rouletteOdds(intent: Intent, statBias: number, luck = 0): { critP: number; failP: number } {
+  const statCrit = Math.min(CRIT_CAP, intent.critP + statBias * CRIT_STAT_K)
+  const critP = intent.critP > 0 ? luckChance(statCrit, luck, CRIT_CAP).final : statCrit
   const failP = intent.failP > 0 ? Math.max(FAIL_FLOOR, intent.failP - statBias * FAIL_STAT_K) : 0
   return { critP, failP }
 }
 
-// 최종 배율 확정 — 기본배율 × variance × 운 × 룰렛. 천장 없음.
+// 최종 배율 확정 — 기본배율 × variance × 룰렛. 천장 없음. 운은 배율이 아니라 확률에만 들어간다.
 // 공격/회복/방어 모든 산출이 이 하나의 배율을 공유한다(한 문장 한 번의 굴림).
 export function resolveMultiplier(
   intent: Intent,
@@ -399,11 +479,10 @@ export function resolveMultiplier(
   doubtRolls: number[] = [],
 ): ResolvedMult {
   let m = intent.multiplier
-  const variance = intent.variance && varRoll !== null ? (varRoll < intent.variance.p ? intent.variance.hi : intent.variance.lo) : 1
+  // 도박 성공 확률도 운만큼 오른다 — 카드에 적힌 확률(운 반영)과 같은 값으로 굴린다.
+  const variance = intent.variance && varRoll !== null ? (varRoll < luckChance(intent.variance.p, ctx.luck).final ? intent.variance.hi : intent.variance.lo) : 1
   m *= variance
-  const luck = 1 + ctx.luck * LUCK_MULT // 운은 기본 배율 요소
-  m *= luck
-  const { critP, failP } = rouletteOdds(intent, ctx.statBias)
+  const { critP, failP } = rouletteOdds(intent, ctx.statBias, ctx.luck)
   let outcome: RouletteOutcome = 'normal'
   let roulette = 1
   if (rouletteRoll < critP) {
@@ -418,7 +497,7 @@ export function resolveMultiplier(
   const rolls = doubtMults(intent, doubtRolls)
   const doubt = rolls.reduce((a, b) => a * b, 1)
   m *= doubt
-  return { mult: m, outcome, critP, failP, parts: { variance, luck, roulette, doubt }, doubtRolls: rolls }
+  return { mult: m, outcome, critP, failP, parts: { variance, roulette, doubt }, doubtRolls: rolls }
 }
 
 // sweep 전용 — variance만 적용한 기본 배율 분포(룰렛/운 제외, 천장 없음).
@@ -426,4 +505,29 @@ export function finalMultiplier(intent: Intent, roll: number | null = null): num
   let m = intent.multiplier
   if (intent.variance && roll !== null) m *= roll < intent.variance.p ? intent.variance.hi : intent.variance.lo
   return m
+}
+
+/**
+ * 문장의 공격 속성 — 적 약점에 들어갈지는 이 감정 하나로 정한다.
+ * 1. 문장에 가장 많이 쓴 감정(무감정 카드는 세지 않는다)
+ * 2. 장수가 같으면 영향이 큰 감정 — 그 감정 카드들의 잉크 비용 합(카드 세기의 정본)
+ * 3. 그래도 같으면 동사(행동을 정하는 카드)의 감정, 그다음은 문장에서 뒤에 놓인 카드
+ * 감정 카드가 하나도 없으면 무속성(null)이다.
+ */
+export function sentenceAttackEmotion(sel: Selection, order: readonly string[]): Emotion | null {
+  const score = new Map<Emotion, { count: number; influence: number; verb: number; last: number }>()
+  order.forEach((key, index) => {
+    const word = sel[key]
+    const emotion = emotionOrNeutral(word?.emotion)
+    if (!word || emotion === 'neutral') return
+    const entry = score.get(emotion) ?? { count: 0, influence: 0, verb: 0, last: -1 }
+    entry.count += 1
+    entry.influence += wordInkCost(word)
+    if (word.slot === 'verb' || word.slot === 'verb2') entry.verb = 1
+    entry.last = index
+    score.set(emotion, entry)
+  })
+  const ranked = [...score.entries()].sort(([, a], [, b]) =>
+    b.count - a.count || b.influence - a.influence || b.verb - a.verb || b.last - a.last)
+  return ranked[0]?.[0] ?? null
 }
