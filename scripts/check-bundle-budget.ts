@@ -12,7 +12,9 @@ const limits: Record<string, { raw: number; gzip: number }> = {
   // 현재 원본 크기와 출시 직전 오류 복구 UI를 정직하게 포함하도록 원본 한도만 올린다.
   // v_0.14.7: main이 이미 274KB를 0.15KB 넘은 상태에서 손패 호버 상세·제련 카드 글자
   // 규칙이 더해져 276KB로 올린다. gzip 예산은 그대로 지킨다.
-  '.css': { raw: 276 * 1024, gzip: 60 * 1024 },
+  // 2026-11-20 피드백 반영(보상·상점·보스·툴팁 UI 확장)으로 CSS가 316KB/gzip 67.7KB가 되어
+  // 원본 330KB, gzip 72KB로 올린다.
+  '.css': { raw: 330 * 1024, gzip: 72 * 1024 },
 }
 
 const files: string[] = []
